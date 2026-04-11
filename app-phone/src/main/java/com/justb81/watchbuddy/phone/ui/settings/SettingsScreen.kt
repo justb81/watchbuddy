@@ -32,7 +32,7 @@ fun SettingsScreen(
                 title = { Text(stringResource(R.string.settings_title)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Zurück")
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.settings_cd_back))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -56,7 +56,7 @@ fun SettingsScreen(
             SettingsCard {
                 SettingsRow(
                     label    = stringResource(R.string.settings_trakt_account),
-                    value    = uiState.traktUsername ?: "Nicht verbunden",
+                    value    = uiState.traktUsername ?: stringResource(R.string.settings_not_connected),
                     showDivider = true
                 )
                 if (uiState.traktUsername != null) {
@@ -186,7 +186,7 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     TextButton(onClick = { showAdvanced = !showAdvanced }) {
-                        Text(if (showAdvanced) "Ausblenden" else "Anzeigen")
+                        Text(if (showAdvanced) stringResource(R.string.settings_advanced_hide) else stringResource(R.string.settings_advanced_show))
                     }
                 }
 
@@ -206,8 +206,8 @@ fun SettingsScreen(
     if (showDisconnectDialog) {
         AlertDialog(
             onDismissRequest = { showDisconnectDialog = false },
-            title = { Text("Trakt trennen?") },
-            text  = { Text("Deine lokalen Daten werden gelöscht. Du kannst dich jederzeit wieder verbinden.") },
+            title = { Text(stringResource(R.string.settings_disconnect_title)) },
+            text  = { Text(stringResource(R.string.settings_disconnect_message)) },
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.disconnectTrakt()

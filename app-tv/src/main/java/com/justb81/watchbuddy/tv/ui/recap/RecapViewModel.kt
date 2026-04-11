@@ -1,7 +1,9 @@
 package com.justb81.watchbuddy.tv.ui.recap
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -22,9 +24,10 @@ sealed class RecapUiState {
 
 @HiltViewModel
 class RecapViewModel @Inject constructor(
+    application: Application,
     private val phoneDiscovery: PhoneDiscoveryManager,
     private val httpClient: OkHttpClient
-) : ViewModel() {
+) : AndroidViewModel(application) {
 
     private val _state = MutableStateFlow<RecapUiState>(RecapUiState.Idle)
     val state: StateFlow<RecapUiState> = _state.asStateFlow()
@@ -45,7 +48,7 @@ class RecapViewModel @Inject constructor(
             }
 
             for (phone in phones) {
-                val deviceName = phone.capability?.deviceName ?: "Handy"
+                val deviceName = phone.capability?.deviceName ?: getApplication<Application>().getString(R.string.tv_default_device_name)
                 _state.value = RecapUiState.Generating(deviceName)
                 try {
                     val host = phone.serviceInfo.host.hostAddress

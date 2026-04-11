@@ -49,7 +49,7 @@ fun OnboardingScreen(
         ) {
             // Logo / Title
             Text(
-                text = "WatchBuddy",
+                text = stringResource(R.string.app_name),
                 style = MaterialTheme.typography.displaySmall,
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Bold

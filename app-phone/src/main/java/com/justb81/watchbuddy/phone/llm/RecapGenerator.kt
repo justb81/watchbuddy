@@ -1,5 +1,7 @@
 package com.justb81.watchbuddy.phone.llm
 
+import android.app.Application
+import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.core.model.TmdbEpisode
 import com.justb81.watchbuddy.core.model.TmdbShow
 import com.justb81.watchbuddy.core.tmdb.TmdbImageHelper
@@ -17,6 +19,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class RecapGenerator @Inject constructor(
+    private val application: Application,
     private val llmOrchestrator: LlmOrchestrator
 ) {
     companion object {
@@ -50,7 +53,7 @@ class RecapGenerator @Inject constructor(
             .takeLast(8)  // keep prompt manageable — last 8 episodes
             .joinToString("\n") { ep ->
                 "S${ep.season_number.toString().padStart(2,'0')}E${ep.episode_number.toString().padStart(2,'0')} " +
-                "\"${ep.name}\": ${ep.overview ?: "Keine Beschreibung verfügbar."}"
+                "\"${ep.name}\": ${ep.overview ?: application.getString(R.string.no_description)}"
             }
 
         return """

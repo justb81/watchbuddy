@@ -1,7 +1,9 @@
 package com.justb81.watchbuddy.phone.ui.settings
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.phone.llm.LlmOrchestrator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -20,7 +22,7 @@ data class SettingsUiState(
     val customBackendUrl: String   = "",
     val directClientId: String     = "",
     val directClientSecret: String = "",
-    val llmBackend: String         = "Wird erkannt…",
+    val llmBackend: String         = "",
     val llmModelName: String?      = null,
     val llmDownloadProgress: Int?  = null,   // null = not downloading, 0–100 = progress
     val llmReady: Boolean          = false,
@@ -29,10 +31,13 @@ data class SettingsUiState(
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
+    application: Application,
     private val llmOrchestrator: LlmOrchestrator
-) : ViewModel() {
+) : AndroidViewModel(application) {
 
-    private val _uiState = MutableStateFlow(SettingsUiState())
+    private val _uiState = MutableStateFlow(SettingsUiState(
+        llmBackend = application.getString(R.string.settings_llm_detecting)
+    ))
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
     init { detectLlm() }

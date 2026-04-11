@@ -1,7 +1,9 @@
 package com.justb81.watchbuddy.phone.ui.onboarding
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.core.trakt.DeviceCodeResponse
 import com.justb81.watchbuddy.core.trakt.TraktApiService
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -29,8 +31,9 @@ sealed class OnboardingState {
 
 @HiltViewModel
 class OnboardingViewModel @Inject constructor(
+    application: Application,
     private val traktApi: TraktApiService
-) : ViewModel() {
+) : AndroidViewModel(application) {
 
     private val _state = MutableStateFlow<OnboardingState>(OnboardingState.Idle)
     val state: StateFlow<OnboardingState> = _state.asStateFlow()
@@ -52,7 +55,7 @@ class OnboardingViewModel @Inject constructor(
                 startCountdown(response)
                 startPolling(response)
             } catch (e: Exception) {
-                _state.value = OnboardingState.Error("Fehler beim Laden des Codes: ${e.message}")
+                _state.value = OnboardingState.Error(getApplication<Application>().getString(R.string.onboarding_error_loading_code, e.message))
             }
         }
     }
@@ -71,7 +74,7 @@ class OnboardingViewModel @Inject constructor(
                 delay(1_000)
                 remaining--
             }
-            _state.value = OnboardingState.Error("Code abgelaufen. Bitte erneut versuchen.")
+            _state.value = OnboardingState.Error(getApplication<Application>().getString(R.string.onboarding_code_expired))
         }
     }
 

@@ -80,7 +80,7 @@ fun UserSelectScreen(
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 OutlinedButton(onClick = onBack) {
-                    Text("Abbrechen")
+                    Text(stringResource(R.string.tv_cancel))
                 }
 
                 Button(
@@ -156,7 +156,7 @@ private fun UserAvatar(
 
             // LLM quality indicator
             Text(
-                text     = llmLabel(user.llmBackend),
+                text     = llmLabel(user.llmBackend, stringResource(R.string.tv_llm_none)),
                 fontSize = 10.sp,
                 color    = llmColor(user.llmBackend)
             )
@@ -164,11 +164,11 @@ private fun UserAvatar(
     }
 }
 
-private fun llmLabel(backend: LlmBackend) = when (backend) {
+private fun llmLabel(backend: LlmBackend, noneLlmLabel: String) = when (backend) {
     LlmBackend.AICORE        -> "AICore"
     LlmBackend.MEDIAPIPE_GPU -> "Gemma GPU"
     LlmBackend.MEDIAPIPE_CPU -> "Gemma CPU"
-    LlmBackend.NONE          -> "Kein LLM"
+    LlmBackend.NONE          -> noneLlmLabel
 }
 
 private fun llmColor(backend: LlmBackend) = when (backend) {

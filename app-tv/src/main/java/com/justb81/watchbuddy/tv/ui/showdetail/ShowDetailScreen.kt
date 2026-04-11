@@ -103,7 +103,7 @@ fun ShowDetailScreen(
                     R.string.tv_episode_label,
                     nextSeason,
                     nextEpisode,
-                    "Nächste Folge"
+                    stringResource(R.string.tv_next_episode)
                 ),
                 fontSize   = 20.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -143,14 +143,14 @@ fun ShowDetailScreen(
 
                 // Back
                 OutlinedButton(onClick = onBack) {
-                    Text("Zurück")
+                    Text(stringResource(R.string.tv_back))
                 }
             }
 
             // Streaming service list
             if (KNOWN_STREAMING_SERVICES.isNotEmpty()) {
                 Text(
-                    text     = "Verfügbar bei:",
+                    text     = stringResource(R.string.tv_available_at),
                     fontSize = 12.sp,
                     color    = Color.White.copy(alpha = 0.4f)
                 )
@@ -170,7 +170,7 @@ fun ShowDetailScreen(
                 .align(Alignment.TopStart)
                 .padding(32.dp)
         ) {
-            Text("‹ Zurück")
+            Text(stringResource(R.string.tv_back_arrow))
         }
     }
 }

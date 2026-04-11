@@ -194,7 +194,7 @@ private fun PhoneStatusBadge(count: Int, bestName: String?) {
                     .background(Color(0xFF4CAF50))
             )
             Text(
-                text     = if (bestName != null) bestName else "$count Gerät(e)",
+                text     = if (bestName != null) bestName else stringResource(R.string.tv_devices_count, count),
                 fontSize = 12.sp,
                 color    = Color.White.copy(alpha = 0.8f)
             )
