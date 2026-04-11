@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- WatchBuddy: TV-Bildschirm mit Play-Symbol -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M20,28 Q20,20 28,20 L80,20 Q88,20 88,28 L88,72 Q88,80 80,80 L60,80 L60,86 L70,86 Q72,86 72,88 Q72,90 70,90 L38,90 Q36,90 36,88 Q36,86 38,86 L48,86 L48,80 L28,80 Q20,80 20,72 Z" />
+    <path
+        android:fillColor="#6200EE"
+        android:pathData="M24,28 Q24,24 28,24 L80,24 Q84,24 84,28 L84,72 Q84,76 80,76 L28,76 Q24,76 24,72 Z" />
+    <!-- Play-Dreieck -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M42,38 L42,62 L66,50 Z" />
+</vector>
