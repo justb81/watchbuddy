@@ -48,7 +48,7 @@ dependencies {
     debugImplementation(libs.compose.ui.tooling)
 
     // Compose for TV (Leanback replacement)
-    implementation(libs.compose.tv.foundation)
+    // tv-foundation ist transitiv in tv-material enthalten
     implementation(libs.compose.tv.material)
 
     // Lifecycle
