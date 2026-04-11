@@ -4,22 +4,14 @@ import java.util.Locale
 
 /**
  * Resolves the display language name for LLM prompt instructions based on the device locale.
- * Supported locales: en, de, fr, es. Falls back to English for unsupported locales.
+ * Uses the system locale to produce the English name of any language.
  */
 object LocaleHelper {
 
-    private val SUPPORTED_LANGUAGES = mapOf(
-        "en" to "English",
-        "de" to "German",
-        "fr" to "French",
-        "es" to "Spanish"
-    )
-
     /**
-     * Returns the English name of the device's current language if supported,
-     * otherwise returns "English" as fallback.
+     * Returns the English name of the device's current language (e.g. "Chinese", "Japanese", "Arabic").
      */
     fun getLlmResponseLanguage(locale: Locale = Locale.getDefault()): String {
-        return SUPPORTED_LANGUAGES[locale.language] ?: "English"
+        return locale.getDisplayLanguage(Locale.ENGLISH)
     }
 }
