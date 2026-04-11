@@ -14,6 +14,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Node.js 24 opt-in (Node.js 20 wird ab Juni 2026 erzwungen, ab Sept. 2026 entfernt)
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build-phone:
     name: Build Phone APK
