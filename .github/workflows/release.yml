@@ -29,6 +29,9 @@ jobs:
     needs: release-please
     if: ${{ needs.release-please.outputs.release_created }}
     runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.release-please.outputs.version }}
+      TAG: ${{ needs.release-please.outputs.tag_name }}
     steps:
       - uses: actions/checkout@v5
 
@@ -46,7 +49,7 @@ jobs:
             ~/.gradle/wrapper
           key: gradle-${{ hashFiles('**/*.gradle.kts', 'gradle/libs.versions.toml') }}
 
-      # ── Release-Signing vorbereiten ─────────────────────────────────────
+      # -- Release-Signing vorbereiten ------------------------------------
       - name: Decode Keystore
         id: keystore
         run: |
@@ -57,7 +60,7 @@ jobs:
             echo "available=false" >> "$GITHUB_OUTPUT"
           fi
 
-      # ── Release-signierte APKs (nur wenn Keystore vorhanden) ────────────
+      # -- Release-signierte APKs (nur wenn Keystore vorhanden) -----------
       - name: Build signed Phone APK
         if: steps.keystore.outputs.available == 'true'
         env:
@@ -80,7 +83,7 @@ jobs:
           VERSION_CODE: ${{ github.run_number }}
         run: ./gradlew :app-tv:assembleRelease
 
-      # ── Debug APKs (immer) ──────────────────────────────────────────────
+      # -- Debug APKs (immer) ---------------------------------------------
       - name: Build Phone debug APK
         env:
           VERSION_NAME: ${{ needs.release-please.outputs.version }}
@@ -93,10 +96,9 @@ jobs:
           VERSION_CODE: ${{ github.run_number }}
         run: ./gradlew :app-tv:assembleDebug
 
-      # ── APKs umbenennen ─────────────────────────────────────────────────
+      # -- APKs sammeln und umbenennen -------------------------------------
       - name: Collect APKs
         run: |
-          VERSION="${{ needs.release-please.outputs.version }}"
           mkdir -p release-assets
 
           # Debug APKs
@@ -115,14 +117,41 @@ jobs:
 
           ls -lh release-assets/
 
-      # ── An GitHub Release anhängen ──────────────────────────────────────
+      # -- APKs an GitHub Release hochladen --------------------------------
       - name: Upload APKs to GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           for apk in release-assets/*.apk; do
-            gh release upload "${{ needs.release-please.outputs.tag_name }}" "$apk" --clobber
+            gh release upload "${TAG}" "$apk" --clobber
           done
+
+      # -- Download-Links in Release-Notes ergaenzen -----------------------
+      - name: Update Release Notes with download links
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          REPO="${{ github.repository }}"
+          BASE="https://github.com/${REPO}/releases/download/${TAG}"
+
+          DOWNLOADS="---"
+          DOWNLOADS="${DOWNLOADS}\n\n## Downloads\n"
+          DOWNLOADS="${DOWNLOADS}\n| APK | Link |"
+          DOWNLOADS="${DOWNLOADS}\n|-----|------|"
+          DOWNLOADS="${DOWNLOADS}\n| Phone (debug) | [watchbuddy-phone-${VERSION}-debug.apk](${BASE}/watchbuddy-phone-${VERSION}-debug.apk) |"
+          DOWNLOADS="${DOWNLOADS}\n| TV (debug) | [watchbuddy-tv-${VERSION}-debug.apk](${BASE}/watchbuddy-tv-${VERSION}-debug.apk) |"
+
+          if [ -f "release-assets/watchbuddy-phone-${VERSION}-release.apk" ]; then
+            DOWNLOADS="${DOWNLOADS}\n| Phone (signed) | [watchbuddy-phone-${VERSION}-release.apk](${BASE}/watchbuddy-phone-${VERSION}-release.apk) |"
+          fi
+          if [ -f "release-assets/watchbuddy-tv-${VERSION}-release.apk" ]; then
+            DOWNLOADS="${DOWNLOADS}\n| TV (signed) | [watchbuddy-tv-${VERSION}-release.apk](${BASE}/watchbuddy-tv-${VERSION}-release.apk) |"
+          fi
+
+          # Bestehende Notes holen und Download-Sektion anhaengen
+          EXISTING=$(gh release view "${TAG}" --json body -q .body)
+          UPDATED=$(printf "%s\n\n%b" "$EXISTING" "$DOWNLOADS")
+          gh release edit "${TAG}" --notes "$UPDATED"
 
       - name: Upload APKs as Artifacts
         uses: actions/upload-artifact@v4
