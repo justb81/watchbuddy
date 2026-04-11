@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">WatchBuddy</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_title">Conectar con Trakt</string>
+    <string name="onboarding_subtitle">WatchBuddy usa Trakt para sincronizar tus series vistas en todos tus dispositivos.</string>
+    <string name="onboarding_step1">En tu PC o teléfono, ve a:</string>
+    <string name="onboarding_activate_url">trakt.tv/activate</string>
+    <string name="onboarding_step2">Introduce este código:</string>
+    <string name="onboarding_loading_code">Cargando código…</string>
+    <string name="onboarding_waiting">Esperando confirmación…</string>
+    <string name="onboarding_success">¡Conectado! Bienvenido/a, %1$s</string>
+    <string name="onboarding_error">La conexión ha fallado. Por favor, inténtalo de nuevo.</string>
+    <string name="onboarding_retry">Reintentar</string>
+    <string name="onboarding_code_expires">El código expira en %1$d segundos</string>
+    <string name="onboarding_error_loading_code">Error al cargar el código: %1$s</string>
+    <string name="onboarding_code_expired">Código expirado. Por favor, inténtalo de nuevo.</string>
+
+    <!-- Home -->
+    <string name="home_title">Mis series</string>
+    <string name="home_continue_watching">Seguir viendo</string>
+    <string name="home_all_shows">Todas las series</string>
+    <string name="home_no_shows">Aún no hay series.\nConéctate con Trakt para empezar.</string>
+    <string name="home_syncing">Sincronizando con Trakt…</string>
+    <string name="home_last_sync">Última sincronización: %1$s</string>
+    <string name="home_episode_progress">S%1$02dE%2$02d — %3$d/%4$d episodios vistos</string>
+    <string name="home_next_episode">Siguiente: S%1$02dE%2$02d</string>
+    <string name="home_just_now">Ahora mismo</string>
+    <string name="home_sync_failed">Error de sincronización: %1$s</string>
+    <string name="home_cd_sync">Sincronizar</string>
+    <string name="home_cd_settings">Ajustes</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Ajustes</string>
+    <string name="settings_account">Cuenta</string>
+    <string name="settings_trakt_account">Cuenta de Trakt</string>
+    <string name="settings_tmdb_account">Cuenta de TMDB</string>
+    <string name="settings_disconnect">Desconectar</string>
+    <string name="settings_companion">Servicio compañero</string>
+    <string name="settings_companion_running">En ejecución (puerto 8765)</string>
+    <string name="settings_companion_stopped">Detenido</string>
+    <string name="settings_companion_toggle">Servicio compañero</string>
+    <string name="settings_llm">Modelo IA</string>
+    <string name="settings_llm_backend">Backend</string>
+    <string name="settings_llm_model">Modelo</string>
+    <string name="settings_llm_download">Descargar modelo</string>
+    <string name="settings_llm_downloading">Descargando… %1$d%%</string>
+    <string name="settings_llm_ready">Listo</string>
+    <string name="settings_llm_not_available">No disponible (RAM insuficiente)</string>
+    <string name="settings_advanced">Ajustes avanzados</string>
+    <string name="settings_auth_mode">Autenticación de Trakt</string>
+    <string name="settings_auth_managed">Backend gestionado (por defecto)</string>
+    <string name="settings_auth_self_hosted">Servidor propio</string>
+    <string name="settings_auth_direct">Credenciales propias</string>
+    <string name="settings_auth_backend_url">URL del backend</string>
+    <string name="settings_auth_client_id">Client ID</string>
+    <string name="settings_auth_client_secret">Client Secret</string>
+    <string name="settings_save">Guardar</string>
+    <string name="settings_cancel">Cancelar</string>
+    <string name="settings_cd_back">Volver</string>
+    <string name="settings_advanced_hide">Ocultar</string>
+    <string name="settings_advanced_show">Mostrar</string>
+    <string name="settings_disconnect_title">¿Desconectar Trakt?</string>
+    <string name="settings_disconnect_message">Tus datos locales serán eliminados. Puedes volver a conectarte en cualquier momento.</string>
+    <string name="settings_not_connected">No conectado</string>
+    <string name="settings_llm_detecting">Detectando…</string>
+
+    <!-- Common -->
+    <string name="no_description">No hay descripción disponible.</string>
+    <string name="loading">Cargando…</string>
+    <string name="error_generic">Se ha producido un error.</string>
+    <string name="retry">Reintentar</string>
+    <string name="ok">OK</string>
+</resources>
