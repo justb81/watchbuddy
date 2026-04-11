@@ -1,0 +1,39 @@
+# Android / Gradle
+*.iml
+.gradle/
+local.properties
+.idea/
+.DS_Store
+build/
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+bin/
+gen/
+out/
+release/
+
+# Keystore / Secrets – NEVER commit these
+*.jks
+*.keystore
+secrets.properties
+google-services.json
+local.defaults.properties
+
+# Node.js (backend)
+node_modules/
+dist/
+backend/.env
+backend/.env.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS
+.DS_Store
+Thumbs.db

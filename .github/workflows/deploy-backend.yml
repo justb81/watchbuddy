@@ -1,0 +1,37 @@
+name: Deploy Backend (Proxmox/Docker)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Build & Deploy Token Proxy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t watchbuddy-backend:${{ github.sha }} ./backend
+
+      - name: Deploy to Proxmox via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            cd ~/watchbuddy/backend
+            git pull origin main
+            docker compose pull
+            docker compose up -d --build
+            docker image prune -f
+            echo "Deploy done: $(date)"
+
+      - name: Health check
+        run: |
+          sleep 5
+          curl -f https://${{ secrets.DEPLOY_HOST }}/health || exit 1
