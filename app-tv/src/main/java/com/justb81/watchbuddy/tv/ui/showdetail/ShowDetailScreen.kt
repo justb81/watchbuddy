@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -174,12 +175,12 @@ fun ShowDetailScreen(
     }
 }
 
-@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun MetaChip(text: String, color: Color = Color(0xFF2C2C2E)) {
-    Surface(
-        shape  = RoundedCornerShape(20.dp),
-        colors = NonInteractiveSurfaceDefaults.colors(containerColor = color)
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(color)
     ) {
         Text(
             text     = text,

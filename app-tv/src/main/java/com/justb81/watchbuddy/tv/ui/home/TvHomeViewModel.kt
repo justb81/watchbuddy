@@ -55,7 +55,7 @@ class TvHomeViewModel @Inject constructor(
             try {
                 // TV fetches shows from the best connected phone's /shows endpoint
                 val bestPhone = phoneDiscovery.getBestPhone()
-                val shows = if (bestPhone != null) {
+                val shows: List<TraktWatchedEntry> = if (bestPhone != null) {
                     // TODO: fetch via phone HTTP API
                     emptyList()
                 } else {

@@ -51,6 +51,9 @@ dependencies {
     // tv-foundation ist transitiv in tv-material enthalten
     implementation(libs.compose.tv.material)
 
+    // Standard Material3 — CircularProgressIndicator / LinearProgressIndicator für TV
+    implementation(libs.compose.material3)
+
     // Lifecycle
     implementation(libs.androidx.lifecycle.runtime)
     implementation(libs.androidx.lifecycle.viewmodel)

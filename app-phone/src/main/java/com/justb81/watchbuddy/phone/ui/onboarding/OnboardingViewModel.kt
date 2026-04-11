@@ -35,8 +35,9 @@ class OnboardingViewModel @Inject constructor(
     private val _state = MutableStateFlow<OnboardingState>(OnboardingState.Idle)
     val state: StateFlow<OnboardingState> = _state.asStateFlow()
 
-    // TODO: read client_id from secure storage
-    private val clientId: String = BuildConfig_placeholder_clientId
+    // Placeholder — replace with actual secure storage read (Android Keystore via SettingsRepository)
+    // In production this value is injected via the Trakt auth backend or direct credentials mode.
+    private val clientId: String = "YOUR_TRAKT_CLIENT_ID"
 
     private var countdownJob: Job? = null
     private var pollingJob: Job? = null
@@ -99,6 +100,4 @@ class OnboardingViewModel @Inject constructor(
         }
     }
 
-    // Placeholder — replace with actual BuildConfig or secure storage read
-    private val BuildConfig_placeholder_clientId = "YOUR_TRAKT_CLIENT_ID"
 }

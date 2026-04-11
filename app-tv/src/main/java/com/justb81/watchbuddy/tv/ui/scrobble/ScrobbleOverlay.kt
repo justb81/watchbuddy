@@ -4,9 +4,11 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -55,13 +57,13 @@ fun ScrobbleOverlay(
             enter    = slideInHorizontally { it } + fadeIn(),
             exit     = slideOutHorizontally { it } + fadeOut()
         ) {
-            Surface(
-                shape  = RoundedCornerShape(topStart = 16.dp, bottomStart = 0.dp,
-                                            topEnd   = 0.dp,  bottomEnd   = 0.dp),
-                colors = NonInteractiveSurfaceDefaults.colors(
-                    containerColor = Color(0xFF1C1C1E).copy(alpha = 0.95f)
-                ),
-                modifier = Modifier.widthIn(max = 400.dp)
+            // Box replaces tv.Surface + NonInteractiveSurfaceDefaults (not available in tv-material 1.0.0)
+            Box(
+                modifier = Modifier
+                    .widthIn(max = 400.dp)
+                    .clip(RoundedCornerShape(topStart = 16.dp, bottomStart = 0.dp,
+                                            topEnd   = 0.dp,  bottomEnd   = 0.dp))
+                    .background(Color(0xFF1C1C1E).copy(alpha = 0.95f))
             ) {
                 Column(
                     modifier = Modifier.padding(20.dp),
@@ -91,7 +93,7 @@ fun ScrobbleOverlay(
                         )
                     }
 
-                    // Auto-dismiss countdown bar
+                    // Auto-dismiss countdown bar (material3 LinearProgressIndicator)
                     LinearProgressIndicator(
                         progress = { secondsLeft / 15f },
                         modifier = Modifier.fillMaxWidth(),

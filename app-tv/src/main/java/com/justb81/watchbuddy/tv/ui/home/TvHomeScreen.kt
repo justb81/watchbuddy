@@ -15,6 +15,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.tv.material3.*
 import com.justb81.watchbuddy.R
@@ -172,15 +173,13 @@ private fun ShowCard(entry: TraktWatchedEntry, onClick: () -> Unit) {
     }
 }
 
-@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun PhoneStatusBadge(count: Int, bestName: String?) {
-    Surface(
-        shape  = RoundedCornerShape(20.dp),
-        colors = NonInteractiveSurfaceDefaults.colors(
-            containerColor = Color(0xFF1C1C1E)
-        ),
-        modifier = Modifier.padding(4.dp)
+    Box(
+        modifier = Modifier
+            .padding(4.dp)
+            .clip(RoundedCornerShape(20.dp))
+            .background(Color(0xFF1C1C1E))
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
