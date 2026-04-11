@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Leanback-kompatibles TV-Theme -->
+    <style name="Theme.WatchBuddy" parent="android:Theme.Material.NoTitleBar">
+        <item name="android:windowBackground">@android:color/black</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:windowOverscan">false</item>
+        <item name="android:screenOrientation">landscape</item>
+    </style>
+</resources>

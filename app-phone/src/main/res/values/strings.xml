@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">WatchBuddy</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_title">Mit Trakt verbinden</string>
+    <string name="onboarding_subtitle">WatchBuddy nutzt Trakt, um deine gesehenen Serien geräteübergreifend zu synchronisieren.</string>
+    <string name="onboarding_step1">Gehe auf deinem PC oder Handy zu:</string>
+    <string name="onboarding_activate_url">trakt.tv/activate</string>
+    <string name="onboarding_step2">Gib diesen Code ein:</string>
+    <string name="onboarding_loading_code">Code wird geladen…</string>
+    <string name="onboarding_waiting">Warte auf Bestätigung…</string>
+    <string name="onboarding_success">Verbunden! Willkommen, %1$s</string>
+    <string name="onboarding_error">Verbindung fehlgeschlagen. Bitte versuche es erneut.</string>
+    <string name="onboarding_retry">Erneut versuchen</string>
+    <string name="onboarding_code_expires">Code läuft ab in %1$d Sekunden</string>
+
+    <!-- Home -->
+    <string name="home_title">Meine Serien</string>
+    <string name="home_continue_watching">Weiterschauen</string>
+    <string name="home_all_shows">Alle Serien</string>
+    <string name="home_no_shows">Noch keine Serien vorhanden.\nVerbinde dich mit Trakt, um loszulegen.</string>
+    <string name="home_syncing">Synchronisiere mit Trakt…</string>
+    <string name="home_last_sync">Zuletzt synchronisiert: %1$s</string>
+    <string name="home_episode_progress">S%1$02dE%2$02d — %3$d/%4$d Folgen gesehen</string>
+    <string name="home_next_episode">Nächste: S%1$02dE%2$02d</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Einstellungen</string>
+    <string name="settings_account">Konto</string>
+    <string name="settings_trakt_account">Trakt-Konto</string>
+    <string name="settings_tmdb_account">TMDB-Konto</string>
+    <string name="settings_disconnect">Trennen</string>
+    <string name="settings_companion">Companion-Dienst</string>
+    <string name="settings_companion_running">Läuft (Port 8765)</string>
+    <string name="settings_companion_stopped">Gestoppt</string>
+    <string name="settings_companion_toggle">Companion-Dienst</string>
+    <string name="settings_llm">KI-Modell</string>
+    <string name="settings_llm_backend">Backend</string>
+    <string name="settings_llm_model">Modell</string>
+    <string name="settings_llm_download">Modell herunterladen</string>
+    <string name="settings_llm_downloading">Wird heruntergeladen… %1$d%%</string>
+    <string name="settings_llm_ready">Bereit</string>
+    <string name="settings_llm_not_available">Nicht verfügbar (zu wenig RAM)</string>
+    <string name="settings_advanced">Erweiterte Einstellungen</string>
+    <string name="settings_auth_mode">Trakt-Authentifizierung</string>
+    <string name="settings_auth_managed">Verwaltetes Backend (Standard)</string>
+    <string name="settings_auth_self_hosted">Eigener Server</string>
+    <string name="settings_auth_direct">Eigene Zugangsdaten</string>
+    <string name="settings_auth_backend_url">Backend-URL</string>
+    <string name="settings_auth_client_id">Client ID</string>
+    <string name="settings_auth_client_secret">Client Secret</string>
+    <string name="settings_save">Speichern</string>
+    <string name="settings_cancel">Abbrechen</string>
+
+    <!-- Common -->
+    <string name="loading">Wird geladen…</string>
+    <string name="error_generic">Ein Fehler ist aufgetreten.</string>
+    <string name="retry">Erneut versuchen</string>
+    <string name="ok">OK</string>
+</resources>
