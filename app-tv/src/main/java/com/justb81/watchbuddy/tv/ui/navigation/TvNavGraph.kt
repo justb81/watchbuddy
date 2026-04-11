@@ -1,9 +1,11 @@
 package com.justb81.watchbuddy.tv.ui.navigation
 
 import androidx.compose.runtime.*
+import androidx.compose.ui.res.stringResource
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
 import com.justb81.watchbuddy.tv.ui.home.TvHomeScreen
 import com.justb81.watchbuddy.tv.ui.recap.RecapScreen
@@ -72,7 +74,7 @@ fun TvNavGraph() {
                 RecapScreen(
                     traktShowId      = entry.show.ids.trakt ?: 0,
                     showTitle        = entry.show.title,
-                    fallbackSynopsis = "Keine Beschreibung verfügbar.",
+                    fallbackSynopsis = stringResource(R.string.tv_no_description),
                     onClose          = { navController.popBackStack() },
                     onWatchNow       = {
                         // Pop back to detail, then trigger deep link

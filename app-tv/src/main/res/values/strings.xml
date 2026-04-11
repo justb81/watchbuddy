@@ -4,42 +4,55 @@
 
     <!-- Home -->
     <string name="tv_home_title">WatchBuddy</string>
-    <string name="tv_continue_watching">Weiterschauen</string>
-    <string name="tv_all_shows">Alle Serien</string>
-    <string name="tv_no_shows">Keine Serien gefunden.\nVerbinde die WatchBuddy-App auf deinem Handy mit Trakt.</string>
-    <string name="tv_no_phone">Kein Handy verbunden.\nStarte die WatchBuddy-App auf deinem Smartphone.</string>
+    <string name="tv_continue_watching">Continue Watching</string>
+    <string name="tv_all_shows">All Shows</string>
+    <string name="tv_no_shows">No shows found.\nConnect the WatchBuddy app on your phone with Trakt.</string>
+    <string name="tv_no_phone">No phone connected.\nStart the WatchBuddy app on your smartphone.</string>
+    <string name="tv_devices_count">%1$d device(s)</string>
 
     <!-- User select -->
-    <string name="tv_select_user">Wer schaut?</string>
-    <string name="tv_select_user_subtitle">Wähle eine oder mehrere Personen aus</string>
-    <string name="tv_watching_together">Gemeinsam schauen</string>
-    <string name="tv_confirm_selection">Bestätigen</string>
+    <string name="tv_select_user">Who\'s watching?</string>
+    <string name="tv_select_user_subtitle">Select one or more people</string>
+    <string name="tv_watching_together">Watch together</string>
+    <string name="tv_confirm_selection">Confirm</string>
+    <string name="tv_cancel">Cancel</string>
 
     <!-- Show detail -->
-    <string name="tv_next_episode">Nächste Folge</string>
+    <string name="tv_next_episode">Next episode</string>
     <string name="tv_episode_label">S%1$02dE%2$02d — %3$s</string>
-    <string name="tv_watch_now">Jetzt ansehen</string>
-    <string name="tv_recap">Was bisher geschah…</string>
-    <string name="tv_no_streaming_service">Kein Streamingdienst zugeordnet</string>
-    <string name="tv_watched_episodes">%1$d Folgen gesehen</string>
-    <string name="tv_seasons">%1$d Staffeln</string>
+    <string name="tv_watch_now">Watch now</string>
+    <string name="tv_recap">Previously on…</string>
+    <string name="tv_no_streaming_service">No streaming service assigned</string>
+    <string name="tv_watched_episodes">%1$d episodes watched</string>
+    <string name="tv_seasons">%1$d seasons</string>
+    <string name="tv_back">Back</string>
+    <string name="tv_back_arrow">‹ Back</string>
+    <string name="tv_available_at">Available on:</string>
+    <string name="tv_no_description">No description available.</string>
 
     <!-- Recap -->
-    <string name="tv_recap_title">Was bisher geschah</string>
-    <string name="tv_recap_generating">Recap wird generiert…</string>
-    <string name="tv_recap_generating_on">Recap wird auf %1$s generiert…</string>
-    <string name="tv_recap_error">Recap konnte nicht geladen werden.</string>
-    <string name="tv_recap_fallback">Keine KI-Zusammenfassung verfügbar.\nKurzbeschreibung aus TMDB:</string>
-    <string name="tv_recap_close">Schließen</string>
-    <string name="tv_recap_watch_now">Jetzt ansehen</string>
+    <string name="tv_recap_title">Previously on</string>
+    <string name="tv_recap_generating">Generating recap…</string>
+    <string name="tv_recap_generating_on">Generating recap on %1$s…</string>
+    <string name="tv_recap_error">Could not load recap.</string>
+    <string name="tv_recap_fallback">No AI summary available.\nBrief description from TMDB:</string>
+    <string name="tv_recap_close">Close</string>
+    <string name="tv_recap_watch_now">Watch now</string>
 
     <!-- Scrobble overlay -->
-    <string name="tv_scrobble_question">Schaust du gerade %1$s?</string>
+    <string name="tv_scrobble_question">Are you watching %1$s?</string>
     <string name="tv_scrobble_episode">S%1$02dE%2$02d</string>
-    <string name="tv_scrobble_yes">Ja, tracken</string>
-    <string name="tv_scrobble_no">Nein</string>
+    <string name="tv_scrobble_yes">Yes, track it</string>
+    <string name="tv_scrobble_no">No</string>
 
     <!-- Phone status -->
-    <string name="tv_phones_connected">%1$d Handy verbunden</string>
-    <string name="tv_phone_best">Bestes Gerät: %1$s (%2$s)</string>
+    <string name="tv_phones_connected">%1$d phone connected</string>
+    <string name="tv_phone_best">Best device: %1$s (%2$s)</string>
+    <string name="tv_default_device_name">Phone</string>
+
+    <!-- LLM labels -->
+    <string name="tv_llm_aicore">AICore</string>
+    <string name="tv_llm_gemma_gpu">Gemma GPU</string>
+    <string name="tv_llm_gemma_cpu">Gemma CPU</string>
+    <string name="tv_llm_none">No LLM</string>
 </resources>

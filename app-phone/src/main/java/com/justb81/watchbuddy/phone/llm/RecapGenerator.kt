@@ -1,5 +1,8 @@
 package com.justb81.watchbuddy.phone.llm
 
+import android.app.Application
+import com.justb81.watchbuddy.R
+import com.justb81.watchbuddy.core.locale.LocaleHelper
 import com.justb81.watchbuddy.core.model.TmdbEpisode
 import com.justb81.watchbuddy.core.model.TmdbShow
 import com.justb81.watchbuddy.core.tmdb.TmdbImageHelper
@@ -17,6 +20,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class RecapGenerator @Inject constructor(
+    private val application: Application,
     private val llmOrchestrator: LlmOrchestrator
 ) {
     companion object {
@@ -50,26 +54,29 @@ class RecapGenerator @Inject constructor(
             .takeLast(8)  // keep prompt manageable — last 8 episodes
             .joinToString("\n") { ep ->
                 "S${ep.season_number.toString().padStart(2,'0')}E${ep.episode_number.toString().padStart(2,'0')} " +
-                "\"${ep.name}\": ${ep.overview ?: "Keine Beschreibung verfügbar."}"
+                "\"${ep.name}\": ${ep.overview ?: application.getString(R.string.no_description)}"
             }
 
+        val language = LocaleHelper.getLlmResponseLanguage()
+
         return """
-Du bist ein TV-Recap-Generator. Erstelle einen prägnanten, spoilerfreien "Was bisher geschah"-Recap für:
+You are a TV recap generator. Create a concise, spoiler-free "Previously on" recap for:
 
-Serie: ${show.name}
-Nächste Folge: S${target.season_number.toString().padStart(2,'0')}E${target.episode_number.toString().padStart(2,'0')} "${target.name}"
+Show: ${show.name}
+Next episode: S${target.season_number.toString().padStart(2,'0')}E${target.episode_number.toString().padStart(2,'0')} "${target.name}"
 
-Bereits gesehene Folgen (die letzten 8):
+Already watched episodes (last 8):
 $episodeSummaries
 
-AUFGABE: Generiere eine animierte HTML-Slideshow mit 4–6 Folien als einzelnen HTML-String.
+TASK: Generate an animated HTML slideshow with 4–6 slides as a single HTML string.
 
-REGELN:
-- Verwende für Standbilder den Platzhalter: <img data-tmdb-still="S02E04" alt="Szene"> (S und E anpassen)
-- Keine externen URLs, keine <script>-Tags außer inline CSS-Animationen
-- Halte es kurz und spannend, max. 2 Sätze pro Folie
-- Sprache: Deutsch
-- Format: vollständiges HTML-Fragment (nur <div>, kein <html>/<body>)
+RULES:
+- Use this placeholder for still images: <img data-tmdb-still="S02E04" alt="Scene"> (adjust S and E)
+- No external URLs, no <script> tags — only inline CSS animations
+- Keep it short and engaging, max 2 sentences per slide
+- Format: complete HTML fragment (only <div>, no <html>/<body>)
+
+Respond in $language.
 """.trimIndent()
     }
 

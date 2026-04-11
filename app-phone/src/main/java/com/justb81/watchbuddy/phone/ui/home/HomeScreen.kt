@@ -49,11 +49,11 @@ fun HomeScreen(
                         )
                     } else {
                         IconButton(onClick = { viewModel.sync() }) {
-                            Icon(Icons.Default.Refresh, contentDescription = "Sync")
+                            Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.home_cd_sync))
                         }
                     }
                     IconButton(onClick = onSettingsClick) {
-                        Icon(Icons.Default.Settings, contentDescription = "Einstellungen")
+                        Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.home_cd_settings))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(

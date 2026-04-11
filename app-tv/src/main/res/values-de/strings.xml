@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">WatchBuddy</string>
+
+    <!-- Home -->
+    <string name="tv_home_title">WatchBuddy</string>
+    <string name="tv_continue_watching">Weiterschauen</string>
+    <string name="tv_all_shows">Alle Serien</string>
+    <string name="tv_no_shows">Keine Serien gefunden.\nVerbinde die WatchBuddy-App auf deinem Handy mit Trakt.</string>
+    <string name="tv_no_phone">Kein Handy verbunden.\nStarte die WatchBuddy-App auf deinem Smartphone.</string>
+    <string name="tv_devices_count">%1$d Gerät(e)</string>
+
+    <!-- User select -->
+    <string name="tv_select_user">Wer schaut?</string>
+    <string name="tv_select_user_subtitle">Wähle eine oder mehrere Personen aus</string>
+    <string name="tv_watching_together">Gemeinsam schauen</string>
+    <string name="tv_confirm_selection">Bestätigen</string>
+    <string name="tv_cancel">Abbrechen</string>
+
+    <!-- Show detail -->
+    <string name="tv_next_episode">Nächste Folge</string>
+    <string name="tv_episode_label">S%1$02dE%2$02d — %3$s</string>
+    <string name="tv_watch_now">Jetzt ansehen</string>
+    <string name="tv_recap">Was bisher geschah…</string>
+    <string name="tv_no_streaming_service">Kein Streamingdienst zugeordnet</string>
+    <string name="tv_watched_episodes">%1$d Folgen gesehen</string>
+    <string name="tv_seasons">%1$d Staffeln</string>
+    <string name="tv_back">Zurück</string>
+    <string name="tv_back_arrow">‹ Zurück</string>
+    <string name="tv_available_at">Verfügbar bei:</string>
+    <string name="tv_no_description">Keine Beschreibung verfügbar.</string>
+
+    <!-- Recap -->
+    <string name="tv_recap_title">Was bisher geschah</string>
+    <string name="tv_recap_generating">Recap wird generiert…</string>
+    <string name="tv_recap_generating_on">Recap wird auf %1$s generiert…</string>
+    <string name="tv_recap_error">Recap konnte nicht geladen werden.</string>
+    <string name="tv_recap_fallback">Keine KI-Zusammenfassung verfügbar.\nKurzbeschreibung aus TMDB:</string>
+    <string name="tv_recap_close">Schließen</string>
+    <string name="tv_recap_watch_now">Jetzt ansehen</string>
+
+    <!-- Scrobble overlay -->
+    <string name="tv_scrobble_question">Schaust du gerade %1$s?</string>
+    <string name="tv_scrobble_episode">S%1$02dE%2$02d</string>
+    <string name="tv_scrobble_yes">Ja, tracken</string>
+    <string name="tv_scrobble_no">Nein</string>
+
+    <!-- Phone status -->
+    <string name="tv_phones_connected">%1$d Handy verbunden</string>
+    <string name="tv_phone_best">Bestes Gerät: %1$s (%2$s)</string>
+    <string name="tv_default_device_name">Handy</string>
+
+    <!-- LLM labels -->
+    <string name="tv_llm_aicore">AICore</string>
+    <string name="tv_llm_gemma_gpu">Gemma GPU</string>
+    <string name="tv_llm_gemma_cpu">Gemma CPU</string>
+    <string name="tv_llm_none">Kein LLM</string>
+</resources>
