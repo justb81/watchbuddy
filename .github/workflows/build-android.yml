@@ -9,8 +9,10 @@ on:
       - 'core/**'
       - '*.gradle.kts'
       - 'gradle/**'
+      - 'gradle.properties'
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   build-phone:
