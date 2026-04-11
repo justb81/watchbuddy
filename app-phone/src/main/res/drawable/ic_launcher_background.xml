@@ -4,10 +4,7 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <rect
+    <path
         android:fillColor="#1A0533"
-        android:left="0"
-        android:top="0"
-        android:right="108"
-        android:bottom="108" />
+        android:pathData="M0,0 H108 V108 H0 Z" />
 </vector>
