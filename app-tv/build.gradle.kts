@@ -15,9 +15,26 @@ android {
         applicationId = "com.justb81.watchbuddy"   // same package as phone app!
         minSdk = 26
         targetSdk = 35
-        // TV APK: versionCode in the 2000s (higher → Play prefers for TV devices)
-        versionCode = 2001
-        versionName = "1.0.0"
+
+        // versionCode: CI setzt VERSION_CODE (run_number). TV-Offset 2000 (höher → Play bevorzugt für TV).
+        val ciVersionCode = System.getenv("VERSION_CODE")?.toIntOrNull() ?: 1
+        versionCode = 2000 + ciVersionCode
+
+        // versionName: release-please setzt VERSION_NAME, Fallback auf x-generic-string
+        versionName = System.getenv("VERSION_NAME") ?: "1.0.0" // x]release-please-version
+    }
+
+    // CI-Signing: Keystore-Pfad + Credentials über Umgebungsvariablen
+    val keystoreFile = System.getenv("KEYSTORE_FILE")
+    if (keystoreFile != null) {
+        signingConfigs {
+            create("release") {
+                storeFile = file(keystoreFile)
+                storePassword = System.getenv("KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("KEY_ALIAS")
+                keyPassword = System.getenv("KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
@@ -25,6 +42,11 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = if (keystoreFile != null) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 

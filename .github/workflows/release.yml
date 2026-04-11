@@ -1,0 +1,131 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    name: Release Please
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  build-release:
+    name: Build Release APKs
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ hashFiles('**/*.gradle.kts', 'gradle/libs.versions.toml') }}
+
+      # ── Release-Signing vorbereiten ─────────────────────────────────────
+      - name: Decode Keystore
+        id: keystore
+        run: |
+          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > /tmp/release.keystore
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # ── Release-signierte APKs (nur wenn Keystore vorhanden) ────────────
+      - name: Build signed Phone APK
+        if: steps.keystore.outputs.available == 'true'
+        env:
+          KEYSTORE_FILE: /tmp/release.keystore
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          VERSION_NAME: ${{ needs.release-please.outputs.version }}
+          VERSION_CODE: ${{ github.run_number }}
+        run: ./gradlew :app-phone:assembleRelease
+
+      - name: Build signed TV APK
+        if: steps.keystore.outputs.available == 'true'
+        env:
+          KEYSTORE_FILE: /tmp/release.keystore
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          VERSION_NAME: ${{ needs.release-please.outputs.version }}
+          VERSION_CODE: ${{ github.run_number }}
+        run: ./gradlew :app-tv:assembleRelease
+
+      # ── Debug APKs (immer) ──────────────────────────────────────────────
+      - name: Build Phone debug APK
+        env:
+          VERSION_NAME: ${{ needs.release-please.outputs.version }}
+          VERSION_CODE: ${{ github.run_number }}
+        run: ./gradlew :app-phone:assembleDebug
+
+      - name: Build TV debug APK
+        env:
+          VERSION_NAME: ${{ needs.release-please.outputs.version }}
+          VERSION_CODE: ${{ github.run_number }}
+        run: ./gradlew :app-tv:assembleDebug
+
+      # ── APKs umbenennen ─────────────────────────────────────────────────
+      - name: Collect APKs
+        run: |
+          VERSION="${{ needs.release-please.outputs.version }}"
+          mkdir -p release-assets
+
+          # Debug APKs
+          cp app-phone/build/outputs/apk/debug/*.apk \
+             "release-assets/watchbuddy-phone-${VERSION}-debug.apk"
+          cp app-tv/build/outputs/apk/debug/*.apk \
+             "release-assets/watchbuddy-tv-${VERSION}-debug.apk"
+
+          # Release APKs (nur wenn vorhanden)
+          for apk in app-phone/build/outputs/apk/release/*.apk; do
+            [ -f "$apk" ] && cp "$apk" "release-assets/watchbuddy-phone-${VERSION}-release.apk"
+          done
+          for apk in app-tv/build/outputs/apk/release/*.apk; do
+            [ -f "$apk" ] && cp "$apk" "release-assets/watchbuddy-tv-${VERSION}-release.apk"
+          done
+
+          ls -lh release-assets/
+
+      # ── An GitHub Release anhängen ──────────────────────────────────────
+      - name: Upload APKs to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for apk in release-assets/*.apk; do
+            gh release upload "${{ needs.release-please.outputs.tag_name }}" "$apk" --clobber
+          done
+
+      - name: Upload APKs as Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: watchbuddy-release-${{ needs.release-please.outputs.version }}
+          path: release-assets/*.apk

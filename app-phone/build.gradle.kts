@@ -15,9 +15,26 @@ android {
         applicationId = "com.justb81.watchbuddy"
         minSdk = 26
         targetSdk = 35
-        // Phone APK: versionCode in the 1000s
-        versionCode = 1001
-        versionName = "1.0.0"
+
+        // versionCode: CI setzt VERSION_CODE (run_number). Phone-Offset 1000.
+        val ciVersionCode = System.getenv("VERSION_CODE")?.toIntOrNull() ?: 1
+        versionCode = 1000 + ciVersionCode
+
+        // versionName: release-please setzt VERSION_NAME, Fallback auf x-generic-string
+        versionName = System.getenv("VERSION_NAME") ?: "1.0.0" // x]release-please-version
+    }
+
+    // CI-Signing: Keystore-Pfad + Credentials über Umgebungsvariablen
+    val keystoreFile = System.getenv("KEYSTORE_FILE")
+    if (keystoreFile != null) {
+        signingConfigs {
+            create("release") {
+                storeFile = file(keystoreFile)
+                storePassword = System.getenv("KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("KEY_ALIAS")
+                keyPassword = System.getenv("KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
@@ -25,7 +42,11 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("debug") // TODO: replace with release keystore
+            signingConfig = if (keystoreFile != null) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 

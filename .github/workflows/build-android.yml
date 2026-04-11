@@ -36,6 +36,8 @@ jobs:
           key: gradle-${{ hashFiles('**/*.gradle.kts', 'gradle/libs.versions.toml') }}
 
       - name: Build Phone debug APK
+        env:
+          VERSION_CODE: ${{ github.run_number }}
         run: ./gradlew :app-phone:assembleDebug
 
       - name: Upload Phone APK
@@ -65,6 +67,8 @@ jobs:
           key: gradle-${{ hashFiles('**/*.gradle.kts', 'gradle/libs.versions.toml') }}
 
       - name: Build TV debug APK
+        env:
+          VERSION_CODE: ${{ github.run_number }}
         run: ./gradlew :app-tv:assembleDebug
 
       - name: Upload TV APK
