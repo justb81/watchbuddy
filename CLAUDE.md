@@ -80,6 +80,7 @@ watchbuddy/
 2. Make changes and commit using Conventional Commits (see below)
 3. Push the branch and open a PR against `main`
 4. The CI pipeline (`build-android.yml`) runs automatically on every PR
+5. **Wait for a green build before considering the work done.** Do not merge or continue with follow-up changes if the build is red.
 
 **Branch naming:**
 
