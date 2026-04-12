@@ -6,5 +6,10 @@ data class AppSettings(
     val authMode: AuthMode = AuthMode.MANAGED,
     val backendUrl: String = "",
     val directClientId: String = "",
-    val companionEnabled: Boolean = false
-)
+    val companionEnabled: Boolean = false,
+    val ollamaUrl: String = DEFAULT_OLLAMA_URL
+) {
+    companion object {
+        const val DEFAULT_OLLAMA_URL = "http://localhost:11434"
+    }
+}

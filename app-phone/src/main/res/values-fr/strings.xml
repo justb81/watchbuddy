@@ -56,6 +56,8 @@
     <string name="settings_auth_backend_url">URL du backend</string>
     <string name="settings_auth_client_id">Client ID</string>
     <string name="settings_auth_client_secret">Client Secret</string>
+    <string name="settings_ollama_section">LLM distant</string>
+    <string name="settings_ollama_url">URL du serveur Ollama</string>
     <string name="settings_save">Enregistrer</string>
     <string name="settings_saved">Paramètres enregistrés</string>
     <string name="settings_cancel">Annuler</string>
