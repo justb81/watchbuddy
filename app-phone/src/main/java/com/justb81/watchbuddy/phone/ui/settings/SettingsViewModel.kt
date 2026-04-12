@@ -6,10 +6,13 @@ import androidx.lifecycle.viewModelScope
 import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.phone.auth.TokenRepository
 import com.justb81.watchbuddy.phone.llm.LlmOrchestrator
+import com.justb81.watchbuddy.phone.settings.AppSettings
+import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -25,7 +28,7 @@ data class SettingsUiState(
     val directClientSecret: String = "",
     val llmBackend: String         = "",
     val llmModelName: String?      = null,
-    val llmDownloadProgress: Int?  = null,   // null = not downloading, 0–100 = progress
+    val llmDownloadProgress: Int?  = null,
     val llmReady: Boolean          = false,
     val freeRamMb: Int             = 0
 )
@@ -34,7 +37,8 @@ data class SettingsUiState(
 class SettingsViewModel @Inject constructor(
     application: Application,
     private val llmOrchestrator: LlmOrchestrator,
-    private val tokenRepository: TokenRepository
+    private val tokenRepository: TokenRepository,
+    private val settingsRepository: SettingsRepository
 ) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(SettingsUiState(
@@ -42,7 +46,24 @@ class SettingsViewModel @Inject constructor(
     ))
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
-    init { detectLlm() }
+    init {
+        detectLlm()
+        loadSettings()
+    }
+
+    private fun loadSettings() {
+        viewModelScope.launch {
+            val settings = settingsRepository.settings.first()
+            _uiState.value = _uiState.value.copy(
+                authMode = settings.authMode,
+                customBackendUrl = settings.backendUrl,
+                directClientId = settings.directClientId,
+                directClientSecret = settings.directClientSecret,
+                companionRunning = settings.companionEnabled,
+                llmReady = settings.modelReady
+            )
+        }
+    }
 
     private fun detectLlm() {
         viewModelScope.launch {
@@ -50,7 +71,7 @@ class SettingsViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(
                 llmBackend  = config.backend.name,
                 llmModelName = config.modelVariant?.fileName,
-                llmReady    = false  // true after download
+                llmReady    = false
             )
         }
     }
@@ -72,14 +93,25 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun saveAdvancedSettings() {
-        // TODO: persist to DataStore / Android Keystore
+        viewModelScope.launch {
+            settingsRepository.saveSettings(
+                AppSettings(
+                    authMode = _uiState.value.authMode,
+                    backendUrl = _uiState.value.customBackendUrl,
+                    directClientId = _uiState.value.directClientId,
+                    directClientSecret = _uiState.value.directClientSecret,
+                    companionEnabled = _uiState.value.companionRunning
+                )
+            )
+        }
     }
 
     fun toggleCompanionService() {
-        _uiState.value = _uiState.value.copy(
-            companionRunning = !_uiState.value.companionRunning
-        )
-        // TODO: start/stop CompanionService
+        val newState = !_uiState.value.companionRunning
+        _uiState.value = _uiState.value.copy(companionRunning = newState)
+        viewModelScope.launch {
+            settingsRepository.setCompanionEnabled(newState)
+        }
     }
 
     fun disconnectTrakt() {
