@@ -3,8 +3,8 @@ package com.justb81.watchbuddy.tv.ui.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
-import com.justb81.watchbuddy.core.trakt.TraktApiService
 import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
+import com.justb81.watchbuddy.tv.network.PhoneApiClientFactory
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -16,17 +16,20 @@ data class TvHomeUiState(
     val connectedPhones: Int = 0,
     val bestPhoneName: String? = null,
     val bestPhoneBackend: String? = null,
+    val noPhoneConnected: Boolean = false,
     val error: String? = null
 )
 
 @HiltViewModel
 class TvHomeViewModel @Inject constructor(
-    private val traktApi: TraktApiService,
-    private val phoneDiscovery: PhoneDiscoveryManager
+    private val phoneDiscovery: PhoneDiscoveryManager,
+    private val phoneApiClientFactory: PhoneApiClientFactory
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(TvHomeUiState())
     val uiState: StateFlow<TvHomeUiState> = _uiState.asStateFlow()
+
+    private var cachedShows: List<TraktWatchedEntry> = emptyList()
 
     init {
         phoneDiscovery.startDiscovery()
@@ -42,29 +45,40 @@ class TvHomeViewModel @Inject constructor(
                     it.copy(
                         connectedPhones = phones.size,
                         bestPhoneName   = best?.capability?.deviceName,
-                        bestPhoneBackend = best?.capability?.llmBackend?.name
+                        bestPhoneBackend = best?.capability?.llmBackend?.name,
+                        noPhoneConnected = phones.isEmpty()
                     )
+                }
+                if (phones.isNotEmpty() && _uiState.value.shows.isEmpty()) {
+                    loadShows()
                 }
             }
         }
     }
 
-    private fun loadShows() {
+    fun loadShows() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true, error = null) }
             try {
-                // TV fetches shows from the best connected phone's /shows endpoint
                 val bestPhone = phoneDiscovery.getBestPhone()
-                val shows: List<TraktWatchedEntry> = if (bestPhone != null) {
-                    // TODO: fetch via phone HTTP API
-                    emptyList()
+                val shows: List<TraktWatchedEntry> = if (bestPhone != null && bestPhone.baseUrl.isNotBlank()) {
+                    val client = phoneApiClientFactory.createClient(bestPhone.baseUrl)
+                    client.getShows().also { cachedShows = it }
+                } else if (cachedShows.isNotEmpty()) {
+                    cachedShows
                 } else {
-                    // Fallback: direct Trakt API (needs token on TV — not ideal)
+                    _uiState.update { it.copy(noPhoneConnected = true) }
                     emptyList()
                 }
                 _uiState.update { it.copy(isLoading = false, shows = shows) }
             } catch (e: Exception) {
-                _uiState.update { it.copy(isLoading = false, error = e.message) }
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        shows = cachedShows,
+                        error = e.message
+                    )
+                }
             }
         }
     }
