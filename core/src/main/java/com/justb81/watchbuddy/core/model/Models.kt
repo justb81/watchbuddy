@@ -76,6 +76,7 @@ data class TmdbEpisode(
 data class DeviceCapability(
     val deviceId: String,
     val userName: String,
+    val userAvatarUrl: String? = null,
     val deviceName: String,
     val llmBackend: LlmBackend,         // AICORE, MEDIAPIPE_GPU, MEDIAPIPE_CPU, NONE
     val modelQuality: Int,              // 0–150 (see scoring docs)
