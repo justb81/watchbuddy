@@ -14,6 +14,7 @@ import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.phone.auth.TokenRepository
 import com.justb81.watchbuddy.phone.llm.LlmOrchestrator
 import com.justb81.watchbuddy.phone.llm.ModelDownloadWorker
+import com.justb81.watchbuddy.phone.server.DeviceCapabilityProvider
 import com.justb81.watchbuddy.phone.settings.AppSettings
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -47,6 +48,7 @@ class SettingsViewModel @Inject constructor(
     application: Application,
     private val llmOrchestrator: LlmOrchestrator,
     private val tokenRepository: TokenRepository,
+    private val deviceCapabilityProvider: DeviceCapabilityProvider,
     private val settingsRepository: SettingsRepository
 ) : AndroidViewModel(application) {
 
@@ -145,6 +147,7 @@ class SettingsViewModel @Inject constructor(
 
     fun disconnectTrakt() {
         tokenRepository.clearTokens()
+        deviceCapabilityProvider.invalidateCache()
         _uiState.value = _uiState.value.copy(traktUsername = null)
     }
 
