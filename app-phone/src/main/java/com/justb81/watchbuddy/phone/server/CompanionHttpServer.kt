@@ -1,8 +1,11 @@
 package com.justb81.watchbuddy.phone.server
 
 import android.util.Log
+import com.justb81.watchbuddy.core.model.DeviceCapability
+import com.justb81.watchbuddy.core.model.TokenResponse
 import com.justb81.watchbuddy.core.tmdb.TmdbApiService
 import com.justb81.watchbuddy.phone.auth.TokenRepository
+import com.justb81.watchbuddy.phone.llm.LlmOrchestrator
 import com.justb81.watchbuddy.phone.llm.RecapGenerator
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -24,12 +27,13 @@ import javax.inject.Singleton
  *
  * Endpoints:
  *   GET  /capability           → DeviceCapability (device score, RAM, LLM backend)
+ *   GET  /auth/token           → TokenResponse (access token for Trakt API calls from TV)
  *   GET  /shows                → List of watched shows for this user (from Trakt cache)
  *   POST /recap/{traktShowId}  → Generate + return HTML recap for a show
- *   GET  /auth/token           → Current access token for TV app usage
  */
 @Singleton
 class CompanionHttpServer @Inject constructor(
+    private val llmOrchestrator: LlmOrchestrator,
     private val recapGenerator: RecapGenerator,
     private val capabilityProvider: DeviceCapabilityProvider,
     private val showRepository: ShowRepository,
@@ -51,6 +55,18 @@ class CompanionHttpServer @Inject constructor(
             routing {
                 get("/capability") {
                     call.respond(capabilityProvider.getCapability())
+                }
+
+                get("/auth/token") {
+                    val token = tokenRepository.getAccessToken()
+                    if (token.isNullOrBlank() || !tokenRepository.isTokenValid()) {
+                        call.respond(io.ktor.http.HttpStatusCode.Unauthorized)
+                        return@get
+                    }
+                    call.respond(TokenResponse(
+                        accessToken = token,
+                        expiresIn = 3600  // approximate remaining TTL
+                    ))
                 }
 
                 get("/shows") {
@@ -122,11 +138,6 @@ class CompanionHttpServer @Inject constructor(
                     }
                 }
 
-                get("/auth/token") {
-                    val token = tokenRepository.getAccessToken()
-                        ?: return@get call.respond(HttpStatusCode.Unauthorized, ErrorResponse("No access token"))
-                    call.respond(TokenResponse(accessToken = token))
-                }
             }
         }.start(wait = false)
     }
@@ -140,11 +151,6 @@ class CompanionHttpServer @Inject constructor(
 @Serializable
 private data class RecapRequest(
     val tmdbApiKey: String = ""
-)
-
-@Serializable
-private data class TokenResponse(
-    val accessToken: String
 )
 
 @Serializable

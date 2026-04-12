@@ -97,6 +97,14 @@ data class ScrobbleCandidate(
     val matchedEpisode: TraktEpisode? = null
 )
 
+// ── Token ────────────────────────────────────────────────────────────────────
+
+@Serializable
+data class TokenResponse(
+    val accessToken: String,
+    val expiresIn: Long            // remaining seconds until expiry
+)
+
 // ── Streaming Deep Links ──────────────────────────────────────────────────────
 
 @Serializable

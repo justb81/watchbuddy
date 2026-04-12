@@ -2,11 +2,15 @@ package com.justb81.watchbuddy.tv.scrobbler
 
 import android.content.ComponentName
 import android.content.Context
+import android.media.session.MediaController
 import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
+import android.util.Log
 import com.justb81.watchbuddy.core.model.ScrobbleCandidate
 import com.justb81.watchbuddy.core.model.TraktEpisode
+import com.justb81.watchbuddy.core.model.TraktIds
 import com.justb81.watchbuddy.core.model.TraktShow
+import com.justb81.watchbuddy.core.trakt.ScrobbleBody
 import com.justb81.watchbuddy.core.trakt.TraktApiService
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
@@ -23,15 +27,23 @@ import javax.inject.Singleton
  *   2. Extract package name + media title from session metadata
  *   3. Fuzzy-match title against user's Trakt watchlist
  *   4. Confidence ≥ 0.9 → auto-scrobble; < 0.9 → emit ScrobbleCandidate for UI confirmation
- *   5. On playback stop/pause → call Trakt scrobble/stop
+ *   5. On playback stop/pause → call Trakt scrobble/stop or scrobble/pause
+ *
+ * Scrobble lifecycle:
+ *   STATE_PLAYING  → scrobble/start (progress = 0)
+ *   STATE_PAUSED   → scrobble/pause
+ *   STATE_STOPPED / ≥ 80% → scrobble/stop (marks episode as watched)
  */
 @Singleton
 class MediaSessionScrobbler @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val traktApi: TraktApiService
+    private val traktApi: TraktApiService,
+    private val tvTokenCache: TvTokenCache
 ) {
     companion object {
+        private const val TAG = "MediaSessionScrobbler"
         const val AUTO_SCROBBLE_THRESHOLD = 0.90f
+        private const val WATCHED_THRESHOLD = 80f
     }
 
     private val _pendingConfirmation = MutableSharedFlow<ScrobbleCandidate>()
@@ -39,6 +51,10 @@ class MediaSessionScrobbler @Inject constructor(
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var pollingJob: Job? = null
+
+    /** Currently active scrobble — tracks which episode we told Trakt about. */
+    private var activeCandidate: ScrobbleCandidate? = null
+    private var lastPlaybackState: Int = PlaybackState.STATE_NONE
 
     fun startListening(notificationListenerComponent: ComponentName) {
         val sessionManager = context.getSystemService(Context.MEDIA_SESSION_SERVICE)
@@ -48,16 +64,11 @@ class MediaSessionScrobbler @Inject constructor(
             while (isActive) {
                 try {
                     val sessions = sessionManager.getActiveSessions(notificationListenerComponent)
-                    sessions.forEach { controller ->
-                        val packageName = controller.packageName
-                        val metadata = controller.metadata ?: return@forEach
-                        val playbackState = controller.playbackState ?: return@forEach
-
-                        if (playbackState.state == PlaybackState.STATE_PLAYING) {
-                            val title = metadata.getString(android.media.MediaMetadata.METADATA_KEY_TITLE)
-                                ?: return@forEach
-
-                            processPlayingMedia(packageName, title)
+                    if (sessions.isEmpty()) {
+                        handlePlaybackStateChange(PlaybackState.STATE_STOPPED, progress = 100f)
+                    } else {
+                        sessions.forEach { controller ->
+                            processSession(controller)
                         }
                     }
                 } catch (e: Exception) {
@@ -70,15 +81,57 @@ class MediaSessionScrobbler @Inject constructor(
 
     fun stopListening() {
         pollingJob?.cancel()
+        scope.launch { handlePlaybackStateChange(PlaybackState.STATE_STOPPED, progress = 100f) }
     }
 
-    private suspend fun processPlayingMedia(packageName: String, rawTitle: String) {
-        val candidate = matchTitleToTrakt(packageName, rawTitle)
-        if (candidate != null) {
-            if (candidate.confidence >= AUTO_SCROBBLE_THRESHOLD) {
-                autoScrobble(candidate)
-            } else {
-                _pendingConfirmation.emit(candidate)
+    private suspend fun processSession(controller: MediaController) {
+        val packageName = controller.packageName
+        val metadata = controller.metadata ?: return
+        val playbackState = controller.playbackState ?: return
+        val state = playbackState.state
+
+        val title = metadata.getString(android.media.MediaMetadata.METADATA_KEY_TITLE)
+            ?: return
+        val duration = metadata.getLong(android.media.MediaMetadata.METADATA_KEY_DURATION)
+        val position = playbackState.position
+
+        val progress = if (duration > 0) (position.toFloat() / duration * 100f) else 0f
+
+        when (state) {
+            PlaybackState.STATE_PLAYING -> {
+                val candidate = matchTitleToTrakt(packageName, title)
+                if (candidate != null) {
+                    if (candidate.confidence >= AUTO_SCROBBLE_THRESHOLD) {
+                        if (activeCandidate?.mediaTitle != candidate.mediaTitle) {
+                            activeCandidate = candidate
+                            autoScrobble(candidate, progress)
+                        }
+                        lastPlaybackState = state
+                    } else if (activeCandidate?.mediaTitle != candidate.mediaTitle) {
+                        _pendingConfirmation.emit(candidate)
+                    }
+                }
+            }
+            PlaybackState.STATE_PAUSED -> handlePlaybackStateChange(state, progress)
+            PlaybackState.STATE_STOPPED, PlaybackState.STATE_NONE ->
+                handlePlaybackStateChange(PlaybackState.STATE_STOPPED, progress)
+            else -> { /* ignore buffering etc. */ }
+        }
+    }
+
+    private suspend fun handlePlaybackStateChange(newState: Int, progress: Float) {
+        val candidate = activeCandidate ?: return
+        if (newState == lastPlaybackState) return
+
+        when (newState) {
+            PlaybackState.STATE_PAUSED -> {
+                scrobblePause(candidate, progress)
+                lastPlaybackState = newState
+            }
+            PlaybackState.STATE_STOPPED -> {
+                scrobbleStop(candidate, progress.coerceAtLeast(WATCHED_THRESHOLD))
+                activeCandidate = null
+                lastPlaybackState = PlaybackState.STATE_NONE
             }
         }
     }
@@ -105,14 +158,61 @@ class MediaSessionScrobbler @Inject constructor(
             packageName = packageName,
             mediaTitle = rawTitle,
             confidence = confidence,
-            matchedShow = TraktShow(title = showTitle, ids = com.justb81.watchbuddy.core.model.TraktIds()),
+            matchedShow = TraktShow(title = showTitle, ids = TraktIds()),
             matchedEpisode = if (season != null && episode != null)
                 TraktEpisode(season = season, number = episode)
             else null
         )
     }
 
-    private suspend fun autoScrobble(candidate: ScrobbleCandidate) {
-        // TODO: retrieve stored access_token from secure storage and call traktApi.scrobbleStart()
+    private suspend fun autoScrobble(candidate: ScrobbleCandidate, progress: Float) {
+        val token = tvTokenCache.getToken() ?: run {
+            Log.w(TAG, "No access token available — skipping scrobble")
+            return
+        }
+        val episode = candidate.matchedEpisode ?: run {
+            Log.w(TAG, "No matched episode — skipping scrobble")
+            return
+        }
+        val show = candidate.matchedShow ?: return
+        try {
+            traktApi.scrobbleStart(
+                bearer = "Bearer $token",
+                body = ScrobbleBody(show = show, episode = episode, progress = progress)
+            )
+            Log.i(TAG, "Scrobble started: ${show.title} S${episode.season}E${episode.number}")
+        } catch (e: Exception) {
+            Log.e(TAG, "scrobble/start failed: ${e.message}")
+        }
+    }
+
+    private suspend fun scrobblePause(candidate: ScrobbleCandidate, progress: Float) {
+        val token = tvTokenCache.getToken() ?: return
+        val episode = candidate.matchedEpisode ?: return
+        val show = candidate.matchedShow ?: return
+        try {
+            traktApi.scrobblePause(
+                bearer = "Bearer $token",
+                body = ScrobbleBody(show = show, episode = episode, progress = progress)
+            )
+            Log.i(TAG, "Scrobble paused: ${show.title} at ${progress.toInt()}%")
+        } catch (e: Exception) {
+            Log.e(TAG, "scrobble/pause failed: ${e.message}")
+        }
+    }
+
+    private suspend fun scrobbleStop(candidate: ScrobbleCandidate, progress: Float) {
+        val token = tvTokenCache.getToken() ?: return
+        val episode = candidate.matchedEpisode ?: return
+        val show = candidate.matchedShow ?: return
+        try {
+            traktApi.scrobbleStop(
+                bearer = "Bearer $token",
+                body = ScrobbleBody(show = show, episode = episode, progress = progress)
+            )
+            Log.i(TAG, "Scrobble stopped: ${show.title} S${episode.season}E${episode.number} (${progress.toInt()}%)")
+        } catch (e: Exception) {
+            Log.e(TAG, "scrobble/stop failed: ${e.message}")
+        }
     }
 }
