@@ -3,9 +3,17 @@ package com.justb81.watchbuddy.phone.ui.settings
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.work.Constraints
+import androidx.work.ExistingWorkPolicy
+import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
+import androidx.work.workDataOf
 import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.phone.auth.TokenRepository
 import com.justb81.watchbuddy.phone.llm.LlmOrchestrator
+import com.justb81.watchbuddy.phone.llm.ModelDownloadWorker
 import com.justb81.watchbuddy.phone.service.CompanionService
 import com.justb81.watchbuddy.phone.settings.AppSettings
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
@@ -127,16 +135,48 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun downloadModel() {
+        val config = llmOrchestrator.selectConfig()
+        val variant = config.modelVariant ?: return
+        val modelUrl = "https://storage.googleapis.com/mediapipe-models/llm_inference/${variant.fileName}"
+
+        val downloadRequest = OneTimeWorkRequestBuilder<ModelDownloadWorker>()
+            .setInputData(workDataOf(
+                ModelDownloadWorker.KEY_MODEL_URL to modelUrl,
+                ModelDownloadWorker.KEY_FILE_NAME to variant.fileName
+            ))
+            .setConstraints(Constraints.Builder()
+                .setRequiredNetworkType(NetworkType.CONNECTED)
+                .setRequiresStorageNotLow(true)
+                .build())
+            .addTag(ModelDownloadWorker.WORK_TAG)
+            .build()
+
+        val workManager = WorkManager.getInstance(getApplication())
+        workManager.enqueueUniqueWork(
+            ModelDownloadWorker.WORK_TAG,
+            ExistingWorkPolicy.KEEP,
+            downloadRequest
+        )
+
         viewModelScope.launch {
-            // TODO: trigger WorkManager model download job
-            for (progress in 0..100 step 5) {
-                _uiState.value = _uiState.value.copy(llmDownloadProgress = progress)
-                kotlinx.coroutines.delay(100)
+            workManager.getWorkInfoByIdFlow(downloadRequest.id).collect { workInfo ->
+                when (workInfo?.state) {
+                    WorkInfo.State.RUNNING -> {
+                        val progress = workInfo.progress.getInt(ModelDownloadWorker.KEY_PROGRESS, 0)
+                        _uiState.value = _uiState.value.copy(llmDownloadProgress = progress)
+                    }
+                    WorkInfo.State.SUCCEEDED -> {
+                        _uiState.value = _uiState.value.copy(
+                            llmDownloadProgress = null,
+                            llmReady = true
+                        )
+                    }
+                    WorkInfo.State.FAILED -> {
+                        _uiState.value = _uiState.value.copy(llmDownloadProgress = null)
+                    }
+                    else -> {}
+                }
             }
-            _uiState.value = _uiState.value.copy(
-                llmDownloadProgress = null,
-                llmReady = true
-            )
         }
     }
 }
