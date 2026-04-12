@@ -1,6 +1,7 @@
 package com.justb81.watchbuddy.phone.llm
 
 import android.app.Application
+import android.util.Log
 import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.core.locale.LocaleHelper
 import com.justb81.watchbuddy.core.model.TmdbEpisode
@@ -21,9 +22,10 @@ import javax.inject.Singleton
 @Singleton
 class RecapGenerator @Inject constructor(
     private val application: Application,
-    private val llmOrchestrator: LlmOrchestrator
+    private val llmProviderFactory: LlmProviderFactory
 ) {
     companion object {
+        private const val TAG = "RecapGenerator"
         // TMDB still placeholder pattern: data-tmdb-still="S{season}E{episode}"
         private val STILL_PLACEHOLDER_REGEX = Regex("""data-tmdb-still="S(\d+)E(\d+)"""")
     }
@@ -41,7 +43,7 @@ class RecapGenerator @Inject constructor(
         apiKey: String
     ): String {
         val prompt = buildPrompt(show, watchedEpisodes, targetEpisode)
-        val rawHtml = inferWithLlm(prompt)
+        val rawHtml = inferWithLlm(prompt, watchedEpisodes)
         return replaceTmdbPlaceholders(rawHtml, watchedEpisodes, apiKey)
     }
 
@@ -80,10 +82,9 @@ Respond in $language.
 """.trimIndent()
     }
 
-    private suspend fun inferWithLlm(prompt: String): String {
-        // TODO: route to AICore or MediaPipe based on LlmOrchestrator.selectConfig()
-        // Placeholder — real implementation connects to the active LLM backend
-        return buildFallbackHtml("Recap wird geladen…")
+    private suspend fun inferWithLlm(prompt: String, episodes: List<TmdbEpisode>): String {
+        Log.d(TAG, "Starting LLM inference with cascade fallback")
+        return llmProviderFactory.generateWithCascade(prompt, episodes)
     }
 
     private fun replaceTmdbPlaceholders(
@@ -101,10 +102,4 @@ Respond in $language.
             """src="$url""""
         }
     }
-
-    private fun buildFallbackHtml(message: String) = """
-        <div style="display:flex;align-items:center;justify-content:center;height:100%;color:white;font-family:sans-serif;">
-          <p>$message</p>
-        </div>
-    """.trimIndent()
 }
