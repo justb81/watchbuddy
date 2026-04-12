@@ -5,17 +5,25 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import java.net.HttpURLConnection
-import java.net.URL
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import java.util.concurrent.TimeUnit
 
 /**
  * LLM provider that sends prompts to a remote Ollama server via HTTP POST.
  *
  * Expected Ollama endpoint: POST /api/generate
  * The server URL is user-configurable (e.g. http://192.168.1.100:11434).
+ *
+ * Uses the shared [OkHttpClient] for connection pooling, interceptors, and logging.
+ * Ollama-specific timeouts are applied via [OkHttpClient.newBuilder] without mutating
+ * the shared instance.
  */
 class RemoteOllamaProvider(
     private val serverUrl: String,
+    private val httpClient: OkHttpClient,
     private val model: String = "gemma3:4b"
 ) : LlmProvider {
 
@@ -35,33 +43,34 @@ class RemoteOllamaProvider(
 
     private val json = Json { ignoreUnknownKeys = true }
 
+    private val client = httpClient.newBuilder()
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(120, TimeUnit.SECONDS) // LLM generation can be slow
+        .build()
+
     override suspend fun generate(prompt: String): String = withContext(Dispatchers.IO) {
-        val url = URL("${serverUrl.trimEnd('/')}/api/generate")
-        val connection = url.openConnection() as HttpURLConnection
-        try {
-            connection.requestMethod = "POST"
-            connection.setRequestProperty("Content-Type", "application/json")
-            connection.doOutput = true
-            connection.connectTimeout = 10_000
-            connection.readTimeout = 120_000 // LLM generation can be slow
+        val url = "${serverUrl.trimEnd('/')}/api/generate"
+        val body = json.encodeToString(OllamaRequest(model, prompt))
 
-            val body = json.encodeToString(OllamaRequest(model, prompt))
-            connection.outputStream.bufferedWriter().use { it.write(body) }
+        val request = Request.Builder()
+            .url(url)
+            .post(body.toRequestBody("application/json".toMediaType()))
+            .build()
 
-            val code = connection.responseCode
-            if (code != 200) {
-                val error = connection.errorStream?.bufferedReader()?.readText() ?: "unknown error"
-                throw IllegalStateException("Ollama returned HTTP $code: $error")
+        val response = client.newCall(request).execute()
+        response.use {
+            if (!it.isSuccessful) {
+                val error = it.body?.string() ?: "unknown error"
+                throw IllegalStateException("Ollama returned HTTP ${it.code}: $error")
             }
 
-            val responseBody = connection.inputStream.bufferedReader().readText()
+            val responseBody = it.body?.string()
+                ?: throw IllegalStateException("Ollama returned empty body")
             val parsed = json.decodeFromString<OllamaResponse>(responseBody)
             if (parsed.response.isBlank()) {
                 throw IllegalStateException("Ollama returned empty response")
             }
             parsed.response
-        } finally {
-            connection.disconnect()
         }
     }
 }

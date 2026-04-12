@@ -1,5 +1,6 @@
 package com.justb81.watchbuddy.phone.llm
 
+import okhttp3.OkHttpClient
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
@@ -14,6 +15,7 @@ import org.junit.jupiter.api.BeforeEach
 class RemoteOllamaProviderTest {
 
     private lateinit var server: MockWebServer
+    private val client = OkHttpClient()
 
     @BeforeEach
     fun setUp() {
@@ -27,11 +29,11 @@ class RemoteOllamaProviderTest {
     }
 
     private fun provider(model: String = "gemma3:4b"): RemoteOllamaProvider =
-        RemoteOllamaProvider(server.url("/").toString().trimEnd('/'), model)
+        RemoteOllamaProvider(server.url("/").toString().trimEnd('/'), client, model)
 
     @Test
     fun `displayName includes model and server URL`() {
-        val p = RemoteOllamaProvider("http://192.168.1.1:11434", "llama3")
+        val p = RemoteOllamaProvider("http://192.168.1.1:11434", client, "llama3")
         assertTrue(p.displayName.contains("llama3"))
         assertTrue(p.displayName.contains("192.168.1.1"))
     }
@@ -48,9 +50,7 @@ class RemoteOllamaProviderTest {
     @Test
     fun `generate sends correct JSON body`() = runTest {
         server.enqueue(MockResponse().setBody("""{"response":"Hello"}"""))
-        // RemoteOllamaProvider uses HttpURLConnection which goes through the system proxy.
-        // MockWebServer receives the raw request. The body encoding may differ.
-        // We just verify the request was received and method is POST
+        // Verify the request was received with correct method and non-empty body
         provider("testmodel").generate("my prompt")
         val request = server.takeRequest()
         assertEquals("POST", request.method)
@@ -95,6 +95,28 @@ class RemoteOllamaProviderTest {
         server.enqueue(MockResponse().setBody("""{"response":"ok"}"""))
         provider().generate("prompt")
         val request = server.takeRequest()
-        assertEquals("application/json", request.getHeader("Content-Type"))
+        assertTrue(request.getHeader("Content-Type")!!.contains("application/json"))
+    }
+
+    @Test
+    fun `request body contains model and prompt`() = runTest {
+        server.enqueue(MockResponse().setBody("""{"response":"ok"}"""))
+        provider("testmodel").generate("my prompt")
+        val request = server.takeRequest()
+        val body = request.body.readUtf8()
+        assertTrue(body.contains("testmodel"))
+        assertTrue(body.contains("my prompt"))
+    }
+
+    @Test
+    fun `uses shared OkHttpClient connection pool`() = runTest {
+        server.enqueue(MockResponse().setBody("""{"response":"first"}"""))
+        server.enqueue(MockResponse().setBody("""{"response":"second"}"""))
+        val p = provider()
+        val r1 = p.generate("prompt1")
+        val r2 = p.generate("prompt2")
+        assertEquals("first", r1)
+        assertEquals("second", r2)
+        assertEquals(2, server.requestCount)
     }
 }
