@@ -1,8 +1,11 @@
 package com.justb81.watchbuddy
 
 import android.app.Application
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
+import com.justb81.watchbuddy.service.CompanionService
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 
@@ -16,4 +19,23 @@ class WatchBuddyPhoneApp : Application(), Configuration.Provider {
         get() = Configuration.Builder()
             .setWorkerFactory(workerFactory)
             .build()
+
+    override fun onCreate() {
+        super.onCreate()
+        createNotificationChannels()
+    }
+
+    private fun createNotificationChannels() {
+        val manager = getSystemService(NotificationManager::class.java)
+        if (manager.getNotificationChannel(CompanionService.CHANNEL_ID) == null) {
+            val channel = NotificationChannel(
+                CompanionService.CHANNEL_ID,
+                getString(R.string.companion_channel_name),
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = getString(R.string.companion_channel_description)
+            }
+            manager.createNotificationChannel(channel)
+        }
+    }
 }

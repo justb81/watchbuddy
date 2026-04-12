@@ -12,6 +12,7 @@ import androidx.work.WorkManager
 import androidx.work.workDataOf
 import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.phone.auth.TokenRepository
+import com.justb81.watchbuddy.service.CompanionService
 import com.justb81.watchbuddy.phone.llm.LlmOrchestrator
 import com.justb81.watchbuddy.phone.llm.ModelDownloadWorker
 import com.justb81.watchbuddy.phone.server.DeviceCapabilityProvider
@@ -142,7 +143,12 @@ class SettingsViewModel @Inject constructor(
             val current = settingsRepository.settings.first()
             settingsRepository.saveSettings(current.copy(companionEnabled = newState))
         }
-        // TODO: start/stop CompanionService
+        val context = getApplication<Application>()
+        if (newState) {
+            CompanionService.start(context)
+        } else {
+            CompanionService.stop(context)
+        }
     }
 
     fun disconnectTrakt() {
