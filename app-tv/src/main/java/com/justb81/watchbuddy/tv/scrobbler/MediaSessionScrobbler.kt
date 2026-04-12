@@ -43,13 +43,14 @@ class MediaSessionScrobbler @Inject constructor(
     private val _pendingConfirmation = MutableSharedFlow<ScrobbleCandidate>()
     val pendingConfirmation: SharedFlow<ScrobbleCandidate> = _pendingConfirmation
 
-    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private var scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var pollingJob: Job? = null
 
     /** Track which media title is currently being scrobbled to avoid duplicate starts. */
     private var currentlyScrobbling: String? = null
 
     fun startListening(notificationListenerComponent: ComponentName) {
+        scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
         val sessionManager = context.getSystemService(Context.MEDIA_SESSION_SERVICE)
                 as MediaSessionManager
 
@@ -83,6 +84,7 @@ class MediaSessionScrobbler @Inject constructor(
 
     fun stopListening() {
         pollingJob?.cancel()
+        scope.cancel()
     }
 
     private suspend fun processPlayingMedia(packageName: String, rawTitle: String) {
