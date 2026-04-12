@@ -20,6 +20,7 @@ import com.justb81.watchbuddy.R
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
+    onDisconnected: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -212,6 +213,7 @@ fun SettingsScreen(
                 TextButton(onClick = {
                     viewModel.disconnectTrakt()
                     showDisconnectDialog = false
+                    onDisconnected()
                 }) {
                     Text(stringResource(R.string.settings_disconnect), color = MaterialTheme.colorScheme.error)
                 }

@@ -42,7 +42,12 @@ fun PhoneNavGraph(
 
         composable(PhoneRoute.Settings.route) {
             SettingsScreen(
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                onDisconnected = {
+                    navController.navigate(PhoneRoute.Onboarding.route) {
+                        popUpTo(navController.graph.id) { inclusive = true }
+                    }
+                }
             )
         }
     }
