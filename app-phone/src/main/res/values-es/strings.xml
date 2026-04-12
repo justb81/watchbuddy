@@ -57,6 +57,7 @@
     <string name="settings_auth_client_id">Client ID</string>
     <string name="settings_auth_client_secret">Client Secret</string>
     <string name="settings_save">Guardar</string>
+    <string name="settings_saved">Ajustes guardados</string>
     <string name="settings_cancel">Cancelar</string>
     <string name="settings_cd_back">Volver</string>
     <string name="settings_advanced_hide">Ocultar</string>
