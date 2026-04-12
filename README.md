@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="app-phone/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png" width="120" alt="WatchBuddy Logo" />
+  <img src="docs/assets/logo.png" width="280" alt="WatchBuddy Logo" />
 </p>
 
 <h1 align="center">WatchBuddy</h1>
