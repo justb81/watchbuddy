@@ -53,18 +53,21 @@ class RemoteOllamaProvider(
             .build()
 
         val response = ollamaClient.newCall(request).execute()
-        response.use { res ->
-            if (!res.isSuccessful) {
-                val error = res.body?.string() ?: "unknown error"
-                throw IllegalStateException("Ollama returned HTTP ${res.code}: $error")
-            }
+        val code = response.code
+        val responseBody = response.body?.string() ?: ""
+        response.close()
 
-            val responseBody = res.body?.string() ?: throw IllegalStateException("Empty response body")
-            val parsed = json.decodeFromString<OllamaResponse>(responseBody)
-            if (parsed.response.isBlank()) {
-                throw IllegalStateException("Ollama returned empty response")
-            }
-            parsed.response
+        if (code != 200) {
+            throw IllegalStateException("Ollama returned HTTP $code: $responseBody")
         }
+        if (responseBody.isEmpty()) {
+            throw IllegalStateException("Empty response body")
+        }
+
+        val parsed = json.decodeFromString<OllamaResponse>(responseBody)
+        if (parsed.response.isBlank()) {
+            throw IllegalStateException("Ollama returned empty response")
+        }
+        parsed.response
     }
 }
