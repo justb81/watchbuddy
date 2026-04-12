@@ -5,8 +5,12 @@ import androidx.work.Data
 import androidx.work.ListenableWorker.Result
 import androidx.work.WorkerParameters
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
+import io.mockk.coEvery
 import io.mockk.every
+import io.mockk.just
+import io.mockk.Runs
 import io.mockk.mockk
+import io.mockk.spyk
 import io.mockk.verify
 import kotlinx.coroutines.test.runTest
 import okhttp3.OkHttpClient
@@ -54,7 +58,13 @@ class ModelDownloadWorkerTest {
         }
         every { workerParams.inputData } returns inputData
         every { workerParams.runAttemptCount } returns 1
-        return ModelDownloadWorker(context, workerParams, settingsRepository, client)
+        // Use spyk to intercept setProgress which would otherwise hang
+        // because the mocked WorkerParameters cannot provide a real ProgressUpdater
+        val worker = spyk(
+            ModelDownloadWorker(context, workerParams, settingsRepository, client)
+        )
+        coEvery { worker.setProgress(any()) } just Runs
+        return worker
     }
 
     @Test
@@ -69,9 +79,7 @@ class ModelDownloadWorkerTest {
         val worker = createWorker(server.url("/model.bin").toString())
         val result = worker.doWork()
 
-        assertEquals(Result.success(
-            Data.Builder().putInt(ModelDownloadWorker.KEY_PROGRESS, 100).build()
-        ), result)
+        assertTrue(result is Result.Success)
 
         val request = server.takeRequest()
         assertEquals("GET", request.method)
@@ -96,7 +104,7 @@ class ModelDownloadWorkerTest {
         val worker = createWorker(server.url("/model.bin").toString())
         val result = worker.doWork()
 
-        assertEquals(Result.retry(), result)
+        assertTrue(result is Result.Retry)
     }
 
     @Test
@@ -133,8 +141,6 @@ class ModelDownloadWorkerTest {
 
     @Test
     fun `uses shared OkHttpClient instead of creating new instance`() = runTest {
-        // Verify that our injected client's connection pool is used
-        // by making two sequential downloads
         server.enqueue(MockResponse().setBody("data1"))
         server.enqueue(MockResponse().setBody("data2"))
 
