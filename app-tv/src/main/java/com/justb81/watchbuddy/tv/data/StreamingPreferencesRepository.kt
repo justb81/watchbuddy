@@ -4,8 +4,8 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.stringSetKey
-import androidx.datastore.preferences.core.stringKey
+import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
@@ -21,8 +21,8 @@ private val Context.streamingDataStore: DataStore<Preferences> by preferencesDat
 class StreamingPreferencesRepository @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
-    private val subscribedKey = stringSetKey("subscribed_service_ids")
-    private val orderKey = stringKey("service_order")
+    private val subscribedKey = stringSetPreferencesKey("subscribed_service_ids")
+    private val orderKey = stringPreferencesKey("service_order")
 
     /**
      * Emits the ordered list of subscribed service IDs.
