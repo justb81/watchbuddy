@@ -3,6 +3,7 @@ package com.justb81.watchbuddy.tv.ui.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
+import com.justb81.watchbuddy.tv.data.TvShowCache
 import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
 import com.justb81.watchbuddy.tv.network.PhoneApiClientFactory
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -23,7 +24,8 @@ data class TvHomeUiState(
 @HiltViewModel
 class TvHomeViewModel @Inject constructor(
     private val phoneDiscovery: PhoneDiscoveryManager,
-    private val phoneApiClientFactory: PhoneApiClientFactory
+    private val phoneApiClientFactory: PhoneApiClientFactory,
+    private val showCache: TvShowCache
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(TvHomeUiState())
@@ -63,7 +65,10 @@ class TvHomeViewModel @Inject constructor(
                 val bestPhone = phoneDiscovery.getBestPhone()
                 val shows: List<TraktWatchedEntry> = if (bestPhone != null && bestPhone.baseUrl.isNotBlank()) {
                     val client = phoneApiClientFactory.createClient(bestPhone.baseUrl)
-                    client.getShows().also { cachedShows = it }
+                    client.getShows().also {
+                        cachedShows = it
+                        showCache.updateShows(it)
+                    }
                 } else if (cachedShows.isNotEmpty()) {
                     cachedShows
                 } else {
