@@ -5,6 +5,7 @@ import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import okhttp3.logging.HttpLoggingInterceptor
 import javax.inject.Named
 import javax.inject.Singleton
 
@@ -32,4 +33,12 @@ object AppModule {
     @Provides
     @Singleton
     fun provideTokenBackendUrl(): String = BuildConfig.TOKEN_BACKEND_URL
+
+    /** HTTP-Logging: BODY in Debug, NONE in Release (verhindert Token-Leaks). */
+    @Provides
+    @Singleton
+    @Named("httpLoggingLevel")
+    fun provideHttpLoggingLevel(): HttpLoggingInterceptor.Level =
+        if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BODY
+        else HttpLoggingInterceptor.Level.NONE
 }
