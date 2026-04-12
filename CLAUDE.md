@@ -74,13 +74,18 @@ watchbuddy/
 
 ### Git Workflow — IMPORTANT
 
-**Never push directly to `main`.** All changes must go through a Pull Request:
+**Never push directly to `main`.** All changes must go through a Pull Request — no exceptions, including for agents.
+
+**The complete agent workflow:**
 
 1. Create a feature branch from `main`
 2. Make changes and commit using Conventional Commits (see below)
 3. Push the branch and open a PR against `main`
-4. The CI pipeline (`build-android.yml`) runs automatically on every PR
-5. **Wait for a green build before considering the work done.** Do not merge or continue with follow-up changes if the build is red.
+4. **Wait for a green CI build** (`build-android.yml`) — do not continue if the build is red; fix the issue first
+5. **Stop here.** The PR is the deliverable. Do NOT merge into `main` automatically.
+6. Merging into `main` is the owner's decision and happens only on explicit instruction.
+
+> Agents that open multiple PRs without waiting for CI or without owner approval create unreviewed, potentially broken state on `main`. One PR per task, green build, then hand off.
 
 **Branch naming:**
 
