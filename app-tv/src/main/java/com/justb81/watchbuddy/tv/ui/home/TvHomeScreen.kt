@@ -97,6 +97,10 @@ fun TvHomeScreen(
                     }
                 }
 
+                uiState.noPhoneConnected && uiState.shows.isEmpty() -> {
+                    NoPhoneConnectedState(onRetry = { viewModel.loadShows() })
+                }
+
                 uiState.shows.isEmpty() -> {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(
@@ -123,6 +127,27 @@ fun TvHomeScreen(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+private fun NoPhoneConnectedState(onRetry: () -> Unit) {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text     = stringResource(R.string.tv_no_phone),
+                fontSize = 18.sp,
+                color    = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
+                modifier = Modifier.padding(bottom = 24.dp)
+            )
+            Button(
+                onClick = onRetry,
+                scale   = ButtonDefaults.scale(scale = 1f)
+            ) {
+                Text(stringResource(R.string.tv_retry))
             }
         }
     }

@@ -8,6 +8,7 @@
     <string name="tv_all_shows">Todas las series</string>
     <string name="tv_no_shows">No se encontraron series.\nConecta la aplicación WatchBuddy en tu teléfono con Trakt.</string>
     <string name="tv_no_phone">Ningún teléfono conectado.\nInicia la aplicación WatchBuddy en tu smartphone.</string>
+    <string name="tv_retry">Reintentar</string>
     <string name="tv_devices_count">%1$d dispositivo(s)</string>
 
     <!-- User select -->

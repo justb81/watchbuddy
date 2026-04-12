@@ -3,7 +3,7 @@ package com.justb81.watchbuddy.tv.ui.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
-import com.justb81.watchbuddy.core.trakt.TraktApiService
+import com.justb81.watchbuddy.tv.discovery.PhoneApiClientFactory
 import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -16,17 +16,21 @@ data class TvHomeUiState(
     val connectedPhones: Int = 0,
     val bestPhoneName: String? = null,
     val bestPhoneBackend: String? = null,
+    val noPhoneConnected: Boolean = false,
     val error: String? = null
 )
 
 @HiltViewModel
 class TvHomeViewModel @Inject constructor(
-    private val traktApi: TraktApiService,
-    private val phoneDiscovery: PhoneDiscoveryManager
+    private val phoneDiscovery: PhoneDiscoveryManager,
+    private val phoneApiClientFactory: PhoneApiClientFactory
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(TvHomeUiState())
     val uiState: StateFlow<TvHomeUiState> = _uiState.asStateFlow()
+
+    private var cachedShows: List<TraktWatchedEntry>? = null
+    private var cacheTimestamp: Long = 0L
 
     init {
         phoneDiscovery.startDiscovery()
@@ -49,24 +53,42 @@ class TvHomeViewModel @Inject constructor(
         }
     }
 
-    private fun loadShows() {
+    fun loadShows() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null) }
+            _uiState.update { it.copy(isLoading = true, error = null, noPhoneConnected = false) }
             try {
-                // TV fetches shows from the best connected phone's /shows endpoint
                 val bestPhone = phoneDiscovery.getBestPhone()
-                val shows: List<TraktWatchedEntry> = if (bestPhone != null) {
-                    // TODO: fetch via phone HTTP API
-                    emptyList()
+                if (bestPhone != null) {
+                    val api = phoneApiClientFactory.createClient(bestPhone.baseUrl)
+                    val shows = api.getShows()
+                    cachedShows = shows
+                    cacheTimestamp = System.currentTimeMillis()
+                    _uiState.update { it.copy(isLoading = false, shows = shows) }
                 } else {
-                    // Fallback: direct Trakt API (needs token on TV — not ideal)
-                    emptyList()
+                    // No phone — try cache fallback
+                    val cached = getCachedShows()
+                    if (cached != null) {
+                        _uiState.update { it.copy(isLoading = false, shows = cached, noPhoneConnected = true) }
+                    } else {
+                        _uiState.update { it.copy(isLoading = false, noPhoneConnected = true) }
+                    }
                 }
-                _uiState.update { it.copy(isLoading = false, shows = shows) }
             } catch (e: Exception) {
-                _uiState.update { it.copy(isLoading = false, error = e.message) }
+                // Network error — try cache fallback
+                val cached = getCachedShows()
+                if (cached != null) {
+                    _uiState.update { it.copy(isLoading = false, shows = cached, error = e.message) }
+                } else {
+                    _uiState.update { it.copy(isLoading = false, error = e.message, noPhoneConnected = true) }
+                }
             }
         }
+    }
+
+    private fun getCachedShows(): List<TraktWatchedEntry>? {
+        val ttl = 5 * 60 * 1000L // 5 minutes
+        val cached = cachedShows
+        return if (cached != null && System.currentTimeMillis() - cacheTimestamp < ttl) cached else null
     }
 
     override fun onCleared() {

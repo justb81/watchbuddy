@@ -39,7 +39,8 @@ class PhoneDiscoveryManager @Inject constructor(
     data class DiscoveredPhone(
         val serviceInfo: NsdServiceInfo,
         val capability: DeviceCapability?,
-        val score: Int
+        val score: Int,
+        val baseUrl: String
     )
 
     private val discoveryListener = object : NsdManager.DiscoveryListener {
@@ -85,7 +86,8 @@ class PhoneDiscoveryManager @Inject constructor(
                 Json.decodeFromString<DeviceCapability>(it)
             }
             val score = calculateScore(capability)
-            val phone = DiscoveredPhone(serviceInfo, capability, score)
+            val baseUrl = "http://${serviceInfo.host.hostAddress}:${serviceInfo.port}/"
+            val phone = DiscoveredPhone(serviceInfo, capability, score, baseUrl)
             _discoveredPhones.value = (_discoveredPhones.value
                 .filter { it.serviceInfo.serviceName != serviceInfo.serviceName } + phone)
                 .sortedByDescending { it.score }
