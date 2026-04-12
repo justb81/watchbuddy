@@ -3,6 +3,7 @@ package com.justb81.watchbuddy.tv.ui.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
+import com.justb81.watchbuddy.tv.data.TvShowCache
 import com.justb81.watchbuddy.tv.data.UserSessionRepository
 import com.justb81.watchbuddy.tv.discovery.PhoneApiClientFactory
 import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
@@ -26,7 +27,8 @@ data class TvHomeUiState(
 class TvHomeViewModel @Inject constructor(
     private val phoneDiscovery: PhoneDiscoveryManager,
     private val phoneApiClientFactory: PhoneApiClientFactory,
-    private val userSessionRepository: UserSessionRepository
+    private val userSessionRepository: UserSessionRepository,
+    private val tvShowCache: TvShowCache
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(TvHomeUiState())
@@ -80,6 +82,7 @@ class TvHomeViewModel @Inject constructor(
                 val shows = api.getShows()
                 cachedShows = shows
                 cacheTimestamp = System.currentTimeMillis()
+                tvShowCache.updateShows(shows)
                 _uiState.update { it.copy(isLoading = false, shows = shows) }
             } else {
                 val cached = getCachedShows()

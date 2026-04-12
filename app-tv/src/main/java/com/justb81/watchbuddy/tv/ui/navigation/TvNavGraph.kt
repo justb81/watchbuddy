@@ -2,6 +2,7 @@ package com.justb81.watchbuddy.tv.ui.navigation
 
 import androidx.compose.runtime.*
 import androidx.compose.ui.res.stringResource
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -10,10 +11,10 @@ import com.justb81.watchbuddy.core.model.TraktWatchedEntry
 import com.justb81.watchbuddy.tv.ui.home.TvHomeScreen
 import com.justb81.watchbuddy.tv.ui.recap.RecapScreen
 import com.justb81.watchbuddy.tv.ui.scrobble.ScrobbleOverlay
+import com.justb81.watchbuddy.tv.ui.scrobble.ScrobbleViewModel
 import com.justb81.watchbuddy.tv.ui.settings.StreamingSettingsScreen
 import com.justb81.watchbuddy.tv.ui.showdetail.ShowDetailScreen
 import com.justb81.watchbuddy.tv.ui.userselect.UserSelectScreen
-import com.justb81.watchbuddy.core.model.ScrobbleCandidate
 
 sealed class TvRoute(val route: String) {
     object Home       : TvRoute("tv_home")
@@ -30,8 +31,9 @@ fun TvNavGraph() {
     // Shared state: currently selected show (passed between Home → Detail → Recap)
     var selectedEntry by remember { mutableStateOf<TraktWatchedEntry?>(null) }
 
-    // Scrobble overlay state — shown on top of any screen
-    var scrobbleCandidate by remember { mutableStateOf<ScrobbleCandidate?>(null) }
+    // Scrobble overlay — driven by ScrobbleViewModel (Issue #18)
+    val scrobbleViewModel: ScrobbleViewModel = hiltViewModel()
+    val pendingCandidate by scrobbleViewModel.pendingCandidate.collectAsState()
 
     NavHost(
         navController    = navController,
@@ -94,14 +96,11 @@ fun TvNavGraph() {
     }
 
     // Scrobble overlay — renders on top of everything
-    scrobbleCandidate?.let { candidate ->
+    pendingCandidate?.let { candidate ->
         ScrobbleOverlay(
             candidate = candidate,
-            onConfirm = {
-                // TODO: call scrobbler.autoScrobble(candidate)
-                scrobbleCandidate = null
-            },
-            onDismiss = { scrobbleCandidate = null }
+            onConfirm = { scrobbleViewModel.confirmScrobble() },
+            onDismiss = { scrobbleViewModel.dismissScrobble() }
         )
     }
 }
