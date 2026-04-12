@@ -50,9 +50,16 @@ class TokenRepository(context: Context) {
             .apply()
     }
 
+    fun getClientSecret(): String = prefs.getString(KEY_CLIENT_SECRET, "") ?: ""
+
+    fun saveClientSecret(secret: String) {
+        prefs.edit().putString(KEY_CLIENT_SECRET, secret).apply()
+    }
+
     private companion object {
         const val KEY_ACCESS_TOKEN = "access_token"
         const val KEY_REFRESH_TOKEN = "refresh_token"
         const val KEY_EXPIRES_AT = "expires_at"
+        const val KEY_CLIENT_SECRET = "trakt_client_secret"
     }
 }

@@ -26,8 +26,18 @@ fun SettingsScreen(
     val uiState by viewModel.uiState.collectAsState()
     var showAdvanced by remember { mutableStateOf(false) }
     var showDisconnectDialog by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val savedMessage = stringResource(R.string.settings_saved)
+
+    LaunchedEffect(uiState.saveSuccess) {
+        if (uiState.saveSuccess) {
+            snackbarHostState.showSnackbar(savedMessage)
+            viewModel.clearSaveSuccess()
+        }
+    }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.settings_title)) },
