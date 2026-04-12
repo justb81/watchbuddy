@@ -17,6 +17,7 @@ import com.justb81.watchbuddy.phone.llm.LlmOrchestrator
 import com.justb81.watchbuddy.phone.llm.ModelDownloadWorker
 import com.justb81.watchbuddy.phone.server.DeviceCapabilityProvider
 import com.justb81.watchbuddy.phone.settings.AppSettings
+import com.justb81.watchbuddy.phone.settings.AppSettings.Companion.DEFAULT_OLLAMA_URL
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -40,6 +41,7 @@ data class SettingsUiState(
     val llmModelName: String?      = null,
     val llmDownloadProgress: Int?  = null,   // null = not downloading, 0-100 = progress
     val llmReady: Boolean          = false,
+    val ollamaUrl: String           = DEFAULT_OLLAMA_URL,
     val freeRamMb: Int             = 0,
     val saveSuccess: Boolean       = false
 )
@@ -76,7 +78,8 @@ class SettingsViewModel @Inject constructor(
                 customBackendUrl = saved.backendUrl,
                 directClientId = saved.directClientId,
                 directClientSecret = clientSecret,
-                companionRunning = saved.companionEnabled
+                companionRunning = saved.companionEnabled,
+                ollamaUrl = saved.ollamaUrl
             )
         }
     }
@@ -116,6 +119,10 @@ class SettingsViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(directClientSecret = secret)
     }
 
+    fun setOllamaUrl(url: String) {
+        _uiState.value = _uiState.value.copy(ollamaUrl = url)
+    }
+
     fun saveAdvancedSettings() {
         viewModelScope.launch {
             val state = _uiState.value
@@ -124,7 +131,8 @@ class SettingsViewModel @Inject constructor(
                     authMode = state.authMode,
                     backendUrl = state.customBackendUrl,
                     directClientId = state.directClientId,
-                    companionEnabled = state.companionRunning
+                    companionEnabled = state.companionRunning,
+                    ollamaUrl = state.ollamaUrl
                 )
             )
             settingsRepository.saveClientSecret(state.directClientSecret)

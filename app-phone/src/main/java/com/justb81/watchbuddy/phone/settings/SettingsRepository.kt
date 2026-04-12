@@ -35,6 +35,7 @@ class SettingsRepository @Inject constructor(
         val BACKEND_URL = stringPreferencesKey("backend_url")
         val DIRECT_CLIENT_ID = stringPreferencesKey("direct_client_id")
         val COMPANION_ENABLED = booleanPreferencesKey("companion_enabled")
+        val OLLAMA_URL = stringPreferencesKey("ollama_url")
         val MODEL_READY = booleanPreferencesKey("model_ready")
     }
 
@@ -58,7 +59,8 @@ class SettingsRepository @Inject constructor(
                 ?: AuthMode.MANAGED,
             backendUrl = prefs[Keys.BACKEND_URL] ?: "",
             directClientId = prefs[Keys.DIRECT_CLIENT_ID] ?: "",
-            companionEnabled = prefs[Keys.COMPANION_ENABLED] ?: false
+            companionEnabled = prefs[Keys.COMPANION_ENABLED] ?: false,
+            ollamaUrl = prefs[Keys.OLLAMA_URL] ?: AppSettings.DEFAULT_OLLAMA_URL
         )
     }
 
@@ -68,6 +70,7 @@ class SettingsRepository @Inject constructor(
             prefs[Keys.BACKEND_URL] = settings.backendUrl
             prefs[Keys.DIRECT_CLIENT_ID] = settings.directClientId
             prefs[Keys.COMPANION_ENABLED] = settings.companionEnabled
+            prefs[Keys.OLLAMA_URL] = settings.ollamaUrl
         }
     }
 

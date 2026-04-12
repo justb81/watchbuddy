@@ -296,6 +296,23 @@ private fun AdvancedAuthSettings(uiState: SettingsUiState, viewModel: SettingsVi
             else -> {}
         }
 
+        Spacer(Modifier.height(16.dp))
+
+        // Ollama server URL
+        Text(
+            text  = stringResource(R.string.settings_ollama_section),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Spacer(Modifier.height(4.dp))
+        OutlinedTextField(
+            value         = uiState.ollamaUrl,
+            onValueChange = viewModel::setOllamaUrl,
+            label         = { Text(stringResource(R.string.settings_ollama_url)) },
+            modifier      = Modifier.fillMaxWidth(),
+            singleLine    = true
+        )
+
         Spacer(Modifier.height(12.dp))
         Button(
             onClick  = { viewModel.saveAdvancedSettings() },

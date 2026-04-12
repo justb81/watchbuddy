@@ -4,7 +4,10 @@ import android.content.Context
 import android.util.Log
 import com.justb81.watchbuddy.core.model.LlmBackend
 import com.justb81.watchbuddy.core.model.TmdbEpisode
+import com.justb81.watchbuddy.phone.settings.AppSettings
+import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -17,12 +20,11 @@ import javax.inject.Singleton
 @Singleton
 class LlmProviderFactory @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val llmOrchestrator: LlmOrchestrator
+    private val llmOrchestrator: LlmOrchestrator,
+    private val settingsRepository: SettingsRepository
 ) {
     companion object {
         private const val TAG = "LlmProviderFactory"
-        // TODO: make configurable via DataStore / Settings UI
-        private const val DEFAULT_OLLAMA_URL = "http://localhost:11434"
     }
 
     /**
@@ -39,7 +41,9 @@ class LlmProviderFactory @Inject constructor(
         ollamaUrl: String? = null
     ): String {
         val config = llmOrchestrator.selectConfig()
-        val providers = buildProviderCascade(config, episodes, ollamaUrl)
+        val savedSettings = settingsRepository.settings.first()
+        val resolvedOllamaUrl = ollamaUrl ?: savedSettings.ollamaUrl
+        val providers = buildProviderCascade(config, episodes, resolvedOllamaUrl)
 
         for (provider in providers) {
             try {
@@ -81,8 +85,7 @@ class LlmProviderFactory @Inject constructor(
         }
 
         // Remote Ollama as next-to-last resort
-        val url = ollamaUrl ?: DEFAULT_OLLAMA_URL
-        providers += RemoteOllamaProvider(url)
+        providers += RemoteOllamaProvider(ollamaUrl ?: AppSettings.DEFAULT_OLLAMA_URL)
 
         // TMDB synopsis fallback is always last
         providers += FallbackProvider(episodes)
