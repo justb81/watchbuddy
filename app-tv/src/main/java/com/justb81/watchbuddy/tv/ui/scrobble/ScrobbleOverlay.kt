@@ -45,7 +45,7 @@ fun ScrobbleOverlay(
             delay(1_000)
             secondsLeft--
         }
-        onDismiss()
+        onConfirm() // Auto-confirm on countdown expiry
     }
 
     Box(
