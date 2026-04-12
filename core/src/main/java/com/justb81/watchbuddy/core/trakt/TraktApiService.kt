@@ -101,7 +101,16 @@ interface TraktApiService {
 @Serializable data class TraktUserProfile(
     val username: String,
     val name: String? = null,
-    val vip: Boolean = false
+    val vip: Boolean = false,
+    val images: TraktUserImages? = null
+)
+
+@Serializable data class TraktUserImages(
+    val avatar: TraktAvatar? = null
+)
+
+@Serializable data class TraktAvatar(
+    val full: String? = null
 )
 
 @Serializable data class ScrobbleBody(
