@@ -15,17 +15,54 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import androidx.tv.material3.*
 import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.core.model.KNOWN_STREAMING_SERVICES
+import com.justb81.watchbuddy.core.model.StreamingService
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
+import com.justb81.watchbuddy.tv.data.StreamingRepository
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+
+@HiltViewModel
+class ShowDetailViewModel @Inject constructor(
+    private val streamingRepository: StreamingRepository
+) : ViewModel() {
+
+    val subscribedServices: StateFlow<List<StreamingService>> =
+        streamingRepository.subscribedServices.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = emptyList()
+        )
+
+    private val _subscribedIds = MutableStateFlow<Set<String>>(emptySet())
+
+    init {
+        viewModelScope.launch {
+            streamingRepository.subscribedServiceIds.collect { ids ->
+                _subscribedIds.value = ids
+            }
+        }
+    }
+
+    fun resolveDeepLink(tmdbId: Int): String? {
+        return streamingRepository.resolveDeepLink(tmdbId, _subscribedIds.value)
+    }
+}
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun ShowDetailScreen(
     entry: TraktWatchedEntry,
     onRecapClick: () -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    viewModel: ShowDetailViewModel = hiltViewModel()
 ) {
     val context      = LocalContext.current
     val lastSeason   = entry.seasons.maxByOrNull { it.number }
@@ -33,6 +70,15 @@ fun ShowDetailScreen(
     val nextSeason   = lastSeason?.number ?: 1
     val nextEpisode  = (lastEpisode?.number ?: 0) + 1
     val tmdbId       = entry.show.ids.tmdb
+
+    val subscribedServices by viewModel.subscribedServices.collectAsState()
+
+    // Show subscribed services if available, otherwise show all known as fallback
+    val displayedServices = if (subscribedServices.isNotEmpty()) {
+        subscribedServices
+    } else {
+        KNOWN_STREAMING_SERVICES
+    }
 
     Box(
         modifier = Modifier
@@ -115,10 +161,12 @@ fun ShowDetailScreen(
             // Action buttons
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
 
-                // Watch Now — deep link
+                // Watch Now — deep link using user's preferred streaming service
                 Button(
                     onClick = {
-                        val deepLink = resolveDeepLink(entry, nextSeason, nextEpisode)
+                        val deepLink = if (tmdbId != null) {
+                            viewModel.resolveDeepLink(tmdbId)
+                        } else null
                         if (deepLink != null) {
                             context.startActivity(
                                 Intent(Intent.ACTION_VIEW, Uri.parse(deepLink))
@@ -147,16 +195,15 @@ fun ShowDetailScreen(
                 }
             }
 
-            // Streaming service list
-            if (KNOWN_STREAMING_SERVICES.isNotEmpty()) {
+            // Streaming service list — shows user's subscribed services
+            if (displayedServices.isNotEmpty()) {
                 Text(
                     text     = stringResource(R.string.tv_available_at),
                     fontSize = 12.sp,
                     color    = Color.White.copy(alpha = 0.4f)
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    // TODO: resolve actual availability via JustWatch / user mapping
-                    KNOWN_STREAMING_SERVICES.take(4).forEach { service ->
+                    displayedServices.take(4).forEach { service ->
                         MetaChip(service.name, color = Color(0xFF1C1C1E))
                     }
                 }
@@ -189,18 +236,4 @@ private fun MetaChip(text: String, color: Color = Color(0xFF2C2C2E)) {
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
         )
     }
-}
-
-/**
- * Resolves the best available deep link for a show.
- * TODO: replace with user-configured streaming service mapping.
- */
-private fun resolveDeepLink(
-    entry: TraktWatchedEntry,
-    season: Int,
-    episode: Int
-): String? {
-    val tmdbId = entry.show.ids.tmdb ?: return null
-    // Default to Netflix — real implementation checks user's subscriptions
-    return "https://www.netflix.com/title/$tmdbId"
 }
