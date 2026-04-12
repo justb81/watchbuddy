@@ -22,7 +22,7 @@ import javax.inject.Singleton
  *   1. MediaSessionManager.getActiveSessions() returns all active sessions
  *   2. Extract package name + media title from session metadata
  *   3. Fuzzy-match title against user's Trakt watchlist
- *   4. Confidence ≥ 0.9 → auto-scrobble; < 0.9 → emit ScrobbleCandidate for UI confirmation
+ *   4. Confidence ≥ 0.95 → auto-scrobble; 0.70–0.95 → emit ScrobbleCandidate for UI confirmation
  *   5. On playback stop/pause → call Trakt scrobble/stop
  */
 @Singleton
@@ -31,7 +31,8 @@ class MediaSessionScrobbler @Inject constructor(
     private val traktApi: TraktApiService
 ) {
     companion object {
-        const val AUTO_SCROBBLE_THRESHOLD = 0.90f
+        const val AUTO_SCROBBLE_THRESHOLD = 0.95f
+        const val CONFIRMATION_THRESHOLD = 0.70f
     }
 
     private val _pendingConfirmation = MutableSharedFlow<ScrobbleCandidate>()
@@ -75,10 +76,10 @@ class MediaSessionScrobbler @Inject constructor(
     private suspend fun processPlayingMedia(packageName: String, rawTitle: String) {
         val candidate = matchTitleToTrakt(packageName, rawTitle)
         if (candidate != null) {
-            if (candidate.confidence >= AUTO_SCROBBLE_THRESHOLD) {
-                autoScrobble(candidate)
-            } else {
-                _pendingConfirmation.emit(candidate)
+            when {
+                candidate.confidence >= AUTO_SCROBBLE_THRESHOLD -> autoScrobble(candidate)
+                candidate.confidence >= CONFIRMATION_THRESHOLD  -> _pendingConfirmation.emit(candidate)
+                // Below CONFIRMATION_THRESHOLD → ignore (too uncertain)
             }
         }
     }
@@ -112,7 +113,7 @@ class MediaSessionScrobbler @Inject constructor(
         )
     }
 
-    private suspend fun autoScrobble(candidate: ScrobbleCandidate) {
+    suspend fun autoScrobble(candidate: ScrobbleCandidate) {
         // TODO: retrieve stored access_token from secure storage and call traktApi.scrobbleStart()
     }
 }
