@@ -8,6 +8,7 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import kotlinx.serialization.json.Json
+import okhttp3.CertificatePinner
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -26,11 +27,21 @@ object NetworkModule {
         coerceInputValues = true
     }
 
+    // Pin intermediate CA certificates for Trakt and TMDB APIs.
+    // Using wildcard pins on intermediate CAs for resilience during leaf cert rotation.
+    private val certificatePinner = CertificatePinner.Builder()
+        .add("api.trakt.tv", "sha256/jQJTbIh0grw0/1TkHSumWb+Fs0Ggogr621gT3PvPKG0=")         // Let's Encrypt R3
+        .add("api.trakt.tv", "sha256/C5+lpZ7tcVwmwQIMcRtPbsQtWLABXhQzejna0wHFr8M=")         // ISRG Root X1
+        .add("api.themoviedb.org", "sha256/jQJTbIh0grw0/1TkHSumWb+Fs0Ggogr621gT3PvPKG0=")    // Let's Encrypt R3
+        .add("api.themoviedb.org", "sha256/C5+lpZ7tcVwmwQIMcRtPbsQtWLABXhQzejna0wHFr8M=")    // ISRG Root X1
+        .build()
+
     @Provides
     @Singleton
     fun provideOkHttpClient(
         @Named("isDebugBuild") isDebug: Boolean
     ): OkHttpClient = OkHttpClient.Builder()
+        .certificatePinner(certificatePinner)
         .addInterceptor { chain ->
             // Trakt required headers
             val request = chain.request().newBuilder()

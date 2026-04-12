@@ -1,6 +1,5 @@
 package com.justb81.watchbuddy.tv.ui.recap
 
-import android.annotation.SuppressLint
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.background
@@ -152,7 +151,6 @@ fun RecapScreen(
     }
 }
 
-@SuppressLint("SetJavaScriptEnabled")
 @Composable
 private fun RecapWebView(html: String) {
     // Wrap HTML in a full page with dark background and slide animation
@@ -219,7 +217,7 @@ private fun RecapWebView(html: String) {
         factory = { ctx ->
             WebView(ctx).apply {
                 webViewClient = WebViewClient()
-                settings.javaScriptEnabled = true
+                settings.javaScriptEnabled = false
                 settings.loadWithOverviewMode = true
                 settings.useWideViewPort = true
                 setBackgroundColor(android.graphics.Color.TRANSPARENT)

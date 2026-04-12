@@ -28,6 +28,24 @@ class RecapGenerator @Inject constructor(
         private const val TAG = "RecapGenerator"
         // TMDB still placeholder pattern: data-tmdb-still="S{season}E{episode}"
         private val STILL_PLACEHOLDER_REGEX = Regex("""data-tmdb-still="S(\d+)E(\d+)"""")
+
+        // HTML sanitization: strip dangerous tags and event handlers to prevent XSS
+        private val DANGEROUS_TAGS_REGEX = Regex(
+            """<\s*/?\s*(script|iframe|object|embed|form|link|meta|base|applet)\b[^>]*>""",
+            setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)
+        )
+        private val DANGEROUS_TAG_CONTENT_REGEX = Regex(
+            """<\s*(script|style)\b[^>]*>.*?<\s*/\s*\1\s*>""",
+            setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)
+        )
+        private val EVENT_HANDLER_REGEX = Regex(
+            """\s+on\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]*)""",
+            RegexOption.IGNORE_CASE
+        )
+        private val JAVASCRIPT_URL_REGEX = Regex(
+            """(href|src|action)\s*=\s*["']?\s*javascript:""",
+            RegexOption.IGNORE_CASE
+        )
     }
 
     /**
@@ -44,7 +62,8 @@ class RecapGenerator @Inject constructor(
     ): String {
         val prompt = buildPrompt(show, watchedEpisodes, targetEpisode)
         val rawHtml = inferWithLlm(prompt, watchedEpisodes)
-        return replaceTmdbPlaceholders(rawHtml, watchedEpisodes, apiKey)
+        val sanitized = sanitizeHtml(rawHtml)
+        return replaceTmdbPlaceholders(sanitized, watchedEpisodes, apiKey)
     }
 
     private fun buildPrompt(
@@ -85,6 +104,18 @@ Respond in $language.
     private suspend fun inferWithLlm(prompt: String, episodes: List<TmdbEpisode>): String {
         Log.d(TAG, "Starting LLM inference with cascade fallback")
         return llmProviderFactory.generateWithCascade(prompt, episodes)
+    }
+
+    /**
+     * Strips dangerous HTML elements and attributes to prevent XSS when rendered in WebView.
+     * Removes: script/iframe/object/embed/form tags, on* event handlers, javascript: URLs.
+     */
+    private fun sanitizeHtml(html: String): String {
+        var sanitized = DANGEROUS_TAG_CONTENT_REGEX.replace(html, "")
+        sanitized = DANGEROUS_TAGS_REGEX.replace(sanitized, "")
+        sanitized = EVENT_HANDLER_REGEX.replace(sanitized, "")
+        sanitized = JAVASCRIPT_URL_REGEX.replace(sanitized, """$1="about:blank""")
+        return sanitized
     }
 
     private fun replaceTmdbPlaceholders(

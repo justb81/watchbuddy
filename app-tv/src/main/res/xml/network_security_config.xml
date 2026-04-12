@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Allow cleartext by default because the TV discovers phone companions via
+         mDNS and connects to their dynamic LAN IPs over HTTP (port 8765).
+         Android's domain-config cannot express LAN IP ranges, so cleartext must
+         stay permitted at the base level. Certificate pinning in NetworkModule
+         protects the HTTPS API calls (Trakt, TMDB) independently. -->
+    <base-config cleartextTrafficPermitted="true" />
+
+    <!-- Enforce HTTPS-only for external API hosts -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">api.trakt.tv</domain>
+        <domain includeSubdomains="true">api.themoviedb.org</domain>
+    </domain-config>
+</network-security-config>
