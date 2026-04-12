@@ -1,5 +1,45 @@
 # Changelog
 
+## [0.1.3](https://github.com/justb81/watchbuddy/compare/v0.1.2...v0.1.3) (2026-04-12)
+
+
+### Features
+
+* **phone:** implement /shows, /recap and /auth/token endpoints ([7abae27](https://github.com/justb81/watchbuddy/commit/7abae27f89595981bd4627700768793310f04988))
+* **phone:** implement /shows, /recap and /auth/token endpoints in CompanionHttpServer ([ff0ae58](https://github.com/justb81/watchbuddy/commit/ff0ae58e4e7d544bdc10636d1649c1b147be0a81)), closes [#8](https://github.com/justb81/watchbuddy/issues/8)
+* **phone:** implement CompanionService as Android Foreground Service ([a3319eb](https://github.com/justb81/watchbuddy/commit/a3319eb8dbde2f6687f8a53b6c69a0c40035a69e))
+* **phone:** implement CompanionService as Android Foreground Service ([e8fa845](https://github.com/justb81/watchbuddy/commit/e8fa845f47d828bb299a4cf6bd6df729043db0e5)), closes [#12](https://github.com/justb81/watchbuddy/issues/12)
+* **phone:** implement LLM model download via WorkManager ([f3745ff](https://github.com/justb81/watchbuddy/commit/f3745ff07e9300c65b77ed9b453bd6fa31681dd0))
+* **phone:** implement LLM model download via WorkManager ([0b6567d](https://github.com/justb81/watchbuddy/commit/0b6567dc5c2f0efbbd92b9e8d0cdc06f059dfbe3)), closes [#13](https://github.com/justb81/watchbuddy/issues/13)
+* **phone:** implement LLM provider routing in RecapGenerator ([5487619](https://github.com/justb81/watchbuddy/commit/54876198ce77849b12a65b8e74938072f3172479))
+* **phone:** implement LLM provider routing in RecapGenerator ([351baab](https://github.com/justb81/watchbuddy/commit/351baab44caedb7cce0d87f76630052419cc5388)), closes [#9](https://github.com/justb81/watchbuddy/issues/9)
+* **phone:** load username from Trakt profile in DeviceCapabilityProvider ([5a25904](https://github.com/justb81/watchbuddy/commit/5a2590437ebf6deb0ea84c8d9cbd0798a1cdc916))
+* **phone:** load username from Trakt profile in DeviceCapabilityProvider ([678b743](https://github.com/justb81/watchbuddy/commit/678b743123c327e16309bdf920b6e6f6d2ce4092)), closes [#21](https://github.com/justb81/watchbuddy/issues/21)
+* **phone:** navigate to Onboarding on Trakt disconnect ([6b8dc9c](https://github.com/justb81/watchbuddy/commit/6b8dc9c64932dd5094d7739ee678118335b550f4))
+* **phone:** navigate to Onboarding on Trakt disconnect ([234a9fb](https://github.com/justb81/watchbuddy/commit/234a9fb335fab30c5d4b75b5fd403b44c4c4f5d0)), closes [#10](https://github.com/justb81/watchbuddy/issues/10)
+* **phone:** persist settings in DataStore ([6bdfb14](https://github.com/justb81/watchbuddy/commit/6bdfb1466eaa8962d7d4f7cd6810f0dbebcb3fd5))
+* **phone:** persist settings in DataStore ([c1777ec](https://github.com/justb81/watchbuddy/commit/c1777ec6954039323b424da9eeab459c256306c0)), closes [#11](https://github.com/justb81/watchbuddy/issues/11)
+* **phone:** persist Trakt token in EncryptedSharedPreferences ([7136bd2](https://github.com/justb81/watchbuddy/commit/7136bd213942d012443bf20300b37a8fe56ca24c))
+* **phone:** persist Trakt token in EncryptedSharedPreferences ([52fb511](https://github.com/justb81/watchbuddy/commit/52fb511ffcd00f24b71c575fcd2d01b5a0c05b3a)), closes [#7](https://github.com/justb81/watchbuddy/issues/7)
+* Trakt token proxy integration ([6cad884](https://github.com/justb81/watchbuddy/commit/6cad884300ed3db0584f528eabcc46ce4fd12214))
+* **tv:** implement scrobble system (Issues [#15](https://github.com/justb81/watchbuddy/issues/15), [#16](https://github.com/justb81/watchbuddy/issues/16), [#18](https://github.com/justb81/watchbuddy/issues/18)) ([9552456](https://github.com/justb81/watchbuddy/commit/9552456554ca7c49791f215a127dd0200f9dc02a))
+* **tv:** implement scrobble system (Issues [#15](https://github.com/justb81/watchbuddy/issues/15), [#16](https://github.com/justb81/watchbuddy/issues/16), [#18](https://github.com/justb81/watchbuddy/issues/18)) ([7538ce5](https://github.com/justb81/watchbuddy/commit/7538ce5a3705d5504090e20e5ca85f02d7cf64b9))
+* **tv:** implement scrobble system with fuzzy matching, Trakt API, and overlay wiring ([3b82d52](https://github.com/justb81/watchbuddy/commit/3b82d523dac75f9ba96e1baea95b427abfb5f58d))
+* **tv:** load shows from Phone companion via HTTP API ([8aed994](https://github.com/justb81/watchbuddy/commit/8aed9941e41e8e728ee870a4f53e5e9a6d8e8fa1))
+* **tv:** load shows from Phone companion via HTTP API ([853560e](https://github.com/justb81/watchbuddy/commit/853560ef9fd48024ec01bdd1e4f00ada32258c44)), closes [#14](https://github.com/justb81/watchbuddy/issues/14)
+* **tv:** persist selected user IDs in DataStore ([5833c62](https://github.com/justb81/watchbuddy/commit/5833c62a59d80f3d332337c9faae3eccc47fd3a2))
+* **tv:** persist selected user IDs in DataStore ([213f943](https://github.com/justb81/watchbuddy/commit/213f943e51146289c4d2060df1be5148263fb1a4)), closes [#17](https://github.com/justb81/watchbuddy/issues/17)
+* **tv:** resolve streaming availability via user preference mapping ([3aadfd3](https://github.com/justb81/watchbuddy/commit/3aadfd3bd77f5dda64262b749b26bca3a587969e))
+* **tv:** resolve streaming availability via user preference mapping ([6d2bdfa](https://github.com/justb81/watchbuddy/commit/6d2bdfaa7143b91c8975682cc57b7bca1353b463)), closes [#19](https://github.com/justb81/watchbuddy/issues/19)
+
+
+### Bug Fixes
+
+* **core:** disable HTTP logging in release builds ([61f41bc](https://github.com/justb81/watchbuddy/commit/61f41bc09f71249d0f9187320ee181f707832d4a))
+* **core:** disable HTTP logging in release builds ([585d983](https://github.com/justb81/watchbuddy/commit/585d983342ebcf6575f2c538776df43fe0a2774e)), closes [#20](https://github.com/justb81/watchbuddy/issues/20)
+* **core:** inject Boolean instead of OkHttp type for logging level ([2d02a0e](https://github.com/justb81/watchbuddy/commit/2d02a0ed6c4ca9ad03b5fce07fb5dfbcff561c8e))
+* **tv:** use correct DataStore preferences key factory functions ([33da4fa](https://github.com/justb81/watchbuddy/commit/33da4fabe5ba9c3140c5bb922047f0c0bd1aae14))
+
 ## [0.1.2](https://github.com/justb81/watchbuddy/compare/v0.1.1...v0.1.2) (2026-04-12)
 
 
