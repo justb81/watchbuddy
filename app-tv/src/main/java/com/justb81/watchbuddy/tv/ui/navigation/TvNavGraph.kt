@@ -54,10 +54,7 @@ fun TvNavGraph() {
 
         composable(TvRoute.UserSelect.route) {
             UserSelectScreen(
-                onConfirm = { selectedIds ->
-                    // TODO: persist selected user IDs to session state
-                    navController.popBackStack()
-                },
+                onConfirm = { navController.popBackStack() },
                 onBack = { navController.popBackStack() }
             )
         }

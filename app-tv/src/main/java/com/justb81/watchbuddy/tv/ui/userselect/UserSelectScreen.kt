@@ -25,7 +25,7 @@ import com.justb81.watchbuddy.core.model.LlmBackend
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun UserSelectScreen(
-    onConfirm: (Set<String>) -> Unit,
+    onConfirm: () -> Unit,
     onBack: () -> Unit,
     viewModel: UserSelectViewModel = hiltViewModel()
 ) {
@@ -84,7 +84,10 @@ fun UserSelectScreen(
                 }
 
                 Button(
-                    onClick  = { onConfirm(selectedIds) },
+                    onClick  = {
+                        viewModel.persistSelection()
+                        onConfirm()
+                    },
                     enabled  = selectedIds.isNotEmpty()
                 ) {
                     Text(

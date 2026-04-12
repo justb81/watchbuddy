@@ -3,6 +3,7 @@ package com.justb81.watchbuddy.tv.ui.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
+import com.justb81.watchbuddy.tv.data.UserSessionRepository
 import com.justb81.watchbuddy.tv.discovery.PhoneApiClientFactory
 import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -13,6 +14,7 @@ import javax.inject.Inject
 data class TvHomeUiState(
     val isLoading: Boolean = true,
     val shows: List<TraktWatchedEntry> = emptyList(),
+    val selectedUserIds: Set<String> = emptySet(),
     val connectedPhones: Int = 0,
     val bestPhoneName: String? = null,
     val bestPhoneBackend: String? = null,
@@ -23,7 +25,8 @@ data class TvHomeUiState(
 @HiltViewModel
 class TvHomeViewModel @Inject constructor(
     private val phoneDiscovery: PhoneDiscoveryManager,
-    private val phoneApiClientFactory: PhoneApiClientFactory
+    private val phoneApiClientFactory: PhoneApiClientFactory,
+    private val userSessionRepository: UserSessionRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(TvHomeUiState())
@@ -35,7 +38,7 @@ class TvHomeViewModel @Inject constructor(
     init {
         phoneDiscovery.startDiscovery()
         observePhones()
-        loadShows()
+        observeSelectedUsers()
     }
 
     private fun observePhones() {
@@ -53,34 +56,45 @@ class TvHomeViewModel @Inject constructor(
         }
     }
 
+    private fun observeSelectedUsers() {
+        viewModelScope.launch {
+            userSessionRepository.selectedUserIds.collect { ids ->
+                _uiState.update { it.copy(selectedUserIds = ids) }
+                loadShows(ids)
+            }
+        }
+    }
+
     fun loadShows() {
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null, noPhoneConnected = false) }
-            try {
-                val bestPhone = phoneDiscovery.getBestPhone()
-                if (bestPhone != null) {
-                    val api = phoneApiClientFactory.createClient(bestPhone.baseUrl)
-                    val shows = api.getShows()
-                    cachedShows = shows
-                    cacheTimestamp = System.currentTimeMillis()
-                    _uiState.update { it.copy(isLoading = false, shows = shows) }
-                } else {
-                    // No phone — try cache fallback
-                    val cached = getCachedShows()
-                    if (cached != null) {
-                        _uiState.update { it.copy(isLoading = false, shows = cached, noPhoneConnected = true) }
-                    } else {
-                        _uiState.update { it.copy(isLoading = false, noPhoneConnected = true) }
-                    }
-                }
-            } catch (e: Exception) {
-                // Network error — try cache fallback
+            loadShows(_uiState.value.selectedUserIds)
+        }
+    }
+
+    private suspend fun loadShows(selectedUserIds: Set<String>) {
+        _uiState.update { it.copy(isLoading = true, error = null, noPhoneConnected = false) }
+        try {
+            val bestPhone = phoneDiscovery.getBestPhone()
+            if (bestPhone != null) {
+                val api = phoneApiClientFactory.createClient(bestPhone.baseUrl)
+                val shows = api.getShows()
+                cachedShows = shows
+                cacheTimestamp = System.currentTimeMillis()
+                _uiState.update { it.copy(isLoading = false, shows = shows) }
+            } else {
                 val cached = getCachedShows()
                 if (cached != null) {
-                    _uiState.update { it.copy(isLoading = false, shows = cached, error = e.message) }
+                    _uiState.update { it.copy(isLoading = false, shows = cached, noPhoneConnected = true) }
                 } else {
-                    _uiState.update { it.copy(isLoading = false, error = e.message, noPhoneConnected = true) }
+                    _uiState.update { it.copy(isLoading = false, noPhoneConnected = true) }
                 }
+            }
+        } catch (e: Exception) {
+            val cached = getCachedShows()
+            if (cached != null) {
+                _uiState.update { it.copy(isLoading = false, shows = cached, error = e.message) }
+            } else {
+                _uiState.update { it.copy(isLoading = false, error = e.message, noPhoneConnected = true) }
             }
         }
     }
