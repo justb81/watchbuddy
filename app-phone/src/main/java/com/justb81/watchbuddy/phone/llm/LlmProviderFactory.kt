@@ -8,6 +8,7 @@ import com.justb81.watchbuddy.phone.settings.AppSettings
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.first
+import okhttp3.OkHttpClient
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -21,7 +22,8 @@ import javax.inject.Singleton
 class LlmProviderFactory @Inject constructor(
     @ApplicationContext private val context: Context,
     private val llmOrchestrator: LlmOrchestrator,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val httpClient: OkHttpClient
 ) {
     companion object {
         private const val TAG = "LlmProviderFactory"
@@ -85,7 +87,7 @@ class LlmProviderFactory @Inject constructor(
         }
 
         // Remote Ollama as next-to-last resort
-        providers += RemoteOllamaProvider(ollamaUrl ?: AppSettings.DEFAULT_OLLAMA_URL)
+        providers += RemoteOllamaProvider(ollamaUrl ?: AppSettings.DEFAULT_OLLAMA_URL, httpClient = httpClient)
 
         // TMDB synopsis fallback is always last
         providers += FallbackProvider(episodes)
