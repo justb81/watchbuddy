@@ -59,6 +59,21 @@ watchbuddy/
 
 ## Key Conventions
 
+### Language — MANDATORY
+
+**All content in this repository must be written in English.** This applies to everything, without exception:
+
+- Code: variable names, function names, class names, constants
+- Comments and documentation strings
+- Commit messages (Conventional Commits, in English)
+- Pull request titles and descriptions
+- GitHub issue titles, descriptions, and comments
+- Markdown files (README, CLAUDE.md, architecture docs, CHANGELOG, etc.)
+- CI/CD configuration and log messages
+- Code review comments
+
+The only exceptions are **localization string resources** (`values-de/`, `values-fr/`, `values-es/`) which contain translated user-facing strings by design. The default `values/strings.xml` must remain in English.
+
 ### Code Style
 - Kotlin official code style (`kotlin.code.style=official`)
 - Compose UI follows single-Activity, screen-level composables
