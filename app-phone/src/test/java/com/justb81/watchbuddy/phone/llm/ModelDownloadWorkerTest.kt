@@ -48,7 +48,10 @@ class ModelDownloadWorkerTest {
         server.shutdown()
     }
 
-    private fun createWorker(modelUrl: String?): ModelDownloadWorker {
+    private fun createWorker(
+        modelUrl: String?,
+        attemptCount: Int = 1
+    ): ModelDownloadWorker {
         val inputData = if (modelUrl != null) {
             Data.Builder()
                 .putString(ModelDownloadWorker.KEY_MODEL_URL, modelUrl)
@@ -57,7 +60,8 @@ class ModelDownloadWorkerTest {
             Data.EMPTY
         }
         every { workerParams.inputData } returns inputData
-        every { workerParams.runAttemptCount } returns 1
+        // Must be set before construction — ListenableWorker caches this value
+        every { workerParams.runAttemptCount } returns attemptCount
         // Use spyk to intercept setProgress which would otherwise hang
         // because the mocked WorkerParameters cannot provide a real ProgressUpdater
         val worker = spyk(
@@ -100,8 +104,7 @@ class ModelDownloadWorkerTest {
     fun `returns retry on HTTP error when attempts remain`() = runTest {
         server.enqueue(MockResponse().setResponseCode(500).setBody("Server Error"))
 
-        every { workerParams.runAttemptCount } returns 1
-        val worker = createWorker(server.url("/model.bin").toString())
+        val worker = createWorker(server.url("/model.bin").toString(), attemptCount = 1)
         val result = worker.doWork()
 
         assertTrue(result is Result.Retry)
@@ -111,8 +114,7 @@ class ModelDownloadWorkerTest {
     fun `returns failure on HTTP error when max retries exceeded`() = runTest {
         server.enqueue(MockResponse().setResponseCode(500).setBody("Server Error"))
 
-        every { workerParams.runAttemptCount } returns 3
-        val worker = createWorker(server.url("/model.bin").toString())
+        val worker = createWorker(server.url("/model.bin").toString(), attemptCount = 3)
         val result = worker.doWork()
 
         assertTrue(result is Result.Failure)
