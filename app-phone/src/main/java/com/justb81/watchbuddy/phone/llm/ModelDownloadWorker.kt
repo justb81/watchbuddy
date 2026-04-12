@@ -19,7 +19,8 @@ import java.util.concurrent.TimeUnit
 class ModelDownloadWorker @AssistedInject constructor(
     @Assisted appContext: Context,
     @Assisted workerParams: WorkerParameters,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val httpClient: OkHttpClient
 ) : CoroutineWorker(appContext, workerParams) {
 
     override suspend fun doWork(): Result {
@@ -48,13 +49,13 @@ class ModelDownloadWorker @AssistedInject constructor(
     }
 
     private suspend fun downloadFile(url: String, target: File) {
-        val client = OkHttpClient.Builder()
+        val downloadClient = httpClient.newBuilder()
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(60, TimeUnit.SECONDS)
             .build()
 
         val request = Request.Builder().url(url).build()
-        val response = client.newCall(request).execute()
+        val response = downloadClient.newCall(request).execute()
 
         if (!response.isSuccessful) {
             throw RuntimeException("HTTP ${response.code}: ${response.message}")

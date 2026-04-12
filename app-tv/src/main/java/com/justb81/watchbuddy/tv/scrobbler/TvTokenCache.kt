@@ -3,6 +3,7 @@ package com.justb81.watchbuddy.tv.scrobbler
 import android.util.Log
 import com.justb81.watchbuddy.tv.discovery.PhoneApiClientFactory
 import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
+import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -23,22 +24,21 @@ class TvTokenCache @Inject constructor(
         private const val CACHE_TTL = 30 * 60 * 1000L // 30 minutes
     }
 
-    @Volatile
-    private var cachedToken: String? = null
-    private var tokenTimestamp: Long = 0L
+    private data class CachedToken(val token: String, val timestamp: Long)
+
+    private val cached = AtomicReference<CachedToken?>(null)
 
     suspend fun getToken(): String? {
         val now = System.currentTimeMillis()
-        cachedToken?.let { token ->
-            if (now - tokenTimestamp < CACHE_TTL) return token
+        cached.get()?.let { entry ->
+            if (now - entry.timestamp < CACHE_TTL) return entry.token
         }
 
         val phone = phoneDiscovery.getBestPhone() ?: return null
         return try {
             val client = phoneApiClientFactory.createClient(phone.baseUrl)
             val response = client.getAccessToken()
-            cachedToken = response.accessToken
-            tokenTimestamp = System.currentTimeMillis()
+            cached.set(CachedToken(response.accessToken, System.currentTimeMillis()))
             response.accessToken
         } catch (e: Exception) {
             Log.w(TAG, "Failed to fetch access token from phone", e)
@@ -47,7 +47,6 @@ class TvTokenCache @Inject constructor(
     }
 
     fun invalidate() {
-        cachedToken = null
-        tokenTimestamp = 0L
+        cached.set(null)
     }
 }

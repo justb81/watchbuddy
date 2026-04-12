@@ -18,9 +18,14 @@ import 'dotenv/config';
 import express from 'express';
 import fetch from 'node-fetch';
 import rateLimit from 'express-rate-limit';
+import cors from 'cors';
 
 const app = express();
 app.use(express.json());
+
+// CORS — restrict to configured origins or disable entirely
+const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',').map(o => o.trim()).filter(Boolean);
+app.use(cors(allowedOrigins?.length ? { origin: allowedOrigins } : { origin: false }));
 
 // Rate limiting — Trakt allows 1000 calls/5min per app
 const limiter = rateLimit({
@@ -31,11 +36,28 @@ const limiter = rateLimit({
 app.use('/trakt', limiter);
 
 const TRAKT_API = 'https://api.trakt.tv';
+const FETCH_TIMEOUT_MS = 15_000;
 const { TRAKT_CLIENT_ID, TRAKT_CLIENT_SECRET, PORT = 3000 } = process.env;
 
 if (!TRAKT_CLIENT_ID || !TRAKT_CLIENT_SECRET) {
   console.error('ERROR: TRAKT_CLIENT_ID and TRAKT_CLIENT_SECRET must be set in .env');
   process.exit(1);
+}
+
+/** Input validation: alphanumeric string with limited length. */
+function isValidToken(value) {
+  return typeof value === 'string' && value.length > 0 && value.length <= 256 && /^[a-zA-Z0-9_\-]+$/.test(value);
+}
+
+/** Fetch with timeout via AbortController. */
+async function fetchWithTimeout(url, options) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 // ── POST /trakt/token ─────────────────────────────────────────────────────────
@@ -44,9 +66,10 @@ if (!TRAKT_CLIENT_ID || !TRAKT_CLIENT_SECRET) {
 app.post('/trakt/token', async (req, res) => {
   const { code } = req.body;
   if (!code) return res.status(400).json({ error: 'Missing code' });
+  if (!isValidToken(code)) return res.status(400).json({ error: 'Invalid code format' });
 
   try {
-    const traktRes = await fetch(`${TRAKT_API}/oauth/device/token`, {
+    const traktRes = await fetchWithTimeout(`${TRAKT_API}/oauth/device/token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -71,6 +94,10 @@ app.post('/trakt/token', async (req, res) => {
       scope: data.scope
     });
   } catch (err) {
+    if (err.name === 'AbortError') {
+      console.error('Token exchange timed out');
+      return res.status(504).json({ error: 'Upstream timeout' });
+    }
     console.error('Token exchange error:', err);
     return res.status(502).json({ error: 'Upstream error' });
   }
@@ -81,9 +108,10 @@ app.post('/trakt/token', async (req, res) => {
 app.post('/trakt/token/refresh', async (req, res) => {
   const { refresh_token } = req.body;
   if (!refresh_token) return res.status(400).json({ error: 'Missing refresh_token' });
+  if (!isValidToken(refresh_token)) return res.status(400).json({ error: 'Invalid refresh_token format' });
 
   try {
-    const traktRes = await fetch(`${TRAKT_API}/oauth/token`, {
+    const traktRes = await fetchWithTimeout(`${TRAKT_API}/oauth/token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -103,6 +131,10 @@ app.post('/trakt/token/refresh', async (req, res) => {
       expires_in: data.expires_in
     });
   } catch (err) {
+    if (err.name === 'AbortError') {
+      console.error('Token refresh timed out');
+      return res.status(504).json({ error: 'Upstream timeout' });
+    }
     console.error('Token refresh error:', err);
     return res.status(502).json({ error: 'Upstream error' });
   }
