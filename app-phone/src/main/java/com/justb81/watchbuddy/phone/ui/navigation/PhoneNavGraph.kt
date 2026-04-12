@@ -16,7 +16,7 @@ sealed class PhoneRoute(val route: String) {
 
 @Composable
 fun PhoneNavGraph(
-    startDestination: String = PhoneRoute.Onboarding.route  // TODO: check token → skip to Home
+    startDestination: String = PhoneRoute.Onboarding.route
 ) {
     val navController = rememberNavController()
 
