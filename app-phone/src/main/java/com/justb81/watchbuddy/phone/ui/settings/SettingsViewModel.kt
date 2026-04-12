@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.phone.auth.TokenRepository
 import com.justb81.watchbuddy.phone.llm.LlmOrchestrator
+import com.justb81.watchbuddy.phone.service.CompanionService
 import com.justb81.watchbuddy.phone.settings.AppSettings
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -109,6 +110,12 @@ class SettingsViewModel @Inject constructor(
     fun toggleCompanionService() {
         val newState = !_uiState.value.companionRunning
         _uiState.value = _uiState.value.copy(companionRunning = newState)
+        val context = getApplication<Application>()
+        if (newState) {
+            CompanionService.start(context)
+        } else {
+            CompanionService.stop(context)
+        }
         viewModelScope.launch {
             settingsRepository.setCompanionEnabled(newState)
         }

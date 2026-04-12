@@ -66,6 +66,12 @@
     <string name="settings_not_connected">Not connected</string>
     <string name="settings_llm_detecting">Detecting…</string>
 
+    <!-- Companion Service -->
+    <string name="companion_notification_title">WatchBuddy Companion</string>
+    <string name="companion_notification_text">TV connection active on port 8765</string>
+    <string name="companion_channel_name">Companion Service</string>
+    <string name="companion_channel_description">Shows when the TV companion server is running</string>
+
     <!-- Common -->
     <string name="no_description">No description available.</string>
     <string name="loading">Loading…</string>

@@ -42,7 +42,7 @@
 
         <!-- Companion HTTP server (NSD + Ktor) -->
         <service
-            android:name=".service.CompanionService"
+            android:name=".phone.service.CompanionService"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
