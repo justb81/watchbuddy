@@ -17,4 +17,13 @@ object AppModule {
     @Singleton
     @Named("isDebugBuild")
     fun provideIsDebugBuild(): Boolean = BuildConfig.DEBUG
+
+    /**
+     * URL des Token-Proxy-Backends — die TV-App nutzt keinen Token-Proxy,
+     * daher Leerstring. Wird von NetworkModule.provideTokenProxyRetrofit()
+     * benötigt; bei leerem String wird null zurückgegeben.
+     */
+    @Provides
+    @Singleton
+    fun provideTokenBackendUrl(): String = ""
 }
