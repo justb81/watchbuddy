@@ -32,4 +32,10 @@ object AppModule {
     @Provides
     @Singleton
     fun provideTokenBackendUrl(): String = BuildConfig.TOKEN_BACKEND_URL
+
+    /** Debug-Flag für NetworkModule (steuert HTTP-Logging-Level). */
+    @Provides
+    @Singleton
+    @Named("isDebugBuild")
+    fun provideIsDebugBuild(): Boolean = BuildConfig.DEBUG
 }

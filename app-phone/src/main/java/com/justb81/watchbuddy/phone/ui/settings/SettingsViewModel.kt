@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.justb81.watchbuddy.R
+import com.justb81.watchbuddy.phone.auth.TokenRepository
 import com.justb81.watchbuddy.phone.llm.LlmOrchestrator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,7 +33,8 @@ data class SettingsUiState(
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     application: Application,
-    private val llmOrchestrator: LlmOrchestrator
+    private val llmOrchestrator: LlmOrchestrator,
+    private val tokenRepository: TokenRepository
 ) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(SettingsUiState(
@@ -81,7 +83,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun disconnectTrakt() {
-        // TODO: clear tokens from Keystore
+        tokenRepository.clearTokens()
         _uiState.value = _uiState.value.copy(traktUsername = null)
     }
 
