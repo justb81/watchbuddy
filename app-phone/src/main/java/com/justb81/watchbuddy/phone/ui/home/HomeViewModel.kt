@@ -7,6 +7,9 @@ import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
 import com.justb81.watchbuddy.core.trakt.TraktApiService
 import com.justb81.watchbuddy.phone.auth.TokenRepository
+import com.justb81.watchbuddy.phone.settings.SettingsRepository
+import com.justb81.watchbuddy.service.CompanionService
+import kotlinx.coroutines.flow.first
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -26,13 +29,26 @@ data class HomeUiState(
 class HomeViewModel @Inject constructor(
     application: Application,
     private val traktApi: TraktApiService,
-    private val tokenRepository: TokenRepository
+    private val tokenRepository: TokenRepository,
+    private val settingsRepository: SettingsRepository
 ) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(HomeUiState(isLoading = true))
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
-    init { loadShows() }
+    init {
+        loadShows()
+        startCompanionIfEnabled()
+    }
+
+    private fun startCompanionIfEnabled() {
+        viewModelScope.launch {
+            val settings = settingsRepository.settings.first()
+            if (settings.companionEnabled) {
+                CompanionService.start(getApplication<Application>())
+            }
+        }
+    }
 
     fun loadShows() {
         viewModelScope.launch {
