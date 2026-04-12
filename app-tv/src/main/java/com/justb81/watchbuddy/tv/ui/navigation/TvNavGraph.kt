@@ -10,6 +10,7 @@ import com.justb81.watchbuddy.core.model.TraktWatchedEntry
 import com.justb81.watchbuddy.tv.ui.home.TvHomeScreen
 import com.justb81.watchbuddy.tv.ui.recap.RecapScreen
 import com.justb81.watchbuddy.tv.ui.scrobble.ScrobbleOverlay
+import com.justb81.watchbuddy.tv.ui.settings.StreamingSettingsScreen
 import com.justb81.watchbuddy.tv.ui.showdetail.ShowDetailScreen
 import com.justb81.watchbuddy.tv.ui.userselect.UserSelectScreen
 import com.justb81.watchbuddy.core.model.ScrobbleCandidate
@@ -18,7 +19,8 @@ sealed class TvRoute(val route: String) {
     object Home       : TvRoute("tv_home")
     object UserSelect : TvRoute("tv_user_select")
     object ShowDetail : TvRoute("tv_show_detail")
-    object Recap      : TvRoute("tv_recap")
+    object Recap              : TvRoute("tv_recap")
+    object StreamingSettings  : TvRoute("tv_streaming_settings")
 }
 
 @Composable
@@ -43,6 +45,9 @@ fun TvNavGraph() {
                 },
                 onUserSelectClick = {
                     navController.navigate(TvRoute.UserSelect.route)
+                },
+                onStreamingSettingsClick = {
+                    navController.navigate(TvRoute.StreamingSettings.route)
                 }
             )
         }
@@ -82,6 +87,12 @@ fun TvNavGraph() {
                     }
                 )
             }
+        }
+
+        composable(TvRoute.StreamingSettings.route) {
+            StreamingSettingsScreen(
+                onBack = { navController.popBackStack() }
+            )
         }
     }
 

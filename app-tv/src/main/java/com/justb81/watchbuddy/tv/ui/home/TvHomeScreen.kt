@@ -26,6 +26,7 @@ import com.justb81.watchbuddy.core.model.TraktWatchedEntry
 fun TvHomeScreen(
     onShowClick: (TraktWatchedEntry) -> Unit,
     onUserSelectClick: () -> Unit,
+    onStreamingSettingsClick: () -> Unit = {},
     viewModel: TvHomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -68,6 +69,14 @@ fun TvHomeScreen(
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f)
                         )
+                    }
+
+                    // Streaming settings button
+                    OutlinedButton(
+                        onClick = onStreamingSettingsClick,
+                        scale   = ButtonDefaults.scale(scale = 1f)
+                    ) {
+                        Text(stringResource(R.string.tv_streaming_settings_button))
                     }
 
                     // User select button
