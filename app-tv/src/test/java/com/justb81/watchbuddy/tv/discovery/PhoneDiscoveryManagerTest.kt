@@ -133,6 +133,48 @@ class PhoneDiscoveryManagerTest {
         }
     }
 
+    @Nested
+    @DisplayName("fetchCapabilityAndAdd null safety")
+    inner class NullHostTest {
+
+        @Test
+        fun `fetchCapabilityAndAdd returns early when host is null`() {
+            val serviceInfo = mockk<NsdServiceInfo>()
+            every { serviceInfo.host } returns null
+            every { serviceInfo.serviceName } returns "test-service"
+
+            val method = PhoneDiscoveryManager::class.java.getDeclaredMethod(
+                "fetchCapabilityAndAdd", NsdServiceInfo::class.java
+            )
+            method.isAccessible = true
+
+            // Should not throw NPE — returns early when host is null
+            method.invoke(manager, serviceInfo)
+
+            // Verify no phones were added
+            assertTrue(manager.discoveredPhones.value.isEmpty())
+        }
+
+        @Test
+        fun `fetchCapabilityAndAdd returns early when hostAddress is null`() {
+            val serviceInfo = mockk<NsdServiceInfo>()
+            every { serviceInfo.host } returns mockk {
+                every { hostAddress } returns null
+            }
+            every { serviceInfo.serviceName } returns "test-service"
+
+            val method = PhoneDiscoveryManager::class.java.getDeclaredMethod(
+                "fetchCapabilityAndAdd", NsdServiceInfo::class.java
+            )
+            method.isAccessible = true
+
+            // Should not throw NPE — returns early when hostAddress is null
+            method.invoke(manager, serviceInfo)
+
+            assertTrue(manager.discoveredPhones.value.isEmpty())
+        }
+    }
+
     @Test
     fun `SERVICE_TYPE constant is correct`() {
         assertEquals("_watchbuddy._tcp.", PhoneDiscoveryManager.SERVICE_TYPE)

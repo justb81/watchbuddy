@@ -214,6 +214,49 @@ class MediaSessionScrobblerTest {
     }
 
     @Nested
+    @DisplayName("scope lifecycle")
+    inner class ScopeLifecycleTest {
+
+        @Test
+        fun `stopListening cancels scope and clears currentlyScrobbling`() {
+            // Access currentlyScrobbling via reflection to set it
+            val field = MediaSessionScrobbler::class.java.getDeclaredField("currentlyScrobbling")
+            field.isAccessible = true
+            field.set(scrobbler, "Some Show S01E01")
+
+            scrobbler.stopListening()
+
+            // After stopping, currentlyScrobbling should be null
+            assertNull(field.get(scrobbler))
+        }
+
+        @Test
+        fun `stopListening without prior startListening does not throw`() {
+            // Should handle gracefully
+            scrobbler.stopListening()
+        }
+
+        @Test
+        fun `startListening after stopListening creates fresh scope`() {
+            // First stop (cancel scope)
+            scrobbler.stopListening()
+
+            // Start should create a new scope and not throw
+            // We can't easily test the actual polling, but we verify no crash
+            val componentName = mockk<android.content.ComponentName>()
+            val sessionManager = mockk<android.media.session.MediaSessionManager>()
+            every { context.getSystemService(Context.MEDIA_SESSION_SERVICE) } returns sessionManager
+            every { sessionManager.getActiveSessions(any()) } returns emptyList()
+
+            // Should not throw even though previous scope was cancelled
+            scrobbler.startListening(componentName)
+
+            // Clean up
+            scrobbler.stopListening()
+        }
+    }
+
+    @Nested
     @DisplayName("Levenshtein distance via fuzzyScore")
     inner class LevenshteinTest {
 

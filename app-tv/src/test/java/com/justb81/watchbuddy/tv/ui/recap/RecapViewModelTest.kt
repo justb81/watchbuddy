@@ -9,6 +9,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import okhttp3.OkHttpClient
+import okhttp3.mockwebserver.MockResponse
+import okhttp3.mockwebserver.MockWebServer
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -86,5 +89,108 @@ class RecapViewModelTest {
 
         val state = viewModel.state.value
         assertTrue(state is RecapUiState.Fallback)
+    }
+
+    @Test
+    fun `requestRecap skips phone with null host and falls back`() = runTest {
+        val phone = mockk<PhoneDiscoveryManager.DiscoveredPhone>()
+        every { phone.capability } returns mockk {
+            every { isAvailable } returns true
+            every { deviceName } returns "NullHostPhone"
+        }
+        every { phone.score } returns 100
+        every { phone.serviceInfo } returns mockk {
+            every { host } returns null
+            every { port } returns 8765
+        }
+
+        phonesFlow.value = listOf(phone)
+
+        viewModel.requestRecap(123, "Fallback due to null host")
+        advanceUntilIdle()
+
+        val state = viewModel.state.value
+        assertTrue(state is RecapUiState.Fallback)
+        assertEquals("Fallback due to null host", (state as RecapUiState.Fallback).synopsis)
+    }
+
+    @Test
+    fun `requestRecap parses JSON response with kotlinx serialization`() = runTest {
+        val server = MockWebServer()
+        server.start()
+        val realClient = OkHttpClient()
+
+        try {
+            server.enqueue(
+                MockResponse()
+                    .setBody("""{"html":"<h1>Previously on Test Show</h1>"}""")
+                    .setResponseCode(200)
+            )
+
+            val phone = mockk<PhoneDiscoveryManager.DiscoveredPhone>()
+            every { phone.capability } returns mockk {
+                every { isAvailable } returns true
+                every { deviceName } returns "Pixel"
+            }
+            every { phone.score } returns 100
+            every { phone.serviceInfo } returns mockk {
+                every { host } returns mockk {
+                    every { hostAddress } returns server.hostName
+                }
+                every { port } returns server.port
+            }
+
+            phonesFlow.value = listOf(phone)
+
+            val vm = RecapViewModel(application, phoneDiscovery, realClient)
+            vm.requestRecap(123, "Fallback")
+            advanceUntilIdle()
+
+            val state = vm.state.value
+            assertTrue(state is RecapUiState.Ready, "Expected Ready but got $state")
+            assertEquals("<h1>Previously on Test Show</h1>", (state as RecapUiState.Ready).html)
+        } finally {
+            server.shutdown()
+        }
+    }
+
+    @Test
+    fun `requestRecap handles JSON with extra fields gracefully`() = runTest {
+        val server = MockWebServer()
+        server.start()
+        val realClient = OkHttpClient()
+
+        try {
+            server.enqueue(
+                MockResponse()
+                    .setBody("""{"html":"<p>Recap</p>","model":"gemma","duration_ms":1234}""")
+                    .setResponseCode(200)
+            )
+
+            val phone = mockk<PhoneDiscoveryManager.DiscoveredPhone>()
+            every { phone.capability } returns mockk {
+                every { isAvailable } returns true
+                every { deviceName } returns "Pixel"
+            }
+            every { phone.score } returns 100
+            every { phone.serviceInfo } returns mockk {
+                every { host } returns mockk {
+                    every { hostAddress } returns server.hostName
+                }
+                every { port } returns server.port
+            }
+
+            phonesFlow.value = listOf(phone)
+
+            val vm = RecapViewModel(application, phoneDiscovery, realClient)
+            vm.requestRecap(123, "Fallback")
+            advanceUntilIdle()
+
+            val state = vm.state.value
+            assertTrue(state is RecapUiState.Ready)
+            assertEquals("<p>Recap</p>", (state as RecapUiState.Ready).html)
+        } finally {
+            server.shutdown()
+        }
     }
 }

@@ -8,6 +8,7 @@ import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import io.mockk.*
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
+import okhttp3.OkHttpClient
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -20,6 +21,7 @@ class LlmProviderFactoryTest {
     private val context: Context = mockk(relaxed = true)
     private val orchestrator: LlmOrchestrator = mockk()
     private val settingsRepository: SettingsRepository = mockk()
+    private val httpClient: OkHttpClient = OkHttpClient()
     private lateinit var factory: LlmProviderFactory
 
     private val episodes = listOf(
@@ -29,7 +31,7 @@ class LlmProviderFactoryTest {
     @BeforeEach
     fun setUp() {
         every { settingsRepository.settings } returns flowOf(AppSettings())
-        factory = LlmProviderFactory(context, orchestrator, settingsRepository)
+        factory = LlmProviderFactory(context, orchestrator, settingsRepository, httpClient)
     }
 
     @Nested
@@ -63,7 +65,7 @@ class LlmProviderFactoryTest {
             every { settingsRepository.settings } returns flowOf(
                 AppSettings(ollamaUrl = "http://custom:11434")
             )
-            factory = LlmProviderFactory(context, orchestrator, settingsRepository)
+            factory = LlmProviderFactory(context, orchestrator, settingsRepository, httpClient)
             every { orchestrator.selectConfig() } returns LlmOrchestrator.LlmConfig(
                 LlmBackend.NONE, null, 0
             )

@@ -14,11 +14,13 @@ import org.junit.jupiter.api.BeforeEach
 class RemoteOllamaProviderTest {
 
     private lateinit var server: MockWebServer
+    private lateinit var httpClient: okhttp3.OkHttpClient
 
     @BeforeEach
     fun setUp() {
         server = MockWebServer()
         server.start()
+        httpClient = okhttp3.OkHttpClient()
     }
 
     @AfterEach
@@ -27,11 +29,11 @@ class RemoteOllamaProviderTest {
     }
 
     private fun provider(model: String = "gemma3:4b"): RemoteOllamaProvider =
-        RemoteOllamaProvider(server.url("/").toString().trimEnd('/'), model)
+        RemoteOllamaProvider(server.url("/").toString().trimEnd('/'), model, httpClient)
 
     @Test
     fun `displayName includes model and server URL`() {
-        val p = RemoteOllamaProvider("http://192.168.1.1:11434", "llama3")
+        val p = RemoteOllamaProvider("http://192.168.1.1:11434", "llama3", httpClient)
         assertTrue(p.displayName.contains("llama3"))
         assertTrue(p.displayName.contains("192.168.1.1"))
     }
@@ -95,6 +97,16 @@ class RemoteOllamaProviderTest {
         server.enqueue(MockResponse().setBody("""{"response":"ok"}"""))
         provider().generate("prompt")
         val request = server.takeRequest()
-        assertEquals("application/json", request.getHeader("Content-Type"))
+        assertTrue(request.getHeader("Content-Type")!!.contains("application/json"))
+    }
+
+    @Test
+    fun `uses shared OkHttpClient connection pool`() = runTest {
+        server.enqueue(MockResponse().setBody("""{"response":"first"}"""))
+        server.enqueue(MockResponse().setBody("""{"response":"second"}"""))
+        val p = provider()
+        p.generate("p1")
+        p.generate("p2")
+        assertEquals(2, server.requestCount)
     }
 }

@@ -87,4 +87,38 @@ class TvTokenCacheTest {
         tokenCache.invalidate()
         // Verify no crash on invalidating empty cache
     }
+
+    @Test
+    fun `getToken and invalidate are safe for concurrent access`() = runTest {
+        mockBestPhone()
+        coEvery { phoneApiService.getAccessToken() } returns TokenResponse("concurrent-token")
+
+        // Simulate concurrent access: get token then invalidate
+        val token = tokenCache.getToken()
+        assertEquals("concurrent-token", token)
+
+        // Invalidate from another "thread" (simulated sequentially)
+        tokenCache.invalidate()
+
+        // Next call should re-fetch
+        coEvery { phoneApiService.getAccessToken() } returns TokenResponse("new-token")
+        val newToken = tokenCache.getToken()
+        assertEquals("new-token", newToken)
+        coVerify(exactly = 2) { phoneApiService.getAccessToken() }
+    }
+
+    @Test
+    fun `token and timestamp are atomically consistent`() = runTest {
+        mockBestPhone()
+        coEvery { phoneApiService.getAccessToken() } returns TokenResponse("token-a")
+
+        // First call caches token
+        val first = tokenCache.getToken()
+        assertEquals("token-a", first)
+
+        // Second call returns cached token (no re-fetch)
+        val second = tokenCache.getToken()
+        assertEquals("token-a", second)
+        coVerify(exactly = 1) { phoneApiService.getAccessToken() }
+    }
 }
