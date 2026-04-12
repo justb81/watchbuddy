@@ -22,6 +22,19 @@ android {
 
         // versionName: release-please setzt VERSION_NAME, Fallback auf x-generic-string
         versionName = System.getenv("VERSION_NAME") ?: "0.1.0" // x]release-please-version
+
+        // ── Trakt-Konfiguration ───────────────────────────────────────────────
+        // Leer lassen → App nutzt keinen Token-Proxy / zeigt keinen Trakt-Login.
+        // Werte können auch über CI-Umgebungsvariablen TRAKT_CLIENT_ID und
+        // TOKEN_BACKEND_URL gesetzt werden (empfohlen für Release-Builds).
+        buildConfigField(
+            "String", "TRAKT_CLIENT_ID",
+            "\"${System.getenv("TRAKT_CLIENT_ID") ?: ""}\""
+        )
+        buildConfigField(
+            "String", "TOKEN_BACKEND_URL",
+            "\"${System.getenv("TOKEN_BACKEND_URL") ?: ""}\""
+        )
     }
 
     // CI-Signing: Keystore-Pfad + Credentials über Umgebungsvariablen
@@ -56,7 +69,10 @@ android {
     }
     kotlinOptions { jvmTarget = "17" }
 
-    buildFeatures { compose = true }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
 
     // Ktor + Netty bringen mehrere META-INF-Dateien mit — bei Konflikten einfach die erste nehmen
     packaging {
