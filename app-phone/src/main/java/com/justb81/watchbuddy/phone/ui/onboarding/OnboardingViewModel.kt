@@ -9,6 +9,7 @@ import com.justb81.watchbuddy.core.trakt.DeviceCodeResponse
 import com.justb81.watchbuddy.core.trakt.ProxyTokenRequest
 import com.justb81.watchbuddy.core.trakt.TokenProxyService
 import com.justb81.watchbuddy.core.trakt.TraktApiService
+import com.justb81.watchbuddy.phone.auth.TokenRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -42,7 +43,8 @@ class OnboardingViewModel @Inject constructor(
     private val traktApi: TraktApiService,
     /** Null, wenn TOKEN_BACKEND_URL in BuildConfig leer ist. */
     private val tokenProxy: TokenProxyService?,
-    @Named("traktClientId") private val clientId: String
+    @Named("traktClientId") private val clientId: String,
+    private val tokenRepository: TokenRepository
 ) : AndroidViewModel(application) {
 
     private val _state = MutableStateFlow<OnboardingState>(OnboardingState.Idle)
@@ -116,7 +118,11 @@ class OnboardingViewModel @Inject constructor(
                     val token = tokenProxy!!.exchangeDeviceCode(
                         ProxyTokenRequest(code = response.device_code)
                     )
-                    // TODO: Token im Android Keystore persistieren
+                    tokenRepository.saveTokens(
+                        accessToken = token.access_token,
+                        refreshToken = token.refresh_token,
+                        expiresIn = token.expires_in
+                    )
                     val profile = traktApi.getProfile("Bearer ${token.access_token}")
                     countdownJob?.cancel()
                     pollingJob?.cancel()
