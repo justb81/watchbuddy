@@ -9,31 +9,16 @@ import com.justb81.watchbuddy.core.tmdb.TmdbImageHelper
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * Generates an HTML slideshow recap for a TV show up to the current episode.
- *
- * Flow:
- *   1. Build prompt from watched episode synopses (TMDB) + show metadata
- *   2. LLM generates HTML with <img data-tmdb-still="S02E04"> placeholders
- *   3. Replace placeholders with real TMDB still image URLs
- *   4. Return final HTML string → sent to TV app for WebView rendering
- */
 @Singleton
 class RecapGenerator @Inject constructor(
     private val application: Application,
-    private val llmOrchestrator: LlmOrchestrator
+    private val llmOrchestrator: LlmOrchestrator,
+    private val providerFactory: LlmProviderFactory
 ) {
     companion object {
-        // TMDB still placeholder pattern: data-tmdb-still="S{season}E{episode}"
         private val STILL_PLACEHOLDER_REGEX = Regex("""data-tmdb-still="S(\d+)E(\d+)"""")
     }
 
-    /**
-     * @param show         TMDB show metadata
-     * @param watchedEpisodes  All already-watched episodes (with overviews)
-     * @param targetEpisode    The episode about to be watched (recap up to but not including this)
-     * @param apiKey           TMDB API key (user's own key)
-     */
     suspend fun generateRecap(
         show: TmdbShow,
         watchedEpisodes: List<TmdbEpisode>,
@@ -51,7 +36,7 @@ class RecapGenerator @Inject constructor(
         target: TmdbEpisode
     ): String {
         val episodeSummaries = episodes
-            .takeLast(8)  // keep prompt manageable — last 8 episodes
+            .takeLast(8)
             .joinToString("\n") { ep ->
                 "S${ep.season_number.toString().padStart(2,'0')}E${ep.episode_number.toString().padStart(2,'0')} " +
                 "\"${ep.name}\": ${ep.overview ?: application.getString(R.string.no_description)}"
@@ -81,9 +66,15 @@ Respond in $language.
     }
 
     private suspend fun inferWithLlm(prompt: String): String {
-        // TODO: route to AICore or MediaPipe based on LlmOrchestrator.selectConfig()
-        // Placeholder — real implementation connects to the active LLM backend
-        return buildFallbackHtml("Recap wird geladen…")
+        val config = llmOrchestrator.selectConfig()
+        val provider = providerFactory.create(config)
+            ?: return buildFallbackHtml(application.getString(R.string.no_description))
+
+        return try {
+            provider.generate(prompt)
+        } catch (e: Exception) {
+            buildFallbackHtml(application.getString(R.string.error_generic))
+        }
     }
 
     private fun replaceTmdbPlaceholders(
