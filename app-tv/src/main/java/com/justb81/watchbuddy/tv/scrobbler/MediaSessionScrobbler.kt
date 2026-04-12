@@ -21,17 +21,21 @@ import javax.inject.Singleton
  * How it works:
  *   1. MediaSessionManager.getActiveSessions() returns all active sessions
  *   2. Extract package name + media title from session metadata
- *   3. Fuzzy-match title against user's Trakt watchlist
- *   4. Confidence ≥ 0.9 → auto-scrobble; < 0.9 → emit ScrobbleCandidate for UI confirmation
+ *   3. Fuzzy-match title against user's Trakt watchlist (local cache first, then API)
+ *   4. Confidence ≥ 0.95 → auto-scrobble; 0.70–0.95 → emit for UI confirmation; < 0.70 → ignore
  *   5. On playback stop/pause → call Trakt scrobble/stop
  */
 @Singleton
 class MediaSessionScrobbler @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val traktApi: TraktApiService
+    private val traktApi: TraktApiService,
+    private val showCacheProvider: ShowCacheProvider
 ) {
     companion object {
-        const val AUTO_SCROBBLE_THRESHOLD = 0.90f
+        const val AUTO_SCROBBLE_THRESHOLD = 0.95f
+        const val OVERLAY_THRESHOLD = 0.70f
+        const val CACHE_CONFIDENCE_THRESHOLD = 0.85f
+        const val MIN_MATCH_THRESHOLD = 0.50f
     }
 
     private val _pendingConfirmation = MutableSharedFlow<ScrobbleCandidate>()
@@ -75,10 +79,10 @@ class MediaSessionScrobbler @Inject constructor(
     private suspend fun processPlayingMedia(packageName: String, rawTitle: String) {
         val candidate = matchTitleToTrakt(packageName, rawTitle)
         if (candidate != null) {
-            if (candidate.confidence >= AUTO_SCROBBLE_THRESHOLD) {
-                autoScrobble(candidate)
-            } else {
-                _pendingConfirmation.emit(candidate)
+            when {
+                candidate.confidence >= AUTO_SCROBBLE_THRESHOLD -> autoScrobble(candidate)
+                candidate.confidence >= OVERLAY_THRESHOLD -> _pendingConfirmation.emit(candidate)
+                // < OVERLAY_THRESHOLD → ignore
             }
         }
     }
@@ -86,9 +90,44 @@ class MediaSessionScrobbler @Inject constructor(
     /**
      * Fuzzy-match the media title to a show+episode in the user's Trakt history.
      * Parses common patterns like "Show Title S02E04", "Show Title · Season 2", etc.
+     *
+     * Strategy:
+     *   1. Extract episode info (SxxExx pattern) from raw title
+     *   2. Search local cache (ShowCacheProvider) with fuzzy score
+     *   3. If cache score < 0.85 → fall back to Trakt API searchShow()
+     *   4. Return null if best score < 0.50
      */
-    private suspend fun matchTitleToTrakt(packageName: String, rawTitle: String): ScrobbleCandidate? {
-        // Common patterns: "Breaking Bad S03E07", "The Boys Season 2 Episode 4"
+    internal suspend fun matchTitleToTrakt(packageName: String, rawTitle: String): ScrobbleCandidate? {
+        val parsed = parseEpisodeInfo(rawTitle)
+        if (parsed.showTitle.isBlank()) return null
+
+        // 1. Search local cache
+        val cacheResult = searchCache(parsed.showTitle)
+
+        // 2. If cache hit is strong enough, use it
+        if (cacheResult != null && cacheResult.second >= CACHE_CONFIDENCE_THRESHOLD) {
+            return buildCandidate(packageName, rawTitle, cacheResult.first, cacheResult.second, parsed)
+        }
+
+        // 3. Trakt API fallback
+        val apiResult = searchTraktApi(parsed.showTitle)
+
+        // 4. Pick the best result between cache and API
+        val best = listOfNotNull(cacheResult, apiResult).maxByOrNull { it.second }
+            ?: return null
+
+        if (best.second < MIN_MATCH_THRESHOLD) return null
+
+        return buildCandidate(packageName, rawTitle, best.first, best.second, parsed)
+    }
+
+    private data class ParsedEpisodeInfo(
+        val showTitle: String,
+        val season: Int?,
+        val episode: Int?
+    )
+
+    private fun parseEpisodeInfo(rawTitle: String): ParsedEpisodeInfo {
         val episodePattern = Regex("""(?i)S(\d{1,2})E(\d{1,2})""")
         val match = episodePattern.find(rawTitle)
 
@@ -96,18 +135,48 @@ class MediaSessionScrobbler @Inject constructor(
         val season = match?.groupValues?.get(1)?.toIntOrNull()
         val episode = match?.groupValues?.get(2)?.toIntOrNull()
 
-        if (showTitle.isBlank()) return null
+        return ParsedEpisodeInfo(showTitle, season, episode)
+    }
 
-        // TODO: search user's local Trakt cache first, then API fallback
-        val confidence = if (match != null) 0.85f else 0.50f  // TODO: real fuzzy score
+    private fun searchCache(showTitle: String): Pair<TraktShow, Float>? {
+        val cachedShows = showCacheProvider.getCachedShows()
+        if (cachedShows.isEmpty()) return null
 
+        return cachedShows
+            .map { entry -> entry.show to FuzzyMatcher.fuzzyScore(showTitle, entry.show.title) }
+            .maxByOrNull { it.second }
+            ?.takeIf { it.second >= MIN_MATCH_THRESHOLD }
+    }
+
+    private suspend fun searchTraktApi(showTitle: String): Pair<TraktShow, Float>? {
+        return try {
+            val results = traktApi.searchShow(bearer = "", query = showTitle, limit = 5)
+            results
+                .mapNotNull { result ->
+                    val show = result.show ?: return@mapNotNull null
+                    show to FuzzyMatcher.fuzzyScore(showTitle, show.title)
+                }
+                .maxByOrNull { it.second }
+                ?.takeIf { it.second >= MIN_MATCH_THRESHOLD }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun buildCandidate(
+        packageName: String,
+        rawTitle: String,
+        show: TraktShow,
+        score: Float,
+        parsed: ParsedEpisodeInfo
+    ): ScrobbleCandidate {
         return ScrobbleCandidate(
             packageName = packageName,
             mediaTitle = rawTitle,
-            confidence = confidence,
-            matchedShow = TraktShow(title = showTitle, ids = com.justb81.watchbuddy.core.model.TraktIds()),
-            matchedEpisode = if (season != null && episode != null)
-                TraktEpisode(season = season, number = episode)
+            confidence = score,
+            matchedShow = show,
+            matchedEpisode = if (parsed.season != null && parsed.episode != null)
+                TraktEpisode(season = parsed.season, number = parsed.episode)
             else null
         )
     }

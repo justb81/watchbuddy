@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
 import com.justb81.watchbuddy.tv.discovery.PhoneApiClientFactory
 import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
+import com.justb81.watchbuddy.tv.scrobbler.ShowCacheProvider
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -23,7 +24,8 @@ data class TvHomeUiState(
 @HiltViewModel
 class TvHomeViewModel @Inject constructor(
     private val phoneDiscovery: PhoneDiscoveryManager,
-    private val phoneApiClientFactory: PhoneApiClientFactory
+    private val phoneApiClientFactory: PhoneApiClientFactory,
+    private val showCacheProvider: ShowCacheProvider
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(TvHomeUiState())
@@ -63,6 +65,7 @@ class TvHomeViewModel @Inject constructor(
                     val shows = api.getShows()
                     cachedShows = shows
                     cacheTimestamp = System.currentTimeMillis()
+                    showCacheProvider.updateShows(shows)
                     _uiState.update { it.copy(isLoading = false, shows = shows) }
                 } else {
                     // No phone — try cache fallback

@@ -96,4 +96,7 @@ dependencies {
 
     // WorkManager (background Trakt sync)
     implementation(libs.work.runtime)
+
+    // Testing
+    testImplementation("junit:junit:4.13.2")
 }
