@@ -9,7 +9,6 @@ import android.content.Intent
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import android.os.IBinder
-import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.phone.server.CompanionHttpServer
@@ -20,7 +19,6 @@ import javax.inject.Inject
 class CompanionService : Service() {
 
     companion object {
-        private const val TAG = "CompanionService"
         const val CHANNEL_ID = "companion_service"
         private const val NOTIFICATION_ID = 1
         private const val NSD_SERVICE_TYPE = "_http._tcp."
@@ -90,18 +88,10 @@ class CompanionService : Service() {
         }
 
         val listener = object : NsdManager.RegistrationListener {
-            override fun onServiceRegistered(info: NsdServiceInfo) {
-                Log.i(TAG, "NSD service registered: ${info.serviceName}")
-            }
-            override fun onRegistrationFailed(info: NsdServiceInfo, errorCode: Int) {
-                Log.e(TAG, "NSD registration failed: error=$errorCode, service=${info.serviceName}")
-            }
-            override fun onServiceUnregistered(info: NsdServiceInfo) {
-                Log.i(TAG, "NSD service unregistered: ${info.serviceName}")
-            }
-            override fun onUnregistrationFailed(info: NsdServiceInfo, errorCode: Int) {
-                Log.e(TAG, "NSD unregistration failed: error=$errorCode, service=${info.serviceName}")
-            }
+            override fun onServiceRegistered(info: NsdServiceInfo) {}
+            override fun onRegistrationFailed(info: NsdServiceInfo, errorCode: Int) {}
+            override fun onServiceUnregistered(info: NsdServiceInfo) {}
+            override fun onUnregistrationFailed(info: NsdServiceInfo, errorCode: Int) {}
         }
 
         nsdRegistrationListener = listener

@@ -79,15 +79,14 @@ class PhoneDiscoveryManager @Inject constructor(
             .maxByOrNull { it.score }
 
     private fun fetchCapabilityAndAdd(serviceInfo: NsdServiceInfo) {
-        val host = serviceInfo.host?.hostAddress ?: return
-        val url = "http://${host}:${serviceInfo.port}${CAPABILITY_PATH}"
+        val url = "http://${serviceInfo.host.hostAddress}:${serviceInfo.port}${CAPABILITY_PATH}"
         try {
             val response = httpClient.newCall(Request.Builder().url(url).build()).execute()
             val capability = response.body?.string()?.let {
                 Json.decodeFromString<DeviceCapability>(it)
             }
             val score = calculateScore(capability)
-            val baseUrl = "http://${host}:${serviceInfo.port}/"
+            val baseUrl = "http://${serviceInfo.host.hostAddress}:${serviceInfo.port}/"
             val phone = DiscoveredPhone(serviceInfo, capability, score, baseUrl)
             _discoveredPhones.value = (_discoveredPhones.value
                 .filter { it.serviceInfo.serviceName != serviceInfo.serviceName } + phone)

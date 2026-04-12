@@ -8,18 +8,11 @@ import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import javax.inject.Inject
-
-@Serializable
-private data class RecapResponse(val html: String)
-
-private val recapJson = Json { ignoreUnknownKeys = true }
 
 sealed class RecapUiState {
     object Idle : RecapUiState()
@@ -58,7 +51,7 @@ class RecapViewModel @Inject constructor(
                 val deviceName = phone.capability?.deviceName ?: getApplication<Application>().getString(R.string.tv_default_device_name)
                 _state.value = RecapUiState.Generating(deviceName)
                 try {
-                    val host = phone.serviceInfo.host?.hostAddress ?: continue
+                    val host = phone.serviceInfo.host.hostAddress
                     val port = phone.serviceInfo.port
                     val url  = "http://$host:$port/recap/$traktShowId"
 
@@ -71,7 +64,9 @@ class RecapViewModel @Inject constructor(
 
                     if (response.isSuccessful) {
                         val body = response.body?.string() ?: ""
-                        val html = recapJson.decodeFromString<RecapResponse>(body).html
+                        // Parse {"html": "..."} from response
+                        val html = Regex(""""html"\s*:\s*"(.*?)"""", RegexOption.DOT_MATCHES_ALL)
+                            .find(body)?.groupValues?.get(1) ?: body
                         _state.value = RecapUiState.Ready(html)
                         return@launch
                     }
