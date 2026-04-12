@@ -72,10 +72,32 @@ watchbuddy/
 - `./gradlew :app-tv:assembleDebug` — TV only
 - Secrets via `local.properties` (not checked in) or environment variables for CI
 
+### Git Workflow — IMPORTANT
+
+**Never push directly to `main`.** All changes must go through a Pull Request:
+
+1. Create a feature branch from `main`
+2. Make changes and commit using Conventional Commits (see below)
+3. Push the branch and open a PR against `main`
+4. The CI pipeline (`build-android.yml`) runs automatically on every PR
+
+**Branch naming:**
+
+| Purpose | Prefix | Example |
+|---------|--------|---------|
+| New feature | `feature/` | `feature/add-watchlist-filter` |
+| Bug fix | `fix/` | `fix/scrobble-confidence-threshold` |
+| Documentation | `docs/` | `docs/update-architecture` |
+| Chore / maintenance | `chore/` | `chore/upgrade-mediapipe` |
+| Release (automated) | `release-please--` | `release-please--branches--main` |
+
+The `release-please--` prefix is reserved for the automated release-please bot — never create branches with this prefix manually.
+
 ### Versioning
 - release-please with Conventional Commits (`feat:`, `fix:`, `chore:`, etc.)
 - Version tracked in `.release-please-manifest.json`
 - `versionCode` derived from `github.run_number` in CI
+- release-please opens its own PR (`release-please--branches--main`) to bump the version and update `CHANGELOG.md` — merge it to trigger a GitHub Release with signed APKs
 
 ### Localization
 - Supported languages: English (default), German, French, Spanish
