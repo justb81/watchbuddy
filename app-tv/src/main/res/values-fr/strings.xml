@@ -39,6 +39,11 @@
     <string name="tv_recap_close">Fermer</string>
     <string name="tv_recap_watch_now">Regarder maintenant</string>
 
+    <!-- Streaming settings -->
+    <string name="tv_streaming_settings_button">Services</string>
+    <string name="tv_streaming_settings_title">Services de streaming</string>
+    <string name="tv_streaming_settings_subtitle">Sélectionnez vos services abonnés. L\'ordre détermine la priorité pour Regarder maintenant.</string>
+
     <!-- Scrobble overlay -->
     <string name="tv_scrobble_question">Regardez-vous %1$s ?</string>
     <string name="tv_scrobble_episode">S%1$02dE%2$02d</string>
