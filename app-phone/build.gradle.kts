@@ -113,6 +113,8 @@ dependencies {
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
     implementation(libs.hilt.navigation.compose)
+    implementation(libs.hilt.work)
+    ksp(libs.hilt.work.compiler)
 
     // Ktor (local HTTP server for TV ↔ Phone communication)
     implementation(libs.ktor.server.core)

@@ -3,9 +3,17 @@ package com.justb81.watchbuddy.phone.ui.settings
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.work.Constraints
+import androidx.work.ExistingWorkPolicy
+import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
+import androidx.work.workDataOf
 import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.phone.auth.TokenRepository
 import com.justb81.watchbuddy.phone.llm.LlmOrchestrator
+import com.justb81.watchbuddy.phone.llm.ModelDownloadWorker
 import com.justb81.watchbuddy.phone.settings.AppSettings
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -42,14 +50,18 @@ class SettingsViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository
 ) : AndroidViewModel(application) {
 
+    private val workManager = WorkManager.getInstance(application)
+
     private val _uiState = MutableStateFlow(SettingsUiState(
-        llmBackend = application.getString(R.string.settings_llm_detecting)
+        llmBackend = application.getString(R.string.settings_llm_detecting),
+        llmReady = settingsRepository.modelReady.value
     ))
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
     init {
         loadPersistedSettings()
         detectLlm()
+        observeModelReadyState()
     }
 
     private fun loadPersistedSettings() {
@@ -72,8 +84,16 @@ class SettingsViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(
                 llmBackend  = config.backend.name,
                 llmModelName = config.modelVariant?.fileName,
-                llmReady    = false  // true after download
+                llmReady    = settingsRepository.modelReady.value
             )
+        }
+    }
+
+    private fun observeModelReadyState() {
+        viewModelScope.launch {
+            settingsRepository.modelReady.collect { ready ->
+                _uiState.value = _uiState.value.copy(llmReady = ready)
+            }
         }
     }
 
@@ -129,16 +149,69 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun downloadModel() {
+        val config = llmOrchestrator.selectConfig()
+        val modelUrl = config.modelVariant?.let { variant ->
+            "$MODEL_BASE_URL${variant.fileName}"
+        } ?: return // no variant selected → nothing to download
+
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .setRequiresStorageNotLow(true)
+            .build()
+
+        val workRequest = OneTimeWorkRequestBuilder<ModelDownloadWorker>()
+            .setConstraints(constraints)
+            .setInputData(workDataOf(ModelDownloadWorker.KEY_MODEL_URL to modelUrl))
+            .build()
+
+        workManager.enqueueUniqueWork(
+            ModelDownloadWorker.UNIQUE_WORK_NAME,
+            ExistingWorkPolicy.KEEP,
+            workRequest
+        )
+
+        // Observe work progress
         viewModelScope.launch {
-            // TODO: trigger WorkManager model download job
-            for (progress in 0..100 step 5) {
-                _uiState.value = _uiState.value.copy(llmDownloadProgress = progress)
-                kotlinx.coroutines.delay(100)
+            workManager.getWorkInfoByIdFlow(workRequest.id).collect { workInfo ->
+                if (workInfo == null) return@collect
+                when (workInfo.state) {
+                    WorkInfo.State.RUNNING -> {
+                        val progress = workInfo.progress.getInt(
+                            ModelDownloadWorker.KEY_PROGRESS, 0
+                        )
+                        _uiState.value = _uiState.value.copy(
+                            llmDownloadProgress = progress
+                        )
+                    }
+                    WorkInfo.State.SUCCEEDED -> {
+                        _uiState.value = _uiState.value.copy(
+                            llmDownloadProgress = null,
+                            llmReady = true
+                        )
+                    }
+                    WorkInfo.State.FAILED -> {
+                        _uiState.value = _uiState.value.copy(
+                            llmDownloadProgress = null,
+                            llmReady = false
+                        )
+                    }
+                    WorkInfo.State.ENQUEUED -> {
+                        _uiState.value = _uiState.value.copy(
+                            llmDownloadProgress = 0
+                        )
+                    }
+                    else -> { /* BLOCKED, CANCELLED — no UI update needed */ }
+                }
             }
-            _uiState.value = _uiState.value.copy(
-                llmDownloadProgress = null,
-                llmReady = true
-            )
         }
+    }
+
+    companion object {
+        /**
+         * Base URL for MediaPipe/Gemma model downloads.
+         * In production this would come from a remote config or the LlmOrchestrator.
+         */
+        private const val MODEL_BASE_URL =
+            "https://storage.googleapis.com/mediapipe-models/llm_inference/gemma4/"
     }
 }
