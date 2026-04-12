@@ -28,7 +28,9 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideOkHttpClient(): OkHttpClient = OkHttpClient.Builder()
+    fun provideOkHttpClient(
+        @Named("isDebugBuild") isDebug: Boolean
+    ): OkHttpClient = OkHttpClient.Builder()
         .addInterceptor { chain ->
             // Trakt required headers
             val request = chain.request().newBuilder()
@@ -39,7 +41,8 @@ object NetworkModule {
             chain.proceed(request)
         }
         .addInterceptor(HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BODY // TODO: set to NONE in release
+            level = if (isDebug) HttpLoggingInterceptor.Level.BODY
+                    else HttpLoggingInterceptor.Level.NONE
         })
         .build()
 
