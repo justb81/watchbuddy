@@ -17,6 +17,7 @@ on:
 jobs:
   build-phone:
     name: Build Phone APK
+    if: "!startsWith(github.head_ref, 'release-please--')"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -48,6 +49,7 @@ jobs:
 
   build-tv:
     name: Build TV APK
+    if: "!startsWith(github.head_ref, 'release-please--')"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
