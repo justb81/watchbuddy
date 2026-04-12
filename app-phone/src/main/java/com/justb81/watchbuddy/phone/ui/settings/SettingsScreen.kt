@@ -20,13 +20,24 @@ import com.justb81.watchbuddy.R
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
+    onDisconnected: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
     var showAdvanced by remember { mutableStateOf(false) }
     var showDisconnectDialog by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val savedMessage = stringResource(R.string.settings_saved)
+
+    LaunchedEffect(uiState.saveSuccess) {
+        if (uiState.saveSuccess) {
+            snackbarHostState.showSnackbar(savedMessage)
+            viewModel.clearSaveSuccess()
+        }
+    }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.settings_title)) },
@@ -212,6 +223,7 @@ fun SettingsScreen(
                 TextButton(onClick = {
                     viewModel.disconnectTrakt()
                     showDisconnectDialog = false
+                    onDisconnected()
                 }) {
                     Text(stringResource(R.string.settings_disconnect), color = MaterialTheme.colorScheme.error)
                 }
