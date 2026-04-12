@@ -1,6 +1,18 @@
-# WatchBuddy
+<p align="center">
+  <img src="app-phone/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png" width="120" alt="WatchBuddy Logo" />
+</p>
 
-**WatchBuddy** is a two-app ecosystem for Google TV and Android that tracks what you watch across all streaming apps, generates AI-powered "Previously on…" recaps, and deep-links you directly into the right streaming app — all powered by [Trakt](https://trakt.tv) and [TMDB](https://themoviedb.org).
+<h1 align="center">WatchBuddy</h1>
+
+<p align="center">
+  Google TV + Android Companion App for cross-app series tracking with Trakt, local LLM recaps and deep links.
+</p>
+
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License" /></a>
+  <img src="https://img.shields.io/badge/platform-Android%20%7C%20Google%20TV-green.svg" alt="Platform" />
+  <img src="https://img.shields.io/badge/language-Kotlin-purple.svg" alt="Kotlin" />
+</p>
 
 ---
 
@@ -12,9 +24,11 @@ watchbuddy/
 ├── app-tv/         Google TV app (display, NSD client, recap WebView, deep links)
 ├── core/           Shared: Trakt API, TMDB API, data models, network
 ├── backend/        Node.js Trakt token proxy (Docker, runs on your own server)
-├── .github/        CI/CD workflows
+├── .github/        CI/CD workflows (build + release-please)
 └── docs/           Architecture docs and decisions
 ```
+
+> For a detailed system architecture, communication protocols, LLM strategy and more, see [`docs/architecture.md`](docs/architecture.md).
 
 ## Key Features
 
@@ -32,6 +46,21 @@ watchbuddy/
 | `app-tv` | Compose for TV, NSD discovery, WebView recap, MediaSession scrobbler |
 | `core` | Trakt & TMDB API clients, shared models, network utilities |
 | `backend` | Node.js proxy: exchanges Trakt auth_code for tokens server-side |
+
+## Localization
+
+WatchBuddy supports multiple languages out of the box. The UI is fully localized via Android resource files (`values-<locale>/strings.xml`):
+
+| Language | Phone App | TV App |
+|----------|-----------|--------|
+| English  | ✅ (default) | ✅ (default) |
+| Deutsch  | ✅ | ✅ |
+| Français | ✅ | ✅ |
+| Español  | ✅ | ✅ |
+
+AI-generated recaps automatically adapt to the device language via `LocaleHelper`, which passes the system locale to the LLM prompt so recaps are generated in the user's language.
+
+To add a new language, create `values-<locale>/strings.xml` in both `app-phone/src/main/res/` and `app-tv/src/main/res/`.
 
 ## Setup
 
@@ -56,6 +85,21 @@ Both apps share the package name `com.justb81.watchbuddy`:
 
 Google Play auto-delivers the correct APK per device type.
 
+## Contributing
+
+Contributions are welcome! Here's how:
+
+1. **Fork** the repository
+2. Create a **feature branch** (`git checkout -b feature/my-feature`)
+3. **Commit** your changes with a descriptive message
+4. **Push** to your fork (`git push origin feature/my-feature`)
+5. Open a **Pull Request** against `main`
+
+Please make sure your PR:
+- Follows the existing code style and project structure
+- Builds successfully (`./gradlew assembleDebug`)
+- Includes a clear description of the changes
+
 ## Attribution
 
 - This product uses the Trakt API but is not endorsed or certified by Trakt.
@@ -63,4 +107,4 @@ Google Play auto-delivers the correct APK per device type.
 
 ## License
 
-Private — All rights reserved.
+This project is licensed under the [MIT License](LICENSE).
