@@ -126,6 +126,9 @@ dependencies {
     // WorkManager (background model updates)
     implementation(libs.work.runtime)
 
+    // Security / Encrypted Storage
+    implementation(libs.security.crypto)
+
     // Image loading
     implementation(libs.coil)
 }

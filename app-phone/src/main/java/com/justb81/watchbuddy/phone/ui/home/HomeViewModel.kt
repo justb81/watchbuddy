@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
 import com.justb81.watchbuddy.core.trakt.TraktApiService
+import com.justb81.watchbuddy.phone.auth.TokenRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,7 +25,8 @@ data class HomeUiState(
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     application: Application,
-    private val traktApi: TraktApiService
+    private val traktApi: TraktApiService,
+    private val tokenRepository: TokenRepository
 ) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(HomeUiState(isLoading = true))
@@ -36,8 +38,9 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             try {
-                // TODO: pull token from Keystore
-                val shows = traktApi.getWatchedShows("Bearer TODO")
+                val accessToken = tokenRepository.getAccessToken()
+                    ?: throw IllegalStateException("No access token available")
+                val shows = traktApi.getWatchedShows("Bearer $accessToken")
                 _uiState.value = _uiState.value.copy(
                     isLoading    = false,
                     shows        = shows,
