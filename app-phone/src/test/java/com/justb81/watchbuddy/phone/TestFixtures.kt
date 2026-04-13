@@ -36,7 +36,7 @@ object TestFixtures {
         deviceId: String = "device-1",
         userName: String = "testuser",
         deviceName: String = "Pixel 8",
-        llmBackend: LlmBackend = LlmBackend.MEDIAPIPE_GPU,
+        llmBackend: LlmBackend = LlmBackend.LITERT,
         modelQuality: Int = 75,
         freeRamMb: Int = 4000,
         isAvailable: Boolean = true

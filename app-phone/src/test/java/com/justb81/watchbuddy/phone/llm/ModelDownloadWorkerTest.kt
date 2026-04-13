@@ -27,6 +27,10 @@ import java.io.File
 @DisplayName("ModelDownloadWorker")
 class ModelDownloadWorkerTest {
 
+    companion object {
+        private const val MODEL_FILENAME = "gemma-4-E2B-it.litertlm"
+    }
+
     private lateinit var server: MockWebServer
     private val client = OkHttpClient()
     private val context: Context = mockk(relaxed = true)
@@ -50,11 +54,13 @@ class ModelDownloadWorkerTest {
 
     private fun createWorker(
         modelUrl: String?,
+        modelFileName: String = MODEL_FILENAME,
         attemptCount: Int = 1
     ): ModelDownloadWorker {
         val inputData = if (modelUrl != null) {
             Data.Builder()
                 .putString(ModelDownloadWorker.KEY_MODEL_URL, modelUrl)
+                .putString(ModelDownloadWorker.KEY_MODEL_FILENAME, modelFileName)
                 .build()
         } else {
             Data.EMPTY
@@ -88,7 +94,7 @@ class ModelDownloadWorkerTest {
         val request = server.takeRequest()
         assertEquals("GET", request.method)
 
-        val outputFile = File(tempDir, "model.bin")
+        val outputFile = File(tempDir, MODEL_FILENAME)
         assertTrue(outputFile.exists())
         assertEquals(content, outputFile.readText())
     }
@@ -127,7 +133,7 @@ class ModelDownloadWorkerTest {
         val worker = createWorker(server.url("/model.bin").toString())
         worker.doWork()
 
-        val tempFile = File(tempDir, "model.bin.tmp")
+        val tempFile = File(tempDir, "$MODEL_FILENAME.tmp")
         assertFalse(tempFile.exists())
     }
 

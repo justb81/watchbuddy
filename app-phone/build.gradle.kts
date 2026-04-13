@@ -127,8 +127,8 @@ dependencies {
     implementation(libs.ktor.server.content.negotiation)
     implementation(libs.ktor.serialization.json)
 
-    // MediaPipe LLM (Gemma — RAM-adaptive)
-    implementation(libs.mediapipe.tasks.genai)
+    // LiteRT-LM (Gemma — RAM-adaptive)
+    implementation(libs.litertlm.android)
 
     // WorkManager (background model updates)
     implementation(libs.work.runtime)

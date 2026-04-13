@@ -42,30 +42,21 @@ class LlmOrchestratorTest {
     @DisplayName("RAM-based variant selection")
     inner class RamBasedSelection {
         @Test
-        fun `selects BF16 when freeRam is at least 6000 MB`() {
+        fun `selects E4B when freeRam is at least 5000 MB`() {
             mockFreeRam(6000)
             val config = orchestrator.selectConfig()
-            assertEquals(LlmBackend.MEDIAPIPE_GPU, config.backend)
-            assertEquals(LlmOrchestrator.ModelVariant.GEMMA4_E2B_BF16, config.modelVariant)
+            assertEquals(LlmBackend.LITERT, config.backend)
+            assertEquals(LlmOrchestrator.ModelVariant.GEMMA4_E4B, config.modelVariant)
             assertEquals(90, config.qualityScore)
         }
 
         @Test
-        fun `selects INT8 when freeRam is at least 4000 but less than 6000 MB`() {
-            mockFreeRam(4500)
+        fun `selects E2B when freeRam is at least 3000 but less than 5000 MB`() {
+            mockFreeRam(4000)
             val config = orchestrator.selectConfig()
-            assertEquals(LlmBackend.MEDIAPIPE_GPU, config.backend)
-            assertEquals(LlmOrchestrator.ModelVariant.GEMMA4_E2B_INT8, config.modelVariant)
-            assertEquals(75, config.qualityScore)
-        }
-
-        @Test
-        fun `selects INT4 when freeRam is at least 3000 but less than 4000 MB`() {
-            mockFreeRam(3500)
-            val config = orchestrator.selectConfig()
-            assertEquals(LlmBackend.MEDIAPIPE_GPU, config.backend)
-            assertEquals(LlmOrchestrator.ModelVariant.GEMMA4_E2B_INT4, config.modelVariant)
-            assertEquals(60, config.qualityScore)
+            assertEquals(LlmBackend.LITERT, config.backend)
+            assertEquals(LlmOrchestrator.ModelVariant.GEMMA4_E2B, config.modelVariant)
+            assertEquals(70, config.qualityScore)
         }
 
         @Test
@@ -78,24 +69,17 @@ class LlmOrchestratorTest {
         }
 
         @Test
-        fun `selects BF16 at exact 6000 MB boundary`() {
-            mockFreeRam(6000)
+        fun `selects E4B at exact 5000 MB boundary`() {
+            mockFreeRam(5000)
             val config = orchestrator.selectConfig()
-            assertEquals(LlmOrchestrator.ModelVariant.GEMMA4_E2B_BF16, config.modelVariant)
+            assertEquals(LlmOrchestrator.ModelVariant.GEMMA4_E4B, config.modelVariant)
         }
 
         @Test
-        fun `selects INT8 at exact 4000 MB boundary`() {
-            mockFreeRam(4000)
-            val config = orchestrator.selectConfig()
-            assertEquals(LlmOrchestrator.ModelVariant.GEMMA4_E2B_INT8, config.modelVariant)
-        }
-
-        @Test
-        fun `selects INT4 at exact 3000 MB boundary`() {
+        fun `selects E2B at exact 3000 MB boundary`() {
             mockFreeRam(3000)
             val config = orchestrator.selectConfig()
-            assertEquals(LlmOrchestrator.ModelVariant.GEMMA4_E2B_INT4, config.modelVariant)
+            assertEquals(LlmOrchestrator.ModelVariant.GEMMA4_E2B, config.modelVariant)
         }
     }
 
@@ -105,23 +89,26 @@ class LlmOrchestratorTest {
         @Test
         fun `entries are sorted by qualityScore descending`() {
             val sorted = LlmOrchestrator.ModelVariant.entries.sortedByDescending { it.qualityScore }
-            assertEquals(LlmOrchestrator.ModelVariant.GEMMA4_E2B_BF16, sorted[0])
-            assertEquals(LlmOrchestrator.ModelVariant.GEMMA4_E2B_INT8, sorted[1])
-            assertEquals(LlmOrchestrator.ModelVariant.GEMMA4_E2B_INT4, sorted[2])
+            assertEquals(LlmOrchestrator.ModelVariant.GEMMA4_E4B, sorted[0])
+            assertEquals(LlmOrchestrator.ModelVariant.GEMMA4_E2B, sorted[1])
         }
 
         @Test
         fun `each variant has correct file name`() {
-            assertEquals("gemma-4-e2b-it-bf16.task", LlmOrchestrator.ModelVariant.GEMMA4_E2B_BF16.fileName)
-            assertEquals("gemma-4-e2b-it-int8.task", LlmOrchestrator.ModelVariant.GEMMA4_E2B_INT8.fileName)
-            assertEquals("gemma-4-e2b-it-int4.task", LlmOrchestrator.ModelVariant.GEMMA4_E2B_INT4.fileName)
+            assertEquals("gemma-4-E4B-it.litertlm", LlmOrchestrator.ModelVariant.GEMMA4_E4B.fileName)
+            assertEquals("gemma-4-E2B-it.litertlm", LlmOrchestrator.ModelVariant.GEMMA4_E2B.fileName)
         }
 
         @Test
         fun `each variant has correct RAM requirement`() {
-            assertEquals(6_000, LlmOrchestrator.ModelVariant.GEMMA4_E2B_BF16.requiredRamMb)
-            assertEquals(4_000, LlmOrchestrator.ModelVariant.GEMMA4_E2B_INT8.requiredRamMb)
-            assertEquals(3_000, LlmOrchestrator.ModelVariant.GEMMA4_E2B_INT4.requiredRamMb)
+            assertEquals(5_000, LlmOrchestrator.ModelVariant.GEMMA4_E4B.requiredRamMb)
+            assertEquals(3_000, LlmOrchestrator.ModelVariant.GEMMA4_E2B.requiredRamMb)
+        }
+
+        @Test
+        fun `each variant has correct download URL`() {
+            assertTrue(LlmOrchestrator.ModelVariant.GEMMA4_E4B.downloadUrl.contains("gemma-4-E4B-it"))
+            assertTrue(LlmOrchestrator.ModelVariant.GEMMA4_E2B.downloadUrl.contains("gemma-4-E2B-it"))
         }
     }
 
@@ -133,10 +120,10 @@ class LlmOrchestratorTest {
         // AICore package presence alone is not enough -- SDK check must also pass.
 
         @Test
-        fun `falls back to MediaPipe when AICore package missing`() {
+        fun `falls back to LiteRT when AICore package missing`() {
             mockFreeRam(8000)
             val config = orchestrator.selectConfig()
-            assertEquals(LlmBackend.MEDIAPIPE_GPU, config.backend)
+            assertEquals(LlmBackend.LITERT, config.backend)
         }
     }
 }

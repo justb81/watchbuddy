@@ -42,6 +42,7 @@ data class SettingsUiState(
     val llmDownloadProgress: Int?  = null,   // null = not downloading, 0-100 = progress
     val llmReady: Boolean          = false,
     val ollamaUrl: String           = DEFAULT_OLLAMA_URL,
+    val modelBaseUrl: String        = "",
     val freeRamMb: Int             = 0,
     val saveSuccess: Boolean       = false
 )
@@ -79,7 +80,8 @@ class SettingsViewModel @Inject constructor(
                 directClientId = saved.directClientId,
                 directClientSecret = clientSecret,
                 companionRunning = saved.companionEnabled,
-                ollamaUrl = saved.ollamaUrl
+                ollamaUrl = saved.ollamaUrl,
+                modelBaseUrl = saved.modelBaseUrl
             )
         }
     }
@@ -123,6 +125,10 @@ class SettingsViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(ollamaUrl = url)
     }
 
+    fun setModelBaseUrl(url: String) {
+        _uiState.value = _uiState.value.copy(modelBaseUrl = url)
+    }
+
     fun saveAdvancedSettings() {
         viewModelScope.launch {
             val state = _uiState.value
@@ -132,7 +138,8 @@ class SettingsViewModel @Inject constructor(
                     backendUrl = state.customBackendUrl,
                     directClientId = state.directClientId,
                     companionEnabled = state.companionRunning,
-                    ollamaUrl = state.ollamaUrl
+                    ollamaUrl = state.ollamaUrl,
+                    modelBaseUrl = state.modelBaseUrl
                 )
             )
             settingsRepository.saveClientSecret(state.directClientSecret)
@@ -167,9 +174,13 @@ class SettingsViewModel @Inject constructor(
 
     fun downloadModel() {
         val config = llmOrchestrator.selectConfig()
-        val modelUrl = config.modelVariant?.let { variant ->
-            "$MODEL_BASE_URL${variant.fileName}"
-        } ?: return // no variant selected → nothing to download
+        val variant = config.modelVariant ?: return // no variant selected → nothing to download
+        val customBase = _uiState.value.modelBaseUrl
+        val modelUrl = if (customBase.isNotBlank()) {
+            "${customBase.trimEnd('/')}/${variant.fileName}"
+        } else {
+            variant.downloadUrl
+        }
 
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
@@ -178,7 +189,10 @@ class SettingsViewModel @Inject constructor(
 
         val workRequest = OneTimeWorkRequestBuilder<ModelDownloadWorker>()
             .setConstraints(constraints)
-            .setInputData(workDataOf(ModelDownloadWorker.KEY_MODEL_URL to modelUrl))
+            .setInputData(workDataOf(
+                ModelDownloadWorker.KEY_MODEL_URL to modelUrl,
+                ModelDownloadWorker.KEY_MODEL_FILENAME to variant.fileName
+            ))
             .build()
 
         workManager.enqueueUniqueWork(
@@ -223,12 +237,4 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    companion object {
-        /**
-         * Base URL for MediaPipe/Gemma model downloads.
-         * In production this would come from a remote config or the LlmOrchestrator.
-         */
-        private const val MODEL_BASE_URL =
-            "https://storage.googleapis.com/mediapipe-models/llm_inference/gemma4/"
-    }
 }

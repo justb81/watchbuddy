@@ -73,7 +73,7 @@ object TestFixtures {
         userName: String = "testuser",
         userAvatarUrl: String? = null,
         deviceName: String = "Pixel 8",
-        llmBackend: LlmBackend = LlmBackend.MEDIAPIPE_GPU,
+        llmBackend: LlmBackend = LlmBackend.LITERT,
         modelQuality: Int = 75,
         freeRamMb: Int = 4000,
         isAvailable: Boolean = true

@@ -199,8 +199,8 @@ class ModelsSerializationTest {
         }
 
         @Test
-        fun `has exactly 4 values`() {
-            assertEquals(4, LlmBackend.entries.size)
+        fun `has exactly 3 values`() {
+            assertEquals(3, LlmBackend.entries.size)
         }
     }
 

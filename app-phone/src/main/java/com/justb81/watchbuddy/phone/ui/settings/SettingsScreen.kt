@@ -313,6 +313,23 @@ private fun AdvancedAuthSettings(uiState: SettingsUiState, viewModel: SettingsVi
             singleLine    = true
         )
 
+        Spacer(Modifier.height(16.dp))
+
+        // Model download URL override
+        Text(
+            text  = stringResource(R.string.settings_model_url_section),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Spacer(Modifier.height(4.dp))
+        OutlinedTextField(
+            value         = uiState.modelBaseUrl,
+            onValueChange = viewModel::setModelBaseUrl,
+            label         = { Text(stringResource(R.string.settings_model_url)) },
+            modifier      = Modifier.fillMaxWidth(),
+            singleLine    = true
+        )
+
         Spacer(Modifier.height(12.dp))
         Button(
             onClick  = { viewModel.saveAdvancedSettings() },

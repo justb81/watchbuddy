@@ -14,7 +14,7 @@ import javax.inject.Singleton
 
 /**
  * Creates [LlmProvider] instances based on [LlmOrchestrator.selectConfig] and
- * implements a cascade fallback:  AICore -> MediaPipe -> Remote Ollama -> TMDB Fallback.
+ * implements a cascade fallback:  AICore -> LiteRT-LM -> Remote Ollama -> TMDB Fallback.
  *
  * Each provider is attempted in order. If a provider throws, the next one is tried.
  */
@@ -73,14 +73,14 @@ class LlmProviderFactory @Inject constructor(
         when (config.backend) {
             LlmBackend.AICORE -> {
                 providers += AiCoreLlmProvider(context)
-                // Fall through to MediaPipe if AICore fails
+                // Fall through to LiteRT-LM if AICore fails
                 config.modelVariant?.let {
-                    providers += MediaPipeLlmProvider(context, it)
+                    providers += LiteRtLlmProvider(context, it)
                 }
             }
-            LlmBackend.MEDIAPIPE_GPU, LlmBackend.MEDIAPIPE_CPU -> {
+            LlmBackend.LITERT -> {
                 config.modelVariant?.let {
-                    providers += MediaPipeLlmProvider(context, it)
+                    providers += LiteRtLlmProvider(context, it)
                 }
             }
             LlmBackend.NONE -> { /* skip on-device, go straight to remote/fallback */ }

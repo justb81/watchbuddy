@@ -14,7 +14,7 @@ watchbuddy/
 │   └── src/main/java/com/justb81/watchbuddy/phone/
 │       ├── auth/       TokenRepository, AuthModule (Trakt OAuth, Keystore)
 │       ├── di/         AppModule (Hilt dependency injection)
-│       ├── llm/        LlmOrchestrator, RecapGenerator, LlmProviders (MediaPipe / AICore / Ollama)
+│       ├── llm/        LlmOrchestrator, RecapGenerator, LlmProviders (LiteRT-LM / AICore / Ollama)
 │       ├── server/     CompanionHttpServer (Ktor, port 8765), DeviceCapabilityProvider, ShowRepository
 │       ├── settings/   AppSettings, SettingsRepository (DataStore)
 │       ├── ui/         MainActivity, PhoneNavGraph
@@ -71,7 +71,7 @@ watchbuddy/
 - **DI:** Hilt (Dagger)
 - **Network:** Retrofit + OkHttp (API clients), Ktor (phone HTTP server)
 - **Serialization:** kotlinx.serialization
-- **LLM:** MediaPipe Tasks GenAI (Gemma models), AICore (Gemini Nano), Remote Ollama (optional)
+- **LLM:** LiteRT-LM (Gemma 4 models, .litertlm format), AICore (Gemini Nano), Remote Ollama (optional)
 - **Storage:** Room DB, DataStore Preferences, Android Keystore
 - **Background:** WorkManager (model updates)
 - **Image loading:** Coil
@@ -131,7 +131,7 @@ The only exceptions are **localization string resources** (`values-de/`, `values
 | New feature | `feature/` | `feature/add-watchlist-filter` |
 | Bug fix | `fix/` | `fix/scrobble-confidence-threshold` |
 | Documentation | `docs/` | `docs/update-architecture` |
-| Chore / maintenance | `chore/` | `chore/upgrade-mediapipe` |
+| Chore / maintenance | `chore/` | `chore/upgrade-litertlm` |
 | Release (automated) | `release-please--` | `release-please--branches--main` |
 
 The `release-please--` prefix is reserved for the automated release-please bot — never create branches with this prefix manually.
@@ -170,7 +170,7 @@ The TV ranks connected phones by LLM quality and uses the best one. Failover cha
 ## Important Patterns
 
 - **Scrobbling:** `MediaSessionScrobbler` listens to active media sessions on the TV, extracts package name + title, fuzzy-matches against Trakt watchlist. Auto-scrobbles if confidence ≥ 95%, shows overlay confirmation between 70–95%, ignores below 70%.
-- **LLM selection:** `LlmOrchestrator` checks AICore first, then falls back to MediaPipe with a Gemma model sized to available RAM. Remote Ollama is available as an optional provider.
+- **LLM selection:** `LlmOrchestrator` checks AICore first, then falls back to LiteRT-LM with a Gemma 4 model (E4B or E2B) sized to available RAM. Remote Ollama is available as an optional provider.
 - **Auth modes:** Managed backend (default), self-hosted proxy, or direct Trakt credentials.
 - **Multi-user:** Multiple phones can connect to one TV simultaneously; shared watch mode avoids recap spoilers.
 
