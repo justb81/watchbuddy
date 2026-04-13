@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.1.4](https://github.com/justb81/watchbuddy/compare/v0.1.3...v0.1.4) (2026-04-13)
+
+
+### Features
+
+* add comprehensive unit test suite with JUnit 5 ([5341c0e](https://github.com/justb81/watchbuddy/commit/5341c0e2054c6737eb4809ad5e4f76829f6ad5b3))
+* add comprehensive unit test suite with JUnit 5 ([ce823ec](https://github.com/justb81/watchbuddy/commit/ce823ec6273405cfe56eefb1175f7b15f0891acc))
+* make Ollama server URL configurable via Settings UI ([e0e7dc3](https://github.com/justb81/watchbuddy/commit/e0e7dc39684b08eb5cfc1b67db08bdde587f9df4))
+* make Ollama server URL configurable via Settings UI ([6260b2f](https://github.com/justb81/watchbuddy/commit/6260b2f92dfcaf56f84c9d1457a8f1d01c22c304))
+
+
+### Bug Fixes
+
+* pass attemptCount to createWorker before construction ([f40f638](https://github.com/justb81/watchbuddy/commit/f40f638530ef2499deeafc3169883e90e648fa62))
+* replace ad-hoc HTTP clients with injected shared OkHttpClient ([4805b00](https://github.com/justb81/watchbuddy/commit/4805b0012235328e85a2d806a1b95bced37a11b1))
+* replace ad-hoc HTTP clients with injected shared OkHttpClient ([c0650b4](https://github.com/justb81/watchbuddy/commit/c0650b4b6a5a2379d5500403dfb2fcd9c2b90add))
+* resolve 6 high-priority bugs across Android apps ([e5b62a1](https://github.com/justb81/watchbuddy/commit/e5b62a1a287c8215454e33c21e7baeab50ce8460))
+* resolve 7 high-priority bugs across Android apps and backend ([60021ec](https://github.com/justb81/watchbuddy/commit/60021ec3bfc6801768d298ebb3dd98b2ff9cd70d))
+* resolve 7 high-priority bugs across Android apps and backend ([5ca90cd](https://github.com/justb81/watchbuddy/commit/5ca90cd95cd5caa32fe29ed5ca45222b17e28d7f))
+* resolve all P0-critical issues ([#3](https://github.com/justb81/watchbuddy/issues/3), [#4](https://github.com/justb81/watchbuddy/issues/4), [#5](https://github.com/justb81/watchbuddy/issues/5)) ([514450f](https://github.com/justb81/watchbuddy/commit/514450fe38ed731439b03afe685d4ac3e2e695c1))
+* resolve all P0-critical issues ([#3](https://github.com/justb81/watchbuddy/issues/3), [#4](https://github.com/justb81/watchbuddy/issues/4), [#5](https://github.com/justb81/watchbuddy/issues/5)) ([82aaf43](https://github.com/justb81/watchbuddy/commit/82aaf43418355283b172f74ad7362978b6f8bbc2))
+* resolve instant crash on launch for both phone and TV apps ([399adfb](https://github.com/justb81/watchbuddy/commit/399adfb7384712e7e0448cbfbc0f55ad4a923589))
+* resolve ModelDownloadWorkerTest hanging on setProgress ([8987f36](https://github.com/justb81/watchbuddy/commit/8987f36529c6ea5544c1d1eeebe7488431052d09))
+* **tv:** add missing backendUrl Hilt binding to prevent crash on launch ([abab24f](https://github.com/justb81/watchbuddy/commit/abab24f9059a9269d83285c6c6f8a9291c04c369))
+
 ## [0.1.3](https://github.com/justb81/watchbuddy/compare/v0.1.2...v0.1.3) (2026-04-12)
 
 
