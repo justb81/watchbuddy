@@ -16,6 +16,8 @@
     <string name="onboarding_code_expires">Le code expire dans %1$d secondes</string>
     <string name="onboarding_error_loading_code">Erreur lors du chargement du code : %1$s</string>
     <string name="onboarding_code_expired">Code expiré. Veuillez réessayer.</string>
+    <string name="onboarding_not_configured">Trakt n\'est pas encore configuré. Vous pouvez configurer vos identifiants dans les paramètres.</string>
+    <string name="onboarding_skip">Ignorer pour le moment</string>
 
     <!-- Home -->
     <string name="home_title">Mes séries</string>

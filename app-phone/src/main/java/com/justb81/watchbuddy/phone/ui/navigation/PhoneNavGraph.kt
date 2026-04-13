@@ -30,6 +30,11 @@ fun PhoneNavGraph(
                     navController.navigate(PhoneRoute.Home.route) {
                         popUpTo(PhoneRoute.Onboarding.route) { inclusive = true }
                     }
+                },
+                onSkip = {
+                    navController.navigate(PhoneRoute.Home.route) {
+                        popUpTo(PhoneRoute.Onboarding.route) { inclusive = true }
+                    }
                 }
             )
         }

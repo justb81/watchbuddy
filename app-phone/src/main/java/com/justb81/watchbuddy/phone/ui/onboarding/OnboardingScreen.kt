@@ -22,6 +22,7 @@ import com.justb81.watchbuddy.R
 @Composable
 fun OnboardingScreen(
     onSuccess: () -> Unit,
+    onSkip: () -> Unit,
     viewModel: OnboardingViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
@@ -106,8 +107,26 @@ fun OnboardingScreen(
                         }
                     }
 
+                    is OnboardingState.NotConfigured -> {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = stringResource(R.string.onboarding_not_configured),
+                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                                textAlign = TextAlign.Center,
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                    }
+
                     else -> {}
                 }
+            }
+
+            TextButton(onClick = onSkip) {
+                Text(
+                    stringResource(R.string.onboarding_skip),
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                )
             }
         }
     }
