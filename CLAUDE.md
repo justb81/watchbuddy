@@ -12,32 +12,54 @@ WatchBuddy is a two-app Android/Google TV ecosystem for cross-app series trackin
 watchbuddy/
 ├── app-phone/          Android companion app (Kotlin, Jetpack Compose)
 │   └── src/main/java/com/justb81/watchbuddy/phone/
-│       ├── llm/        LlmOrchestrator, RecapGenerator (MediaPipe / AICore)
-│       ├── server/     Ktor HTTP server (port 8765), DeviceCapabilityProvider
-│       ├── ui/         MainActivity, Home, Onboarding, Settings screens
-│       └── ui/theme/   Material 3 theme
+│       ├── auth/       TokenRepository, AuthModule (Trakt OAuth, Keystore)
+│       ├── di/         AppModule (Hilt dependency injection)
+│       ├── llm/        LlmOrchestrator, RecapGenerator, LlmProviders (MediaPipe / AICore / Ollama)
+│       ├── server/     CompanionHttpServer (Ktor, port 8765), DeviceCapabilityProvider, ShowRepository
+│       ├── settings/   AppSettings, SettingsRepository (DataStore)
+│       ├── ui/         MainActivity, PhoneNavGraph
+│       │   ├── home/       HomeScreen, HomeViewModel
+│       │   ├── navigation/ PhoneNavGraph
+│       │   ├── onboarding/ OnboardingScreen, OnboardingViewModel
+│       │   ├── settings/   SettingsScreen, SettingsViewModel
+│       │   └── theme/      Material 3 theme
+│       └── (service/)  CompanionService (foreground NSD server)
 ├── app-tv/             Google TV app (Kotlin, Compose for TV)
 │   └── src/main/java/com/justb81/watchbuddy/tv/
-│       ├── discovery/  PhoneDiscoveryManager (NSD/mDNS client)
-│       ├── scrobbler/  MediaSessionScrobbler (auto-tracking)
-│       ├── ui/         TvMainActivity, Home, Recap, ShowDetail, UserSelect, ScrobbleOverlay
-│       └── ui/theme/   TV Material theme
+│       ├── data/       StreamingPreferencesRepository, UserSessionRepository, TvShowCache
+│       ├── di/         AppModule (Hilt dependency injection)
+│       ├── discovery/  PhoneDiscoveryManager, PhoneApiService, PhoneApiClientFactory
+│       ├── scrobbler/  MediaSessionScrobbler, TvTokenCache
+│       ├── ui/         TvMainActivity, TvNavGraph
+│       │   ├── home/       TvHomeScreen, TvHomeViewModel
+│       │   ├── navigation/ TvNavGraph
+│       │   ├── recap/      RecapScreen, RecapViewModel
+│       │   ├── scrobble/   ScrobbleOverlay, ScrobbleViewModel
+│       │   ├── settings/   StreamingSettingsScreen, StreamingSettingsViewModel
+│       │   ├── showdetail/ ShowDetailScreen, ShowDetailViewModel
+│       │   ├── theme/      TV Material theme
+│       │   └── userselect/ UserSelectScreen, UserSelectViewModel
 ├── core/               Shared library module
 │   └── src/main/java/com/justb81/watchbuddy/core/
 │       ├── locale/     LocaleHelper (LLM language resolution)
 │       ├── model/      Data models (Kotlin Serialization)
 │       ├── network/    NetworkModule (Hilt, OkHttp, Retrofit)
 │       ├── tmdb/       TmdbApiService
-│       └── trakt/      TraktApiService
+│       └── trakt/      TraktApiService, TokenProxyService
 ├── backend/            Node.js token proxy (Docker)
-│   ├── src/index.js    Express server for Trakt OAuth token exchange
+│   ├── src/
+│   │   ├── index.js        Express server entry point
+│   │   ├── app.js          Express app setup (Trakt OAuth token exchange)
+│   │   └── __tests__/      Backend tests
 │   ├── Dockerfile
-│   └── docker-compose.yml
+│   ├── docker-compose.yml
+│   └── package.json
 ├── docs/
 │   └── architecture.md Detailed architecture, protocols, LLM strategy, deep links
 ├── .github/workflows/
 │   ├── build-android.yml   CI: builds debug APKs on push/PR
-│   └── release.yml         CD: release-please + signed APK builds
+│   ├── release.yml         CD: release-please + signed APK builds
+│   └── test-backend.yml    CI: tests for the Node.js backend
 └── gradle/
     └── libs.versions.toml  Version catalog (single source of truth for dependencies)
 ```
@@ -49,11 +71,11 @@ watchbuddy/
 - **DI:** Hilt (Dagger)
 - **Network:** Retrofit + OkHttp (API clients), Ktor (phone HTTP server)
 - **Serialization:** kotlinx.serialization
-- **LLM:** MediaPipe Tasks GenAI (Gemma models), AICore (Gemini Nano)
+- **LLM:** MediaPipe Tasks GenAI (Gemma models), AICore (Gemini Nano), Remote Ollama (optional)
 - **Storage:** Room DB, DataStore Preferences, Android Keystore
 - **Background:** WorkManager (model updates)
 - **Image loading:** Coil
-- **Build:** Gradle with version catalog, AGP 8.4.2
+- **Build:** Gradle with version catalog, AGP 8.7.0
 - **CI/CD:** GitHub Actions, release-please (Conventional Commits)
 - **Backend:** Node.js, Docker
 
@@ -141,13 +163,14 @@ The phone acts as an NSD/mDNS server on port 8765. The TV discovers phone(s) on 
 | GET | `/capability` | Device info + LLM quality score |
 | GET | `/shows` | User's Trakt watched shows |
 | POST | `/recap/{traktShowId}` | Generate HTML recap |
+| GET | `/auth/token` | Current access token for TV app usage |
 
 The TV ranks connected phones by LLM quality and uses the best one. Failover chain: best phone → next phone → local cache → TMDB synopsis only.
 
 ## Important Patterns
 
-- **Scrobbling:** `MediaSessionScrobbler` listens to active media sessions on the TV, extracts package name + title, fuzzy-matches against Trakt watchlist, and auto-scrobbles if confidence ≥ 90%.
-- **LLM selection:** `LlmOrchestrator` checks AICore first, then falls back to MediaPipe with a Gemma model sized to available RAM.
+- **Scrobbling:** `MediaSessionScrobbler` listens to active media sessions on the TV, extracts package name + title, fuzzy-matches against Trakt watchlist. Auto-scrobbles if confidence ≥ 95%, shows overlay confirmation between 70–95%, ignores below 70%.
+- **LLM selection:** `LlmOrchestrator` checks AICore first, then falls back to MediaPipe with a Gemma model sized to available RAM. Remote Ollama is available as an optional provider.
 - **Auth modes:** Managed backend (default), self-hosted proxy, or direct Trakt credentials.
 - **Multi-user:** Multiple phones can connect to one TV simultaneously; shared watch mode avoids recap spoilers.
 

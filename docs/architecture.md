@@ -52,6 +52,7 @@ TXT records:   version=1, modelQuality=60, llmBackend=MEDIAPIPE_GPU
 | GET | `/capability` | Device info + LLM score |
 | GET | `/shows` | User's Trakt watched shows (cached) |
 | POST | `/recap/{traktShowId}` | Generate HTML recap for a show |
+| GET | `/auth/token` | Current access token for TV app usage |
 
 ### Device Ranking (TV side)
 ```
@@ -73,6 +74,9 @@ Failover: best phone → next best → next → local TV cache → TMDB synopsis
 App start
     │
     ▼
+Remote Ollama configured? ──YES──► Use Remote Ollama (user-hosted server)
+    │ NO
+    ▼
 AICore available? ──YES──► Use Gemini Nano (auto-updated, no download)
     │ NO
     ▼
@@ -83,26 +87,30 @@ Free RAM check
     └── < 3 GB → TMDB text only (no model downloaded)
 ```
 
-Model updates: WorkManager, weekly, WiFi only.
+Model updates: WorkManager (`ModelDownloadWorker`), WiFi only.
 Auto-migrate to AICore if OS update adds support.
+Remote Ollama URL is configurable in Advanced Settings.
 
 ## Scrobbling Flow
 
 ```
-MediaSession on TV
+MediaSession on TV (polled every 30s)
     │
     ▼
 Package name + media title extracted
     │
     ▼
-Fuzzy match against Trakt watchlist cache
+Fuzzy match against local show cache (Levenshtein distance)
+    │ Falls back to Trakt API search if no good cache match
     │
-    ├── Confidence ≥ 90% → auto-scrobble (Trakt /scrobble/start)
+    ├── Confidence ≥ 95% → auto-scrobble (Trakt /scrobble/start)
     │
-    └── Confidence < 90% → Toast: "Schaust du gerade [Titel]?" → user confirms
-                                │
-                           Confirmed → scrobble
-                           Rejected → ignore
+    ├── Confidence 70–95% → ScrobbleOverlay: user confirms or rejects
+    │                           │
+    │                      Confirmed → scrobble
+    │                      Rejected → ignore
+    │
+    └── Confidence < 70% → ignored
 ```
 
 ## Secret Storage Strategy
@@ -137,7 +145,7 @@ Fuzzy match against Trakt watchlist cache
 |---------|---------|---------------|
 | Netflix | `com.netflix.ninja` | `https://www.netflix.com/title/{tmdb_id}` |
 | Prime Video | `com.amazon.amazonvideo.livingroom` | `https://app.primevideo.com/detail?asin={asin}` |
-| Disney+ | `com.disney.disneyplus` | `https://www.disneyplus.com/series/{slug}/{id}` |
+| Disney+ | `com.disney.disneyplus` | `https://www.disneyplus.com/series/{slug}/{tmdb_id}` |
 | WaipuTV | `tv.waipu.app` | `waipu://tv` |
 | Joyn | `de.prosiebensat1digital.android.joyn` | `https://www.joyn.de/serien/{slug}` |
 | ARD | `de.swr.avp.ard.phone` | `https://www.ardmediathek.de/video/{id}` |
