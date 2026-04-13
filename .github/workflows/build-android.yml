@@ -3,28 +3,37 @@ name: Build Android APKs
 on:
   push:
     branches: [main, develop]
-    paths:
-      - 'app-phone/**'
-      - 'app-tv/**'
-      - 'core/**'
-      - '*.gradle.kts'
-      - 'gradle/**'
-      - 'gradle.properties'
   pull_request:
     branches: [main]
-    paths:
-      - 'app-phone/**'
-      - 'app-tv/**'
-      - 'core/**'
-      - '*.gradle.kts'
-      - 'gradle/**'
-      - 'gradle.properties'
   workflow_dispatch:
 
 jobs:
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    if: "!startsWith(github.head_ref, 'release-please--')"
+    permissions:
+      pull-requests: read
+    outputs:
+      android: ${{ steps.filter.outputs.android }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            android:
+              - 'app-phone/**'
+              - 'app-tv/**'
+              - 'core/**'
+              - '*.gradle.kts'
+              - 'gradle/**'
+              - 'gradle.properties'
+
   test:
     name: Unit Tests
-    if: "!startsWith(github.head_ref, 'release-please--')"
+    needs: changes
+    if: needs.changes.outputs.android == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -43,8 +52,8 @@ jobs:
 
   build-phone:
     name: Build Phone APK
-    needs: test
-    if: "!startsWith(github.head_ref, 'release-please--')"
+    needs: [changes, test]
+    if: needs.changes.outputs.android == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -71,8 +80,8 @@ jobs:
 
   build-tv:
     name: Build TV APK
-    needs: test
-    if: "!startsWith(github.head_ref, 'release-please--')"
+    needs: [changes, test]
+    if: needs.changes.outputs.android == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
