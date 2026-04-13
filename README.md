@@ -65,9 +65,9 @@ To add a new language, create `values-<locale>/strings.xml` in both `app-phone/s
 ## Setup
 
 ### Android Apps
-1. Create a `local.properties` file in the project root and add your API keys (see `gradle/libs.versions.toml` for required properties)
-2. Register a Trakt application at [trakt.tv/oauth/applications](https://trakt.tv/oauth/applications)
-3. Register a TMDB account at [themoviedb.org](https://themoviedb.org)
+1. Register a Trakt application at [trakt.tv/oauth/applications](https://trakt.tv/oauth/applications)
+2. Register a TMDB account at [themoviedb.org](https://themoviedb.org)
+3. Set environment variables: `TRAKT_CLIENT_ID`, `TOKEN_BACKEND_URL` (or leave empty for no proxy)
 4. Build with Android Studio or `./gradlew assembleDebug`
 
 ### Backend (Token Proxy)
