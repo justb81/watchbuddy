@@ -22,7 +22,7 @@ android {
 
         // versionName: release-please sets VERSION_NAME, fallback to hardcoded value
         versionName = providers.environmentVariable("VERSION_NAME")
-            .orElse("0.2.2").get() // x-release-please-version
+            .orElse("0.3.0").get() // x-release-please-version
     }
 
     // CI signing: keystore path + credentials via environment variables

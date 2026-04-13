@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.0](https://github.com/justb81/watchbuddy/compare/v0.2.2...v0.3.0) (2026-04-13)
+
+
+### Features
+
+* add TMDB API key configuration UI and propagation ([#94](https://github.com/justb81/watchbuddy/issues/94)) ([#97](https://github.com/justb81/watchbuddy/issues/97)) ([d7f9c00](https://github.com/justb81/watchbuddy/commit/d7f9c00e39e11643116cc0c4a98234be5ddc7c82))
+
+
+### Bug Fixes
+
+* add Connect to Trakt buttons to Home and Settings screens ([#95](https://github.com/justb81/watchbuddy/issues/95)) ([abb962c](https://github.com/justb81/watchbuddy/commit/abb962c6752171c1895742e1f2193a9cf18ef19d)), closes [#93](https://github.com/justb81/watchbuddy/issues/93)
+
 ## [0.2.2](https://github.com/justb81/watchbuddy/compare/v0.2.1...v0.2.2) (2026-04-13)
 
 
