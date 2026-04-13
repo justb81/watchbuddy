@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/justb81/watchbuddy/compare/v0.2.0...v0.2.1) (2026-04-13)
+
+
+### Bug Fixes
+
+* correct activity class references in AndroidManifest.xml ([#88](https://github.com/justb81/watchbuddy/issues/88)) ([a467336](https://github.com/justb81/watchbuddy/commit/a46733650581b059f2f733c44b8c19a78d31d732)), closes [#86](https://github.com/justb81/watchbuddy/issues/86)
+
 ## [0.2.0](https://github.com/justb81/watchbuddy/compare/v0.1.5...v0.2.0) (2026-04-13)
 
 
