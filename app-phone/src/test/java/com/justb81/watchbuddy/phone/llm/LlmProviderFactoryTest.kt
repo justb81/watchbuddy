@@ -93,7 +93,7 @@ class LlmProviderFactoryTest {
             every { orchestrator.selectConfig() } returns LlmOrchestrator.LlmConfig(
                 LlmBackend.AICORE, null, 150
             )
-            // AICore throws UnsupportedOperationException, then cascade continues
+            // AICore fails (no Play Services in test), then cascade continues
             val result = factory.generateWithCascade("prompt", episodes)
             assertNotNull(result)
         }
