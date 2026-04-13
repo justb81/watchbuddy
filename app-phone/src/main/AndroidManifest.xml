@@ -2,6 +2,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- AICore declares minSdk 31, but we support 26+.
+         Runtime guard in LlmOrchestrator.isAiCoreAvailable() ensures AICore
+         is only used on Android 14+ (SDK 34+) devices. -->
+    <uses-sdk tools:overrideLibrary="com.google.ai.edge.aicore" />
+
     <!-- Network -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />

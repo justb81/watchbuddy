@@ -51,6 +51,10 @@
 -keep class com.google.ai.edge.litertlm.** { *; }
 -dontwarn com.google.ai.edge.litertlm.**
 
+# ── AICore (Gemini Nano) ─────────────────────────────────────────────────────
+-keep class com.google.ai.edge.aicore.** { *; }
+-dontwarn com.google.ai.edge.aicore.**
+
 # ── Coil ─────────────────────────────────────────────────────────────────────
 -dontwarn coil.**
 

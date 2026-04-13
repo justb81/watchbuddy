@@ -130,6 +130,9 @@ dependencies {
     // LiteRT-LM (Gemma — RAM-adaptive)
     implementation(libs.litertlm.android)
 
+    // AICore (Gemini Nano)
+    implementation(libs.aicore)
+
     // WorkManager (background model updates)
     implementation(libs.work.runtime)
 
