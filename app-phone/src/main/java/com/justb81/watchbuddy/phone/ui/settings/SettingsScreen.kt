@@ -21,6 +21,7 @@ import com.justb81.watchbuddy.R
 fun SettingsScreen(
     onBack: () -> Unit,
     onDisconnected: () -> Unit,
+    onConnectClick: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -79,6 +80,13 @@ fun SettingsScreen(
                             stringResource(R.string.settings_disconnect),
                             color = MaterialTheme.colorScheme.error
                         )
+                    }
+                } else {
+                    TextButton(
+                        onClick  = onConnectClick,
+                        modifier = Modifier.padding(horizontal = 8.dp)
+                    ) {
+                        Text(stringResource(R.string.settings_connect_to_trakt))
                     }
                 }
             }
