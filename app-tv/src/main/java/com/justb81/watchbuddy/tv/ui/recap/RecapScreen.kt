@@ -8,7 +8,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -17,8 +16,11 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.ui.graphics.Color
 import androidx.tv.material3.*
 import com.justb81.watchbuddy.R
+import com.justb81.watchbuddy.tv.ui.theme.extendedColors
+import com.justb81.watchbuddy.tv.ui.theme.toCssHex
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
@@ -43,7 +45,7 @@ fun RecapScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xEE0A0A0A)),
+            .background(MaterialTheme.extendedColors.scrim),
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -62,7 +64,7 @@ fun RecapScreen(
                     Text(
                         text     = stringResource(R.string.tv_recap_title),
                         fontSize = 14.sp,
-                        color    = Color(0xFFE53935)
+                        color    = MaterialTheme.colorScheme.secondary
                     )
                     Text(
                         text       = showTitle,
@@ -78,7 +80,7 @@ fun RecapScreen(
                     }
                     Button(
                         onClick = onWatchNow,
-                        colors  = ButtonDefaults.colors(containerColor = Color(0xFFE53935))
+                        colors  = ButtonDefaults.colors(containerColor = MaterialTheme.colorScheme.primary)
                     ) {
                         Text(stringResource(R.string.tv_recap_watch_now))
                     }
@@ -95,12 +97,12 @@ fun RecapScreen(
             ) {
                 when (val s = state) {
                     is RecapUiState.Idle -> {
-                        CircularProgressIndicator(color = Color(0xFFE53935))
+                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                     }
 
                     is RecapUiState.Generating -> {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            CircularProgressIndicator(color = Color(0xFFE53935))
+                            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                             Spacer(Modifier.height(16.dp))
                             Text(
                                 text     = stringResource(R.string.tv_recap_generating_on, s.deviceName),
@@ -118,7 +120,7 @@ fun RecapScreen(
                         Column(
                             modifier            = Modifier
                                 .fillMaxWidth(0.7f)
-                                .background(Color(0xFF1C1C1E), RoundedCornerShape(16.dp))
+                                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(16.dp))
                                 .padding(32.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -142,7 +144,7 @@ fun RecapScreen(
                         Text(
                             text     = stringResource(R.string.tv_recap_error),
                             fontSize = 16.sp,
-                            color    = Color(0xFFE53935)
+                            color    = MaterialTheme.colorScheme.error
                         )
                     }
                 }
@@ -153,6 +155,10 @@ fun RecapScreen(
 
 @Composable
 private fun RecapWebView(html: String) {
+    val bgHex          = MaterialTheme.colorScheme.background.toCssHex()
+    val textHex        = MaterialTheme.colorScheme.onBackground.toCssHex()
+    val placeholderHex = MaterialTheme.extendedColors.placeholder.toCssHex()
+
     // Wrap HTML in a full page with dark background and slide animation
     val fullHtml = """
         <!DOCTYPE html>
@@ -162,8 +168,8 @@ private fun RecapWebView(html: String) {
         <style>
           * { margin: 0; padding: 0; box-sizing: border-box; }
           body {
-            background: #0A0A0A;
-            color: #EEEEEE;
+            background: $bgHex;
+            color: $textHex;
             font-family: -apple-system, 'Helvetica Neue', sans-serif;
             display: flex;
             align-items: center;
@@ -192,12 +198,12 @@ private fun RecapWebView(html: String) {
             object-fit: cover;
             border-radius: 12px;
             flex-shrink: 0;
-            background: #2A2A2C;
+            background: $placeholderHex;
           }
           .slide p {
             font-size: 20px;
             line-height: 1.6;
-            color: #EEEEEE;
+            color: $textHex;
           }
           @keyframes fadeIn {
             from { opacity: 0; transform: translateY(16px); }

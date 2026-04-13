@@ -9,13 +9,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.ui.graphics.Color
 import androidx.tv.material3.*
 import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
@@ -39,14 +39,14 @@ fun ShowDetailScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0A0A0A))
+            .background(MaterialTheme.colorScheme.background)
     ) {
         // Background poster area (left 40%)
         Box(
             modifier = Modifier
                 .fillMaxHeight()
                 .fillMaxWidth(0.4f)
-                .background(Color(0xFF1C1C1E))
+                .background(MaterialTheme.colorScheme.surface)
                 .align(Alignment.CenterStart)
         )
 
@@ -56,7 +56,7 @@ fun ShowDetailScreen(
                 .fillMaxSize()
                 .background(
                     androidx.compose.ui.graphics.Brush.horizontalGradient(
-                        colors      = listOf(Color.Transparent, Color(0xFF0A0A0A)),
+                        colors      = listOf(Color.Transparent, MaterialTheme.colorScheme.background),
                         startX      = 400f,
                         endX        = 900f
                     )
@@ -129,7 +129,7 @@ fun ShowDetailScreen(
                         }
                     },
                     colors = ButtonDefaults.colors(
-                        containerColor = Color(0xFFE53935)
+                        containerColor = MaterialTheme.colorScheme.primary
                     )
                 ) {
                     Text(
@@ -158,7 +158,7 @@ fun ShowDetailScreen(
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     services.take(4).forEach { service ->
-                        MetaChip(service.name, color = Color(0xFF1C1C1E))
+                        MetaChip(service.name, color = MaterialTheme.colorScheme.surface)
                     }
                 }
             }
@@ -177,7 +177,7 @@ fun ShowDetailScreen(
 }
 
 @Composable
-private fun MetaChip(text: String, color: Color = Color(0xFF2C2C2E)) {
+private fun MetaChip(text: String, color: Color = MaterialTheme.colorScheme.surfaceVariant) {
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(20.dp))

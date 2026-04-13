@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.sp
 import androidx.tv.material3.*
 import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.core.model.ScrobbleCandidate
+import com.justb81.watchbuddy.tv.ui.theme.extendedColors
 import kotlinx.coroutines.delay
 
 /**
@@ -63,7 +64,7 @@ fun ScrobbleOverlay(
                     .widthIn(max = 400.dp)
                     .clip(RoundedCornerShape(topStart = 16.dp, bottomStart = 0.dp,
                                             topEnd   = 0.dp,  bottomEnd   = 0.dp))
-                    .background(Color(0xFF1C1C1E).copy(alpha = 0.95f))
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.95f))
             ) {
                 Column(
                     modifier = Modifier.padding(20.dp),
@@ -73,7 +74,7 @@ fun ScrobbleOverlay(
                     Text(
                         text     = "Trakt",
                         fontSize = 11.sp,
-                        color    = Color(0xFFE53935),
+                        color    = MaterialTheme.extendedColors.traktRed,
                         fontWeight = FontWeight.Bold
                     )
 
@@ -97,7 +98,7 @@ fun ScrobbleOverlay(
                     LinearProgressIndicator(
                         progress = { secondsLeft / 15f },
                         modifier = Modifier.fillMaxWidth(),
-                        color    = Color(0xFFE53935),
+                        color    = MaterialTheme.colorScheme.primary,
                         trackColor = Color.White.copy(alpha = 0.1f)
                     )
 
@@ -110,7 +111,7 @@ fun ScrobbleOverlay(
                             onClick  = onConfirm,
                             modifier = Modifier.weight(1f),
                             colors   = ButtonDefaults.colors(
-                                containerColor = Color(0xFFE53935)
+                                containerColor = MaterialTheme.colorScheme.primary
                             )
                         ) {
                             Text(stringResource(R.string.tv_scrobble_yes), fontSize = 13.sp)

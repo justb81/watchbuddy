@@ -10,16 +10,17 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.ui.graphics.Color
 import androidx.tv.material3.*
 import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
+import com.justb81.watchbuddy.tv.ui.theme.extendedColors
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
@@ -166,8 +167,8 @@ private fun ShowCard(entry: TraktWatchedEntry, onClick: () -> Unit) {
             .aspectRatio(2f / 3f),
         shape     = CardDefaults.shape(RoundedCornerShape(12.dp)),
         colors    = CardDefaults.colors(
-            containerColor         = Color(0xFF1C1C1E),
-            focusedContainerColor  = Color(0xFF2C2C2E),
+            containerColor         = MaterialTheme.colorScheme.surface,
+            focusedContainerColor  = MaterialTheme.colorScheme.surfaceVariant,
         ),
         scale     = CardDefaults.scale(focusedScale = 1.05f)
     ) {
@@ -176,7 +177,7 @@ private fun ShowCard(entry: TraktWatchedEntry, onClick: () -> Unit) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color(0xFF2A2A2C))
+                    .background(MaterialTheme.extendedColors.placeholder)
             )
 
             // Bottom overlay
@@ -199,7 +200,7 @@ private fun ShowCard(entry: TraktWatchedEntry, onClick: () -> Unit) {
                     Text(
                         text     = "S${lastSeason.number.toString().padStart(2,'0')}E${lastEpisode.number.toString().padStart(2,'0')}",
                         fontSize = 11.sp,
-                        color    = Color(0xFFE53935)
+                        color    = MaterialTheme.colorScheme.primary
                     )
                 }
             }
@@ -213,7 +214,7 @@ private fun PhoneStatusBadge(count: Int, bestName: String?) {
         modifier = Modifier
             .padding(4.dp)
             .clip(RoundedCornerShape(20.dp))
-            .background(Color(0xFF1C1C1E))
+            .background(MaterialTheme.colorScheme.surface)
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
@@ -225,7 +226,7 @@ private fun PhoneStatusBadge(count: Int, bestName: String?) {
                 modifier = Modifier
                     .size(8.dp)
                     .clip(RoundedCornerShape(4.dp))
-                    .background(Color(0xFF4CAF50))
+                    .background(MaterialTheme.extendedColors.success)
             )
             Text(
                 text     = if (bestName != null) bestName else stringResource(R.string.tv_devices_count, count),
