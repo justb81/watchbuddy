@@ -73,7 +73,7 @@
     <string name="companion_channel_name">Companion Service</string>
     <string name="companion_channel_description">Shows when the companion server is active for TV connections</string>
     <string name="companion_notification_title">WatchBuddy Companion</string>
-    <string name="companion_notification_text">Bereit für TV-Verbindung</string>
+    <string name="companion_notification_text">Ready for TV connection</string>
 
     <!-- Common -->
     <string name="no_description">No description available.</string>

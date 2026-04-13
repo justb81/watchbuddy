@@ -97,7 +97,7 @@ class LlmProviderFactory @Inject constructor(
 
     private fun buildMinimalFallback(): String = """
         <div style="display:flex;align-items:center;justify-content:center;height:100%;color:white;font-family:sans-serif;">
-          <p>Recap konnte nicht generiert werden.</p>
+          <p>Could not generate recap.</p>
         </div>
     """.trimIndent()
 }

@@ -69,6 +69,12 @@
     <string name="settings_not_connected">Nicht verbunden</string>
     <string name="settings_llm_detecting">Wird erkannt…</string>
 
+    <!-- Companion Service -->
+    <string name="companion_channel_name">Companion-Dienst</string>
+    <string name="companion_channel_description">Zeigt an, wenn der Companion-Server für TV-Verbindungen aktiv ist</string>
+    <string name="companion_notification_title">WatchBuddy Companion</string>
+    <string name="companion_notification_text">Bereit für TV-Verbindung</string>
+
     <!-- Common -->
     <string name="no_description">Keine Beschreibung verfügbar.</string>
     <string name="loading">Wird geladen…</string>
