@@ -41,7 +41,7 @@ class CompanionHttpServer @Inject constructor(
         private const val TAG = "CompanionHttpServer"
     }
 
-    private var server: ApplicationEngine? = null
+    private var server: EmbeddedServer<*, *>? = null
 
     fun start() {
         server = embeddedServer(Netty, port = PORT) {
