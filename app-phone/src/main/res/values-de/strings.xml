@@ -16,6 +16,8 @@
     <string name="onboarding_code_expires">Code läuft ab in %1$d Sekunden</string>
     <string name="onboarding_error_loading_code">Fehler beim Laden des Codes: %1$s</string>
     <string name="onboarding_code_expired">Code abgelaufen. Bitte erneut versuchen.</string>
+    <string name="onboarding_not_configured">Trakt ist noch nicht konfiguriert. Du kannst deine Zugangsdaten in den Einstellungen einrichten.</string>
+    <string name="onboarding_skip">Jetzt überspringen</string>
 
     <!-- Home -->
     <string name="home_title">Meine Serien</string>

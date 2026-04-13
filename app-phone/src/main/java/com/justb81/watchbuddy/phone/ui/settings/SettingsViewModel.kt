@@ -11,6 +11,7 @@ import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.workDataOf
 import com.justb81.watchbuddy.R
+import com.justb81.watchbuddy.core.trakt.TraktApiService
 import com.justb81.watchbuddy.phone.auth.TokenRepository
 import com.justb81.watchbuddy.service.CompanionService
 import com.justb81.watchbuddy.phone.llm.LlmOrchestrator
@@ -51,6 +52,7 @@ data class SettingsUiState(
 class SettingsViewModel @Inject constructor(
     application: Application,
     private val llmOrchestrator: LlmOrchestrator,
+    private val traktApi: TraktApiService,
     private val tokenRepository: TokenRepository,
     private val deviceCapabilityProvider: DeviceCapabilityProvider,
     private val settingsRepository: SettingsRepository
@@ -66,8 +68,21 @@ class SettingsViewModel @Inject constructor(
 
     init {
         loadPersistedSettings()
+        loadTraktUsername()
         detectLlm()
         observeModelReadyState()
+    }
+
+    private fun loadTraktUsername() {
+        val accessToken = tokenRepository.getAccessToken() ?: return
+        viewModelScope.launch {
+            try {
+                val profile = traktApi.getProfile("Bearer $accessToken")
+                _uiState.value = _uiState.value.copy(traktUsername = profile.username)
+            } catch (_: Exception) {
+                // Token may be expired or network unavailable — keep showing "Not connected"
+            }
+        }
     }
 
     private fun loadPersistedSettings() {
