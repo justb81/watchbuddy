@@ -16,23 +16,25 @@ android {
         minSdk = 26
         targetSdk = 35
 
-        // versionCode: CI setzt VERSION_CODE (run_number). TV-Offset 2000 (höher → Play bevorzugt für TV).
-        val ciVersionCode = System.getenv("VERSION_CODE")?.toIntOrNull() ?: 1
+        // versionCode: CI sets VERSION_CODE (run_number). TV offset 2000 (higher → Play prefers for TV).
+        val ciVersionCode = providers.environmentVariable("VERSION_CODE")
+            .orElse("1").get().toIntOrNull() ?: 1
         versionCode = 2000 + ciVersionCode
 
-        // versionName: release-please setzt VERSION_NAME, Fallback auf x-generic-string
-        versionName = System.getenv("VERSION_NAME") ?: "0.1.5" // x-release-please-version
+        // versionName: release-please sets VERSION_NAME, fallback to hardcoded value
+        versionName = providers.environmentVariable("VERSION_NAME")
+            .orElse("0.1.5").get() // x-release-please-version
     }
 
-    // CI-Signing: Keystore-Pfad + Credentials über Umgebungsvariablen
-    val keystoreFile = System.getenv("KEYSTORE_FILE")
+    // CI signing: keystore path + credentials via environment variables
+    val keystoreFile = providers.environmentVariable("KEYSTORE_FILE").orNull
     if (keystoreFile != null) {
         signingConfigs {
             create("release") {
                 storeFile = file(keystoreFile)
-                storePassword = System.getenv("KEYSTORE_PASSWORD")
-                keyAlias = System.getenv("KEY_ALIAS")
-                keyPassword = System.getenv("KEY_PASSWORD")
+                storePassword = providers.environmentVariable("KEYSTORE_PASSWORD").orNull
+                keyAlias = providers.environmentVariable("KEY_ALIAS").orNull
+                keyPassword = providers.environmentVariable("KEY_PASSWORD").orNull
             }
         }
     }
@@ -78,10 +80,10 @@ dependencies {
     debugImplementation(libs.compose.ui.tooling)
 
     // Compose for TV (Leanback replacement)
-    // tv-foundation ist transitiv in tv-material enthalten
+    // tv-foundation is transitively included in tv-material
     implementation(libs.compose.tv.material)
 
-    // Standard Material3 — CircularProgressIndicator / LinearProgressIndicator für TV
+    // Standard Material3 — CircularProgressIndicator / LinearProgressIndicator for TV
     implementation(libs.compose.material3)
 
     // Lifecycle
@@ -99,7 +101,7 @@ dependencies {
     // Image loading
     implementation(libs.coil)
 
-    // WorkManager (background Trakt sync)
+    // WorkManager (background Trakt sync / scrobble history)
     implementation(libs.work.runtime)
 
     // Testing

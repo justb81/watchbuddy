@@ -40,11 +40,6 @@ dependencies {
     // Coroutines
     api(libs.kotlinx.coroutines)
 
-    // Room
-    api(libs.room.runtime)
-    api(libs.room.ktx)
-    ksp(libs.room.compiler)
-
     // DataStore
     api(libs.datastore.preferences)
 
