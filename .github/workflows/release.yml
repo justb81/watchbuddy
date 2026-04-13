@@ -153,3 +153,21 @@ jobs:
         with:
           name: watchbuddy-release-${{ needs.release-please.outputs.version }}
           path: release-assets/*.apk
+
+  update-stable:
+    name: Update stable branch
+    needs: [release-please, build-release]
+    if: ${{ needs.release-please.outputs.release_created }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Fast-forward stable branch to release tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          TAG="${{ needs.release-please.outputs.tag_name }}"
+          git checkout -B stable "$TAG"
+          git push origin stable --force
