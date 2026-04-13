@@ -1,6 +1,7 @@
 package com.justb81.watchbuddy.phone.llm
 
 import android.content.Context
+import android.util.Log
 import com.google.ai.edge.litertlm.Backend
 import com.google.ai.edge.litertlm.ConversationConfig
 import com.google.ai.edge.litertlm.Engine
@@ -37,15 +38,21 @@ class LiteRtLlmProvider(
             )
         }
 
-        val config = EngineConfig(
-            modelPath = modelPath,
-            backend = Backend.GPU()
-        )
+        val newEngine = try {
+            val gpuConfig = EngineConfig(modelPath = modelPath, backend = Backend.GPU())
+            Engine(gpuConfig).also { it.initialize() }
+        } catch (e: Exception) {
+            Log.w(TAG, "GPU backend unavailable, falling back to CPU", e)
+            val cpuConfig = EngineConfig(modelPath = modelPath, backend = Backend.CPU())
+            Engine(cpuConfig).also { it.initialize() }
+        }
 
-        val newEngine = Engine(config)
-        newEngine.initialize()
         engine = newEngine
         return newEngine
+    }
+
+    companion object {
+        private const val TAG = "LiteRtLlmProvider"
     }
 
     override suspend fun generate(prompt: String): String = withContext(Dispatchers.IO) {

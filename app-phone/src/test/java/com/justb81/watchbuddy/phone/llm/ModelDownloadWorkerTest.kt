@@ -16,10 +16,12 @@ import kotlinx.coroutines.test.runTest
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import okhttp3.mockwebserver.SocketPolicy
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
+import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
@@ -32,7 +34,7 @@ class ModelDownloadWorkerTest {
     }
 
     private lateinit var server: MockWebServer
-    private val client = OkHttpClient()
+    private val downloadClient = OkHttpClient()
     private val context: Context = mockk(relaxed = true)
     private val workerParams: WorkerParameters = mockk(relaxed = true)
     private val settingsRepository: SettingsRepository = mockk(relaxed = true)
@@ -66,98 +68,171 @@ class ModelDownloadWorkerTest {
             Data.EMPTY
         }
         every { workerParams.inputData } returns inputData
-        // Must be set before construction — ListenableWorker caches this value
         every { workerParams.runAttemptCount } returns attemptCount
-        // Use spyk to intercept setProgress which would otherwise hang
-        // because the mocked WorkerParameters cannot provide a real ProgressUpdater
         val worker = spyk(
-            ModelDownloadWorker(context, workerParams, settingsRepository, client)
+            ModelDownloadWorker(context, workerParams, settingsRepository, downloadClient)
         )
         coEvery { worker.setProgress(any()) } just Runs
         return worker
     }
 
-    @Test
-    fun `downloads file using injected OkHttpClient`() = runTest {
-        val content = "model binary data"
-        server.enqueue(
-            MockResponse()
-                .setBody(content)
-                .setHeader("Content-Length", content.length)
-        )
+    @Nested
+    @DisplayName("Successful downloads")
+    inner class SuccessfulDownloads {
 
-        val worker = createWorker(server.url("/model.bin").toString())
-        val result = worker.doWork()
+        @Test
+        fun `downloads file using dedicated download client`() = runTest {
+            val content = "model binary data"
+            server.enqueue(
+                MockResponse()
+                    .setBody(content)
+                    .setHeader("Content-Length", content.length)
+            )
 
-        assertTrue(result is Result.Success)
+            val worker = createWorker(server.url("/model.bin").toString())
+            val result = worker.doWork()
 
-        val request = server.takeRequest()
-        assertEquals("GET", request.method)
+            assertTrue(result is Result.Success)
 
-        val outputFile = File(tempDir, MODEL_FILENAME)
-        assertTrue(outputFile.exists())
-        assertEquals(content, outputFile.readText())
+            val request = server.takeRequest()
+            assertEquals("GET", request.method)
+
+            val outputFile = File(tempDir, MODEL_FILENAME)
+            assertTrue(outputFile.exists())
+            assertEquals(content, outputFile.readText())
+        }
+
+        @Test
+        fun `sets model ready on successful download`() = runTest {
+            server.enqueue(MockResponse().setBody("data"))
+
+            val worker = createWorker(server.url("/model.bin").toString())
+            worker.doWork()
+
+            verify { settingsRepository.setModelReady(true) }
+        }
+
+        @Test
+        fun `does not send Trakt headers on download requests`() = runTest {
+            server.enqueue(MockResponse().setBody("data"))
+
+            val worker = createWorker(server.url("/model.bin").toString())
+            worker.doWork()
+
+            val request = server.takeRequest()
+            assertNull(request.getHeader("trakt-api-version"))
+        }
+
+        @Test
+        fun `removes temp file after successful rename`() = runTest {
+            server.enqueue(MockResponse().setBody("data"))
+
+            val worker = createWorker(server.url("/model.bin").toString())
+            worker.doWork()
+
+            val tempFile = File(tempDir, "$MODEL_FILENAME.tmp")
+            assertFalse(tempFile.exists())
+        }
     }
 
-    @Test
-    fun `returns failure when no model URL provided`() = runTest {
-        val worker = createWorker(null)
-        val result = worker.doWork()
-        assertTrue(result is Result.Failure)
+    @Nested
+    @DisplayName("Failure handling")
+    inner class FailureHandling {
+
+        @Test
+        fun `returns failure when no model URL provided`() = runTest {
+            val worker = createWorker(null)
+            val result = worker.doWork()
+            assertTrue(result is Result.Failure)
+        }
+
+        @Test
+        fun `returns retry on HTTP error when attempts remain`() = runTest {
+            server.enqueue(MockResponse().setResponseCode(500).setBody("Server Error"))
+
+            val worker = createWorker(server.url("/model.bin").toString(), attemptCount = 1)
+            val result = worker.doWork()
+
+            assertTrue(result is Result.Retry)
+        }
+
+        @Test
+        fun `returns failure on HTTP error when max retries exceeded`() = runTest {
+            server.enqueue(MockResponse().setResponseCode(500).setBody("Server Error"))
+
+            val worker = createWorker(server.url("/model.bin").toString(), attemptCount = 3)
+            val result = worker.doWork()
+
+            assertTrue(result is Result.Failure)
+        }
+
+        @Test
+        fun `cleans up temp file on failure`() = runTest {
+            server.enqueue(MockResponse().setResponseCode(500).setBody("Server Error"))
+
+            val worker = createWorker(server.url("/model.bin").toString())
+            worker.doWork()
+
+            val tempFile = File(tempDir, "$MODEL_FILENAME.tmp")
+            assertFalse(tempFile.exists())
+        }
     }
 
-    @Test
-    fun `returns retry on HTTP error when attempts remain`() = runTest {
-        server.enqueue(MockResponse().setResponseCode(500).setBody("Server Error"))
+    @Nested
+    @DisplayName("Download integrity")
+    inner class DownloadIntegrity {
 
-        val worker = createWorker(server.url("/model.bin").toString(), attemptCount = 1)
-        val result = worker.doWork()
+        @Test
+        fun `detects incomplete download when content-length mismatches`() = runTest {
+            val fullContent = "complete model data here"
+            // Advertise full content-length but disconnect early
+            server.enqueue(
+                MockResponse()
+                    .setHeader("Content-Length", fullContent.length)
+                    .setBody("partial")
+                    .setSocketPolicy(SocketPolicy.DISCONNECT_AT_END)
+            )
 
-        assertTrue(result is Result.Retry)
+            val worker = createWorker(server.url("/model.bin").toString(), attemptCount = 3)
+            val result = worker.doWork()
+
+            // Should fail because bytesRead ("partial".length) != contentLength (fullContent.length)
+            assertTrue(result is Result.Failure)
+        }
+
+        @Test
+        fun `succeeds when content-length matches downloaded bytes`() = runTest {
+            val content = "exact content"
+            server.enqueue(
+                MockResponse()
+                    .setBody(content)
+                    .setHeader("Content-Length", content.length)
+            )
+
+            val worker = createWorker(server.url("/model.bin").toString())
+            val result = worker.doWork()
+
+            assertTrue(result is Result.Success)
+            assertEquals(content, File(tempDir, MODEL_FILENAME).readText())
+        }
     }
 
-    @Test
-    fun `returns failure on HTTP error when max retries exceeded`() = runTest {
-        server.enqueue(MockResponse().setResponseCode(500).setBody("Server Error"))
+    @Nested
+    @DisplayName("Client isolation")
+    inner class ClientIsolation {
 
-        val worker = createWorker(server.url("/model.bin").toString(), attemptCount = 3)
-        val result = worker.doWork()
+        @Test
+        fun `uses dedicated download client for multiple workers`() = runTest {
+            server.enqueue(MockResponse().setBody("data1"))
+            server.enqueue(MockResponse().setBody("data2"))
 
-        assertTrue(result is Result.Failure)
-    }
+            val worker1 = createWorker(server.url("/model1.bin").toString())
+            worker1.doWork()
 
-    @Test
-    fun `cleans up temp file on failure`() = runTest {
-        server.enqueue(MockResponse().setResponseCode(500).setBody("Server Error"))
+            val worker2 = createWorker(server.url("/model2.bin").toString())
+            worker2.doWork()
 
-        val worker = createWorker(server.url("/model.bin").toString())
-        worker.doWork()
-
-        val tempFile = File(tempDir, "$MODEL_FILENAME.tmp")
-        assertFalse(tempFile.exists())
-    }
-
-    @Test
-    fun `sets model ready on successful download`() = runTest {
-        server.enqueue(MockResponse().setBody("data"))
-
-        val worker = createWorker(server.url("/model.bin").toString())
-        worker.doWork()
-
-        verify { settingsRepository.setModelReady(true) }
-    }
-
-    @Test
-    fun `uses shared OkHttpClient instead of creating new instance`() = runTest {
-        server.enqueue(MockResponse().setBody("data1"))
-        server.enqueue(MockResponse().setBody("data2"))
-
-        val worker1 = createWorker(server.url("/model1.bin").toString())
-        worker1.doWork()
-
-        val worker2 = createWorker(server.url("/model2.bin").toString())
-        worker2.doWork()
-
-        assertEquals(2, server.requestCount)
+            assertEquals(2, server.requestCount)
+        }
     }
 }

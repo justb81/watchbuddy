@@ -9,18 +9,21 @@ import androidx.work.workDataOf
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
 import java.io.FileOutputStream
-import java.util.concurrent.TimeUnit
+import javax.inject.Named
 
 @HiltWorker
 class ModelDownloadWorker @AssistedInject constructor(
     @Assisted appContext: Context,
     @Assisted workerParams: WorkerParameters,
     private val settingsRepository: SettingsRepository,
-    private val httpClient: OkHttpClient
+    @Named("download") private val downloadClient: OkHttpClient
 ) : CoroutineWorker(appContext, workerParams) {
 
     override suspend fun doWork(): Result {
@@ -34,7 +37,9 @@ class ModelDownloadWorker @AssistedInject constructor(
 
         try {
             downloadFile(modelUrl, tempFile)
-            tempFile.renameTo(outputFile)
+            if (!tempFile.renameTo(outputFile)) {
+                throw RuntimeException("Failed to rename downloaded model to final path")
+            }
             settingsRepository.setModelReady(true)
             setProgress(workDataOf(KEY_PROGRESS to 100))
             return Result.success(workDataOf(KEY_PROGRESS to 100))
@@ -49,41 +54,43 @@ class ModelDownloadWorker @AssistedInject constructor(
         }
     }
 
-    private suspend fun downloadFile(url: String, target: File) {
-        val client = httpClient.newBuilder()
-            .connectTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(60, TimeUnit.SECONDS)
-            .build()
-
+    private suspend fun downloadFile(url: String, target: File) = withContext(Dispatchers.IO) {
         val request = Request.Builder().url(url).build()
-        val response = client.newCall(request).execute()
+        downloadClient.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                throw RuntimeException("HTTP ${response.code}: ${response.message}")
+            }
 
-        if (!response.isSuccessful) {
-            throw RuntimeException("HTTP ${response.code}: ${response.message}")
-        }
+            val body = response.body ?: throw RuntimeException("Empty response body")
+            val contentLength = body.contentLength()
 
-        val body = response.body ?: throw RuntimeException("Empty response body")
-        val contentLength = body.contentLength()
+            body.byteStream().use { input ->
+                FileOutputStream(target).use { output ->
+                    val buffer = ByteArray(BUFFER_SIZE)
+                    var bytesRead: Long = 0
+                    var lastReportedProgress = -1
 
-        body.byteStream().use { input ->
-            FileOutputStream(target).use { output ->
-                val buffer = ByteArray(BUFFER_SIZE)
-                var bytesRead: Long = 0
-                var lastReportedProgress = -1
+                    while (true) {
+                        if (isStopped) throw CancellationException("Download cancelled")
+                        val read = input.read(buffer)
+                        if (read == -1) break
+                        output.write(buffer, 0, read)
+                        bytesRead += read
 
-                while (true) {
-                    val read = input.read(buffer)
-                    if (read == -1) break
-                    output.write(buffer, 0, read)
-                    bytesRead += read
-
-                    if (contentLength > 0) {
-                        val progress = ((bytesRead * 100) / contentLength).toInt()
-                            .coerceIn(0, 99)
-                        if (progress != lastReportedProgress) {
-                            setProgress(workDataOf(KEY_PROGRESS to progress))
-                            lastReportedProgress = progress
+                        if (contentLength > 0) {
+                            val progress = ((bytesRead * 100) / contentLength).toInt()
+                                .coerceIn(0, 99)
+                            if (progress != lastReportedProgress) {
+                                setProgress(workDataOf(KEY_PROGRESS to progress))
+                                lastReportedProgress = progress
+                            }
                         }
+                    }
+
+                    if (contentLength > 0 && bytesRead != contentLength) {
+                        throw RuntimeException(
+                            "Incomplete download: expected $contentLength bytes, got $bytesRead"
+                        )
                     }
                 }
             }

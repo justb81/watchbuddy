@@ -108,6 +108,47 @@ class NetworkModuleTest {
     }
 
     @Nested
+    @DisplayName("provideDownloadClient")
+    inner class DownloadClientTest {
+
+        private lateinit var server: MockWebServer
+
+        @BeforeEach
+        fun setUp() {
+            server = MockWebServer()
+            server.start()
+        }
+
+        @AfterEach
+        fun tearDown() {
+            server.shutdown()
+        }
+
+        @Test
+        fun `does not add Trakt headers`() {
+            server.enqueue(MockResponse().setBody("data"))
+            val client = NetworkModule.provideDownloadClient()
+            client.newCall(Request.Builder().url(server.url("/download")).build()).execute()
+            val recorded = server.takeRequest()
+            assertNull(recorded.getHeader("trakt-api-version"))
+            assertNull(recorded.getHeader("Content-Type"))
+        }
+
+        @Test
+        fun `does not include logging interceptor`() {
+            val client = NetworkModule.provideDownloadClient()
+            assertTrue(client.interceptors.isEmpty())
+        }
+
+        @Test
+        fun `has appropriate timeouts`() {
+            val client = NetworkModule.provideDownloadClient()
+            assertEquals(30_000, client.connectTimeoutMillis)
+            assertEquals(60_000, client.readTimeoutMillis)
+        }
+    }
+
+    @Nested
     @DisplayName("Retrofit base URLs")
     inner class RetrofitBaseUrlTest {
         @Test
