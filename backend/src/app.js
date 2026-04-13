@@ -7,7 +7,25 @@
 
 import express from 'express';
 import fetch from 'node-fetch';
+import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+
+const TOKEN_PATTERN = /^[a-zA-Z0-9_-]+$/;
+const MAX_TOKEN_LENGTH = 256;
+
+/**
+ * Validates a token-like string field.
+ * @param {*} value - The value to validate
+ * @param {string} fieldName - Human-readable field name for error messages
+ * @returns {string|null} Error message, or null if valid
+ */
+function validateField(value, fieldName) {
+  if (!value) return `Missing ${fieldName}`;
+  if (typeof value !== 'string') return `${fieldName} must be a string`;
+  if (value.length > MAX_TOKEN_LENGTH) return `${fieldName} exceeds max length`;
+  if (!TOKEN_PATTERN.test(value)) return `${fieldName} contains invalid characters`;
+  return null;
+}
 
 /**
  * Creates a configured Express app for the Trakt token proxy.
@@ -17,6 +35,7 @@ import rateLimit from 'express-rate-limit';
  * @param {string} config.clientSecret - Trakt client secret
  * @param {string} [config.traktApi]   - Trakt API base URL (default: https://api.trakt.tv)
  * @param {Function} [config.fetchFn]  - fetch implementation (default: node-fetch)
+ * @param {number} [config.fetchTimeoutMs] - Upstream fetch timeout in ms (default: 15000)
  * @returns {import('express').Express}
  */
 export function createApp(config) {
@@ -25,9 +44,21 @@ export function createApp(config) {
     clientSecret,
     traktApi = 'https://api.trakt.tv',
     fetchFn = fetch,
+    fetchTimeoutMs = 15_000,
   } = config;
 
+  async function fetchWithTimeout(url, options) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), fetchTimeoutMs);
+    try {
+      return await fetchFn(url, { ...options, signal: controller.signal });
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   const app = express();
+  app.use(helmet());
   app.use(express.json());
 
   // Rate limiting — Trakt allows 1000 calls/5min per app
@@ -43,10 +74,11 @@ export function createApp(config) {
   // Calls Trakt /oauth/device/token with server-side secret injected
   app.post('/trakt/token', async (req, res) => {
     const { code } = req.body;
-    if (!code) return res.status(400).json({ error: 'Missing code' });
+    const codeError = validateField(code, 'code');
+    if (codeError) return res.status(400).json({ error: codeError });
 
     try {
-      const traktRes = await fetchFn(`${traktApi}/oauth/device/token`, {
+      const traktRes = await fetchWithTimeout(`${traktApi}/oauth/device/token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -71,6 +103,10 @@ export function createApp(config) {
         scope: data.scope,
       });
     } catch (err) {
+      if (err.name === 'AbortError') {
+        console.error('Token exchange timeout');
+        return res.status(504).json({ error: 'Upstream timeout' });
+      }
       console.error('Token exchange error:', err);
       return res.status(502).json({ error: 'Upstream error' });
     }
@@ -80,10 +116,11 @@ export function createApp(config) {
   // Body: { "refresh_token": "<token>" }
   app.post('/trakt/token/refresh', async (req, res) => {
     const { refresh_token } = req.body;
-    if (!refresh_token) return res.status(400).json({ error: 'Missing refresh_token' });
+    const rtError = validateField(refresh_token, 'refresh_token');
+    if (rtError) return res.status(400).json({ error: rtError });
 
     try {
-      const traktRes = await fetchFn(`${traktApi}/oauth/token`, {
+      const traktRes = await fetchWithTimeout(`${traktApi}/oauth/token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -103,6 +140,10 @@ export function createApp(config) {
         expires_in: data.expires_in,
       });
     } catch (err) {
+      if (err.name === 'AbortError') {
+        console.error('Token refresh timeout');
+        return res.status(504).json({ error: 'Upstream timeout' });
+      }
       console.error('Token refresh error:', err);
       return res.status(502).json({ error: 'Upstream error' });
     }

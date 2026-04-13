@@ -12,12 +12,13 @@ function mockFetch(status, body) {
 }
 
 /** Default config with fake credentials and a mock fetch. */
-function buildApp(fetchFn) {
+function buildApp(fetchFn, overrides = {}) {
   return createApp({
     clientId: 'test-client-id',
     clientSecret: 'test-client-secret',
     traktApi: 'https://api.trakt.tv',
     fetchFn,
+    ...overrides,
   });
 }
 
@@ -29,6 +30,16 @@ describe('GET /health', () => {
     const res = await request(app).get('/health');
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ status: 'ok' });
+  });
+});
+
+// ── Security headers ───────────────────────────────────────────────────────
+
+describe('Security headers (helmet)', () => {
+  it('sets security headers via helmet', async () => {
+    const app = buildApp(mockFetch(200, {}));
+    const res = await request(app).get('/health');
+    expect(res.headers['x-content-type-options']).toBe('nosniff');
   });
 });
 
@@ -135,6 +146,52 @@ describe('POST /trakt/token', () => {
     expect(res.status).toBe(429);
     expect(res.body).toEqual({ error: 'rate_limit_exceeded' });
   });
+
+  it('returns 400 when code is not a string', async () => {
+    const res = await request(app)
+      .post('/trakt/token')
+      .send({ code: 12345 });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('code must be a string');
+  });
+
+  it('returns 400 when code exceeds max length', async () => {
+    const res = await request(app)
+      .post('/trakt/token')
+      .send({ code: 'a'.repeat(257) });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('code exceeds max length');
+  });
+
+  it('returns 400 when code contains invalid characters', async () => {
+    const res = await request(app)
+      .post('/trakt/token')
+      .send({ code: 'bad code!@#' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('code contains invalid characters');
+  });
+
+  it('returns 504 when upstream fetch times out', async () => {
+    const hangingFetch = vi.fn().mockImplementation((_url, options) => {
+      return new Promise((_resolve, reject) => {
+        if (options?.signal) {
+          options.signal.addEventListener('abort', () => {
+            const err = new Error('The operation was aborted');
+            err.name = 'AbortError';
+            reject(err);
+          });
+        }
+      });
+    });
+    const timeoutApp = buildApp(hangingFetch, { fetchTimeoutMs: 50 });
+
+    const res = await request(timeoutApp)
+      .post('/trakt/token')
+      .send({ code: 'device-code-abc' });
+
+    expect(res.status).toBe(504);
+    expect(res.body).toEqual({ error: 'Upstream timeout' });
+  });
 });
 
 // ── Token refresh endpoint ──────────────────────────────────────────────────
@@ -224,6 +281,52 @@ describe('POST /trakt/token/refresh', () => {
 
     expect(res.status).toBe(502);
     expect(res.body).toEqual({ error: 'Upstream error' });
+  });
+
+  it('returns 400 when refresh_token is not a string', async () => {
+    const res = await request(app)
+      .post('/trakt/token/refresh')
+      .send({ refresh_token: ['array'] });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('refresh_token must be a string');
+  });
+
+  it('returns 400 when refresh_token exceeds max length', async () => {
+    const res = await request(app)
+      .post('/trakt/token/refresh')
+      .send({ refresh_token: 'x'.repeat(257) });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('refresh_token exceeds max length');
+  });
+
+  it('returns 400 when refresh_token contains invalid characters', async () => {
+    const res = await request(app)
+      .post('/trakt/token/refresh')
+      .send({ refresh_token: 'has spaces and $pecial' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('refresh_token contains invalid characters');
+  });
+
+  it('returns 504 when upstream fetch times out', async () => {
+    const hangingFetch = vi.fn().mockImplementation((_url, options) => {
+      return new Promise((_resolve, reject) => {
+        if (options?.signal) {
+          options.signal.addEventListener('abort', () => {
+            const err = new Error('The operation was aborted');
+            err.name = 'AbortError';
+            reject(err);
+          });
+        }
+      });
+    });
+    const timeoutApp = buildApp(hangingFetch, { fetchTimeoutMs: 50 });
+
+    const res = await request(timeoutApp)
+      .post('/trakt/token/refresh')
+      .send({ refresh_token: 'old-ref-token' });
+
+    expect(res.status).toBe(504);
+    expect(res.body).toEqual({ error: 'Upstream timeout' });
   });
 });
 
