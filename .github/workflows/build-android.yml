@@ -12,6 +12,13 @@ on:
       - 'gradle.properties'
   pull_request:
     branches: [main]
+    paths:
+      - 'app-phone/**'
+      - 'app-tv/**'
+      - 'core/**'
+      - '*.gradle.kts'
+      - 'gradle/**'
+      - 'gradle.properties'
   workflow_dispatch:
 
 jobs:
