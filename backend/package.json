@@ -2,10 +2,13 @@
   "name": "watchbuddy-backend",
   "version": "1.0.0",
   "description": "WatchBuddy Trakt token proxy — exchanges auth_code for tokens server-side so the client_secret never lives in the APK",
+  "type": "module",
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "dev": "nodemon src/index.js"
+    "dev": "nodemon src/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "express": "^4.18.2",
@@ -14,7 +17,9 @@
     "express-rate-limit": "^7.1.5"
   },
   "devDependencies": {
-    "nodemon": "^3.0.2"
+    "nodemon": "^3.0.2",
+    "supertest": "^7.0.0",
+    "vitest": "^3.1.1"
   },
   "engines": {
     "node": ">=18"
