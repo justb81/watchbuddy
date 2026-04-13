@@ -51,11 +51,12 @@ class LiteRtLlmProvider(
         val llm = getOrCreateEngine()
         val conversation = llm.createConversation(ConversationConfig())
         try {
-            val result = conversation.sendMessage(prompt)
-            if (result.isNullOrBlank()) {
+            val message = conversation.sendMessage(prompt)
+            val text = message.text
+            if (text.isNullOrBlank()) {
                 throw IllegalStateException("LiteRT-LM returned empty response")
             }
-            result
+            text
         } finally {
             conversation.close()
         }
