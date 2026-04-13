@@ -6,7 +6,6 @@
  */
 
 import express from 'express';
-import fetch from 'node-fetch';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 
@@ -34,7 +33,7 @@ function validateField(value, fieldName) {
  * @param {string} config.clientId   - Trakt client ID
  * @param {string} config.clientSecret - Trakt client secret
  * @param {string} [config.traktApi]   - Trakt API base URL (default: https://api.trakt.tv)
- * @param {Function} [config.fetchFn]  - fetch implementation (default: node-fetch)
+ * @param {Function} [config.fetchFn]  - fetch implementation (default: global fetch)
  * @param {number} [config.fetchTimeoutMs] - Upstream fetch timeout in ms (default: 15000)
  * @returns {import('express').Express}
  */
