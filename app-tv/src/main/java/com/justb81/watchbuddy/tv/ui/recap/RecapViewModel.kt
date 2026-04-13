@@ -58,6 +58,7 @@ class RecapViewModel @Inject constructor(
                 val deviceName = phone.capability?.deviceName ?: getApplication<Application>().getString(R.string.tv_default_device_name)
                 _state.value = RecapUiState.Generating(deviceName)
                 try {
+                    @Suppress("DEPRECATION")
                     val host = phone.serviceInfo.host?.hostAddress ?: continue
                     val port = phone.serviceInfo.port
                     val url  = "http://$host:$port/recap/$traktShowId"

@@ -1,6 +1,5 @@
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.hilt)
@@ -16,36 +15,38 @@ android {
         minSdk = 26
         targetSdk = 35
 
-        // versionCode: CI setzt VERSION_CODE (run_number). Phone-Offset 1000.
-        val ciVersionCode = System.getenv("VERSION_CODE")?.toIntOrNull() ?: 1
+        // versionCode: CI sets VERSION_CODE (run_number). Phone offset 1000.
+        val ciVersionCode = providers.environmentVariable("VERSION_CODE")
+            .orElse("1").get().toIntOrNull() ?: 1
         versionCode = 1000 + ciVersionCode
 
-        // versionName: release-please setzt VERSION_NAME, Fallback auf x-generic-string
-        versionName = System.getenv("VERSION_NAME") ?: "0.1.5" // x-release-please-version
+        // versionName: release-please sets VERSION_NAME, fallback to hardcoded value
+        versionName = providers.environmentVariable("VERSION_NAME")
+            .orElse("0.1.5").get() // x-release-please-version
 
-        // ── Trakt-Konfiguration ───────────────────────────────────────────────
-        // Leer lassen → App nutzt keinen Token-Proxy / zeigt keinen Trakt-Login.
-        // Werte können auch über CI-Umgebungsvariablen TRAKT_CLIENT_ID und
-        // TOKEN_BACKEND_URL gesetzt werden (empfohlen für Release-Builds).
+        // ── Trakt configuration ───────────────────────────────────────────────
+        // Leave empty → app does not use token proxy / does not show Trakt login.
+        // Values can also be set via CI environment variables TRAKT_CLIENT_ID and
+        // TOKEN_BACKEND_URL (recommended for release builds).
         buildConfigField(
             "String", "TRAKT_CLIENT_ID",
-            "\"${System.getenv("TRAKT_CLIENT_ID") ?: ""}\""
+            "\"${providers.environmentVariable("TRAKT_CLIENT_ID").orElse("").get()}\""
         )
         buildConfigField(
             "String", "TOKEN_BACKEND_URL",
-            "\"${System.getenv("TOKEN_BACKEND_URL") ?: ""}\""
+            "\"${providers.environmentVariable("TOKEN_BACKEND_URL").orElse("").get()}\""
         )
     }
 
-    // CI-Signing: Keystore-Pfad + Credentials über Umgebungsvariablen
-    val keystoreFile = System.getenv("KEYSTORE_FILE")
+    // CI signing: keystore path + credentials via environment variables
+    val keystoreFile = providers.environmentVariable("KEYSTORE_FILE").orNull
     if (keystoreFile != null) {
         signingConfigs {
             create("release") {
                 storeFile = file(keystoreFile)
-                storePassword = System.getenv("KEYSTORE_PASSWORD")
-                keyAlias = System.getenv("KEY_ALIAS")
-                keyPassword = System.getenv("KEY_PASSWORD")
+                storePassword = providers.environmentVariable("KEYSTORE_PASSWORD").orNull
+                keyAlias = providers.environmentVariable("KEY_ALIAS").orNull
+                keyPassword = providers.environmentVariable("KEY_PASSWORD").orNull
             }
         }
     }
@@ -72,14 +73,13 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions { jvmTarget = "17" }
 
     buildFeatures {
         compose = true
         buildConfig = true
     }
 
-    // Ktor + Netty bringen mehrere META-INF-Dateien mit — bei Konflikten einfach die erste nehmen
+    // Ktor + Netty bring multiple META-INF files — exclude duplicates
     packaging {
         resources {
             excludes += setOf(
@@ -143,6 +143,7 @@ dependencies {
     testImplementation(libs.junit5.api)
     testImplementation(libs.junit5.params)
     testRuntimeOnly(libs.junit5.engine)
+    testRuntimeOnly(libs.junit5.platform.launcher)
     testImplementation(libs.mockk)
     testImplementation(libs.mockk.android)
     testImplementation(libs.kotlinx.coroutines.test)
@@ -151,6 +152,12 @@ dependencies {
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.androidx.arch.core.testing)
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+    }
 }
 
 tasks.withType<Test> {

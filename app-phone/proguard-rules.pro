@@ -41,11 +41,6 @@
 # ── Hilt / Dagger ────────────────────────────────────────────────────────────
 -dontwarn dagger.hilt.android.internal.**
 
-# ── Room ─────────────────────────────────────────────────────────────────────
--keep class * extends androidx.room.RoomDatabase
--keep @androidx.room.Entity class *
--dontwarn androidx.room.paging.**
-
 # ── Ktor (phone HTTP server) ────────────────────────────────────────────────
 -keep class io.ktor.** { *; }
 -dontwarn io.ktor.**

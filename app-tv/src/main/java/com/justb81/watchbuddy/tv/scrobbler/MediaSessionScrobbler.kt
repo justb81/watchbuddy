@@ -29,7 +29,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class MediaSessionScrobbler @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
     private val traktApi: TraktApiService,
     private val tvShowCache: TvShowCache,
     private val tvTokenCache: TvTokenCache

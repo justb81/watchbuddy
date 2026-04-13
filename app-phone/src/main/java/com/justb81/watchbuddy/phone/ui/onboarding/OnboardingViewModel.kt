@@ -43,7 +43,7 @@ class OnboardingViewModel @Inject constructor(
     private val traktApi: TraktApiService,
     /** Null, wenn TOKEN_BACKEND_URL in BuildConfig leer ist. */
     private val tokenProxy: TokenProxyService?,
-    @Named("traktClientId") private val clientId: String,
+    @param:Named("traktClientId") private val clientId: String,
     private val tokenRepository: TokenRepository
 ) : AndroidViewModel(application) {
 

@@ -23,7 +23,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class PhoneDiscoveryManager @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
     private val httpClient: OkHttpClient
 ) {
     companion object {
@@ -50,6 +50,7 @@ class PhoneDiscoveryManager @Inject constructor(
         override fun onStopDiscoveryFailed(serviceType: String, errorCode: Int) {}
 
         override fun onServiceFound(service: NsdServiceInfo) {
+            @Suppress("DEPRECATION")
             nsdManager.resolveService(service, object : NsdManager.ResolveListener {
                 override fun onResolveFailed(serviceInfo: NsdServiceInfo, errorCode: Int) {}
                 override fun onServiceResolved(serviceInfo: NsdServiceInfo) {
@@ -79,6 +80,7 @@ class PhoneDiscoveryManager @Inject constructor(
             .maxByOrNull { it.score }
 
     private fun fetchCapabilityAndAdd(serviceInfo: NsdServiceInfo) {
+        @Suppress("DEPRECATION")
         val hostAddress = serviceInfo.host?.hostAddress ?: return
         val url = "http://${hostAddress}:${serviceInfo.port}${CAPABILITY_PATH}"
         try {
