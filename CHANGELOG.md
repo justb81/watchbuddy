@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.2.0](https://github.com/justb81/watchbuddy/compare/v0.1.5...v0.2.0) (2026-04-13)
+
+
+### Features
+
+* migrate from MediaPipe Tasks to LiteRT-LM runtime with Gemma 4 models ([#85](https://github.com/justb81/watchbuddy/issues/85)) ([7d417a3](https://github.com/justb81/watchbuddy/commit/7d417a35649d214ab166a84f50db54af9ab086dc))
+* Remove node-fetch dependency and use native fetch API ([#75](https://github.com/justb81/watchbuddy/issues/75)) ([c447743](https://github.com/justb81/watchbuddy/commit/c447743791fca3ec96edfb96d9601da291cc406e))
+* replace hardcoded colors with MaterialTheme tokens and align brand identity ([#50](https://github.com/justb81/watchbuddy/issues/50)) ([#81](https://github.com/justb81/watchbuddy/issues/81)) ([ead1a92](https://github.com/justb81/watchbuddy/commit/ead1a924e750cdbf375831379f0b7e04f970a24c))
+
+
+### Bug Fixes
+
+* resolve P2-medium i18n, safety, and dependency issues ([#79](https://github.com/justb81/watchbuddy/issues/79)) ([b2c3129](https://github.com/justb81/watchbuddy/commit/b2c31296933ef4a153e19471010982b861dc0149))
+
 ## [0.1.5](https://github.com/justb81/watchbuddy/compare/v0.1.4...v0.1.5) (2026-04-13)
 
 
