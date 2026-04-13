@@ -63,8 +63,6 @@
     <string name="settings_auth_backend_url">Backend URL</string>
     <string name="settings_auth_client_id">Client ID</string>
     <string name="settings_auth_client_secret">Client Secret</string>
-    <string name="settings_ollama_section">Remote LLM</string>
-    <string name="settings_ollama_url">Ollama server URL</string>
     <string name="settings_model_url_section">Model download</string>
     <string name="settings_model_url">Custom model base URL</string>
     <string name="settings_save">Save</string>

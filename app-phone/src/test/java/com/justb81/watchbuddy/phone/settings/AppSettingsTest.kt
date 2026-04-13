@@ -29,16 +29,6 @@ class AppSettingsTest {
     }
 
     @Test
-    fun `default ollamaUrl is localhost 11434`() {
-        assertEquals("http://localhost:11434", AppSettings().ollamaUrl)
-    }
-
-    @Test
-    fun `DEFAULT_OLLAMA_URL constant`() {
-        assertEquals("http://localhost:11434", AppSettings.DEFAULT_OLLAMA_URL)
-    }
-
-    @Test
     fun `copy preserves unchanged fields`() {
         val original = AppSettings(authMode = AuthMode.DIRECT, backendUrl = "https://example.com")
         val modified = original.copy(companionEnabled = true)

@@ -3,12 +3,8 @@ package com.justb81.watchbuddy.phone.llm
 import android.content.Context
 import com.justb81.watchbuddy.core.model.LlmBackend
 import com.justb81.watchbuddy.core.model.TmdbEpisode
-import com.justb81.watchbuddy.phone.settings.AppSettings
-import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import io.mockk.*
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
-import okhttp3.OkHttpClient
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -20,8 +16,6 @@ class LlmProviderFactoryTest {
 
     private val context: Context = mockk(relaxed = true)
     private val orchestrator: LlmOrchestrator = mockk()
-    private val settingsRepository: SettingsRepository = mockk()
-    private val httpClient: OkHttpClient = OkHttpClient()
     private lateinit var factory: LlmProviderFactory
 
     private val episodes = listOf(
@@ -30,8 +24,7 @@ class LlmProviderFactoryTest {
 
     @BeforeEach
     fun setUp() {
-        every { settingsRepository.settings } returns flowOf(AppSettings())
-        factory = LlmProviderFactory(context, orchestrator, settingsRepository, httpClient)
+        factory = LlmProviderFactory(context, orchestrator)
     }
 
     @Nested
@@ -43,8 +36,7 @@ class LlmProviderFactoryTest {
             every { orchestrator.selectConfig() } returns LlmOrchestrator.LlmConfig(
                 LlmBackend.NONE, null, 0
             )
-            // With NONE backend, cascade is: RemoteOllama -> Fallback
-            // RemoteOllama will fail (no real server), Fallback will succeed
+            // With NONE backend, cascade goes straight to Fallback
             val result = factory.generateWithCascade("prompt", episodes)
             assertTrue(result.isNotBlank())
         }
@@ -55,32 +47,8 @@ class LlmProviderFactoryTest {
                 LlmBackend.NONE, null, 0
             )
             // Empty episodes means Fallback generates valid but empty HTML
-            // RemoteOllama will fail
             val result = factory.generateWithCascade("prompt", emptyList())
             assertTrue(result.isNotBlank())
-        }
-
-        @Test
-        fun `uses saved Ollama URL from settings`() = runTest {
-            every { settingsRepository.settings } returns flowOf(
-                AppSettings(ollamaUrl = "http://custom:11434")
-            )
-            factory = LlmProviderFactory(context, orchestrator, settingsRepository, httpClient)
-            every { orchestrator.selectConfig() } returns LlmOrchestrator.LlmConfig(
-                LlmBackend.NONE, null, 0
-            )
-            // Just verify it doesn't crash with a custom URL
-            val result = factory.generateWithCascade("prompt", episodes)
-            assertNotNull(result)
-        }
-
-        @Test
-        fun `uses override Ollama URL when provided`() = runTest {
-            every { orchestrator.selectConfig() } returns LlmOrchestrator.LlmConfig(
-                LlmBackend.NONE, null, 0
-            )
-            val result = factory.generateWithCascade("prompt", episodes, "http://override:11434")
-            assertNotNull(result)
         }
     }
 
@@ -105,13 +73,13 @@ class LlmProviderFactoryTest {
                 LlmOrchestrator.ModelVariant.GEMMA4_E2B,
                 70
             )
-            // LiteRT-LM will fail (no model file), then Ollama fails, then Fallback succeeds
+            // LiteRT-LM will fail (no model file), then Fallback succeeds
             val result = factory.generateWithCascade("prompt", episodes)
             assertNotNull(result)
         }
 
         @Test
-        fun `NONE backend goes straight to Ollama and Fallback`() = runTest {
+        fun `NONE backend goes straight to Fallback`() = runTest {
             every { orchestrator.selectConfig() } returns LlmOrchestrator.LlmConfig(
                 LlmBackend.NONE, null, 0
             )
