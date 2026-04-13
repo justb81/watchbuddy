@@ -110,12 +110,16 @@ class OnboardingViewModel @Inject constructor(
     private fun startPolling(response: DeviceCodeResponse) {
         pollingJob?.cancel()
         pollingJob = viewModelScope.launch {
-            repeat(response.expires_in / response.interval) {
+            val proxy = tokenProxy ?: run {
+                _state.value = OnboardingState.Error("Trakt not configured")
+                return@launch
+            }
+            var attempts = 0
+            val maxAttempts = response.expires_in / response.interval
+            while (isActive && attempts < maxAttempts) {
                 delay(response.interval * 1_000L)
                 try {
-                    // Token-Austausch läuft ausschließlich über den Proxy —
-                    // der client_secret verlässt niemals die APK.
-                    val token = tokenProxy!!.exchangeDeviceCode(
+                    val token = proxy.exchangeDeviceCode(
                         ProxyTokenRequest(code = response.device_code)
                     )
                     tokenRepository.saveTokens(
@@ -125,11 +129,12 @@ class OnboardingViewModel @Inject constructor(
                     )
                     val profile = traktApi.getProfile("Bearer ${token.access_token}")
                     countdownJob?.cancel()
-                    pollingJob?.cancel()
                     _state.value = OnboardingState.Success(profile.username)
+                    return@launch
                 } catch (_: Exception) {
-                    // HTTP 400 = PIN noch nicht bestätigt, 410 = abgelaufen — weiter pollen
+                    // HTTP 400 = PIN not yet confirmed, 410 = expired — keep polling
                 }
+                attempts++
             }
         }
     }
