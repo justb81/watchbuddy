@@ -32,7 +32,7 @@
 
         <!-- TV Leanback launcher -->
         <activity
-            android:name=".ui.TvMainActivity"
+            android:name=".tv.ui.TvMainActivity"
             android:exported="true"
             android:configChanges="keyboard|keyboardHidden|navigation"
             android:theme="@style/Theme.WatchBuddy">

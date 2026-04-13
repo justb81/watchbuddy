@@ -31,7 +31,7 @@
 
         <!-- Main launcher activity -->
         <activity
-            android:name=".ui.MainActivity"
+            android:name=".phone.ui.MainActivity"
             android:exported="true"
             android:theme="@style/Theme.WatchBuddy">
             <intent-filter>
