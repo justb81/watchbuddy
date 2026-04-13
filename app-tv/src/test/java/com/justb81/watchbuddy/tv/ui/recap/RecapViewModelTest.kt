@@ -70,6 +70,7 @@ class RecapViewModelTest {
         }
         every { phone.score } returns 100
         every { phone.serviceInfo } returns mockk {
+            @Suppress("DEPRECATION")
             every { host } returns mockk {
                 every { hostAddress } returns "192.168.1.1"
             }

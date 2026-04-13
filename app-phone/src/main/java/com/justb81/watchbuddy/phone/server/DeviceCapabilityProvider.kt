@@ -14,7 +14,7 @@ import javax.inject.Singleton
 
 @Singleton
 class DeviceCapabilityProvider @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
     private val llmOrchestrator: LlmOrchestrator,
     private val traktApiService: TraktApiService,
     private val tokenRepository: TokenRepository

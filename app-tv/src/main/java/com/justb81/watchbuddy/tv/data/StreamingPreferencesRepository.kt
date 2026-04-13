@@ -19,7 +19,7 @@ private val Context.streamingDataStore: DataStore<Preferences> by preferencesDat
 
 @Singleton
 class StreamingPreferencesRepository @Inject constructor(
-    @ApplicationContext private val context: Context
+    @param:ApplicationContext private val context: Context
 ) {
     private val subscribedKey = stringSetPreferencesKey("subscribed_service_ids")
     private val orderKey = stringPreferencesKey("service_order")

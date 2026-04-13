@@ -18,7 +18,7 @@ private val Context.userSessionDataStore: DataStore<Preferences> by preferencesD
 
 @Singleton
 class UserSessionRepository @Inject constructor(
-    @ApplicationContext private val context: Context
+    @param:ApplicationContext private val context: Context
 ) {
     private val selectedUserIdsKey = stringSetPreferencesKey("selected_user_ids")
 
