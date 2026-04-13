@@ -99,13 +99,13 @@ class LlmProviderFactoryTest {
         }
 
         @Test
-        fun `MEDIAPIPE backend skips AICore`() = runTest {
+        fun `LITERT backend skips AICore`() = runTest {
             every { orchestrator.selectConfig() } returns LlmOrchestrator.LlmConfig(
-                LlmBackend.MEDIAPIPE_GPU,
-                LlmOrchestrator.ModelVariant.GEMMA4_E2B_INT4,
-                60
+                LlmBackend.LITERT,
+                LlmOrchestrator.ModelVariant.GEMMA4_E2B,
+                70
             )
-            // MediaPipe will fail (no model file), then Ollama fails, then Fallback succeeds
+            // LiteRT-LM will fail (no model file), then Ollama fails, then Fallback succeeds
             val result = factory.generateWithCascade("prompt", episodes)
             assertNotNull(result)
         }

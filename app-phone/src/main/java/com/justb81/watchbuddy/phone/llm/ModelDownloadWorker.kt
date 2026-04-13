@@ -26,10 +26,11 @@ class ModelDownloadWorker @AssistedInject constructor(
     override suspend fun doWork(): Result {
         val modelUrl = inputData.getString(KEY_MODEL_URL)
             ?: return Result.failure(workDataOf(KEY_ERROR to "No model URL provided"))
+        val modelFileName = inputData.getString(KEY_MODEL_FILENAME) ?: "model.bin"
 
         val outputDir = settingsRepository.modelDir()
-        val outputFile = File(outputDir, "model.bin")
-        val tempFile = File(outputDir, "model.bin.tmp")
+        val outputFile = File(outputDir, modelFileName)
+        val tempFile = File(outputDir, "$modelFileName.tmp")
 
         try {
             downloadFile(modelUrl, tempFile)
@@ -91,6 +92,7 @@ class ModelDownloadWorker @AssistedInject constructor(
 
     companion object {
         const val KEY_MODEL_URL = "model_url"
+        const val KEY_MODEL_FILENAME = "model_filename"
         const val KEY_PROGRESS = "download_progress"
         const val KEY_ERROR = "download_error"
         const val UNIQUE_WORK_NAME = "llm_model_download"

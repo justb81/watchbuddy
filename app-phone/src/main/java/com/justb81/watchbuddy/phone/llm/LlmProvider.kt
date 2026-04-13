@@ -3,7 +3,7 @@ package com.justb81.watchbuddy.phone.llm
 /**
  * Abstraction for on-device and remote LLM inference backends.
  *
- * Implementations are tried in cascade order (AICore -> MediaPipe -> Remote -> Fallback)
+ * Implementations are tried in cascade order (AICore -> LiteRT-LM -> Remote -> Fallback)
  * by [LlmProviderFactory].
  */
 interface LlmProvider {

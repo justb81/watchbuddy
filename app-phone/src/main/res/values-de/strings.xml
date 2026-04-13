@@ -58,6 +58,8 @@
     <string name="settings_auth_client_secret">Client Secret</string>
     <string name="settings_ollama_section">Remote-LLM</string>
     <string name="settings_ollama_url">Ollama-Server-URL</string>
+    <string name="settings_model_url_section">Modell-Download</string>
+    <string name="settings_model_url">Eigene Modell-Basis-URL</string>
     <string name="settings_save">Speichern</string>
     <string name="settings_saved">Einstellungen gespeichert</string>
     <string name="settings_cancel">Abbrechen</string>

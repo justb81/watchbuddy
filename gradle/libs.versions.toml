@@ -11,7 +11,7 @@ retrofit = "2.11.0"
 okhttp = "4.12.0"
 coroutines = "1.10.1"
 serialization = "1.7.3"
-mediapipe = "0.10.24"
+litertlm = "0.10.1"
 coil = "2.7.0"
 navigation = "2.9.0"
 datastore = "1.1.1"
@@ -77,8 +77,8 @@ work-runtime = { group = "androidx.work", name = "work-runtime-ktx", version.ref
 # Security / Keystore
 security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "security-crypto" }
 
-# MediaPipe LLM (phone)
-mediapipe-tasks-genai = { group = "com.google.mediapipe", name = "tasks-genai", version.ref = "mediapipe" }
+# LiteRT-LM (phone)
+litertlm-android = { group = "com.google.ai.edge.litertlm", name = "litertlm-android", version.ref = "litertlm" }
 
 # Image loading
 coil = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }

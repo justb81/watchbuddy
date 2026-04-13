@@ -42,7 +42,7 @@
 Service name:  watchbuddy-{username}
 Service type:  _watchbuddy._tcp.
 Port:          8765
-TXT records:   version=1, modelQuality=60, llmBackend=MEDIAPIPE_GPU
+TXT records:   version=1, modelQuality=70, llmBackend=LITERT
 ```
 
 ### HTTP API (Phone exposes, TV calls)
@@ -59,10 +59,8 @@ TXT records:   version=1, modelQuality=60, llmBackend=MEDIAPIPE_GPU
 Score = modelQuality (0–150) + ramBonus (0–10)
 
 AICore device:        150 + bonus  → always preferred
-MediaPipe BF16 GPU:    90 + bonus
-MediaPipe INT8 GPU:    75 + bonus
-MediaPipe INT4 GPU:    60 + bonus
-MediaPipe INT4 CPU:    40 + bonus
+LiteRT-LM Gemma E4B:  90 + bonus
+LiteRT-LM Gemma E2B:  70 + bonus
 No LLM:                 0
 ```
 
@@ -80,16 +78,15 @@ Remote Ollama configured? ──YES──► Use Remote Ollama (user-hosted serv
 AICore available? ──YES──► Use Gemini Nano (auto-updated, no download)
     │ NO
     ▼
-Free RAM check
-    ├── ≥ 6 GB → Gemma 4 E2B BF16  (~9.6 GB, quality 90)
-    ├── ≥ 4 GB → Gemma 4 E2B INT8  (~4.6 GB, quality 75)
-    ├── ≥ 3 GB → Gemma 4 E2B INT4  (~3.2 GB, quality 60) ← Pixel 6a / Nothing 2a
+Free RAM check (LiteRT-LM runtime, .litertlm models from HuggingFace)
+    ├── ≥ 5 GB → Gemma 4 E4B  (~3.4 GB, quality 90)
+    ├── ≥ 3 GB → Gemma 4 E2B  (~2.4 GB, quality 70)
     └── < 3 GB → TMDB text only (no model downloaded)
 ```
 
 Model updates: WorkManager (`ModelDownloadWorker`), WiFi only.
 Auto-migrate to AICore if OS update adds support.
-Remote Ollama URL is configurable in Advanced Settings.
+Model download URL is configurable in Advanced Settings (default: HuggingFace `litert-community`).
 
 ## Scrobbling Flow
 

@@ -13,10 +13,9 @@ import javax.inject.Singleton
  *
  * Priority:
  *   1. AICore (Gemini Nano) — if device supports it (no download, auto-updated)
- *   2. MediaPipe + Gemma 4 E2B BF16  — ≥ 6 GB free RAM  (~9.6 GB model)
- *   3. MediaPipe + Gemma 4 E2B INT8  — ≥ 4 GB free RAM  (~4.6 GB model)
- *   4. MediaPipe + Gemma 4 E2B INT4  — ≥ 3 GB free RAM  (~3.2 GB model) ← default for Pixel 6a / Nothing 2a
- *   5. No LLM — TMDB synopsis text only
+ *   2. LiteRT-LM + Gemma 4 E4B — ≥ 5 GB free RAM  (~3.4 GB model)
+ *   3. LiteRT-LM + Gemma 4 E2B — ≥ 3 GB free RAM  (~2.4 GB model)
+ *   4. No LLM — TMDB synopsis text only
  */
 @Singleton
 class LlmOrchestrator @Inject constructor(
@@ -28,10 +27,24 @@ class LlmOrchestrator @Inject constructor(
         val qualityScore: Int           // used by TV for device ranking
     )
 
-    enum class ModelVariant(val fileName: String, val requiredRamMb: Int, val qualityScore: Int) {
-        GEMMA4_E2B_BF16 ("gemma-4-e2b-it-bf16.task",  requiredRamMb = 6_000, qualityScore = 90),
-        GEMMA4_E2B_INT8 ("gemma-4-e2b-it-int8.task",  requiredRamMb = 4_000, qualityScore = 75),
-        GEMMA4_E2B_INT4 ("gemma-4-e2b-it-int4.task",  requiredRamMb = 3_000, qualityScore = 60),
+    enum class ModelVariant(
+        val fileName: String,
+        val downloadUrl: String,
+        val requiredRamMb: Int,
+        val qualityScore: Int
+    ) {
+        GEMMA4_E4B(
+            fileName = "gemma-4-E4B-it.litertlm",
+            downloadUrl = "https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm/resolve/main/gemma-4-E4B-it.litertlm",
+            requiredRamMb = 5_000,
+            qualityScore = 90
+        ),
+        GEMMA4_E2B(
+            fileName = "gemma-4-E2B-it.litertlm",
+            downloadUrl = "https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it.litertlm",
+            requiredRamMb = 3_000,
+            qualityScore = 70
+        ),
     }
 
     fun selectConfig(): LlmConfig {
@@ -40,14 +53,14 @@ class LlmOrchestrator @Inject constructor(
             return LlmConfig(LlmBackend.AICORE, null, qualityScore = 150)
         }
 
-        // 2. Select MediaPipe model based on free RAM
+        // 2. Select LiteRT-LM model based on free RAM
         val freeRamMb = getFreeRamMb()
         val variant = ModelVariant.entries
             .sortedByDescending { it.qualityScore }
             .firstOrNull { freeRamMb >= it.requiredRamMb }
 
         return if (variant != null) {
-            LlmConfig(LlmBackend.MEDIAPIPE_GPU, variant, variant.qualityScore)
+            LlmConfig(LlmBackend.LITERT, variant, variant.qualityScore)
         } else {
             LlmConfig(LlmBackend.NONE, null, qualityScore = 0)
         }

@@ -171,16 +171,14 @@ private fun UserAvatar(
 }
 
 private fun llmLabel(backend: LlmBackend, noneLlmLabel: String) = when (backend) {
-    LlmBackend.AICORE        -> "AICore"
-    LlmBackend.MEDIAPIPE_GPU -> "Gemma GPU"
-    LlmBackend.MEDIAPIPE_CPU -> "Gemma CPU"
-    LlmBackend.NONE          -> noneLlmLabel
+    LlmBackend.AICORE -> "AICore"
+    LlmBackend.LITERT -> "Gemma"
+    LlmBackend.NONE   -> noneLlmLabel
 }
 
 @Composable
 private fun llmColor(backend: LlmBackend) = when (backend) {
-    LlmBackend.AICORE        -> MaterialTheme.extendedColors.llmAiCore
-    LlmBackend.MEDIAPIPE_GPU -> MaterialTheme.extendedColors.llmGpu
-    LlmBackend.MEDIAPIPE_CPU -> MaterialTheme.extendedColors.llmCpu
-    LlmBackend.NONE          -> MaterialTheme.extendedColors.llmNone
+    LlmBackend.AICORE -> MaterialTheme.extendedColors.llmAiCore
+    LlmBackend.LITERT -> MaterialTheme.extendedColors.llmGpu
+    LlmBackend.NONE   -> MaterialTheme.extendedColors.llmNone
 }

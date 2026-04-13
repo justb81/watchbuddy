@@ -45,7 +45,6 @@ data class TvExtendedColors(
     val success: Color     = Color(0xFF4CAF50),
     val llmAiCore: Color   = Color(0xFF4CAF50),
     val llmGpu: Color      = Color(0xFF2196F3),
-    val llmCpu: Color      = Color(0xFFFF9800),
     val llmNone: Color     = Color(0xFF757575),
     val placeholder: Color = Color(0xFF2A2A2C),
     val scrim: Color       = Color(0xEE0D0D1A),   // background @ ~93 % alpha

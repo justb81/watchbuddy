@@ -38,9 +38,9 @@ class DeviceCapabilityProviderTest {
             memInfo.availMem = 4000L * 1_048_576L
         }
         every { orchestrator.selectConfig() } returns LlmOrchestrator.LlmConfig(
-            LlmBackend.MEDIAPIPE_GPU,
-            LlmOrchestrator.ModelVariant.GEMMA4_E2B_INT8,
-            75
+            LlmBackend.LITERT,
+            LlmOrchestrator.ModelVariant.GEMMA4_E2B,
+            70
         )
         provider = DeviceCapabilityProvider(context, orchestrator, traktApi, tokenRepository)
     }
@@ -68,8 +68,8 @@ class DeviceCapabilityProviderTest {
         every { tokenRepository.getAccessToken() } returns null
 
         val cap = provider.getCapability()
-        assertEquals(LlmBackend.MEDIAPIPE_GPU, cap.llmBackend)
-        assertEquals(75, cap.modelQuality)
+        assertEquals(LlmBackend.LITERT, cap.llmBackend)
+        assertEquals(70, cap.modelQuality)
         assertEquals(4000, cap.freeRamMb)
         assertTrue(cap.isAvailable)
     }

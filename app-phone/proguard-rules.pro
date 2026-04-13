@@ -47,9 +47,9 @@
 -keep class io.netty.** { *; }
 -dontwarn io.netty.**
 
-# ── MediaPipe GenAI ──────────────────────────────────────────────────────────
--keep class com.google.mediapipe.** { *; }
--dontwarn com.google.mediapipe.**
+# ── LiteRT-LM ────────────────────────────────────────────────────────────────
+-keep class com.google.ai.edge.litertlm.** { *; }
+-dontwarn com.google.ai.edge.litertlm.**
 
 # ── Coil ─────────────────────────────────────────────────────────────────────
 -dontwarn coil.**

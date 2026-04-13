@@ -78,13 +78,13 @@ data class DeviceCapability(
     val userName: String,
     val userAvatarUrl: String? = null,
     val deviceName: String,
-    val llmBackend: LlmBackend,         // AICORE, MEDIAPIPE_GPU, MEDIAPIPE_CPU, NONE
+    val llmBackend: LlmBackend,         // AICORE, LITERT, NONE
     val modelQuality: Int,              // 0–150 (see scoring docs)
     val freeRamMb: Int,
     val isAvailable: Boolean = true
 )
 
-enum class LlmBackend { AICORE, MEDIAPIPE_GPU, MEDIAPIPE_CPU, NONE }
+enum class LlmBackend { AICORE, LITERT, NONE }
 
 // ── Scrobble / Session ────────────────────────────────────────────────────────
 
