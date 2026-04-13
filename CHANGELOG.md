@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.1.5](https://github.com/justb81/watchbuddy/compare/v0.1.4...v0.1.5) (2026-04-13)
+
+
+### Bug Fixes
+
+* **backend:** harden token proxy with timeouts, validation, and security headers ([7621b23](https://github.com/justb81/watchbuddy/commit/7621b236186f202318f66aff480443a785cd85f0))
+* **backend:** harden token proxy with timeouts, validation, and security headers ([27e61e0](https://github.com/justb81/watchbuddy/commit/27e61e07f06b96dfea92b12223440b1426c563d4)), closes [#45](https://github.com/justb81/watchbuddy/issues/45)
+* declare ES module type in backend package.json ([6fcc5ed](https://github.com/justb81/watchbuddy/commit/6fcc5eda4ef1af91a4d7657394e1c36654d91941))
+* declare ES module type in backend package.json ([16e1ae5](https://github.com/justb81/watchbuddy/commit/16e1ae57bbb9b1c30699fc285456e197761191f5)), closes [#69](https://github.com/justb81/watchbuddy/issues/69)
+
 ## [0.1.4](https://github.com/justb81/watchbuddy/compare/v0.1.3...v0.1.4) (2026-04-13)
 
 
