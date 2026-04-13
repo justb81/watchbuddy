@@ -30,8 +30,8 @@ jobs:
               - 'gradle/**'
               - 'gradle.properties'
 
-  test:
-    name: Unit Tests
+  test-and-build:
+    name: Test & Build
     needs: changes
     if: needs.changes.outputs.android == 'true'
     runs-on: ubuntu-latest
@@ -47,25 +47,15 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
 
+      - name: Cache Configuration Cache
+        uses: actions/cache@v4
+        with:
+          path: .gradle/configuration-cache
+          key: config-cache-${{ hashFiles('**/*.gradle.kts', 'gradle.properties', 'gradle/libs.versions.toml') }}
+          restore-keys: config-cache-
+
       - name: Run unit tests
         run: ./gradlew test
-
-  build:
-    name: Build APKs
-    needs: [changes, test]
-    if: needs.changes.outputs.android == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v5
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v6
 
       - name: Build Phone and TV debug APKs
         env:
