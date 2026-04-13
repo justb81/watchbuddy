@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/justb81/watchbuddy/compare/v0.2.1...v0.2.2) (2026-04-13)
+
+
+### Bug Fixes
+
+* add skip button and NotConfigured state to onboarding screen ([#91](https://github.com/justb81/watchbuddy/issues/91)) ([79d3d27](https://github.com/justb81/watchbuddy/commit/79d3d2723532605ecfd088b683e78e5fb952e922)), closes [#90](https://github.com/justb81/watchbuddy/issues/90)
+
 ## [0.2.1](https://github.com/justb81/watchbuddy/compare/v0.2.0...v0.2.1) (2026-04-13)
 
 
