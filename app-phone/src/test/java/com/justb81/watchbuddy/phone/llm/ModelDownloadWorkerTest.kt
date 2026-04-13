@@ -185,11 +185,12 @@ class ModelDownloadWorkerTest {
         @Test
         fun `detects incomplete download when content-length mismatches`() = runTest {
             val fullContent = "complete model data here"
-            // Advertise full content-length but disconnect early
+            // setBody() overrides Content-Length, so set the header AFTER setBody
+            // to advertise the full length while only sending partial data
             server.enqueue(
                 MockResponse()
-                    .setHeader("Content-Length", fullContent.length)
                     .setBody("partial")
+                    .setHeader("Content-Length", fullContent.length)
                     .setSocketPolicy(SocketPolicy.DISCONNECT_AT_END)
             )
 
