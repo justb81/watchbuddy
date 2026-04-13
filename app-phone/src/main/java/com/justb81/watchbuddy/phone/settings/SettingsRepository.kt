@@ -38,6 +38,7 @@ class SettingsRepository @Inject constructor(
         val OLLAMA_URL = stringPreferencesKey("ollama_url")
         val MODEL_BASE_URL = stringPreferencesKey("model_base_url")
         val MODEL_READY = booleanPreferencesKey("model_ready")
+        val TMDB_API_KEY = stringPreferencesKey("tmdb_api_key")
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -62,7 +63,8 @@ class SettingsRepository @Inject constructor(
             directClientId = prefs[Keys.DIRECT_CLIENT_ID] ?: "",
             companionEnabled = prefs[Keys.COMPANION_ENABLED] ?: false,
             ollamaUrl = prefs[Keys.OLLAMA_URL] ?: AppSettings.DEFAULT_OLLAMA_URL,
-            modelBaseUrl = prefs[Keys.MODEL_BASE_URL] ?: ""
+            modelBaseUrl = prefs[Keys.MODEL_BASE_URL] ?: "",
+            tmdbApiKey = prefs[Keys.TMDB_API_KEY] ?: ""
         )
     }
 
@@ -74,6 +76,7 @@ class SettingsRepository @Inject constructor(
             prefs[Keys.COMPANION_ENABLED] = settings.companionEnabled
             prefs[Keys.OLLAMA_URL] = settings.ollamaUrl
             prefs[Keys.MODEL_BASE_URL] = settings.modelBaseUrl
+            prefs[Keys.TMDB_API_KEY] = settings.tmdbApiKey
         }
     }
 
@@ -81,6 +84,10 @@ class SettingsRepository @Inject constructor(
 
     fun saveClientSecret(secret: String) {
         tokenRepository.saveClientSecret(secret)
+    }
+
+    fun getTmdbApiKey(): Flow<String> = context.dataStore.data.map { prefs ->
+        prefs[Keys.TMDB_API_KEY] ?: ""
     }
 
     fun setModelReady(ready: Boolean) {

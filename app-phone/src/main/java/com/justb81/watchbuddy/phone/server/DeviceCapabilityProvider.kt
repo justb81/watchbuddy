@@ -8,7 +8,9 @@ import com.justb81.watchbuddy.core.trakt.TraktApiService
 import com.justb81.watchbuddy.core.trakt.TraktUserProfile
 import com.justb81.watchbuddy.phone.auth.TokenRepository
 import com.justb81.watchbuddy.phone.llm.LlmOrchestrator
+import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -17,7 +19,8 @@ class DeviceCapabilityProvider @Inject constructor(
     @param:ApplicationContext private val context: Context,
     private val llmOrchestrator: LlmOrchestrator,
     private val traktApiService: TraktApiService,
-    private val tokenRepository: TokenRepository
+    private val tokenRepository: TokenRepository,
+    private val settingsRepository: SettingsRepository
 ) {
     private var cachedProfile: TraktUserProfile? = null
 
@@ -39,6 +42,7 @@ class DeviceCapabilityProvider @Inject constructor(
         val freeRamMb = (memInfo.availMem / 1_048_576).toInt()
 
         val profile = getCachedProfile()
+        val tmdbKey = settingsRepository.getTmdbApiKey().first()
 
         return DeviceCapability(
             deviceId = Build.ID,
@@ -48,7 +52,8 @@ class DeviceCapabilityProvider @Inject constructor(
             llmBackend = config.backend,
             modelQuality = config.qualityScore,
             freeRamMb = freeRamMb,
-            isAvailable = true
+            isAvailable = true,
+            tmdbConfigured = tmdbKey.isNotBlank()
         )
     }
 

@@ -174,16 +174,17 @@ class ModelsSerializationTest {
     inner class DeviceCapabilityTest {
         @Test
         fun `round-trip with all fields`() {
-            val cap = DeviceCapability("d1", "user", null, "Pixel", LlmBackend.AICORE, 150, 8000, true)
+            val cap = DeviceCapability("d1", "user", null, "Pixel", LlmBackend.AICORE, 150, 8000, true, true)
             val decoded = json.decodeFromString<DeviceCapability>(json.encodeToString(cap))
             assertEquals(cap, decoded)
         }
 
         @Test
-        fun `default isAvailable is true`() {
+        fun `default isAvailable is true and tmdbConfigured is false`() {
             val jsonStr = """{"deviceId":"d1","userName":"u","deviceName":"P","llmBackend":"NONE","modelQuality":0,"freeRamMb":1000}"""
             val cap = json.decodeFromString<DeviceCapability>(jsonStr)
             assertTrue(cap.isAvailable)
+            assertFalse(cap.tmdbConfigured)
         }
     }
 
@@ -193,7 +194,7 @@ class ModelsSerializationTest {
         @ParameterizedTest
         @EnumSource(LlmBackend::class)
         fun `all enum values serialize as strings`(backend: LlmBackend) {
-            val cap = DeviceCapability("d", "u", null, "P", backend, 0, 0, true)
+            val cap = DeviceCapability("d", "u", null, "P", backend, 0, 0, true, false)
             val encoded = json.encodeToString(cap)
             assertTrue(encoded.contains("\"${backend.name}\""))
         }

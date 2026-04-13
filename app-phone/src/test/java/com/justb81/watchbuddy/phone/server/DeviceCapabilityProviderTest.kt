@@ -7,7 +7,9 @@ import com.justb81.watchbuddy.core.trakt.TraktApiService
 import com.justb81.watchbuddy.core.trakt.TraktUserProfile
 import com.justb81.watchbuddy.phone.auth.TokenRepository
 import com.justb81.watchbuddy.phone.llm.LlmOrchestrator
+import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import io.mockk.*
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
@@ -22,6 +24,7 @@ class DeviceCapabilityProviderTest {
     private val orchestrator: LlmOrchestrator = mockk()
     private val traktApi: TraktApiService = mockk()
     private val tokenRepository: TokenRepository = mockk()
+    private val settingsRepository: SettingsRepository = mockk()
     private val activityManager: ActivityManager = mockk(relaxed = true)
     private lateinit var provider: DeviceCapabilityProvider
 
@@ -42,7 +45,8 @@ class DeviceCapabilityProviderTest {
             LlmOrchestrator.ModelVariant.GEMMA4_E2B,
             70
         )
-        provider = DeviceCapabilityProvider(context, orchestrator, traktApi, tokenRepository)
+        every { settingsRepository.getTmdbApiKey() } returns flowOf("")
+        provider = DeviceCapabilityProvider(context, orchestrator, traktApi, tokenRepository, settingsRepository)
     }
 
     private fun setStaticField(fieldName: String, value: String) {

@@ -4,6 +4,8 @@ import android.util.Log
 import com.justb81.watchbuddy.core.tmdb.TmdbApiService
 import com.justb81.watchbuddy.phone.auth.TokenRepository
 import com.justb81.watchbuddy.phone.llm.RecapGenerator
+import com.justb81.watchbuddy.phone.settings.SettingsRepository
+import kotlinx.coroutines.flow.first
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
@@ -34,7 +36,8 @@ class CompanionHttpServer @Inject constructor(
     private val capabilityProvider: DeviceCapabilityProvider,
     private val showRepository: ShowRepository,
     private val tokenRepository: TokenRepository,
-    private val tmdbApiService: TmdbApiService
+    private val tmdbApiService: TmdbApiService,
+    private val settingsRepository: SettingsRepository
 ) {
     companion object {
         const val PORT = 8765
@@ -74,6 +77,9 @@ class CompanionHttpServer @Inject constructor(
 
                     try {
                         val body = try { call.receive<RecapRequest>() } catch (_: Exception) { RecapRequest() }
+                        val apiKey = body.tmdbApiKey.ifBlank {
+                            settingsRepository.getTmdbApiKey().first()
+                        }
 
                         val shows = showRepository.getShows()
                         val watchedEntry = shows.find { it.show.ids.trakt == showId }
@@ -82,7 +88,7 @@ class CompanionHttpServer @Inject constructor(
                         val tmdbId = watchedEntry.show.ids.tmdb
                             ?: return@post call.respond(HttpStatusCode.NotFound, ErrorResponse("No TMDB ID for show"))
 
-                        val tmdbShow = tmdbApiService.getShow(tmdbId, body.tmdbApiKey)
+                        val tmdbShow = tmdbApiService.getShow(tmdbId, apiKey)
 
                         // Collect watched episode numbers from Trakt data
                         val watchedEpisodeRefs = watchedEntry.seasons.flatMap { season ->
@@ -94,7 +100,7 @@ class CompanionHttpServer @Inject constructor(
                             .takeLast(8)
                             .mapNotNull { (season, episode) ->
                                 try {
-                                    tmdbApiService.getEpisode(tmdbId, season, episode, body.tmdbApiKey)
+                                    tmdbApiService.getEpisode(tmdbId, season, episode, apiKey)
                                 } catch (e: Exception) {
                                     Log.w(TAG, "Failed to load TMDB episode S${season}E${episode}", e)
                                     null
@@ -113,7 +119,7 @@ class CompanionHttpServer @Inject constructor(
                             show = tmdbShow,
                             watchedEpisodes = watchedEpisodes,
                             targetEpisode = targetEpisode,
-                            apiKey = body.tmdbApiKey
+                            apiKey = apiKey
                         )
                         call.respond(mapOf("html" to html))
                     } catch (e: Exception) {
