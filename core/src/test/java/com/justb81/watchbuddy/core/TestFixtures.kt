@@ -76,11 +76,13 @@ object TestFixtures {
         llmBackend: LlmBackend = LlmBackend.LITERT,
         modelQuality: Int = 75,
         freeRamMb: Int = 4000,
-        isAvailable: Boolean = true
+        isAvailable: Boolean = true,
+        tmdbConfigured: Boolean = false
     ) = DeviceCapability(
         deviceId = deviceId, userName = userName, userAvatarUrl = userAvatarUrl,
         deviceName = deviceName, llmBackend = llmBackend, modelQuality = modelQuality,
-        freeRamMb = freeRamMb, isAvailable = isAvailable
+        freeRamMb = freeRamMb, isAvailable = isAvailable,
+        tmdbConfigured = tmdbConfigured
     )
 
     fun scrobbleCandidate(

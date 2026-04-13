@@ -81,7 +81,8 @@ data class DeviceCapability(
     val llmBackend: LlmBackend,         // AICORE, LITERT, NONE
     val modelQuality: Int,              // 0–150 (see scoring docs)
     val freeRamMb: Int,
-    val isAvailable: Boolean = true
+    val isAvailable: Boolean = true,
+    val tmdbConfigured: Boolean = false
 )
 
 enum class LlmBackend { AICORE, LITERT, NONE }

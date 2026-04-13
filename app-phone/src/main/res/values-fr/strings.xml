@@ -37,7 +37,11 @@
     <string name="settings_title">Paramètres</string>
     <string name="settings_account">Compte</string>
     <string name="settings_trakt_account">Compte Trakt</string>
+    <string name="settings_tmdb">TMDB</string>
     <string name="settings_tmdb_account">Compte TMDB</string>
+    <string name="settings_tmdb_connected">Connecté</string>
+    <string name="settings_tmdb_api_key">Clé API TMDB (auth v3)</string>
+    <string name="settings_tmdb_helper">Obtenez votre clé API gratuite sur themoviedb.org sous Paramètres → API.</string>
     <string name="settings_disconnect">Déconnecter</string>
     <string name="settings_companion">Service compagnon</string>
     <string name="settings_companion_running">En cours (port 8765)</string>

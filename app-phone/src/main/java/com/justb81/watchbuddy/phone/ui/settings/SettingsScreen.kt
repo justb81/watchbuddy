@@ -83,6 +83,57 @@ fun SettingsScreen(
                 }
             }
 
+            // ── TMDB Section ─────────────────────────────────────────────────
+            SettingsSectionHeader(stringResource(R.string.settings_tmdb))
+
+            SettingsCard {
+                SettingsRow(
+                    label    = stringResource(R.string.settings_tmdb_account),
+                    value    = if (uiState.tmdbConnected)
+                                   stringResource(R.string.settings_tmdb_connected)
+                               else
+                                   stringResource(R.string.settings_not_connected),
+                    showDivider = true
+                )
+                if (uiState.tmdbConnected) {
+                    TextButton(
+                        onClick  = { viewModel.disconnectTmdb() },
+                        modifier = Modifier.padding(horizontal = 8.dp)
+                    ) {
+                        Text(
+                            stringResource(R.string.settings_disconnect),
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                } else {
+                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                        OutlinedTextField(
+                            value         = uiState.tmdbApiKey,
+                            onValueChange = viewModel::setTmdbApiKey,
+                            label         = { Text(stringResource(R.string.settings_tmdb_api_key)) },
+                            modifier      = Modifier.fillMaxWidth(),
+                            singleLine    = true,
+                            visualTransformation = PasswordVisualTransformation()
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            text  = stringResource(R.string.settings_tmdb_helper),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Button(
+                            onClick  = { viewModel.saveTmdbApiKey() },
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled  = uiState.tmdbApiKey.isNotBlank()
+                        ) {
+                            Text(stringResource(R.string.settings_save))
+                        }
+                        Spacer(Modifier.height(4.dp))
+                    }
+                }
+            }
+
             // ── Companion Service ─────────────────────────────────────────────
             SettingsSectionHeader(stringResource(R.string.settings_companion))
 

@@ -33,6 +33,7 @@ enum class AuthMode { MANAGED, SELF_HOSTED, DIRECT }
 data class SettingsUiState(
     val traktUsername: String?     = null,
     val tmdbConnected: Boolean     = false,
+    val tmdbApiKey: String         = "",
     val companionRunning: Boolean  = false,
     val authMode: AuthMode         = AuthMode.MANAGED,
     val customBackendUrl: String   = "",
@@ -96,7 +97,9 @@ class SettingsViewModel @Inject constructor(
                 directClientSecret = clientSecret,
                 companionRunning = saved.companionEnabled,
                 ollamaUrl = saved.ollamaUrl,
-                modelBaseUrl = saved.modelBaseUrl
+                modelBaseUrl = saved.modelBaseUrl,
+                tmdbApiKey = saved.tmdbApiKey,
+                tmdbConnected = saved.tmdbApiKey.isNotBlank()
             )
         }
     }
@@ -142,6 +145,33 @@ class SettingsViewModel @Inject constructor(
 
     fun setModelBaseUrl(url: String) {
         _uiState.value = _uiState.value.copy(modelBaseUrl = url)
+    }
+
+    fun setTmdbApiKey(key: String) {
+        _uiState.value = _uiState.value.copy(tmdbApiKey = key)
+    }
+
+    fun saveTmdbApiKey() {
+        viewModelScope.launch {
+            val current = settingsRepository.settings.first()
+            val key = _uiState.value.tmdbApiKey
+            settingsRepository.saveSettings(current.copy(tmdbApiKey = key))
+            _uiState.value = _uiState.value.copy(
+                tmdbConnected = key.isNotBlank(),
+                saveSuccess = true
+            )
+        }
+    }
+
+    fun disconnectTmdb() {
+        viewModelScope.launch {
+            val current = settingsRepository.settings.first()
+            settingsRepository.saveSettings(current.copy(tmdbApiKey = ""))
+            _uiState.value = _uiState.value.copy(
+                tmdbApiKey = "",
+                tmdbConnected = false
+            )
+        }
     }
 
     fun saveAdvancedSettings() {
