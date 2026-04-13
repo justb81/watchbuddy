@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/justb81/watchbuddy/compare/v0.1.5...v0.2.0) (2026-04-13)
+
+
+### Features
+
+* Remove node-fetch dependency and use native fetch API ([#75](https://github.com/justb81/watchbuddy/issues/75)) ([c447743](https://github.com/justb81/watchbuddy/commit/c447743791fca3ec96edfb96d9601da291cc406e))
+
 ## [0.1.5](https://github.com/justb81/watchbuddy/compare/v0.1.4...v0.1.5) (2026-04-13)
 
 

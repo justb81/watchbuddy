@@ -21,7 +21,7 @@ android {
         versionCode = 2000 + ciVersionCode
 
         // versionName: release-please setzt VERSION_NAME, Fallback auf x-generic-string
-        versionName = System.getenv("VERSION_NAME") ?: "0.1.5" // x-release-please-version
+        versionName = System.getenv("VERSION_NAME") ?: "0.2.0" // x-release-please-version
     }
 
     // CI-Signing: Keystore-Pfad + Credentials über Umgebungsvariablen
