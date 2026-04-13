@@ -24,6 +24,7 @@
     <string name="home_continue_watching">Continuer à regarder</string>
     <string name="home_all_shows">Toutes les séries</string>
     <string name="home_no_shows">Aucune série pour le moment.\nConnectez-vous avec Trakt pour commencer.</string>
+    <string name="home_connect_to_trakt">Se connecter à Trakt</string>
     <string name="home_syncing">Synchronisation avec Trakt…</string>
     <string name="home_last_sync">Dernière synchronisation : %1$s</string>
     <string name="home_episode_progress">S%1$02dE%2$02d — %3$d/%4$d épisodes vus</string>
@@ -71,6 +72,7 @@
     <string name="settings_disconnect_title">Déconnecter Trakt ?</string>
     <string name="settings_disconnect_message">Vos données locales seront supprimées. Vous pouvez vous reconnecter à tout moment.</string>
     <string name="settings_not_connected">Non connecté</string>
+    <string name="settings_connect_to_trakt">Se connecter à Trakt</string>
     <string name="settings_llm_detecting">Détection…</string>
 
     <!-- Companion Service -->

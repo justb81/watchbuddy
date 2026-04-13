@@ -12,6 +12,7 @@ sealed class PhoneRoute(val route: String) {
     object Onboarding : PhoneRoute("onboarding")
     object Home       : PhoneRoute("home")
     object Settings   : PhoneRoute("settings")
+    object Connect    : PhoneRoute("connect")
 }
 
 @Composable
@@ -41,7 +42,8 @@ fun PhoneNavGraph(
 
         composable(PhoneRoute.Home.route) {
             HomeScreen(
-                onSettingsClick = { navController.navigate(PhoneRoute.Settings.route) }
+                onSettingsClick = { navController.navigate(PhoneRoute.Settings.route) },
+                onConnectClick  = { navController.navigate(PhoneRoute.Connect.route) }
             )
         }
 
@@ -52,7 +54,19 @@ fun PhoneNavGraph(
                     navController.navigate(PhoneRoute.Onboarding.route) {
                         popUpTo(navController.graph.id) { inclusive = true }
                     }
-                }
+                },
+                onConnectClick = { navController.navigate(PhoneRoute.Connect.route) }
+            )
+        }
+
+        composable(PhoneRoute.Connect.route) {
+            OnboardingScreen(
+                onSuccess = {
+                    navController.navigate(PhoneRoute.Home.route) {
+                        popUpTo(navController.graph.id) { inclusive = true }
+                    }
+                },
+                onSkip = { navController.popBackStack() }
             )
         }
     }

@@ -27,6 +27,7 @@ import com.justb81.watchbuddy.core.model.TraktWatchedEntry
 @Composable
 fun HomeScreen(
     onSettingsClick: () -> Unit,
+    onConnectClick: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -93,12 +94,20 @@ fun HomeScreen(
                 }
 
                 uiState.shows.isEmpty() -> {
-                    Text(
-                        text      = stringResource(R.string.home_no_shows),
-                        modifier  = Modifier.align(Alignment.Center).padding(32.dp),
-                        color     = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
-                        style     = MaterialTheme.typography.bodyLarge
-                    )
+                    Column(
+                        modifier = Modifier.align(Alignment.Center).padding(32.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Text(
+                            text  = stringResource(R.string.home_no_shows),
+                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        Button(onClick = onConnectClick) {
+                            Text(stringResource(R.string.home_connect_to_trakt))
+                        }
+                    }
                 }
 
                 else -> {
