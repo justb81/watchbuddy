@@ -7,20 +7,23 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.ui.graphics.Color
 import androidx.tv.material3.*
 import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.core.model.DeviceCapability
 import com.justb81.watchbuddy.core.model.LlmBackend
+import com.justb81.watchbuddy.tv.ui.theme.extendedColors
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
@@ -109,7 +112,7 @@ private fun UserAvatar(
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
-    val borderColor = if (isSelected) Color(0xFFE53935) else Color.Transparent
+    val borderColor = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent
     val initials    = user.userName.take(2).uppercase()
 
     Card(
@@ -119,8 +122,8 @@ private fun UserAvatar(
             .border(3.dp, borderColor, RoundedCornerShape(16.dp)),
         shape    = CardDefaults.shape(RoundedCornerShape(16.dp)),
         colors   = CardDefaults.colors(
-            containerColor        = Color(0xFF1C1C1E),
-            focusedContainerColor = Color(0xFF2C2C2E),
+            containerColor        = MaterialTheme.colorScheme.surface,
+            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
         ),
         scale    = CardDefaults.scale(focusedScale = 1.08f)
     ) {
@@ -135,8 +138,8 @@ private fun UserAvatar(
                     .size(56.dp)
                     .clip(CircleShape)
                     .background(
-                        if (isSelected) Color(0xFFE53935)
-                        else Color(0xFF3A3A3C)
+                        if (isSelected) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.extendedColors.outline
                     ),
                 contentAlignment = Alignment.Center
             ) {
@@ -174,9 +177,10 @@ private fun llmLabel(backend: LlmBackend, noneLlmLabel: String) = when (backend)
     LlmBackend.NONE          -> noneLlmLabel
 }
 
+@Composable
 private fun llmColor(backend: LlmBackend) = when (backend) {
-    LlmBackend.AICORE        -> Color(0xFF4CAF50)
-    LlmBackend.MEDIAPIPE_GPU -> Color(0xFF2196F3)
-    LlmBackend.MEDIAPIPE_CPU -> Color(0xFFFF9800)
-    LlmBackend.NONE          -> Color(0xFF757575)
+    LlmBackend.AICORE        -> MaterialTheme.extendedColors.llmAiCore
+    LlmBackend.MEDIAPIPE_GPU -> MaterialTheme.extendedColors.llmGpu
+    LlmBackend.MEDIAPIPE_CPU -> MaterialTheme.extendedColors.llmCpu
+    LlmBackend.NONE          -> MaterialTheme.extendedColors.llmNone
 }

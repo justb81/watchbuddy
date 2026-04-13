@@ -18,6 +18,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.tv.material3.*
 import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.core.model.StreamingService
+import com.justb81.watchbuddy.tv.ui.theme.extendedColors
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
@@ -30,7 +31,7 @@ fun StreamingSettingsScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF0A0A0A))
+            .background(MaterialTheme.colorScheme.background)
     ) {
         Column(
             modifier = Modifier
@@ -102,7 +103,7 @@ private fun ServiceRow(
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit
 ) {
-    val borderColor = if (isSubscribed) Color(0xFFE53935) else Color.Transparent
+    val borderColor = if (isSubscribed) MaterialTheme.colorScheme.primary else Color.Transparent
 
     Card(
         onClick  = onToggle,
@@ -111,8 +112,8 @@ private fun ServiceRow(
             .border(2.dp, borderColor, RoundedCornerShape(12.dp)),
         shape    = CardDefaults.shape(RoundedCornerShape(12.dp)),
         colors   = CardDefaults.colors(
-            containerColor        = if (isSubscribed) Color(0xFF1C1C1E) else Color(0xFF121214),
-            focusedContainerColor = Color(0xFF2C2C2E)
+            containerColor        = if (isSubscribed) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.background,
+            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant
         ),
         scale    = CardDefaults.scale(focusedScale = 1.02f)
     ) {
@@ -132,7 +133,7 @@ private fun ServiceRow(
                     modifier = Modifier
                         .size(32.dp)
                         .background(
-                            if (isSubscribed) Color(0xFFE53935) else Color(0xFF3A3A3C),
+                            if (isSubscribed) MaterialTheme.colorScheme.primary else MaterialTheme.extendedColors.outline,
                             RoundedCornerShape(8.dp)
                         ),
                     contentAlignment = Alignment.Center
