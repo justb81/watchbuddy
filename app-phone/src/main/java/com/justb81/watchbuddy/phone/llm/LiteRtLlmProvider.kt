@@ -5,6 +5,7 @@ import com.google.ai.edge.litertlm.Backend
 import com.google.ai.edge.litertlm.ConversationConfig
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
+import com.google.ai.edge.litertlm.Message
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -51,9 +52,9 @@ class LiteRtLlmProvider(
         val llm = getOrCreateEngine()
         val conversation = llm.createConversation(ConversationConfig())
         try {
-            val message = conversation.sendMessage(prompt)
-            val text = message.text
-            if (text.isNullOrBlank()) {
+            val response: Message = conversation.sendMessage(prompt)
+            val text = response.toString()
+            if (text.isBlank()) {
                 throw IllegalStateException("LiteRT-LM returned empty response")
             }
             text
