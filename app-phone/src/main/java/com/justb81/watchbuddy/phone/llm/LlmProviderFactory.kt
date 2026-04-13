@@ -4,26 +4,20 @@ import android.content.Context
 import android.util.Log
 import com.justb81.watchbuddy.core.model.LlmBackend
 import com.justb81.watchbuddy.core.model.TmdbEpisode
-import com.justb81.watchbuddy.phone.settings.AppSettings
-import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.flow.first
-import okhttp3.OkHttpClient
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
  * Creates [LlmProvider] instances based on [LlmOrchestrator.selectConfig] and
- * implements a cascade fallback:  AICore -> LiteRT-LM -> Remote Ollama -> TMDB Fallback.
+ * implements a cascade fallback:  AICore -> LiteRT-LM -> TMDB Fallback.
  *
  * Each provider is attempted in order. If a provider throws, the next one is tried.
  */
 @Singleton
 class LlmProviderFactory @Inject constructor(
     @param:ApplicationContext private val context: Context,
-    private val llmOrchestrator: LlmOrchestrator,
-    private val settingsRepository: SettingsRepository,
-    private val httpClient: OkHttpClient
+    private val llmOrchestrator: LlmOrchestrator
 ) {
     companion object {
         private const val TAG = "LlmProviderFactory"
@@ -34,18 +28,14 @@ class LlmProviderFactory @Inject constructor(
      *
      * @param prompt       The LLM prompt
      * @param episodes     Watched episodes (used by FallbackProvider)
-     * @param ollamaUrl    Optional Ollama server URL override
      * @return Generated text from the first provider that succeeds
      */
     suspend fun generateWithCascade(
         prompt: String,
-        episodes: List<TmdbEpisode>,
-        ollamaUrl: String? = null
+        episodes: List<TmdbEpisode>
     ): String {
         val config = llmOrchestrator.selectConfig()
-        val savedSettings = settingsRepository.settings.first()
-        val resolvedOllamaUrl = ollamaUrl ?: savedSettings.ollamaUrl
-        val providers = buildProviderCascade(config, episodes, resolvedOllamaUrl)
+        val providers = buildProviderCascade(config, episodes)
 
         for (provider in providers) {
             try {
@@ -65,8 +55,7 @@ class LlmProviderFactory @Inject constructor(
 
     private fun buildProviderCascade(
         config: LlmOrchestrator.LlmConfig,
-        episodes: List<TmdbEpisode>,
-        ollamaUrl: String?
+        episodes: List<TmdbEpisode>
     ): List<LlmProvider> {
         val providers = mutableListOf<LlmProvider>()
 
@@ -83,11 +72,8 @@ class LlmProviderFactory @Inject constructor(
                     providers += LiteRtLlmProvider(context, it)
                 }
             }
-            LlmBackend.NONE -> { /* skip on-device, go straight to remote/fallback */ }
+            LlmBackend.NONE -> { /* skip on-device, go straight to fallback */ }
         }
-
-        // Remote Ollama as next-to-last resort
-        providers += RemoteOllamaProvider(ollamaUrl ?: AppSettings.DEFAULT_OLLAMA_URL, httpClient)
 
         // TMDB synopsis fallback is always last
         providers += FallbackProvider(episodes)

@@ -72,9 +72,6 @@ Failover: best phone → next best → next → local TV cache → TMDB synopsis
 App start
     │
     ▼
-Remote Ollama configured? ──YES──► Use Remote Ollama (user-hosted server)
-    │ NO
-    ▼
 AICore available? ──YES──► Use Gemini Nano (auto-updated, no download)
     │ NO
     ▼
