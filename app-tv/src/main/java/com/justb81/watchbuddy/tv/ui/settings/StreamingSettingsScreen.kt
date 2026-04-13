@@ -18,6 +18,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.tv.material3.*
 import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.core.model.StreamingService
+import com.justb81.watchbuddy.tv.ui.theme.extendedColors
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
@@ -132,7 +133,7 @@ private fun ServiceRow(
                     modifier = Modifier
                         .size(32.dp)
                         .background(
-                            if (isSubscribed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                            if (isSubscribed) MaterialTheme.colorScheme.primary else MaterialTheme.extendedColors.outline,
                             RoundedCornerShape(8.dp)
                         ),
                     contentAlignment = Alignment.Center

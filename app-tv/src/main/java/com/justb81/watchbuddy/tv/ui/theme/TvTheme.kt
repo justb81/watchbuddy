@@ -19,7 +19,6 @@ private val Surface        = Color(0xFF1C1C1E)
 private val SurfaceVariant = Color(0xFF2C2C2E)
 private val OnSurface      = Color(0xFFEEEEEE)
 private val ErrorColor     = Color(0xFFEF5350)
-private val Outline        = Color(0xFF3A3A3C)
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 private val TvColors = darkColorScheme(
@@ -36,12 +35,12 @@ private val TvColors = darkColorScheme(
     onSurface      = OnSurface,
     error          = ErrorColor,
     onError        = Color.White,
-    outline        = Outline,
 )
 
 // ── Extended colors (no standard Material3 slot) ─────────────────────────────
 @Immutable
 data class TvExtendedColors(
+    val outline: Color     = Color(0xFF3A3A3C),
     val traktRed: Color    = Color(0xFFE53935),
     val success: Color     = Color(0xFF4CAF50),
     val llmAiCore: Color   = Color(0xFF4CAF50),

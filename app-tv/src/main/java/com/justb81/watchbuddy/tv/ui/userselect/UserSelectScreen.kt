@@ -139,7 +139,7 @@ private fun UserAvatar(
                     .clip(CircleShape)
                     .background(
                         if (isSelected) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.outline
+                        else MaterialTheme.extendedColors.outline
                     ),
                 contentAlignment = Alignment.Center
             ) {
