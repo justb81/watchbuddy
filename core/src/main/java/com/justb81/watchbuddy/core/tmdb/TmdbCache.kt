@@ -21,13 +21,16 @@ class TmdbCache @Inject constructor() {
     private val showCache = ConcurrentHashMap<Int, CacheEntry<TmdbShow>>()
     private val episodeCache = ConcurrentHashMap<Triple<Int, Int, Int>, CacheEntry<TmdbEpisode>>()
 
+    /** Overridable time source — defaults to wall-clock time. Override in tests to control TTL behaviour. */
+    internal var timeSource: () -> Long = { System.currentTimeMillis() }
+
     companion object {
         const val TTL_MS = 15 * 60 * 1000L // 15 minutes
     }
 
     fun getShow(id: Int): TmdbShow? {
         val entry = showCache[id] ?: return null
-        return if (System.currentTimeMillis() - entry.timestamp < TTL_MS) {
+        return if (timeSource() - entry.timestamp < TTL_MS) {
             entry.value
         } else {
             showCache.remove(id)
@@ -36,13 +39,13 @@ class TmdbCache @Inject constructor() {
     }
 
     fun putShow(id: Int, show: TmdbShow) {
-        showCache[id] = CacheEntry(System.currentTimeMillis(), show)
+        showCache[id] = CacheEntry(timeSource(), show)
     }
 
     fun getEpisode(seriesId: Int, season: Int, episode: Int): TmdbEpisode? {
         val key = Triple(seriesId, season, episode)
         val entry = episodeCache[key] ?: return null
-        return if (System.currentTimeMillis() - entry.timestamp < TTL_MS) {
+        return if (timeSource() - entry.timestamp < TTL_MS) {
             entry.value
         } else {
             episodeCache.remove(key)
@@ -52,7 +55,7 @@ class TmdbCache @Inject constructor() {
 
     fun putEpisode(seriesId: Int, season: Int, episode: Int, tmdbEpisode: TmdbEpisode) {
         val key = Triple(seriesId, season, episode)
-        episodeCache[key] = CacheEntry(System.currentTimeMillis(), tmdbEpisode)
+        episodeCache[key] = CacheEntry(timeSource(), tmdbEpisode)
     }
 
     fun clear() {

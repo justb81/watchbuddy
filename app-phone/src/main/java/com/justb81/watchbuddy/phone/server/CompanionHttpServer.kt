@@ -25,6 +25,8 @@ import kotlinx.serialization.json.Json
 import javax.inject.Inject
 import javax.inject.Singleton
 
+private const val TAG = "CompanionHttpServer"
+
 /**
  * Local HTTP server running on the phone (port 8765).
  * The TV app discovers this via NSD (mDNS) and calls its endpoints.
@@ -47,124 +49,142 @@ class CompanionHttpServer @Inject constructor(
 ) {
     companion object {
         const val PORT = 8765
-        private const val TAG = "CompanionHttpServer"
     }
 
     private var server: EmbeddedServer<*, *>? = null
 
     fun start() {
         server = embeddedServer(Netty, port = PORT) {
-            install(ContentNegotiation) {
-                json(Json { ignoreUnknownKeys = true })
-            }
-            routing {
-                get("/capability") {
-                    call.respond(capabilityProvider.getCapability())
-                }
-
-                get("/shows") {
-                    tokenRepository.getAccessToken()
-                        ?: return@get call.respond(HttpStatusCode.Unauthorized, ErrorResponse("No access token"))
-                    try {
-                        val shows = showRepository.getShows()
-                        call.respond(shows)
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Failed to fetch shows", e)
-                        call.respond(HttpStatusCode.InternalServerError, ErrorResponse(e.message ?: "Unknown error"))
-                    }
-                }
-
-                post("/recap/{traktShowId}") {
-                    val showId = call.parameters["traktShowId"]?.toIntOrNull()
-                        ?: return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid show ID"))
-
-                    tokenRepository.getAccessToken()
-                        ?: return@post call.respond(HttpStatusCode.Unauthorized, ErrorResponse("No access token"))
-
-                    try {
-                        val body = try { call.receive<RecapRequest>() } catch (_: Exception) { RecapRequest() }
-                        val apiKey = body.tmdbApiKey.ifBlank {
-                            settingsRepository.getTmdbApiKey().first()
-                        }
-
-                        if (apiKey.isBlank()) {
-                            return@post call.respond(
-                                HttpStatusCode.PreconditionFailed,
-                                ErrorResponse("TMDB API key not configured")
-                            )
-                        }
-
-                        val tmdbLanguage = LocaleHelper.getTmdbLanguage()
-
-                        val shows = showRepository.getShows()
-                        val watchedEntry = shows.find { it.show.ids.trakt == showId }
-                            ?: return@post call.respond(HttpStatusCode.NotFound, ErrorResponse("Show not found"))
-
-                        val tmdbId = watchedEntry.show.ids.tmdb
-                            ?: return@post call.respond(HttpStatusCode.NotFound, ErrorResponse("No TMDB ID for show"))
-
-                        val tmdbShow = tmdbCache.getShow(tmdbId)
-                            ?: tmdbApiService.getShow(tmdbId, apiKey, language = tmdbLanguage)
-                                .also { tmdbCache.putShow(tmdbId, it) }
-
-                        // Collect watched episode numbers from Trakt data
-                        val watchedEpisodeRefs = watchedEntry.seasons.flatMap { season ->
-                            season.episodes.map { ep -> season.number to ep.number }
-                        }
-
-                        // Load episode details from TMDB for the last 8 watched episodes in parallel
-                        val tmdbEpisodes = coroutineScope {
-                            watchedEpisodeRefs
-                                .takeLast(8)
-                                .map { (season, episode) ->
-                                    async {
-                                        try {
-                                            tmdbCache.getEpisode(tmdbId, season, episode)
-                                                ?: tmdbApiService.getEpisode(tmdbId, season, episode, apiKey, language = tmdbLanguage)
-                                                    .also { tmdbCache.putEpisode(tmdbId, season, episode, it) }
-                                        } catch (e: Exception) {
-                                            Log.w(TAG, "Failed to load TMDB episode S${season}E${episode}", e)
-                                            null
-                                        }
-                                    }
-                                }
-                                .awaitAll()
-                                .filterNotNull()
-                        }
-
-                        if (tmdbEpisodes.isEmpty()) {
-                            return@post call.respond(HttpStatusCode.NotFound, ErrorResponse("No episode data available"))
-                        }
-
-                        // Use last episode as the "target" (next to watch)
-                        val targetEpisode = tmdbEpisodes.last()
-                        val watchedEpisodes = tmdbEpisodes.dropLast(1).ifEmpty { tmdbEpisodes }
-
-                        val html = recapGenerator.generateRecap(
-                            show = tmdbShow,
-                            watchedEpisodes = watchedEpisodes,
-                            targetEpisode = targetEpisode,
-                            apiKey = apiKey
-                        )
-                        call.respond(mapOf("html" to html))
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Recap generation failed for show $showId", e)
-                        call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("Recap generation failed: ${e.message}"))
-                    }
-                }
-
-                get("/auth/token") {
-                    val token = tokenRepository.getAccessToken()
-                        ?: return@get call.respond(HttpStatusCode.Unauthorized, ErrorResponse("No access token"))
-                    call.respond(TokenResponse(accessToken = token))
-                }
-            }
+            configureCompanionRoutes(
+                recapGenerator, capabilityProvider, showRepository,
+                tokenRepository, tmdbApiService, tmdbCache, settingsRepository
+            )
         }.start(wait = false)
     }
 
     fun stop() {
         server?.stop(gracePeriodMillis = 1_000, timeoutMillis = 5_000)
         server = null
+    }
+}
+
+/**
+ * Configures the Ktor application with all companion server routes.
+ * Extracted as a top-level function so it can be tested via [io.ktor.server.testing.testApplication].
+ */
+internal fun Application.configureCompanionRoutes(
+    recapGenerator: RecapGenerator,
+    capabilityProvider: DeviceCapabilityProvider,
+    showRepository: ShowRepository,
+    tokenRepository: TokenRepository,
+    tmdbApiService: TmdbApiService,
+    tmdbCache: TmdbCache,
+    settingsRepository: SettingsRepository
+) {
+    install(ContentNegotiation) {
+        json(Json { ignoreUnknownKeys = true })
+    }
+    routing {
+        get("/capability") {
+            call.respond(capabilityProvider.getCapability())
+        }
+
+        get("/shows") {
+            tokenRepository.getAccessToken()
+                ?: return@get call.respond(HttpStatusCode.Unauthorized, ErrorResponse("No access token"))
+            try {
+                val shows = showRepository.getShows()
+                call.respond(shows)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to fetch shows", e)
+                call.respond(HttpStatusCode.InternalServerError, ErrorResponse(e.message ?: "Unknown error"))
+            }
+        }
+
+        post("/recap/{traktShowId}") {
+            val showId = call.parameters["traktShowId"]?.toIntOrNull()
+                ?: return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid show ID"))
+
+            tokenRepository.getAccessToken()
+                ?: return@post call.respond(HttpStatusCode.Unauthorized, ErrorResponse("No access token"))
+
+            try {
+                val body = try { call.receive<RecapRequest>() } catch (_: Exception) { RecapRequest() }
+                val apiKey = body.tmdbApiKey.ifBlank {
+                    settingsRepository.getTmdbApiKey().first()
+                }
+
+                if (apiKey.isBlank()) {
+                    return@post call.respond(
+                        HttpStatusCode.PreconditionFailed,
+                        ErrorResponse("TMDB API key not configured")
+                    )
+                }
+
+                val tmdbLanguage = LocaleHelper.getTmdbLanguage()
+
+                val shows = showRepository.getShows()
+                val watchedEntry = shows.find { it.show.ids.trakt == showId }
+                    ?: return@post call.respond(HttpStatusCode.NotFound, ErrorResponse("Show not found"))
+
+                val tmdbId = watchedEntry.show.ids.tmdb
+                    ?: return@post call.respond(HttpStatusCode.NotFound, ErrorResponse("No TMDB ID for show"))
+
+                val tmdbShow = tmdbCache.getShow(tmdbId)
+                    ?: tmdbApiService.getShow(tmdbId, apiKey, language = tmdbLanguage)
+                        .also { tmdbCache.putShow(tmdbId, it) }
+
+                // Collect watched episode numbers from Trakt data
+                val watchedEpisodeRefs = watchedEntry.seasons.flatMap { season ->
+                    season.episodes.map { ep -> season.number to ep.number }
+                }
+
+                // Load episode details from TMDB for the last 8 watched episodes in parallel
+                val tmdbEpisodes = coroutineScope {
+                    watchedEpisodeRefs
+                        .takeLast(8)
+                        .map { (season, episode) ->
+                            async {
+                                try {
+                                    tmdbCache.getEpisode(tmdbId, season, episode)
+                                        ?: tmdbApiService.getEpisode(tmdbId, season, episode, apiKey, language = tmdbLanguage)
+                                            .also { tmdbCache.putEpisode(tmdbId, season, episode, it) }
+                                } catch (e: Exception) {
+                                    Log.w(TAG, "Failed to load TMDB episode S${season}E${episode}", e)
+                                    null
+                                }
+                            }
+                        }
+                        .awaitAll()
+                        .filterNotNull()
+                }
+
+                if (tmdbEpisodes.isEmpty()) {
+                    return@post call.respond(HttpStatusCode.NotFound, ErrorResponse("No episode data available"))
+                }
+
+                // Use last episode as the "target" (next to watch)
+                val targetEpisode = tmdbEpisodes.last()
+                val watchedEpisodes = tmdbEpisodes.dropLast(1).ifEmpty { tmdbEpisodes }
+
+                val html = recapGenerator.generateRecap(
+                    show = tmdbShow,
+                    watchedEpisodes = watchedEpisodes,
+                    targetEpisode = targetEpisode,
+                    apiKey = apiKey
+                )
+                call.respond(mapOf("html" to html))
+            } catch (e: Exception) {
+                Log.e(TAG, "Recap generation failed for show $showId", e)
+                call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("Recap generation failed: ${e.message}"))
+            }
+        }
+
+        get("/auth/token") {
+            val token = tokenRepository.getAccessToken()
+                ?: return@get call.respond(HttpStatusCode.Unauthorized, ErrorResponse("No access token"))
+            call.respond(TokenResponse(accessToken = token))
+        }
     }
 }
 
