@@ -26,6 +26,8 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 private const val TAG = "CompanionHttpServer"
+private const val DEFAULT_PAGE_SIZE = 30
+private const val MAX_PAGE_SIZE = 200
 
 /**
  * Local HTTP server running on the phone (port 8765).
@@ -93,7 +95,10 @@ internal fun Application.configureCompanionRoutes(
             tokenRepository.getAccessToken()
                 ?: return@get call.respond(HttpStatusCode.Unauthorized, ErrorResponse("No access token"))
             try {
-                val shows = showRepository.getShows()
+                val offset = call.request.queryParameters["offset"]?.toIntOrNull()?.coerceAtLeast(0) ?: 0
+                val limit = call.request.queryParameters["limit"]?.toIntOrNull()
+                    ?.coerceIn(1, MAX_PAGE_SIZE) ?: DEFAULT_PAGE_SIZE
+                val shows = showRepository.getShows().drop(offset).take(limit)
                 call.respond(shows)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to fetch shows", e)

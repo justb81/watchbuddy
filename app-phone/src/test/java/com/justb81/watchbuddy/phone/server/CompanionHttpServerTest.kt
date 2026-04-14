@@ -151,6 +151,102 @@ class CompanionHttpServerTest {
             assertEquals(HttpStatusCode.InternalServerError, response.status)
             assertTrue(response.bodyAsText().contains("Trakt API down"))
         }
+
+        @Test
+        fun `returns first page when limit param is provided`() = testApp {
+            every { tokenRepository.getAccessToken() } returns "test-token"
+            val shows = (1..5).map { i ->
+                TraktWatchedEntry(TraktShow("Show $i", 2020 + i, TraktIds(trakt = i)))
+            }
+            coEvery { showRepository.getShows() } returns shows
+
+            val response = client.get("/shows?limit=2")
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = response.bodyAsText()
+            assertTrue(body.contains("Show 1"))
+            assertTrue(body.contains("Show 2"))
+            assertFalse(body.contains("Show 3"))
+        }
+
+        @Test
+        fun `returns correct page when offset and limit are provided`() = testApp {
+            every { tokenRepository.getAccessToken() } returns "test-token"
+            val shows = (1..5).map { i ->
+                TraktWatchedEntry(TraktShow("Show $i", 2020 + i, TraktIds(trakt = i)))
+            }
+            coEvery { showRepository.getShows() } returns shows
+
+            val response = client.get("/shows?offset=2&limit=2")
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = response.bodyAsText()
+            assertFalse(body.contains("Show 1"))
+            assertFalse(body.contains("Show 2"))
+            assertTrue(body.contains("Show 3"))
+            assertTrue(body.contains("Show 4"))
+            assertFalse(body.contains("Show 5"))
+        }
+
+        @Test
+        fun `returns empty list when offset exceeds total shows`() = testApp {
+            every { tokenRepository.getAccessToken() } returns "test-token"
+            val shows = (1..3).map { i ->
+                TraktWatchedEntry(TraktShow("Show $i", 2020 + i, TraktIds(trakt = i)))
+            }
+            coEvery { showRepository.getShows() } returns shows
+
+            val response = client.get("/shows?offset=10&limit=5")
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertEquals("[]", response.bodyAsText())
+        }
+
+        @Test
+        fun `defaults to first 30 shows when no params provided`() = testApp {
+            every { tokenRepository.getAccessToken() } returns "test-token"
+            // Create 35 shows — only first 30 should be returned
+            val shows = (1..35).map { i ->
+                TraktWatchedEntry(TraktShow("Show $i", 2020, TraktIds(trakt = i)))
+            }
+            coEvery { showRepository.getShows() } returns shows
+
+            val response = client.get("/shows")
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = response.bodyAsText()
+            assertTrue(body.contains("Show 1"))
+            assertTrue(body.contains("Show 30"))
+            assertFalse(body.contains("Show 31"))
+        }
+
+        @Test
+        fun `clamps negative offset to 0`() = testApp {
+            every { tokenRepository.getAccessToken() } returns "test-token"
+            val shows = (1..3).map { i ->
+                TraktWatchedEntry(TraktShow("Show $i", 2020 + i, TraktIds(trakt = i)))
+            }
+            coEvery { showRepository.getShows() } returns shows
+
+            val response = client.get("/shows?offset=-5&limit=2")
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = response.bodyAsText()
+            assertTrue(body.contains("Show 1"))
+            assertTrue(body.contains("Show 2"))
+        }
+
+        @Test
+        fun `ignores invalid non-numeric offset and limit`() = testApp {
+            every { tokenRepository.getAccessToken() } returns "test-token"
+            coEvery { showRepository.getShows() } returns listOf(watchedEntry)
+
+            val response = client.get("/shows?offset=abc&limit=xyz")
+
+            // Falls back to defaults (offset=0, limit=30)
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertTrue(response.bodyAsText().contains("Breaking Bad"))
+        }
     }
 
     // ── POST /recap/{traktShowId} ─────────────────────────────────────────────
