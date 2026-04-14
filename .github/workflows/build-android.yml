@@ -78,12 +78,16 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
+          TOKEN_BACKEND_URL: ${{ secrets.TOKEN_BACKEND_URL }}
         run: ./gradlew :app-phone:assembleDebug :app-tv:assembleDebug
 
       - name: Build Phone and TV debug APKs (unsigned fallback)
         if: steps.keystore.outputs.available == 'false'
         env:
           VERSION_CODE: ${{ github.run_number }}
+          TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
+          TOKEN_BACKEND_URL: ${{ secrets.TOKEN_BACKEND_URL }}
         run: ./gradlew :app-phone:assembleDebug :app-tv:assembleDebug
 
       - name: Upload Phone APK
