@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.1](https://github.com/justb81/watchbuddy/compare/v0.7.0...v0.7.1) (2026-04-14)
+
+
+### Bug Fixes
+
+* **tv:** add R8 keep rule for errorprone annotations (Tink transitive dep) ([#149](https://github.com/justb81/watchbuddy/issues/149)) ([c4100a6](https://github.com/justb81/watchbuddy/commit/c4100a6f37f9c26f78b0f043e685ac62fdf75c3c)), closes [#148](https://github.com/justb81/watchbuddy/issues/148)
+
 ## [0.7.0](https://github.com/justb81/watchbuddy/compare/v0.6.1...v0.7.0) (2026-04-14)
 
 
