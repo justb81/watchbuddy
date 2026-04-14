@@ -14,4 +14,16 @@ object LocaleHelper {
     fun getLlmResponseLanguage(locale: Locale = Locale.getDefault()): String {
         return locale.getDisplayLanguage(Locale.ENGLISH)
     }
+
+    /**
+     * Returns a TMDB-compatible BCP 47 language tag for the given locale,
+     * e.g. "en-US", "de-DE", "fr-FR". Falls back to "en-US" for empty locales.
+     *
+     * Used to request locale-appropriate show/episode metadata from the TMDB API.
+     */
+    fun getTmdbLanguage(locale: Locale = Locale.getDefault()): String {
+        val language = locale.language.takeIf { it.isNotEmpty() } ?: return "en-US"
+        val country = locale.country.takeIf { it.isNotEmpty() }
+        return if (country != null) "$language-$country" else language
+    }
 }

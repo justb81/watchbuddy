@@ -12,15 +12,21 @@ class FallbackProvider(
 
     override val displayName: String = "TMDB Synopsis Fallback"
 
+    private fun String.escapeHtml(): String =
+        replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace("\"", "&quot;")
+
     override suspend fun generate(prompt: String): String {
         val slides = episodes.takeLast(6).mapIndexed { index, ep ->
             val label = "S${ep.season_number.toString().padStart(2, '0')}" +
                     "E${ep.episode_number.toString().padStart(2, '0')}"
-            val overview = ep.overview ?: "—"
+            val overview = (ep.overview ?: "—").escapeHtml()
             """
             <div class="slide" style="animation-delay:${index * 4}s">
               <img data-tmdb-still="$label" alt="$label">
-              <h3>${ep.name} ($label)</h3>
+              <h3>${ep.name.escapeHtml()} ($label)</h3>
               <p>$overview</p>
             </div>
             """.trimIndent()

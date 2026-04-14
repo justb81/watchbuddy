@@ -89,4 +89,46 @@ class FallbackProviderTest {
         assertTrue(html.contains("animation-delay:4s"))
         assertTrue(html.contains("animation-delay:8s"))
     }
+
+    @Test
+    fun `generate escapes HTML special characters in episode name`() = runTest {
+        val ep = TmdbEpisode(1, "The <Choice> & \"Consequences\"", "Normal overview", null, 1, 1)
+        val html = FallbackProvider(listOf(ep)).generate("unused")
+        assertTrue(html.contains("The &lt;Choice&gt; &amp; &quot;Consequences&quot;"))
+        assertFalse(html.contains("<Choice>"))
+        assertFalse(html.contains("\"Consequences\""))
+    }
+
+    @Test
+    fun `generate escapes HTML special characters in episode overview`() = runTest {
+        val ep = TmdbEpisode(1, "Normal", "<script>alert('xss')</script> & more", null, 1, 1)
+        val html = FallbackProvider(listOf(ep)).generate("unused")
+        assertTrue(html.contains("&lt;script&gt;"))
+        assertTrue(html.contains("&amp; more"))
+        assertFalse(html.contains("<script>"))
+    }
+
+    @Test
+    fun `generate escapes ampersand in episode name`() = runTest {
+        val ep = TmdbEpisode(1, "Fire & Ice", null, null, 1, 1)
+        val html = FallbackProvider(listOf(ep)).generate("unused")
+        assertTrue(html.contains("Fire &amp; Ice"))
+        assertFalse(html.contains("Fire & Ice"))
+    }
+
+    @Test
+    fun `generate escapes less-than and greater-than signs in overview`() = runTest {
+        val ep = TmdbEpisode(1, "Normal", "Rating: 8 > 7 and <10", null, 1, 1)
+        val html = FallbackProvider(listOf(ep)).generate("unused")
+        assertTrue(html.contains("8 &gt; 7"))
+        assertTrue(html.contains("&lt;10"))
+    }
+
+    @Test
+    fun `generate escapes double quotes in episode name`() = runTest {
+        val ep = TmdbEpisode(1, "The \"One\"", null, null, 1, 1)
+        val html = FallbackProvider(listOf(ep)).generate("unused")
+        assertTrue(html.contains("The &quot;One&quot;"))
+        assertFalse(html.contains("The \"One\""))
+    }
 }

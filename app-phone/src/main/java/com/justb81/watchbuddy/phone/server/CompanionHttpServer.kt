@@ -1,10 +1,14 @@
 package com.justb81.watchbuddy.phone.server
 
 import android.util.Log
+import com.justb81.watchbuddy.core.locale.LocaleHelper
 import com.justb81.watchbuddy.core.tmdb.TmdbApiService
 import com.justb81.watchbuddy.phone.auth.TokenRepository
 import com.justb81.watchbuddy.phone.llm.RecapGenerator
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -81,6 +85,15 @@ class CompanionHttpServer @Inject constructor(
                             settingsRepository.getTmdbApiKey().first()
                         }
 
+                        if (apiKey.isBlank()) {
+                            return@post call.respond(
+                                HttpStatusCode.PreconditionFailed,
+                                ErrorResponse("TMDB API key not configured")
+                            )
+                        }
+
+                        val tmdbLanguage = LocaleHelper.getTmdbLanguage()
+
                         val shows = showRepository.getShows()
                         val watchedEntry = shows.find { it.show.ids.trakt == showId }
                             ?: return@post call.respond(HttpStatusCode.NotFound, ErrorResponse("Show not found"))
@@ -88,24 +101,30 @@ class CompanionHttpServer @Inject constructor(
                         val tmdbId = watchedEntry.show.ids.tmdb
                             ?: return@post call.respond(HttpStatusCode.NotFound, ErrorResponse("No TMDB ID for show"))
 
-                        val tmdbShow = tmdbApiService.getShow(tmdbId, apiKey)
+                        val tmdbShow = tmdbApiService.getShow(tmdbId, apiKey, language = tmdbLanguage)
 
                         // Collect watched episode numbers from Trakt data
                         val watchedEpisodeRefs = watchedEntry.seasons.flatMap { season ->
                             season.episodes.map { ep -> season.number to ep.number }
                         }
 
-                        // Load episode details from TMDB for the last 8 watched episodes
-                        val tmdbEpisodes = watchedEpisodeRefs
-                            .takeLast(8)
-                            .mapNotNull { (season, episode) ->
-                                try {
-                                    tmdbApiService.getEpisode(tmdbId, season, episode, apiKey)
-                                } catch (e: Exception) {
-                                    Log.w(TAG, "Failed to load TMDB episode S${season}E${episode}", e)
-                                    null
+                        // Load episode details from TMDB for the last 8 watched episodes in parallel
+                        val tmdbEpisodes = coroutineScope {
+                            watchedEpisodeRefs
+                                .takeLast(8)
+                                .map { (season, episode) ->
+                                    async {
+                                        try {
+                                            tmdbApiService.getEpisode(tmdbId, season, episode, apiKey, language = tmdbLanguage)
+                                        } catch (e: Exception) {
+                                            Log.w(TAG, "Failed to load TMDB episode S${season}E${episode}", e)
+                                            null
+                                        }
+                                    }
                                 }
-                            }
+                                .awaitAll()
+                                .filterNotNull()
+                        }
 
                         if (tmdbEpisodes.isEmpty()) {
                             return@post call.respond(HttpStatusCode.NotFound, ErrorResponse("No episode data available"))
