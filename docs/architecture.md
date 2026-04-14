@@ -33,6 +33,8 @@
     │  api.tmdb.org   │
     │  (per-user key) │
     └─────────────────┘
+
+> For a detailed breakdown of TMDB API usage, user journeys, connection handling and error recovery, see [`docs/tmdb-integration.md`](tmdb-integration.md).
 ```
 
 ## Communication Protocol (TV ↔ Phone)

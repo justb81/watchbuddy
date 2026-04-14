@@ -55,7 +55,8 @@ watchbuddy/
 │   ├── docker-compose.yml
 │   └── package.json
 ├── docs/
-│   └── architecture.md Detailed architecture, protocols, LLM strategy, deep links
+│   ├── architecture.md  Detailed architecture, protocols, LLM strategy, deep links
+│   └── tmdb-integration.md  TMDB API usage, user journeys, connection handling
 ├── .github/workflows/
 │   ├── build-android.yml   CI: builds debug APKs on push/PR
 │   ├── release.yml         CD: release-please + signed APK builds
@@ -180,6 +181,7 @@ When making changes to the codebase, keep the following documentation in sync:
 
 1. **`README.md`** — Update if changes affect features, setup instructions, module structure, or supported languages.
 2. **`docs/architecture.md`** — Update if changes affect the system architecture, communication protocol, LLM strategy, deep link table, secret storage, or distribution details.
-3. **`CLAUDE.md`** (this file) — Update if changes affect the repository structure, tech stack, conventions, communication protocol, or any information that helps agents understand the codebase.
+3. **`docs/tmdb-integration.md`** — Update if changes affect TMDB API usage, endpoints, data models, image handling, deep link templates, error handling, caching, or API key management.
+4. **`CLAUDE.md`** (this file) — Update if changes affect the repository structure, tech stack, conventions, communication protocol, or any information that helps agents understand the codebase.
 
-Do not let documentation drift from the actual implementation. When adding new modules, API endpoints, supported languages, or deep link integrations, update all three files accordingly.
+Do not let documentation drift from the actual implementation. When adding new modules, API endpoints, supported languages, or deep link integrations, update all relevant files accordingly.
