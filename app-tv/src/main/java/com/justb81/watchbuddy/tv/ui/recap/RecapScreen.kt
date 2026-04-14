@@ -9,6 +9,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -113,7 +115,7 @@ fun RecapScreen(
                     }
 
                     is RecapUiState.Ready -> {
-                        RecapWebView(html = s.html)
+                        RecapWebView(html = s.html, showTitle = showTitle)
                     }
 
                     is RecapUiState.Fallback -> {
@@ -157,10 +159,11 @@ fun RecapScreen(
 }
 
 @Composable
-private fun RecapWebView(html: String) {
+private fun RecapWebView(html: String, showTitle: String) {
     val bgHex          = MaterialTheme.colorScheme.background.toCssHex()
     val textHex        = MaterialTheme.colorScheme.onBackground.toCssHex()
     val placeholderHex = MaterialTheme.extendedColors.placeholder.toCssHex()
+    val recapLabel     = stringResource(R.string.tv_recap_title) + " " + showTitle
 
     // Wrap HTML in a full page with dark background and slide animation
     val fullHtml = """
@@ -236,6 +239,8 @@ private fun RecapWebView(html: String) {
         update = { webView ->
             webView.loadDataWithBaseURL(null, fullHtml, "text/html", "UTF-8", null)
         },
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier
+            .fillMaxSize()
+            .semantics { contentDescription = recapLabel }
     )
 }

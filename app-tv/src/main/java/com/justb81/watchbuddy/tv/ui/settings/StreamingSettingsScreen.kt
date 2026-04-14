@@ -11,6 +11,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -163,11 +165,15 @@ private fun ServiceRow(
 
             // Priority reorder buttons (only for subscribed services)
             if (isSubscribed) {
+                val moveUpDesc   = stringResource(R.string.cd_service_move_up, service.name)
+                val moveDownDesc = stringResource(R.string.cd_service_move_down, service.name)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(
                         onClick = onMoveUp,
                         enabled = canMoveUp,
-                        modifier = Modifier.size(40.dp),
+                        modifier = Modifier
+                            .size(40.dp)
+                            .semantics { contentDescription = moveUpDesc },
                         contentPadding = PaddingValues(0.dp)
                     ) {
                         Text("\u25B2", fontSize = 14.sp)
@@ -175,7 +181,9 @@ private fun ServiceRow(
                     OutlinedButton(
                         onClick = onMoveDown,
                         enabled = canMoveDown,
-                        modifier = Modifier.size(40.dp),
+                        modifier = Modifier
+                            .size(40.dp)
+                            .semantics { contentDescription = moveDownDesc },
                         contentPadding = PaddingValues(0.dp)
                     ) {
                         Text("\u25BC", fontSize = 14.sp)

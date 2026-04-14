@@ -14,6 +14,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -112,14 +114,19 @@ private fun UserAvatar(
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
-    val borderColor = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent
-    val initials    = user.userName.take(2).uppercase()
+    val borderColor   = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent
+    val initials      = user.userName.take(2).uppercase()
+    val avatarDescription = stringResource(
+        if (isSelected) R.string.cd_user_selected else R.string.cd_user_unselected,
+        user.userName
+    )
 
     Card(
         onClick  = onClick,
         modifier = Modifier
             .size(120.dp)
-            .border(3.dp, borderColor, RoundedCornerShape(16.dp)),
+            .border(3.dp, borderColor, RoundedCornerShape(16.dp))
+            .semantics { contentDescription = avatarDescription },
         shape    = CardDefaults.shape(RoundedCornerShape(16.dp)),
         colors   = CardDefaults.colors(
             containerColor        = MaterialTheme.colorScheme.surface,

@@ -66,4 +66,11 @@
     <string name="tv_llm_gemma_gpu">Gemma GPU</string>
     <string name="tv_llm_gemma_cpu">Gemma CPU</string>
     <string name="tv_llm_none">Sin LLM</string>
+
+    <!-- Accesibilidad -->
+    <string name="cd_user_selected">%1$s, seleccionado</string>
+    <string name="cd_user_unselected">%1$s, pulsar para seleccionar</string>
+    <string name="cd_scrobble_countdown">Confirmación automática en %1$d segundos</string>
+    <string name="cd_service_move_up">Subir %1$s en la prioridad</string>
+    <string name="cd_service_move_down">Bajar %1$s en la prioridad</string>
 </resources>
