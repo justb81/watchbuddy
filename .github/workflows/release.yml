@@ -184,6 +184,17 @@ jobs:
           UPDATED=$(printf "%s\n\n%b" "$EXISTING" "$DOWNLOADS")
           gh release edit "${TAG}" --notes "$UPDATED"
 
+      # -- Determine Play Store release status ------------------------------
+      - name: Determine Play Store release status
+        id: play-status
+        run: |
+          MAJOR=$(echo "$VERSION" | cut -d. -f1)
+          if [ "$MAJOR" -ge 1 ]; then
+            echo "status=completed" >> "$GITHUB_OUTPUT"
+          else
+            echo "status=draft" >> "$GITHUB_OUTPUT"
+          fi
+
       # -- Publish to Google Play Store ------------------------------------
       - name: Upload to Google Play Store
         if: steps.keystore.outputs.available == 'true' && steps.play-store.outputs.available == 'true'
@@ -193,7 +204,7 @@ jobs:
           packageName: com.justb81.watchbuddy
           releaseFiles: release-assets/*-release.aab
           track: internal
-          status: completed
+          status: ${{ steps.play-status.outputs.status }}
 
       - name: Upload release artifacts
         uses: actions/upload-artifact@v7
