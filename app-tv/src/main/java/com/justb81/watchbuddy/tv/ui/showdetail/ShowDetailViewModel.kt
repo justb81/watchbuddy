@@ -45,7 +45,6 @@ class ShowDetailViewModel @Inject constructor(
         return service.deepLinkTemplate
             .replace("{tmdb_id}", tmdbId.toString())
             .replace("{slug}", slug)
-            .replace("{asin}", tmdbId.toString())
             .replace("{id}", tmdbId.toString())
     }
 }

@@ -50,8 +50,9 @@ class KnownStreamingServicesTest {
     }
 
     @Test
-    fun `Prime deep link uses asin placeholder`() {
+    fun `Prime deep link uses slug placeholder for search`() {
         val prime = KNOWN_STREAMING_SERVICES.first { it.id == "prime" }
-        assertTrue(prime.deepLinkTemplate.contains("{asin}"))
+        assertTrue(prime.deepLinkTemplate.contains("{slug}"), "Prime Video should use a search URL with {slug}")
+        assertFalse(prime.deepLinkTemplate.contains("{asin}"), "Prime Video must not use {asin} — TMDB IDs are not Amazon ASINs")
     }
 }

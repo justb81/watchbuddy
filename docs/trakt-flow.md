@@ -359,7 +359,7 @@ Get subscribed streaming services from StreamingPreferencesRepository
 Match show against service deep link templates:
     │
     │  Netflix:      https://www.netflix.com/title/{tmdb_id}
-    │  Prime Video:  https://app.primevideo.com/detail?asin={asin}
+    │  Prime Video:  https://www.primevideo.com/search?phrase={slug}
     │  Disney+:      https://www.disneyplus.com/series/{slug}/{tmdb_id}
     │  WaipuTV:      waipu://tv
     │  Joyn:         https://www.joyn.de/serien/{slug}

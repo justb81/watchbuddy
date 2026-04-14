@@ -91,13 +91,13 @@ class ShowDetailViewModelTest {
         }
 
         @Test
-        fun `substitutes asin placeholder`() {
-            val entry = TraktWatchedEntry(TraktShow("Test", 2024, TraktIds(tmdb = 55, slug = "test")))
+        fun `Prime Video uses search URL with slug`() {
+            val entry = TraktWatchedEntry(TraktShow("Breaking Bad", 2008, TraktIds(tmdb = 1399, slug = "breaking-bad")))
             val services = listOf(
-                StreamingService("prime", "Prime", "pkg", "https://prime.com/detail?asin={asin}")
+                StreamingService("prime", "Prime Video", "pkg", "https://www.primevideo.com/search?phrase={slug}")
             )
             val result = viewModel.resolveDeepLink(entry, services)
-            assertEquals("https://prime.com/detail?asin=55", result)
+            assertEquals("https://www.primevideo.com/search?phrase=breaking-bad", result)
         }
 
         @Test

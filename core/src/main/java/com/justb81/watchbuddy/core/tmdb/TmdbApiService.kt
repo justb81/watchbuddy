@@ -2,17 +2,9 @@ package com.justb81.watchbuddy.core.tmdb
 
 import com.justb81.watchbuddy.core.model.TmdbEpisode
 import com.justb81.watchbuddy.core.model.TmdbShow
-import kotlinx.serialization.Serializable
 import retrofit2.http.*
 
 interface TmdbApiService {
-
-    @GET("search/tv")
-    suspend fun searchShow(
-        @Query("api_key") apiKey: String,
-        @Query("query") query: String,
-        @Query("language") language: String = "en-US"
-    ): TmdbSearchResponse
 
     @GET("tv/{series_id}")
     suspend fun getShow(
@@ -29,28 +21,7 @@ interface TmdbApiService {
         @Query("api_key") apiKey: String,
         @Query("language") language: String = "en-US"
     ): TmdbEpisode
-
-    @GET("tv/{series_id}/season/{season_number}")
-    suspend fun getSeason(
-        @Path("series_id") seriesId: Int,
-        @Path("season_number") seasonNumber: Int,
-        @Query("api_key") apiKey: String,
-        @Query("language") language: String = "en-US"
-    ): TmdbSeasonResponse
 }
-
-@Serializable
-data class TmdbSearchResponse(
-    val results: List<TmdbShow>,
-    val total_results: Int = 0
-)
-
-@Serializable
-data class TmdbSeasonResponse(
-    val id: Int,
-    val season_number: Int,
-    val episodes: List<TmdbEpisode>
-)
 
 // Image URL helper
 object TmdbImageHelper {
