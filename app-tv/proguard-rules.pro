@@ -44,8 +44,9 @@
 # ── Coil ─────────────────────────────────────────────────────────────────────
 -dontwarn coil.**
 
-# ── Security Crypto ──────────────────────────────────────────────────────────
+# ── Security Crypto / Tink ───────────────────────────────────────────────────
 -keep class androidx.security.crypto.** { *; }
+-dontwarn com.google.errorprone.annotations.**
 
 # ── Coroutines ───────────────────────────────────────────────────────────────
 -keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
