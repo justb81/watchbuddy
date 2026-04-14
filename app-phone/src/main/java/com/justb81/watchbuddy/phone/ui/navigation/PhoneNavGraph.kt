@@ -61,12 +61,9 @@ fun PhoneNavGraph(
 
         composable(PhoneRoute.Connect.route) {
             OnboardingScreen(
-                onSuccess = {
-                    navController.navigate(PhoneRoute.Home.route) {
-                        popUpTo(navController.graph.id) { inclusive = true }
-                    }
-                },
-                onSkip = { navController.popBackStack() }
+                onSuccess = { navController.popBackStack() },
+                onSkip = { navController.popBackStack() },
+                isReconnect = true
             )
         }
     }

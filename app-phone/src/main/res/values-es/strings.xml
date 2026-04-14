@@ -18,6 +18,7 @@
     <string name="onboarding_code_expired">Código expirado. Por favor, inténtalo de nuevo.</string>
     <string name="onboarding_not_configured">Trakt aún no está configurado. Puedes configurar tus credenciales en los ajustes.</string>
     <string name="onboarding_skip">Omitir por ahora</string>
+    <string name="onboarding_reconnect_title">Conectar con Trakt</string>
 
     <!-- Home -->
     <string name="home_title">Mis series</string>

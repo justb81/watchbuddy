@@ -18,6 +18,7 @@
     <string name="onboarding_code_expired">Code abgelaufen. Bitte erneut versuchen.</string>
     <string name="onboarding_not_configured">Trakt ist noch nicht konfiguriert. Du kannst deine Zugangsdaten in den Einstellungen einrichten.</string>
     <string name="onboarding_skip">Jetzt überspringen</string>
+    <string name="onboarding_reconnect_title">Mit Trakt verbinden</string>
 
     <!-- Home -->
     <string name="home_title">Meine Serien</string>
