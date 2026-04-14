@@ -8,7 +8,6 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import kotlinx.serialization.json.Json
-import okhttp3.CertificatePinner
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -28,21 +27,11 @@ object NetworkModule {
         coerceInputValues = true
     }
 
-    // Pin intermediate CA certificates for Trakt and TMDB APIs.
-    // Using wildcard pins on intermediate CAs for resilience during leaf cert rotation.
-    private val certificatePinner = CertificatePinner.Builder()
-        .add("api.trakt.tv", "sha256/jQJTbIh0grw0/1TkHSumWb+Fs0Ggogr621gT3PvPKG0=")         // Let's Encrypt R3
-        .add("api.trakt.tv", "sha256/C5+lpZ7tcVwmwQIMcRtPbsQtWLABXhQzejna0wHFr8M=")         // ISRG Root X1
-        .add("api.themoviedb.org", "sha256/jQJTbIh0grw0/1TkHSumWb+Fs0Ggogr621gT3PvPKG0=")    // Let's Encrypt R3
-        .add("api.themoviedb.org", "sha256/C5+lpZ7tcVwmwQIMcRtPbsQtWLABXhQzejna0wHFr8M=")    // ISRG Root X1
-        .build()
-
     @Provides
     @Singleton
     fun provideOkHttpClient(
         @Named("isDebugBuild") isDebug: Boolean
     ): OkHttpClient = OkHttpClient.Builder()
-        .certificatePinner(certificatePinner)
         .addInterceptor { chain ->
             // Trakt required headers
             val request = chain.request().newBuilder()
@@ -103,15 +92,15 @@ object NetworkModule {
         retrofit.create(TmdbApiService::class.java)
 
     /**
-     * Retrofit-Instanz für den Token-Proxy-Backend.
+     * Retrofit instance for the token proxy backend.
      *
-     * Wird nur bereitgestellt, wenn [backendUrl] nicht leer ist — d.h. wenn
-     * BuildConfig.TOKEN_BACKEND_URL in app-phone/build.gradle.kts gesetzt ist.
-     * Andernfalls ist [TokenProxyService] im Hilt-Graph nicht verfügbar und
-     * der Onboarding-Flow blendet die Trakt-Anmeldung aus.
+     * Only provided when [backendUrl] is non-blank — i.e. when
+     * BuildConfig.TOKEN_BACKEND_URL is set in app-phone/build.gradle.kts.
+     * Otherwise [TokenProxyService] is unavailable in the Hilt graph and
+     * the onboarding flow hides the Trakt sign-in option.
      *
-     * Hinweis: Der OkHttpClient wird hier bewusst ohne die Trakt-spezifischen
-     * Header verwendet — der Proxy braucht kein 'trakt-api-version'-Header.
+     * Note: The OkHttpClient is intentionally used without Trakt-specific
+     * headers — the proxy does not require a 'trakt-api-version' header.
      */
     @Provides
     @Singleton

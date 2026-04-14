@@ -91,6 +91,12 @@
     <string name="companion_notification_title">WatchBuddy Companion</string>
     <string name="companion_notification_text">Ready for TV connection</string>
 
+    <!-- Model Download -->
+    <string name="model_download_channel_name">Model Download</string>
+    <string name="model_download_channel_description">Shows progress while downloading the AI model</string>
+    <string name="model_download_notification_title">Downloading AI model</string>
+    <string name="model_download_notification_text">WatchBuddy is downloading the AI model in the background</string>
+
     <!-- Common -->
     <string name="no_description">No description available.</string>
     <string name="loading">Loading…</string>

@@ -1,5 +1,6 @@
 package com.justb81.watchbuddy.core.network
 
+import okhttp3.CertificatePinner
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.mockwebserver.MockResponse
@@ -34,7 +35,7 @@ class NetworkModuleTest {
         @Test
         fun `adds Content-Type header`() {
             server.enqueue(MockResponse().setBody("{}"))
-            val client = createTestClient()
+            val client = NetworkModule.provideOkHttpClient(isDebug = false)
             client.newCall(Request.Builder().url(server.url("/test")).build()).execute()
             val recorded = server.takeRequest()
             assertEquals("application/json", recorded.getHeader("Content-Type"))
@@ -43,23 +44,16 @@ class NetworkModuleTest {
         @Test
         fun `adds trakt-api-version header`() {
             server.enqueue(MockResponse().setBody("{}"))
-            val client = createTestClient()
+            val client = NetworkModule.provideOkHttpClient(isDebug = false)
             client.newCall(Request.Builder().url(server.url("/test")).build()).execute()
             val recorded = server.takeRequest()
             assertEquals("2", recorded.getHeader("trakt-api-version"))
         }
 
-        private fun createTestClient(): OkHttpClient {
-            // Build a client that mimics NetworkModule's interceptor logic but without certificate pinning
-            return OkHttpClient.Builder()
-                .addInterceptor { chain ->
-                    val request = chain.request().newBuilder()
-                        .addHeader("Content-Type", "application/json")
-                        .addHeader("trakt-api-version", "2")
-                        .build()
-                    chain.proceed(request)
-                }
-                .build()
+        @Test
+        fun `does not apply certificate pinning`() {
+            val client = NetworkModule.provideOkHttpClient(isDebug = false)
+            assertEquals(CertificatePinner.DEFAULT, client.certificatePinner)
         }
     }
 

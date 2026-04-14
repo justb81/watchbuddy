@@ -37,5 +37,19 @@ class WatchBuddyPhoneApp : Application(), Configuration.Provider {
             }
             manager.createNotificationChannel(channel)
         }
+        if (manager.getNotificationChannel(MODEL_DOWNLOAD_CHANNEL_ID) == null) {
+            val channel = NotificationChannel(
+                MODEL_DOWNLOAD_CHANNEL_ID,
+                getString(R.string.model_download_channel_name),
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = getString(R.string.model_download_channel_description)
+            }
+            manager.createNotificationChannel(channel)
+        }
+    }
+
+    companion object {
+        const val MODEL_DOWNLOAD_CHANNEL_ID = "model_download"
     }
 }

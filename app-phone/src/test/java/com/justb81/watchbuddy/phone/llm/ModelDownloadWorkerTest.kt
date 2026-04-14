@@ -1,7 +1,9 @@
 package com.justb81.watchbuddy.phone.llm
 
+import android.app.Notification
 import android.content.Context
 import androidx.work.Data
+import androidx.work.ForegroundInfo
 import androidx.work.ListenableWorker.Result
 import androidx.work.WorkerParameters
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
@@ -73,6 +75,8 @@ class ModelDownloadWorkerTest {
             ModelDownloadWorker(context, workerParams, settingsRepository, downloadClient)
         )
         coEvery { worker.setProgress(any()) } just Runs
+        coEvery { worker.setForeground(any()) } just Runs
+        every { worker.createForegroundInfo() } returns ForegroundInfo(2, mockk<Notification>(relaxed = true))
         return worker
     }
 

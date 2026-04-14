@@ -70,6 +70,7 @@ class SettingsViewModel @Inject constructor(
         loadTraktUsername()
         detectLlm()
         observeModelReadyState()
+        observeDownloadProgress()
     }
 
     private fun loadTraktUsername() {
@@ -117,6 +118,36 @@ class SettingsViewModel @Inject constructor(
             settingsRepository.modelReady.collect { ready ->
                 _uiState.value = _uiState.value.copy(llmReady = ready)
             }
+        }
+    }
+
+    private fun observeDownloadProgress() {
+        viewModelScope.launch {
+            workManager.getWorkInfosForUniqueWorkFlow(ModelDownloadWorker.UNIQUE_WORK_NAME)
+                .collect { workInfoList ->
+                    val workInfo = workInfoList.firstOrNull() ?: return@collect
+                    when (workInfo.state) {
+                        WorkInfo.State.RUNNING -> {
+                            val progress = workInfo.progress.getInt(
+                                ModelDownloadWorker.KEY_PROGRESS, 0
+                            )
+                            _uiState.value = _uiState.value.copy(llmDownloadProgress = progress)
+                        }
+                        WorkInfo.State.SUCCEEDED -> {
+                            _uiState.value = _uiState.value.copy(
+                                llmDownloadProgress = null,
+                                llmReady = true
+                            )
+                        }
+                        WorkInfo.State.FAILED, WorkInfo.State.CANCELLED -> {
+                            _uiState.value = _uiState.value.copy(llmDownloadProgress = null)
+                        }
+                        WorkInfo.State.ENQUEUED -> {
+                            _uiState.value = _uiState.value.copy(llmDownloadProgress = 0)
+                        }
+                        else -> { /* BLOCKED — no UI update needed */ }
+                    }
+                }
         }
     }
 
@@ -237,41 +268,7 @@ class SettingsViewModel @Inject constructor(
             ExistingWorkPolicy.KEEP,
             workRequest
         )
-
-        // Observe work progress
-        viewModelScope.launch {
-            workManager.getWorkInfoByIdFlow(workRequest.id).collect { workInfo ->
-                if (workInfo == null) return@collect
-                when (workInfo.state) {
-                    WorkInfo.State.RUNNING -> {
-                        val progress = workInfo.progress.getInt(
-                            ModelDownloadWorker.KEY_PROGRESS, 0
-                        )
-                        _uiState.value = _uiState.value.copy(
-                            llmDownloadProgress = progress
-                        )
-                    }
-                    WorkInfo.State.SUCCEEDED -> {
-                        _uiState.value = _uiState.value.copy(
-                            llmDownloadProgress = null,
-                            llmReady = true
-                        )
-                    }
-                    WorkInfo.State.FAILED -> {
-                        _uiState.value = _uiState.value.copy(
-                            llmDownloadProgress = null,
-                            llmReady = false
-                        )
-                    }
-                    WorkInfo.State.ENQUEUED -> {
-                        _uiState.value = _uiState.value.copy(
-                            llmDownloadProgress = 0
-                        )
-                    }
-                    else -> { /* BLOCKED, CANCELLED — no UI update needed */ }
-                }
-            }
-        }
+        // Progress is tracked by observeDownloadProgress() running since init
     }
 
 }
