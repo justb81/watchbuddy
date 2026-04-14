@@ -11,6 +11,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -200,17 +203,40 @@ private fun PhoneUnreachableBanner() {
     }
 }
 
+/**
+ * Builds a content description for a show card.
+ *
+ * Pure Kotlin — no Compose context required, making it easy to unit-test.
+ * Format: "Show Title, S01E05" when episode is known, or just "Show Title" otherwise.
+ */
+internal fun showCardContentDescription(
+    showTitle: String,
+    lastSeasonNumber: Int?,
+    lastEpisodeNumber: Int?
+): String = if (lastSeasonNumber != null && lastEpisodeNumber != null) {
+    "$showTitle, S${lastSeasonNumber.toString().padStart(2, '0')}E${lastEpisodeNumber.toString().padStart(2, '0')}"
+} else {
+    showTitle
+}
+
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun ShowCard(entry: TraktWatchedEntry, onClick: () -> Unit) {
     val lastSeason  = entry.seasons.maxByOrNull { it.number }
     val lastEpisode = lastSeason?.episodes?.maxByOrNull { it.number }
 
+    val cardDescription = showCardContentDescription(
+        showTitle         = entry.show.title,
+        lastSeasonNumber  = lastSeason?.number,
+        lastEpisodeNumber = lastEpisode?.number
+    )
+
     Card(
         onClick   = onClick,
         modifier  = Modifier
             .width(180.dp)
-            .aspectRatio(2f / 3f),
+            .aspectRatio(2f / 3f)
+            .semantics { contentDescription = cardDescription },
         shape     = CardDefaults.shape(RoundedCornerShape(12.dp)),
         colors    = CardDefaults.colors(
             containerColor         = MaterialTheme.colorScheme.surface,
@@ -263,16 +289,19 @@ private fun PhoneStatusBadge(count: Int, bestName: String?) {
             .background(MaterialTheme.colorScheme.surface)
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            modifier = Modifier
+                .padding(horizontal = 12.dp, vertical = 6.dp)
+                .semantics(mergeDescendants = true) {},
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            // Green dot
+            // Green dot — purely decorative; the adjacent text already conveys the status
             Box(
                 modifier = Modifier
                     .size(8.dp)
                     .clip(RoundedCornerShape(4.dp))
                     .background(MaterialTheme.extendedColors.success)
+                    .clearAndSetSemantics {}
             )
             Text(
                 text     = if (bestName != null) bestName else stringResource(R.string.tv_devices_count, count),
