@@ -65,6 +65,8 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           VERSION_NAME: ${{ needs.release-please.outputs.version }}
           VERSION_CODE: ${{ github.run_number }}
+          TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
+          TOKEN_BACKEND_URL: ${{ secrets.TOKEN_BACKEND_URL }}
         run: ./gradlew :app-phone:assembleRelease
 
       - name: Build signed TV APK
@@ -76,6 +78,8 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           VERSION_NAME: ${{ needs.release-please.outputs.version }}
           VERSION_CODE: ${{ github.run_number }}
+          TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
+          TOKEN_BACKEND_URL: ${{ secrets.TOKEN_BACKEND_URL }}
         run: ./gradlew :app-tv:assembleRelease
 
       # -- Debug APKs (always) — signed with release keystore when available -----
@@ -88,6 +92,8 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
+          TOKEN_BACKEND_URL: ${{ secrets.TOKEN_BACKEND_URL }}
         run: ./gradlew :app-phone:assembleDebug :app-tv:assembleDebug
 
       - name: Build debug APKs (unsigned fallback)
@@ -95,6 +101,8 @@ jobs:
         env:
           VERSION_NAME: ${{ needs.release-please.outputs.version }}
           VERSION_CODE: ${{ github.run_number }}
+          TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
+          TOKEN_BACKEND_URL: ${{ secrets.TOKEN_BACKEND_URL }}
         run: ./gradlew :app-phone:assembleDebug :app-tv:assembleDebug
 
       # -- APKs sammeln und umbenennen -------------------------------------
