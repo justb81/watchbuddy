@@ -2,6 +2,7 @@ package com.justb81.watchbuddy.phone.ui.settings
 
 import android.app.Application
 import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequest
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.workDataOf
@@ -205,7 +206,7 @@ class SettingsViewModelTest {
                 workManager.enqueueUniqueWork(
                     ModelDownloadWorker.UNIQUE_WORK_NAME,
                     ExistingWorkPolicy.KEEP,
-                    any()
+                    any<OneTimeWorkRequest>()
                 )
             }
         }
@@ -223,7 +224,7 @@ class SettingsViewModelTest {
             advanceUntilIdle()
 
             verify(exactly = 0) {
-                workManager.enqueueUniqueWork(any(), any(), any())
+                workManager.enqueueUniqueWork(any<String>(), any<ExistingWorkPolicy>(), any<OneTimeWorkRequest>())
             }
         }
 
@@ -244,7 +245,7 @@ class SettingsViewModelTest {
                 workManager.enqueueUniqueWork(
                     ModelDownloadWorker.UNIQUE_WORK_NAME,
                     ExistingWorkPolicy.KEEP,
-                    any()
+                    any<OneTimeWorkRequest>()
                 )
             }
         }
