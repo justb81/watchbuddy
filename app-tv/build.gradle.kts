@@ -25,8 +25,10 @@ android {
             .orElse("0.5.1").get() // x-release-please-version
     }
 
-    // CI signing: keystore path + credentials via environment variables
-    val keystoreFile = providers.environmentVariable("KEYSTORE_FILE").orNull
+    // CI signing: keystore path + credentials via environment variables.
+    // takeIf guards against KEYSTORE_FILE being set to an empty string (e.g. when
+    // the secret is absent and the workflow sets the variable to '' as a fallback).
+    val keystoreFile = providers.environmentVariable("KEYSTORE_FILE").orNull?.takeIf { it.isNotBlank() }
     if (keystoreFile != null) {
         signingConfigs {
             create("release") {
@@ -39,6 +41,16 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Use the release keystore for debug builds when available so that debug
+            // and release APKs share the same signing certificate.  Without this,
+            // upgrading from a CI debug APK to a release APK fails with
+            // INSTALL_FAILED_UPDATE_INCOMPATIBLE because each runner generates a
+            // different ephemeral debug.keystore.
+            if (keystoreFile != null) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true

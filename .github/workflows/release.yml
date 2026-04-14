@@ -78,18 +78,24 @@ jobs:
           VERSION_CODE: ${{ github.run_number }}
         run: ./gradlew :app-tv:assembleRelease
 
-      # -- Debug APKs (immer) ---------------------------------------------
-      - name: Build Phone debug APK
+      # -- Debug APKs (always) — signed with release keystore when available -----
+      - name: Build debug APKs (signed)
+        if: steps.keystore.outputs.available == 'true'
         env:
           VERSION_NAME: ${{ needs.release-please.outputs.version }}
           VERSION_CODE: ${{ github.run_number }}
-        run: ./gradlew :app-phone:assembleDebug
+          KEYSTORE_FILE: /tmp/release.keystore
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: ./gradlew :app-phone:assembleDebug :app-tv:assembleDebug
 
-      - name: Build TV debug APK
+      - name: Build debug APKs (unsigned fallback)
+        if: steps.keystore.outputs.available == 'false'
         env:
           VERSION_NAME: ${{ needs.release-please.outputs.version }}
           VERSION_CODE: ${{ github.run_number }}
-        run: ./gradlew :app-tv:assembleDebug
+        run: ./gradlew :app-phone:assembleDebug :app-tv:assembleDebug
 
       # -- APKs sammeln und umbenennen -------------------------------------
       - name: Collect APKs
