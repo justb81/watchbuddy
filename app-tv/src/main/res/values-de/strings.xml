@@ -37,8 +37,13 @@
     <string name="tv_recap_generating_on">Recap wird auf %1$s generiert…</string>
     <string name="tv_recap_error">Recap konnte nicht geladen werden.</string>
     <string name="tv_recap_fallback">Keine KI-Zusammenfassung verfügbar.\nKurzbeschreibung aus TMDB:</string>
+    <string name="tv_recap_fallback_phones_failed">Recap nicht verfügbar – Begleit-App nicht erreichbar.\nBeschreibung aus TMDB:</string>
     <string name="tv_recap_close">Schließen</string>
     <string name="tv_recap_watch_now">Jetzt ansehen</string>
+
+    <!-- Error states -->
+    <string name="tv_error_phone_unreachable">Begleit-App nicht erreichbar. Zwischengespeicherte Daten werden angezeigt.</string>
+    <string name="tv_error_phone_unreachable_no_cache">Begleit-App nicht erreichbar. Stelle sicher, dass WatchBuddy auf deinem Handy läuft.</string>
 
     <!-- Streaming settings -->
     <string name="tv_streaming_settings_button">Dienste</string>

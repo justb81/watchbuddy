@@ -20,6 +20,8 @@ data class TvHomeUiState(
     val bestPhoneName: String? = null,
     val bestPhoneBackend: String? = null,
     val noPhoneConnected: Boolean = false,
+    /** True when a phone was discovered via NSD but its API call failed (distinct from noPhoneConnected). */
+    val phoneApiError: Boolean = false,
     val error: String? = null
 )
 
@@ -74,9 +76,12 @@ class TvHomeViewModel @Inject constructor(
     }
 
     private suspend fun loadShows(selectedUserIds: Set<String>) {
-        _uiState.update { it.copy(isLoading = true, error = null, noPhoneConnected = false) }
+        _uiState.update { it.copy(isLoading = true, error = null, noPhoneConnected = false, phoneApiError = false) }
+
+        // Determine best phone before entering the try block so it is accessible in the catch.
+        val bestPhone = phoneDiscovery.getBestPhone()
+
         try {
-            val bestPhone = phoneDiscovery.getBestPhone()
             if (bestPhone != null) {
                 val api = phoneApiClientFactory.createClient(bestPhone.baseUrl)
                 val shows = api.getShows()
@@ -93,11 +98,23 @@ class TvHomeViewModel @Inject constructor(
                 }
             }
         } catch (e: Exception) {
+            // A phone was found (bestPhone != null) but its API call failed — this is different from
+            // "no phone connected". Show phoneApiError so the UI can display the correct message.
+            val phoneFound = bestPhone != null
             val cached = getCachedShows()
             if (cached != null) {
-                _uiState.update { it.copy(isLoading = false, shows = cached, error = e.message) }
+                _uiState.update {
+                    it.copy(isLoading = false, shows = cached, phoneApiError = phoneFound, error = e.message)
+                }
             } else {
-                _uiState.update { it.copy(isLoading = false, error = e.message, noPhoneConnected = true) }
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        phoneApiError = phoneFound,
+                        noPhoneConnected = !phoneFound,
+                        error = e.message
+                    )
+                }
             }
         }
     }

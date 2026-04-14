@@ -64,6 +64,49 @@ class TvHomeViewModelTest {
         val state = viewModel.uiState.value
         assertFalse(state.isLoading)
         assertTrue(state.noPhoneConnected)
+        assertFalse(state.phoneApiError)
+    }
+
+    @Test
+    fun `loadShows sets phoneApiError (not noPhoneConnected) when phone found but API fails`() = runTest {
+        val phone = mockk<PhoneDiscoveryManager.DiscoveredPhone>()
+        every { phone.baseUrl } returns "http://192.168.1.1:8765/"
+        every { phoneDiscovery.getBestPhone() } returns phone
+        every { phoneApiClientFactory.createClient(any()) } returns phoneApiService
+        coEvery { phoneApiService.getShows() } throws RuntimeException("Connection refused")
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertFalse(state.isLoading)
+        assertTrue(state.phoneApiError)
+        assertFalse(state.noPhoneConnected)
+    }
+
+    @Test
+    fun `loadShows shows cached data with phoneApiError when phone found but API fails`() = runTest {
+        val phone = mockk<PhoneDiscoveryManager.DiscoveredPhone>()
+        every { phone.baseUrl } returns "http://192.168.1.1:8765/"
+        every { phoneApiClientFactory.createClient(any()) } returns phoneApiService
+
+        // First call succeeds and populates cache
+        every { phoneDiscovery.getBestPhone() } returns phone
+        coEvery { phoneApiService.getShows() } returns testShows
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+        assertEquals(2, viewModel.uiState.value.shows.size)
+
+        // Second call fails — cached shows should be shown with phoneApiError
+        coEvery { phoneApiService.getShows() } throws RuntimeException("Timeout")
+        viewModel.loadShows()
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertFalse(state.isLoading)
+        assertTrue(state.phoneApiError)
+        assertFalse(state.noPhoneConnected)
+        assertEquals(2, state.shows.size)
     }
 
     @Test
@@ -81,6 +124,8 @@ class TvHomeViewModelTest {
         assertEquals(2, state.shows.size)
         assertEquals("Show 1", state.shows[0].show.title)
         assertFalse(state.isLoading)
+        assertFalse(state.phoneApiError)
+        assertFalse(state.noPhoneConnected)
     }
 
     @Test
