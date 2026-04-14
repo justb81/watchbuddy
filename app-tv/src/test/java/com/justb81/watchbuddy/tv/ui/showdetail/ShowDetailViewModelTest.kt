@@ -70,81 +70,175 @@ class ShowDetailViewModelTest {
             viewModel = ShowDetailViewModel(streamingPrefs)
         }
 
+        // ── Services that require a TMDB ID ──────────────────────────────────
+
         @Test
-        fun `substitutes tmdb_id placeholder`() {
+        fun `substitutes tmdb_id placeholder for Netflix`() {
             val entry = TraktWatchedEntry(TraktShow("Test", 2024, TraktIds(tmdb = 42, slug = "test")))
             val services = listOf(
                 StreamingService("netflix", "Netflix", "pkg", "https://netflix.com/title/{tmdb_id}")
             )
-            val result = viewModel.resolveDeepLink(entry, services)
-            assertEquals("https://netflix.com/title/42", result)
+            assertEquals("https://netflix.com/title/42", viewModel.resolveDeepLink(entry, services))
         }
 
         @Test
-        fun `substitutes slug placeholder`() {
-            val entry = TraktWatchedEntry(TraktShow("Test", 2024, TraktIds(tmdb = 1, slug = "test-show")))
-            val services = listOf(
-                StreamingService("joyn", "Joyn", "pkg", "https://joyn.de/serien/{slug}")
-            )
-            val result = viewModel.resolveDeepLink(entry, services)
-            assertEquals("https://joyn.de/serien/test-show", result)
-        }
-
-        @Test
-        fun `Prime Video uses search URL with slug`() {
-            val entry = TraktWatchedEntry(TraktShow("Breaking Bad", 2008, TraktIds(tmdb = 1399, slug = "breaking-bad")))
-            val services = listOf(
-                StreamingService("prime", "Prime Video", "pkg", "https://www.primevideo.com/search?phrase={slug}")
-            )
-            val result = viewModel.resolveDeepLink(entry, services)
-            assertEquals("https://www.primevideo.com/search?phrase=breaking-bad", result)
-        }
-
-        @Test
-        fun `substitutes id placeholder`() {
+        fun `substitutes id placeholder for ARD`() {
             val entry = TraktWatchedEntry(TraktShow("Test", 2024, TraktIds(tmdb = 77, slug = "test")))
             val services = listOf(
                 StreamingService("ard", "ARD", "pkg", "https://ard.de/video/{id}")
             )
-            val result = viewModel.resolveDeepLink(entry, services)
-            assertEquals("https://ard.de/video/77", result)
+            assertEquals("https://ard.de/video/77", viewModel.resolveDeepLink(entry, services))
         }
 
         @Test
-        fun `returns null when tmdb id is null`() {
-            val entry = TraktWatchedEntry(TraktShow("Test", 2024, TraktIds(tmdb = null)))
-            val result = viewModel.resolveDeepLink(entry, KNOWN_STREAMING_SERVICES)
-            assertNull(result)
+        fun `substitutes both tmdb_id and slug for Disney+`() {
+            val entry = TraktWatchedEntry(TraktShow("Test", 2024, TraktIds(tmdb = 5, slug = "test-show")))
+            val services = listOf(
+                StreamingService("disney", "Disney+", "pkg", "https://disney.com/series/{slug}/{tmdb_id}")
+            )
+            assertEquals("https://disney.com/series/test-show/5", viewModel.resolveDeepLink(entry, services))
+        }
+
+        // ── Services that only need a slug ────────────────────────────────────
+
+        @Test
+        fun `Joyn generates slug link without tmdb_id`() {
+            val entry = TraktWatchedEntry(TraktShow("Test Show", 2024, TraktIds(tmdb = null, slug = "test-show")))
+            val services = listOf(
+                StreamingService("joyn", "Joyn", "pkg", "https://joyn.de/serien/{slug}")
+            )
+            assertEquals("https://joyn.de/serien/test-show", viewModel.resolveDeepLink(entry, services))
         }
 
         @Test
-        fun `falls back to title-based slug when slug is null`() {
+        fun `Prime Video generates search URL without tmdb_id`() {
+            val entry = TraktWatchedEntry(TraktShow("Breaking Bad", 2008, TraktIds(tmdb = null, slug = "breaking-bad")))
+            val services = listOf(
+                StreamingService("prime", "Prime Video", "pkg", "https://www.primevideo.com/search?phrase={slug}")
+            )
+            assertEquals(
+                "https://www.primevideo.com/search?phrase=breaking-bad",
+                viewModel.resolveDeepLink(entry, services)
+            )
+        }
+
+        @Test
+        fun `ZDF generates slug link without tmdb_id`() {
+            val entry = TraktWatchedEntry(TraktShow("Tatort", 2024, TraktIds(tmdb = null, slug = "tatort")))
+            val services = listOf(
+                StreamingService("zdf", "ZDF", "pkg", "https://www.zdf.de/serien/{slug}")
+            )
+            assertEquals("https://www.zdf.de/serien/tatort", viewModel.resolveDeepLink(entry, services))
+        }
+
+        @Test
+        fun `slug-only service still works when tmdb_id is present`() {
+            val entry = TraktWatchedEntry(TraktShow("Test", 2024, TraktIds(tmdb = 99, slug = "test")))
+            val services = listOf(
+                StreamingService("joyn", "Joyn", "pkg", "https://joyn.de/serien/{slug}")
+            )
+            assertEquals("https://joyn.de/serien/test", viewModel.resolveDeepLink(entry, services))
+        }
+
+        // ── Services with no template variables ───────────────────────────────
+
+        @Test
+        fun `WaipuTV generates deep link without tmdb_id`() {
+            val entry = TraktWatchedEntry(TraktShow("Any Show", 2024, TraktIds(tmdb = null)))
+            val services = listOf(
+                StreamingService("waipu", "WaipuTV", "tv.waipu.app", "waipu://tv")
+            )
+            assertEquals("waipu://tv", viewModel.resolveDeepLink(entry, services))
+        }
+
+        @Test
+        fun `WaipuTV generates deep link even with tmdb_id present`() {
+            val entry = TraktWatchedEntry(TraktShow("Any Show", 2024, TraktIds(tmdb = 1)))
+            val services = listOf(
+                StreamingService("waipu", "WaipuTV", "tv.waipu.app", "waipu://tv")
+            )
+            assertEquals("waipu://tv", viewModel.resolveDeepLink(entry, services))
+        }
+
+        // ── Slug derivation from title ─────────────────────────────────────────
+
+        @Test
+        fun `derives slug from show title when slug field is null`() {
             val entry = TraktWatchedEntry(TraktShow("My Show", 2024, TraktIds(tmdb = 1, slug = null)))
             val services = listOf(
                 StreamingService("test", "Test", "pkg", "https://test.com/{slug}")
             )
-            val result = viewModel.resolveDeepLink(entry, services)
-            assertEquals("https://test.com/my-show", result)
+            assertEquals("https://test.com/my-show", viewModel.resolveDeepLink(entry, services))
         }
 
         @Test
-        fun `uses first subscribed service`() {
+        fun `derives slug from title for slug-only service when both slug and tmdb_id are null`() {
+            val entry = TraktWatchedEntry(TraktShow("Breaking Bad", 2008, TraktIds(tmdb = null, slug = null)))
+            val services = listOf(
+                StreamingService("joyn", "Joyn", "pkg", "https://joyn.de/serien/{slug}")
+            )
+            assertEquals("https://joyn.de/serien/breaking-bad", viewModel.resolveDeepLink(entry, services))
+        }
+
+        // ── Service priority and fallback ─────────────────────────────────────
+
+        @Test
+        fun `returns first subscribed service link when all ids available`() {
             val entry = TraktWatchedEntry(TraktShow("Test", 2024, TraktIds(tmdb = 1, slug = "test")))
             val services = listOf(
                 StreamingService("disney", "Disney+", "pkg", "https://disney.com/{tmdb_id}"),
                 StreamingService("netflix", "Netflix", "pkg", "https://netflix.com/{tmdb_id}")
             )
-            val result = viewModel.resolveDeepLink(entry, services)
-            assertEquals("https://disney.com/1", result)
+            assertEquals("https://disney.com/1", viewModel.resolveDeepLink(entry, services))
         }
 
         @Test
-        fun `falls back to first known service when subscribed list empty`() {
+        fun `skips Netflix and falls back to WaipuTV when tmdb_id is null`() {
+            val entry = TraktWatchedEntry(TraktShow("Test", 2024, TraktIds(tmdb = null, slug = "test")))
+            val services = listOf(
+                StreamingService("netflix", "Netflix", "pkg", "https://netflix.com/title/{tmdb_id}"),
+                StreamingService("waipu",   "WaipuTV", "tv.waipu.app", "waipu://tv")
+            )
+            assertEquals("waipu://tv", viewModel.resolveDeepLink(entry, services))
+        }
+
+        @Test
+        fun `skips all id-requiring services and uses first slug-only service`() {
+            val entry = TraktWatchedEntry(TraktShow("Test", 2024, TraktIds(tmdb = null, slug = "test-show")))
+            val services = listOf(
+                StreamingService("netflix", "Netflix",  "pkg", "https://netflix.com/title/{tmdb_id}"),
+                StreamingService("disney",  "Disney+",  "pkg", "https://disney.com/series/{slug}/{tmdb_id}"),
+                StreamingService("prime",   "Prime",    "pkg", "https://www.primevideo.com/search?phrase={slug}")
+            )
+            assertEquals("https://www.primevideo.com/search?phrase=test-show", viewModel.resolveDeepLink(entry, services))
+        }
+
+        @Test
+        fun `returns null only when all subscribed services need an unavailable tmdb_id`() {
+            val entry = TraktWatchedEntry(TraktShow("Test", 2024, TraktIds(tmdb = null)))
+            val services = listOf(
+                StreamingService("netflix", "Netflix", "pkg", "https://netflix.com/title/{tmdb_id}"),
+                StreamingService("ard",     "ARD",     "pkg", "https://ard.de/video/{id}")
+            )
+            assertNull(viewModel.resolveDeepLink(entry, services))
+        }
+
+        @Test
+        fun `falls back to KNOWN_STREAMING_SERVICES when subscribed list is empty and tmdb_id present`() {
             val entry = TraktWatchedEntry(TraktShow("Test", 2024, TraktIds(tmdb = 1, slug = "test")))
             val result = viewModel.resolveDeepLink(entry, emptyList())
-            // Should use first KNOWN_STREAMING_SERVICES (netflix)
+            // Netflix is first in KNOWN_STREAMING_SERVICES and tmdb_id is available
             assertNotNull(result)
             assertTrue(result!!.contains("1"))
+        }
+
+        @Test
+        fun `falls back to slug-only service in KNOWN_STREAMING_SERVICES when tmdb_id is null`() {
+            val entry = TraktWatchedEntry(TraktShow("Test Show", 2024, TraktIds(tmdb = null, slug = "test-show")))
+            val result = viewModel.resolveDeepLink(entry, emptyList())
+            // Netflix and Disney+ fail (need tmdb_id); Prime Video succeeds with slug
+            assertNotNull(result)
+            assertTrue(result!!.contains("test-show"))
         }
     }
 }
