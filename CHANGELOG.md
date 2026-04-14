@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.2](https://github.com/justb81/watchbuddy/compare/v0.7.1...v0.7.2) (2026-04-14)
+
+
+### Bug Fixes
+
+* **tv:** resolve deep links for slug-only and no-variable services when tmdb_id is absent ([#152](https://github.com/justb81/watchbuddy/issues/152)) ([d98b52b](https://github.com/justb81/watchbuddy/commit/d98b52bc16fea02123312b6b9c7764b210d1e19d))
+* use draft status for Play Store uploads on pre-1.0.0 releases ([#153](https://github.com/justb81/watchbuddy/issues/153)) ([690724c](https://github.com/justb81/watchbuddy/commit/690724c19c408afef9955a65f9b32b386f02316b))
+
 ## [0.7.1](https://github.com/justb81/watchbuddy/compare/v0.7.0...v0.7.1) (2026-04-14)
 
 
