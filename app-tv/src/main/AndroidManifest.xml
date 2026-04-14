@@ -14,9 +14,11 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
 
-    <!-- Play Store: TV app — no touchscreen required -->
+    <!-- Play Store: TV app — no touchscreen, leanback required for correct
+         multi-APK device targeting (prevents phone devices from receiving the
+         TV AAB which has a higher versionCode). -->
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
-    <uses-feature android:name="android.software.leanback" android:required="false" />
+    <uses-feature android:name="android.software.leanback" android:required="true" />
 
     <!-- 64-bit required from August 2026 (arm64 only) -->
     <uses-feature android:name="android.hardware.type.television" android:required="false" />
