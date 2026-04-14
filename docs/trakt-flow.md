@@ -48,7 +48,7 @@ This document describes the full user journey and technical flow for connecting 
    └──────────────────┘                       └───────────────────┘
 ```
 
-The phone app owns the Trakt connection. The TV app has **no Trakt credentials** — it discovers the phone on the local network, borrows its access token, and uses that token for scrobbling and show lookups.
+The phone app owns the Trakt connection. The TV app has **no Trakt credentials** — it discovers all phones on the local network, borrows each phone's access token, and uses those tokens for scrobbling (one Trakt call per connected user) and show lookups.
 
 ---
 
@@ -186,18 +186,23 @@ Rank phone:  score = modelQuality (0–150) + ramBonus (0–10)
     │  RAM bonus:  ≥6 GB → +10  |  4–6 GB → +6  |  3–4 GB → +3  |  <3 GB → 0
     │
     ▼
-getBestPhone() → highest-scoring phone
+getBestPhone() → highest-scoring phone (used for single-token ops like search)
     │
     ▼
-TvTokenCache.getToken()
-    ├── Check in-memory cache (30-min TTL)
-    └── If expired → GET http://{bestPhone}:8765/auth/token
-                          │
-                          ▼
-                     Response: { "accessToken": "..." }
-                          │
-                          ▼
-                     Cache token in memory with timestamp
+TvTokenCache — per-phone token cache (ConcurrentHashMap, 30-min TTL per phone)
+    │
+    ├── getToken()       → token for best phone only   (Trakt search)
+    └── getAllTokens()   → tokens for ALL available phones  (scrobbling)
+              │
+              └── For each available phone in parallel:
+                    Check per-phone cache (30-min TTL)
+                    If expired → GET http://{phone}:8765/auth/token
+                                      │
+                                      ▼
+                                 Response: { "accessToken": "..." }
+                                      │
+                                      ▼
+                                 Cache token keyed by phone baseUrl
 ```
 
 ### Key Classes
@@ -301,6 +306,7 @@ matchTitleToTrakt() — two-tier fuzzy matching:
     │     If score ≥ 0.70 → use cached match
     │
     └── Tier 2: Trakt API fallback
+          TvTokenCache.getToken() → token from best phone
           GET https://api.trakt.tv/search/show?query={title}&limit=5 (Bearer token)
           If best result score ≥ 0.50 → use API match
     │
@@ -308,21 +314,24 @@ matchTitleToTrakt() — two-tier fuzzy matching:
 Create ScrobbleCandidate { packageName, mediaTitle, confidence, matchedShow, matchedEpisode }
     │
     ├── confidence ≥ 0.95 → autoScrobble()
-    │     POST https://api.trakt.tv/scrobble/start
-    │       Body: { show, episode, progress: 0.0 }
+    │     TvTokenCache.getAllTokens() → tokens for ALL connected phones
+    │     For each phone token (in parallel):
+    │       POST https://api.trakt.tv/scrobble/start
+    │         Body: { show, episode, progress: 0.0 }
+    │       Failure for one user does not block the others
     │
     ├── confidence 0.70–0.95 → emit to pendingConfirmation SharedFlow
     │     │
     │     ▼
     │   ScrobbleViewModel collects → ScrobbleOverlay displayed
     │     │
-    │     ├── User confirms → autoScrobble()
+    │     ├── User confirms → autoScrobble()  (same multi-user flow above)
     │     ├── User dismisses → remembered in session (won't re-show)
     │     └── 15s timeout → auto-confirms
     │
     └── confidence < 0.70 → ignored
 
-Playback state changes:
+Playback state changes (each fires for ALL connected phones in parallel):
     ├── PLAYING  → scrobbleStart()  { progress: 0.0 }
     ├── PAUSED   → scrobblePause()  { progress: 50.0 }
     └── STOPPED  → scrobbleStop()   { progress: 100.0 }  ← marks episode as watched
@@ -332,7 +341,8 @@ Playback state changes:
 
 | Class | Responsibility |
 |-------|----------------|
-| `MediaSessionScrobbler` | Polls media sessions, fuzzy matches, scrobbles to Trakt |
+| `MediaSessionScrobbler` | Polls media sessions, fuzzy matches, scrobbles to Trakt for all connected users |
+| `TvTokenCache` | Per-phone token cache; `getToken()` for best phone, `getAllTokens()` for all phones |
 | `TvShowCache` | In-memory show cache for first-pass matching |
 | `ScrobbleViewModel` | Bridges pending confirmations to the overlay UI |
 | `ScrobbleOverlay` | Composable confirmation overlay (D-pad navigable) |
@@ -444,17 +454,21 @@ fun resolveClientId(authMode, backendUrl, directClientId): String? = when (authM
 ### Token Flow Across Devices
 
 ```
-Phone (owns token)                    TV (borrows token)
-─────────────────                    ──────────────────
-TokenRepository                      TvTokenCache
-  │                                    │
-  │  access_token in Keystore          │  In-memory, 30-min TTL
-  │  refresh_token in Keystore         │
-  │                                    │  On cache miss:
-  │◄───── GET /auth/token ────────────│    GET http://{phone}:8765/auth/token
-  │                                    │
-  ▼                                    ▼
-  Returns current access_token         Caches and uses for Trakt API calls
+Phone A (Alice)  Phone B (Bob)       TV (borrows tokens)
+───────────────  ─────────────       ───────────────────
+TokenRepository  TokenRepository     TvTokenCache
+  │                │                   │
+  │  token in      │  token in         │  Per-phone ConcurrentHashMap
+  │  Keystore      │  Keystore         │  30-min TTL per phone
+  │                │                   │
+  │                │                   │  getToken()    → best phone only (search)
+  │                │                   │  getAllTokens() → all available phones (scrobble)
+  │                │                   │
+  │◄── GET /auth/token ───────────────│   On cache miss per phone:
+  │                │◄── GET /auth/token│     GET http://{phone}:8765/auth/token
+  ▼                ▼                   ▼
+  Alice's token    Bob's token         Both cached and used independently
+                                       for parallel Trakt scrobble calls
 ```
 
 ### Refresh
@@ -518,41 +532,45 @@ The `TraktApiService` and `TokenProxyService` both define refresh endpoints (`PO
   │◄───────────────│                │                │
 ```
 
-### Full Scrobble Sequence
+### Full Scrobble Sequence (multi-user)
 
 ```
- Streaming App    TV Scrobbler     Phone             Trakt API
-  │                │                │                │
-  │  Playing       │                │                │
-  │  media session │                │                │
-  │───────────────►│                │                │
-  │                │  Extract title + package        │
-  │                │                │                │
-  │                │  Fuzzy match (local cache)      │
-  │                │  Score: 0.97 (auto-scrobble)    │
-  │                │                │                │
-  │                │  Need token    │                │
-  │                │  GET /auth/token│               │
-  │                │───────────────►│                │
-  │                │◄───────────────│                │
-  │                │  { accessToken }│               │
-  │                │                │                │
-  │                │  POST /scrobble/start           │
-  │                │  { show, episode, progress: 0 } │
-  │                │────────────────────────────────►│
-  │                │◄────────────────────────────────│
-  │                │                │                │
-  │  Paused        │                │                │
-  │───────────────►│                │                │
-  │                │  POST /scrobble/pause           │
-  │                │  { progress: 50 }               │
-  │                │────────────────────────────────►│
-  │                │                │                │
-  │  Stopped       │                │                │
-  │───────────────►│                │                │
-  │                │  POST /scrobble/stop            │
-  │                │  { progress: 100 }  ← watched  │
-  │                │────────────────────────────────►│
+ Streaming App    TV Scrobbler    Phone A (Alice)   Phone B (Bob)    Trakt API
+  │                │                │                │                │
+  │  Playing       │                │                │                │
+  │  media session │                │                │                │
+  │───────────────►│                │                │                │
+  │                │  Extract title + package        │                │
+  │                │                │                │                │
+  │                │  Fuzzy match (local cache)      │                │
+  │                │  Score: 0.97 → auto-scrobble    │                │
+  │                │                │                │                │
+  │                │  getAllTokens() — fetch from all phones in parallel
+  │                │  GET /auth/token│               │                │
+  │                │───────────────►│                │                │
+  │                │  GET /auth/token│               │                │
+  │                │────────────────────────────────►│                │
+  │                │◄───────────────│                │                │
+  │                │  { Alice token }│               │                │
+  │                │◄────────────────────────────────│                │
+  │                │                │  { Bob token } │                │
+  │                │                │                │                │
+  │                │  POST /scrobble/start (Alice)   │                │
+  │                │  { show, episode, progress: 0 } │                │
+  │                │────────────────────────────────────────────────►│
+  │                │  POST /scrobble/start (Bob) ← parallel          │
+  │                │────────────────────────────────────────────────►│
+  │                │◄────────────────────────────────────────────────│
+  │                │                │                │                │
+  │  Paused        │                │                │                │
+  │───────────────►│                │                │                │
+  │                │  POST /scrobble/pause (Alice + Bob, parallel)   │
+  │                │────────────────────────────────────────────────►│
+  │                │                │                │                │
+  │  Stopped       │                │                │                │
+  │───────────────►│                │                │                │
+  │                │  POST /scrobble/stop (Alice + Bob) ← watched   │
+  │                │────────────────────────────────────────────────►│
 ```
 
 ---
@@ -585,7 +603,7 @@ The `TraktApiService` and `TokenProxyService` both define refresh endpoints (`PO
 | `app-tv/.../discovery/PhoneDiscoveryManager.kt` | NSD listener, phone ranking |
 | `app-tv/.../discovery/PhoneApiService.kt` | Retrofit interface for phone HTTP API |
 | `app-tv/.../discovery/PhoneApiClientFactory.kt` | Per-phone Retrofit client factory |
-| `app-tv/.../scrobbler/TvTokenCache.kt` | In-memory token cache (30-min TTL) |
+| `app-tv/.../scrobbler/TvTokenCache.kt` | Per-phone token cache (ConcurrentHashMap, 30-min TTL); `getAllTokens()` for multi-user scrobbling |
 
 ### TV App — Scrobbling
 

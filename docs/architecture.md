@@ -97,17 +97,25 @@ Package name + media title extracted
     │
     ▼
 Fuzzy match against local show cache (Levenshtein distance)
-    │ Falls back to Trakt API search if no good cache match
+    │ Falls back to Trakt API search via best phone if no good cache match
     │
-    ├── Confidence ≥ 95% → auto-scrobble (Trakt /scrobble/start)
+    ├── Confidence ≥ 95% → auto-scrobble
+    │                           │
+    │                     For each connected phone:
+    │                       fetch token → Trakt /scrobble/start
+    │                       (parallel, failures isolated per user)
     │
     ├── Confidence 70–95% → ScrobbleOverlay: user confirms or rejects
     │                           │
-    │                      Confirmed → scrobble
-    │                      Rejected → ignore
+    │                      Confirmed → scrobble all connected users (same parallel flow)
+    │                      Rejected  → ignore
     │
     └── Confidence < 70% → ignored
 ```
+
+Multi-user: when multiple phones are connected, each user's watch history is recorded
+independently — one Trakt scrobble call per phone, in parallel. A failure for one user
+does not block the others.
 
 ## Secret Storage Strategy
 
