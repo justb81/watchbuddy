@@ -14,6 +14,7 @@ import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
+import java.util.concurrent.TimeUnit
 import javax.inject.Named
 import javax.inject.Singleton
 
@@ -55,6 +56,22 @@ object NetworkModule {
             level = if (isDebug) HttpLoggingInterceptor.Level.BODY
                     else HttpLoggingInterceptor.Level.NONE
         })
+        .build()
+
+    /**
+     * Plain OkHttpClient for large file downloads (e.g. LLM models from Hugging Face).
+     *
+     * Intentionally omits all API-specific configuration: no logging interceptor
+     * (which would buffer the entire response body in memory, causing OOM on
+     * multi-GB downloads), no certificate pinning (not needed for CDN hosts),
+     * and no Trakt headers.
+     */
+    @Provides
+    @Singleton
+    @Named("download")
+    fun provideDownloadClient(): OkHttpClient = OkHttpClient.Builder()
+        .connectTimeout(30, TimeUnit.SECONDS)
+        .readTimeout(60, TimeUnit.SECONDS)
         .build()
 
     @Provides
