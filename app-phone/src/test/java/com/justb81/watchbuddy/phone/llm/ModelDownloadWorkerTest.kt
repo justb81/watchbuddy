@@ -31,6 +31,8 @@ class ModelDownloadWorkerTest {
 
     companion object {
         private const val MODEL_FILENAME = "gemma-4-E2B-it.litertlm"
+        // 1 MB + 1 byte — just over the validation threshold so successful downloads pass
+        private val VALID_MODEL_CONTENT = "x".repeat(1_048_577)
     }
 
     private lateinit var server: MockWebServer
@@ -84,11 +86,10 @@ class ModelDownloadWorkerTest {
 
         @Test
         fun `downloads file using dedicated download client`() = runTest {
-            val content = "model binary data"
             server.enqueue(
                 MockResponse()
-                    .setBody(content)
-                    .setHeader("Content-Length", content.length)
+                    .setBody(VALID_MODEL_CONTENT)
+                    .setHeader("Content-Length", VALID_MODEL_CONTENT.length)
             )
 
             val worker = createWorker(server.url("/model.bin").toString())
@@ -101,12 +102,12 @@ class ModelDownloadWorkerTest {
 
             val outputFile = File(tempDir, MODEL_FILENAME)
             assertTrue(outputFile.exists())
-            assertEquals(content, outputFile.readText())
+            assertEquals(VALID_MODEL_CONTENT.length.toLong(), outputFile.length())
         }
 
         @Test
         fun `sets model ready on successful download`() = runTest {
-            server.enqueue(MockResponse().setBody("data"))
+            server.enqueue(MockResponse().setBody(VALID_MODEL_CONTENT))
 
             val worker = createWorker(server.url("/model.bin").toString())
             worker.doWork()
@@ -230,18 +231,17 @@ class ModelDownloadWorkerTest {
 
         @Test
         fun `succeeds when content-length matches downloaded bytes`() = runTest {
-            val content = "exact content"
             server.enqueue(
                 MockResponse()
-                    .setBody(content)
-                    .setHeader("Content-Length", content.length)
+                    .setBody(VALID_MODEL_CONTENT)
+                    .setHeader("Content-Length", VALID_MODEL_CONTENT.length)
             )
 
             val worker = createWorker(server.url("/model.bin").toString())
             val result = worker.doWork()
 
             assertTrue(result is Result.Success)
-            assertEquals(content, File(tempDir, MODEL_FILENAME).readText())
+            assertEquals(VALID_MODEL_CONTENT.length.toLong(), File(tempDir, MODEL_FILENAME).length())
         }
     }
 
