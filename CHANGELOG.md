@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.7.0](https://github.com/justb81/watchbuddy/compare/v0.6.1...v0.7.0) (2026-04-14)
+
+
+### Features
+
+* **ci:** automate Google Play Store publishing via release workflow ([#145](https://github.com/justb81/watchbuddy/issues/145)) ([70018f0](https://github.com/justb81/watchbuddy/commit/70018f0cb5c6e88b695c10da975d7cb827eb1cab))
+* **phone:** default TMDB API key + clickable registration link ([#142](https://github.com/justb81/watchbuddy/issues/142)) ([8023204](https://github.com/justb81/watchbuddy/commit/802320423118e910f90e9366eacd95ced17db33c))
+
+
+### Bug Fixes
+
+* **phone:** group advanced settings by function and fix toggle label ([#144](https://github.com/justb81/watchbuddy/issues/144)) ([dd163be](https://github.com/justb81/watchbuddy/commit/dd163be82c580a615f67314367f8238f705a9953)), closes [#134](https://github.com/justb81/watchbuddy/issues/134)
+
 ## [0.6.1](https://github.com/justb81/watchbuddy/compare/v0.6.0...v0.6.1) (2026-04-14)
 
 
