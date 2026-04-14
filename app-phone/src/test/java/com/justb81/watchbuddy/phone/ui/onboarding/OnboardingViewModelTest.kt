@@ -110,7 +110,8 @@ class OnboardingViewModelTest {
 
             val vm = createViewModel()
             vm.requestDeviceCode()
-            advanceUntilIdle()
+            // Don't advanceUntilIdle — the countdown coroutine would expire the code.
+            // With UnconfinedTestDispatcher, state is already set eagerly.
 
             val state = vm.state.value
             assertTrue(state is OnboardingState.WaitingForPin)
@@ -153,7 +154,6 @@ class OnboardingViewModelTest {
 
             val vm = createViewModel()
             vm.requestDeviceCode()
-            advanceUntilIdle()
 
             val state = vm.state.value
             assertTrue(state is OnboardingState.WaitingForPin)
@@ -200,7 +200,6 @@ class OnboardingViewModelTest {
 
             val vm = createViewModel()
             vm.requestDeviceCode()
-            advanceUntilIdle()
 
             val state = vm.state.value
             assertTrue(state is OnboardingState.WaitingForPin)
