@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.5.1](https://github.com/justb81/watchbuddy/compare/v0.5.0...v0.5.1) (2026-04-14)
+
+
+### Bug Fixes
+
+* **onboarding:** improve NotConfigured state with specific reasons and error UI ([#125](https://github.com/justb81/watchbuddy/issues/125)) ([2f22d79](https://github.com/justb81/watchbuddy/commit/2f22d792644579cc230780a665500d8347af5304))
+* **scrobble:** scrobble to Trakt for all connected users, not just the best phone ([#124](https://github.com/justb81/watchbuddy/issues/124)) ([11b2b44](https://github.com/justb81/watchbuddy/commit/11b2b442f000bf6214b275937be0f79e312bef4d))
+* **tmdb:** fix Prime Video deep link, remove dead code, add response cache ([#122](https://github.com/justb81/watchbuddy/issues/122)) ([3e75fdb](https://github.com/justb81/watchbuddy/commit/3e75fdb7f77fa76defea2b244d396c9529c96638))
+* **tv:** surface actionable error messages when companion phone is unreachable ([#126](https://github.com/justb81/watchbuddy/issues/126)) ([5372014](https://github.com/justb81/watchbuddy/commit/5372014ba7876c0f97e637bf3ca98d5a61939d4f))
+
 ## [0.5.0](https://github.com/justb81/watchbuddy/compare/v0.4.0...v0.5.0) (2026-04-14)
 
 
