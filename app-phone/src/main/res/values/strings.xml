@@ -50,7 +50,12 @@
     <string name="settings_tmdb_account">TMDB account</string>
     <string name="settings_tmdb_connected">Connected</string>
     <string name="settings_tmdb_api_key">TMDB API key (v3 auth)</string>
-    <string name="settings_tmdb_helper">Get your free API key at themoviedb.org under Settings → API.</string>
+    <string name="settings_tmdb_helper">Get your free API key at themoviedb.org → Settings → API</string>
+    <string name="settings_tmdb_helper_link">Get API key</string>
+    <string name="settings_tmdb_api_url" translatable="false">https://www.themoviedb.org/settings/api</string>
+    <string name="settings_tmdb_default_key_active">Built-in key active</string>
+    <string name="settings_tmdb_default_key_hint">A built-in TMDB key is active. You can optionally enter your own key below to override it.</string>
+    <string name="settings_tmdb_attribution" translatable="false">This app uses the TMDB API but is not endorsed or certified by TMDB.</string>
     <string name="settings_disconnect">Disconnect</string>
     <string name="settings_companion">Companion service</string>
     <string name="settings_companion_running">Running (port 8765)</string>

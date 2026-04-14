@@ -36,6 +36,16 @@ android {
             "String", "TOKEN_BACKEND_URL",
             "\"${providers.environmentVariable("TOKEN_BACKEND_URL").orElse("").get()}\""
         )
+
+        // ── TMDB configuration ────────────────────────────────────────────────
+        // A default TMDB API v3 key bundled at build time so the app works out of
+        // the box without requiring users to supply their own key.  Users can still
+        // override it in Settings.  Set via the TMDB_API_KEY CI secret; leave empty
+        // in development builds to force users through the settings flow.
+        buildConfigField(
+            "String", "DEFAULT_TMDB_API_KEY",
+            "\"${providers.environmentVariable("TMDB_API_KEY").orElse("").get()}\""
+        )
     }
 
     // CI signing: keystore path + credentials via environment variables.

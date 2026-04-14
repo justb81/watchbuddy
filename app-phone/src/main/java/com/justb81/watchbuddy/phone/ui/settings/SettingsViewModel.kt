@@ -33,6 +33,8 @@ data class SettingsUiState(
     val traktUsername: String?     = null,
     val tmdbConnected: Boolean     = false,
     val tmdbApiKey: String         = "",
+    /** True when the build ships a default TMDB API key and the user has not set a custom one. */
+    val defaultTmdbApiKeyAvailable: Boolean = false,
     val companionRunning: Boolean  = false,
     val authMode: AuthMode         = AuthMode.MANAGED,
     val customBackendUrl: String   = "",
@@ -98,7 +100,8 @@ class SettingsViewModel @Inject constructor(
                 companionRunning = saved.companionEnabled,
                 modelDownloadUrl = saved.modelDownloadUrl,
                 tmdbApiKey = saved.tmdbApiKey,
-                tmdbConnected = saved.tmdbApiKey.isNotBlank()
+                tmdbConnected = saved.tmdbApiKey.isNotBlank(),
+                defaultTmdbApiKeyAvailable = saved.defaultTmdbApiKeyAvailable && saved.tmdbApiKey.isBlank()
             )
         }
     }
@@ -194,6 +197,7 @@ class SettingsViewModel @Inject constructor(
             settingsRepository.saveSettings(current.copy(tmdbApiKey = key))
             _uiState.value = _uiState.value.copy(
                 tmdbConnected = key.isNotBlank(),
+                defaultTmdbApiKeyAvailable = key.isBlank() && current.defaultTmdbApiKeyAvailable,
                 saveSuccess = true
             )
         }
@@ -205,7 +209,8 @@ class SettingsViewModel @Inject constructor(
             settingsRepository.saveSettings(current.copy(tmdbApiKey = ""))
             _uiState.value = _uiState.value.copy(
                 tmdbApiKey = "",
-                tmdbConnected = false
+                tmdbConnected = false,
+                defaultTmdbApiKeyAvailable = current.defaultTmdbApiKeyAvailable
             )
         }
     }
