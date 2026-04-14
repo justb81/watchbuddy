@@ -131,6 +131,97 @@ class TmdbCacheTest {
     }
 
     @Nested
+    @DisplayName("TTL expiry")
+    inner class TtlTest {
+
+        private val baseTime = 1_000_000L
+        private var fakeTime = baseTime
+
+        @BeforeEach
+        fun setUpClock() {
+            fakeTime = baseTime
+            cache.timeSource = { fakeTime }
+        }
+
+        @Test
+        fun `getShow returns entry just before TTL expires`() {
+            cache.putShow(1, TmdbShow(1, "Breaking Bad"))
+            fakeTime = baseTime + TmdbCache.TTL_MS - 1
+            assertNotNull(cache.getShow(1))
+        }
+
+        @Test
+        fun `getShow returns null at TTL boundary`() {
+            cache.putShow(1, TmdbShow(1, "Breaking Bad"))
+            fakeTime = baseTime + TmdbCache.TTL_MS
+            assertNull(cache.getShow(1))
+        }
+
+        @Test
+        fun `getShow returns null after TTL expires`() {
+            cache.putShow(1, TmdbShow(1, "Breaking Bad"))
+            fakeTime = baseTime + TmdbCache.TTL_MS + 1
+            assertNull(cache.getShow(1))
+        }
+
+        @Test
+        fun `getShow removes expired entry from cache`() {
+            cache.putShow(1, TmdbShow(1, "Test"))
+            fakeTime = baseTime + TmdbCache.TTL_MS + 1
+            cache.getShow(1) // triggers eviction
+            // A fresh put at current time should work
+            cache.putShow(1, TmdbShow(1, "Fresh"))
+            assertNotNull(cache.getShow(1))
+        }
+
+        @Test
+        fun `putShow refreshes TTL on overwrite`() {
+            cache.putShow(1, TmdbShow(1, "Original"))
+            // Advance close to expiry, then overwrite
+            fakeTime = baseTime + TmdbCache.TTL_MS - 100
+            cache.putShow(1, TmdbShow(1, "Updated"))
+            // Advance past the original TTL — new entry should still be valid
+            fakeTime = baseTime + TmdbCache.TTL_MS + 1
+            val result = cache.getShow(1)
+            assertNotNull(result)
+            assertEquals("Updated", result!!.name)
+        }
+
+        @Test
+        fun `getEpisode returns entry just before TTL expires`() {
+            cache.putEpisode(100, 1, 1, TmdbEpisode(1, "Pilot", null, null, 1, 1))
+            fakeTime = baseTime + TmdbCache.TTL_MS - 1
+            assertNotNull(cache.getEpisode(100, 1, 1))
+        }
+
+        @Test
+        fun `getEpisode returns null at TTL boundary`() {
+            cache.putEpisode(100, 1, 1, TmdbEpisode(1, "Pilot", null, null, 1, 1))
+            fakeTime = baseTime + TmdbCache.TTL_MS
+            assertNull(cache.getEpisode(100, 1, 1))
+        }
+
+        @Test
+        fun `getEpisode returns null after TTL expires`() {
+            cache.putEpisode(100, 1, 1, TmdbEpisode(1, "Pilot", null, null, 1, 1))
+            fakeTime = baseTime + TmdbCache.TTL_MS + 1
+            assertNull(cache.getEpisode(100, 1, 1))
+        }
+
+        @Test
+        fun `TTL expiry is independent per entry`() {
+            cache.putShow(1, TmdbShow(1, "Show A"))
+            fakeTime = baseTime + 1000
+            cache.putShow(2, TmdbShow(2, "Show B"))
+
+            // Advance past Show A's TTL but not Show B's
+            fakeTime = baseTime + TmdbCache.TTL_MS + 500
+            assertNull(cache.getShow(1))     // Show A expired
+            assertNotNull(cache.getShow(2))  // Show B still valid (its TTL is TTL_MS - 500 ms away)
+        }
+    }
+
+    @Nested
     @DisplayName("clear")
     inner class ClearTest {
 
