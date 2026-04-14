@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.1](https://github.com/justb81/watchbuddy/compare/v0.6.0...v0.6.1) (2026-04-14)
+
+
+### Bug Fixes
+
+* **ci:** pass Trakt secrets to Gradle build steps ([#136](https://github.com/justb81/watchbuddy/issues/136)) ([c5c105d](https://github.com/justb81/watchbuddy/commit/c5c105d3504e5b6a3326cc40798885620636c9ab)), closes [#135](https://github.com/justb81/watchbuddy/issues/135)
+
 ## [0.6.0](https://github.com/justb81/watchbuddy/compare/v0.5.1...v0.6.0) (2026-04-14)
 
 
