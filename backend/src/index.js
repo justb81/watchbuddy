@@ -17,18 +17,24 @@
 import 'dotenv/config';
 import { createApp } from './app.js';
 
-const { TRAKT_CLIENT_ID, TRAKT_CLIENT_SECRET, PORT = 3000 } = process.env;
+const { TRAKT_CLIENT_ID, TRAKT_CLIENT_SECRET, PORT = 3000, DEBUG_MODE } = process.env;
 
 if (!TRAKT_CLIENT_ID || !TRAKT_CLIENT_SECRET) {
   console.error('ERROR: TRAKT_CLIENT_ID and TRAKT_CLIENT_SECRET must be set in .env');
   process.exit(1);
 }
 
+const debug = DEBUG_MODE === 'true';
+
 const app = createApp({
   clientId: TRAKT_CLIENT_ID,
   clientSecret: TRAKT_CLIENT_SECRET,
+  debug,
 });
 
 app.listen(PORT, () => {
   console.log(`WatchBuddy token proxy running on port ${PORT}`);
+  if (debug) {
+    console.log('Debug mode enabled — request logging is active');
+  }
 });

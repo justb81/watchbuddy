@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../app.js';
 
@@ -337,5 +337,76 @@ describe('Unknown routes', () => {
     const app = buildApp(mockFetch(200, {}));
     const res = await request(app).get('/does-not-exist');
     expect(res.status).toBe(404);
+  });
+});
+
+// ── Debug logging ───────────────────────────────────────────────────────────
+
+describe('Debug logging (debug: true)', () => {
+  let debugSpy;
+
+  beforeEach(() => {
+    debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    debugSpy.mockRestore();
+  });
+
+  it('logs a debug line for GET /health when debug is enabled', async () => {
+    const app = buildApp(mockFetch(200, {}), { debug: true });
+    await request(app).get('/health');
+    expect(debugSpy).toHaveBeenCalledOnce();
+    expect(debugSpy.mock.calls[0][0]).toMatch(/\[DEBUG\].*GET.*\/health.*200/);
+  });
+
+  it('log line includes method, path, status, and timing', async () => {
+    const app = buildApp(mockFetch(200, {}), { debug: true });
+    await request(app).post('/trakt/token').send({ code: 'device-code-abc' });
+    expect(debugSpy).toHaveBeenCalledOnce();
+    const msg = debugSpy.mock.calls[0][0];
+    expect(msg).toMatch(/\[DEBUG\]/);
+    expect(msg).toMatch(/POST/);
+    expect(msg).toMatch(/\/trakt\/token/);
+    expect(msg).toMatch(/200/);
+    expect(msg).toMatch(/\d+ms/);
+  });
+
+  it('logs debug line even when the endpoint returns an error status', async () => {
+    const app = buildApp(mockFetch(400, { error: 'invalid_grant' }), { debug: true });
+    await request(app).post('/trakt/token').send({ code: 'bad-code' });
+    expect(debugSpy).toHaveBeenCalledOnce();
+    expect(debugSpy.mock.calls[0][0]).toMatch(/400/);
+  });
+
+  it('logs one line per request for multiple requests', async () => {
+    const app = buildApp(mockFetch(200, {}), { debug: true });
+    await request(app).get('/health');
+    await request(app).get('/health');
+    expect(debugSpy).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('Debug logging (debug: false / default)', () => {
+  let debugSpy;
+
+  beforeEach(() => {
+    debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    debugSpy.mockRestore();
+  });
+
+  it('does not log any debug output when debug is disabled (explicit false)', async () => {
+    const app = buildApp(mockFetch(200, {}), { debug: false });
+    await request(app).get('/health');
+    expect(debugSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not log any debug output when debug option is omitted', async () => {
+    const app = buildApp(mockFetch(200, {}));
+    await request(app).get('/health');
+    expect(debugSpy).not.toHaveBeenCalled();
   });
 });

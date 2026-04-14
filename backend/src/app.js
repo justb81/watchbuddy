@@ -35,6 +35,7 @@ function validateField(value, fieldName) {
  * @param {string} [config.traktApi]   - Trakt API base URL (default: https://api.trakt.tv)
  * @param {Function} [config.fetchFn]  - fetch implementation (default: global fetch)
  * @param {number} [config.fetchTimeoutMs] - Upstream fetch timeout in ms (default: 15000)
+ * @param {boolean} [config.debug]     - Enable request debug logging (default: false)
  * @returns {import('express').Express}
  */
 export function createApp(config) {
@@ -44,6 +45,7 @@ export function createApp(config) {
     traktApi = 'https://api.trakt.tv',
     fetchFn = fetch,
     fetchTimeoutMs = 15_000,
+    debug = false,
   } = config;
 
   async function fetchWithTimeout(url, options) {
@@ -59,6 +61,20 @@ export function createApp(config) {
   const app = express();
   app.use(helmet());
   app.use(express.json());
+
+  if (debug) {
+    app.use((req, res, next) => {
+      const start = Date.now();
+      const ip = req.ip ?? req.socket?.remoteAddress ?? 'unknown';
+      res.on('finish', () => {
+        const ms = Date.now() - start;
+        console.debug(
+          `[DEBUG] ${new Date().toISOString()} ${req.method} ${req.path} from ${ip} \u2192 ${res.statusCode} (${ms}ms)`,
+        );
+      });
+      next();
+    });
+  }
 
   // Rate limiting — Trakt allows 1000 calls/5min per app
   const limiter = rateLimit({
