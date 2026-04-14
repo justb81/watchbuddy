@@ -4,6 +4,7 @@ import android.util.Log
 import com.justb81.watchbuddy.core.locale.LocaleHelper
 import com.justb81.watchbuddy.core.tmdb.TmdbApiService
 import com.justb81.watchbuddy.core.tmdb.TmdbCache
+import com.justb81.watchbuddy.phone.auth.TokenRefreshManager
 import com.justb81.watchbuddy.phone.auth.TokenRepository
 import com.justb81.watchbuddy.phone.llm.RecapGenerator
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
@@ -45,6 +46,7 @@ class CompanionHttpServer @Inject constructor(
     private val capabilityProvider: DeviceCapabilityProvider,
     private val showRepository: ShowRepository,
     private val tokenRepository: TokenRepository,
+    private val tokenRefreshManager: TokenRefreshManager,
     private val tmdbApiService: TmdbApiService,
     private val tmdbCache: TmdbCache,
     private val settingsRepository: SettingsRepository
@@ -59,7 +61,7 @@ class CompanionHttpServer @Inject constructor(
         server = embeddedServer(Netty, port = PORT) {
             configureCompanionRoutes(
                 recapGenerator, capabilityProvider, showRepository,
-                tokenRepository, tmdbApiService, tmdbCache, settingsRepository
+                tokenRepository, tokenRefreshManager, tmdbApiService, tmdbCache, settingsRepository
             )
         }.start(wait = false)
     }
@@ -79,6 +81,7 @@ internal fun Application.configureCompanionRoutes(
     capabilityProvider: DeviceCapabilityProvider,
     showRepository: ShowRepository,
     tokenRepository: TokenRepository,
+    tokenRefreshManager: TokenRefreshManager,
     tmdbApiService: TmdbApiService,
     tmdbCache: TmdbCache,
     settingsRepository: SettingsRepository
@@ -186,7 +189,7 @@ internal fun Application.configureCompanionRoutes(
         }
 
         get("/auth/token") {
-            val token = tokenRepository.getAccessToken()
+            val token = tokenRefreshManager.getValidAccessToken()
                 ?: return@get call.respond(HttpStatusCode.Unauthorized, ErrorResponse("No access token"))
             call.respond(TokenResponse(accessToken = token))
         }

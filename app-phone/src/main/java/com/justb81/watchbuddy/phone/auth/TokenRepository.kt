@@ -40,6 +40,18 @@ class TokenRepository(context: Context) {
         return System.currentTimeMillis() < expiresAt
     }
 
+    /**
+     * Returns `true` when the access token is missing, blank, already expired, or will
+     * expire within [bufferMs] milliseconds. Used by [TokenRefreshManager] to trigger a
+     * proactive refresh before the token actually expires.
+     */
+    fun isTokenExpiredOrExpiringSoon(bufferMs: Long): Boolean {
+        val token = getAccessToken()
+        if (token.isNullOrBlank()) return true
+        val expiresAt = prefs.getLong(KEY_EXPIRES_AT, 0L)
+        return System.currentTimeMillis() + bufferMs >= expiresAt
+    }
+
     fun clearTokens() {
         prefs.edit()
             .remove(KEY_ACCESS_TOKEN)

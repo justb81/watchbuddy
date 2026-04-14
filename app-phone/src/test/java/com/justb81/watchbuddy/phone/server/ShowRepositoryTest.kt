@@ -4,7 +4,7 @@ import com.justb81.watchbuddy.core.model.TraktIds
 import com.justb81.watchbuddy.core.model.TraktShow
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
 import com.justb81.watchbuddy.core.trakt.TraktApiService
-import com.justb81.watchbuddy.phone.auth.TokenRepository
+import com.justb81.watchbuddy.phone.auth.TokenRefreshManager
 import io.mockk.*
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.*
@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test
 class ShowRepositoryTest {
 
     private val traktApi: TraktApiService = mockk()
-    private val tokenRepository: TokenRepository = mockk()
+    private val tokenRefreshManager: TokenRefreshManager = mockk()
     private lateinit var repository: ShowRepository
 
     private val testShows = listOf(
@@ -26,12 +26,12 @@ class ShowRepositoryTest {
 
     @BeforeEach
     fun setUp() {
-        repository = ShowRepository(traktApi, tokenRepository)
+        repository = ShowRepository(traktApi, tokenRefreshManager)
     }
 
     @Test
     fun `getShows fetches from API on first call`() = runTest {
-        every { tokenRepository.getAccessToken() } returns "test-token"
+        coEvery { tokenRefreshManager.getValidAccessToken() } returns "test-token"
         coEvery { traktApi.getWatchedShows("Bearer test-token") } returns testShows
 
         val result = repository.getShows()
@@ -42,7 +42,7 @@ class ShowRepositoryTest {
 
     @Test
     fun `getShows returns cached result on second call`() = runTest {
-        every { tokenRepository.getAccessToken() } returns "test-token"
+        coEvery { tokenRefreshManager.getValidAccessToken() } returns "test-token"
         coEvery { traktApi.getWatchedShows(any()) } returns testShows
 
         repository.getShows()
@@ -52,8 +52,8 @@ class ShowRepositoryTest {
     }
 
     @Test
-    fun `getShows returns empty list when no token`() = runTest {
-        every { tokenRepository.getAccessToken() } returns null
+    fun `getShows returns empty list when token refresh fails`() = runTest {
+        coEvery { tokenRefreshManager.getValidAccessToken() } returns null
 
         val result = repository.getShows()
         assertTrue(result.isEmpty())
@@ -62,7 +62,7 @@ class ShowRepositoryTest {
 
     @Test
     fun `getShows calls API with Bearer token`() = runTest {
-        every { tokenRepository.getAccessToken() } returns "my-secret-token"
+        coEvery { tokenRefreshManager.getValidAccessToken() } returns "my-secret-token"
         coEvery { traktApi.getWatchedShows("Bearer my-secret-token") } returns testShows
 
         repository.getShows()
