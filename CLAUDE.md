@@ -170,10 +170,10 @@ The TV ranks connected phones by LLM quality and uses the best one. Failover cha
 
 ## Important Patterns
 
-- **Scrobbling:** `MediaSessionScrobbler` listens to active media sessions on the TV, extracts package name + title, fuzzy-matches against Trakt watchlist. Auto-scrobbles if confidence ≥ 95%, shows overlay confirmation between 70–95%, ignores below 70%.
+- **Scrobbling:** `MediaSessionScrobbler` listens to active media sessions on the TV, extracts package name + title, fuzzy-matches against Trakt watchlist. Auto-scrobbles if confidence ≥ 95%, shows overlay confirmation between 70–95%, ignores below 70%. When multiple phones are connected, scrobbling fires in parallel for **every** connected user via `TvTokenCache.getAllTokens()` — each user's Trakt account is updated independently and a failure for one user does not block the others.
 - **LLM selection:** `LlmOrchestrator` checks AICore first, then falls back to LiteRT-LM with a Gemma 4 model (E4B or E2B) sized to available RAM.
 - **Auth modes:** Managed backend (default), self-hosted proxy, or direct Trakt credentials.
-- **Multi-user:** Multiple phones can connect to one TV simultaneously; shared watch mode avoids recap spoilers.
+- **Multi-user:** Multiple phones can connect to one TV simultaneously; scrobbling records the episode for each connected user independently; shared watch mode avoids recap spoilers.
 
 ## Documentation Maintenance
 
