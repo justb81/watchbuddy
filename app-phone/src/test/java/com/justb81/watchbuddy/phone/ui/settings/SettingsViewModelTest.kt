@@ -15,6 +15,7 @@ import com.justb81.watchbuddy.phone.llm.ModelDownloadWorker
 import com.justb81.watchbuddy.phone.server.DeviceCapabilityProvider
 import com.justb81.watchbuddy.phone.settings.AppSettings
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
+import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -297,6 +298,96 @@ class SettingsViewModelTest {
                     any<OneTimeWorkRequest>()
                 )
             }
+        }
+    }
+
+    @Nested
+    @DisplayName("TMDB API key state")
+    inner class TmdbApiKeyState {
+
+        @Test
+        fun `tmdbConnected is false and defaultTmdbApiKeyAvailable is false when no keys`() = runTest {
+            every { settingsRepository.settings } returns flowOf(
+                AppSettings(tmdbApiKey = "", defaultTmdbApiKeyAvailable = false)
+            )
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            assertFalse(vm.uiState.value.tmdbConnected)
+            assertFalse(vm.uiState.value.defaultTmdbApiKeyAvailable)
+        }
+
+        @Test
+        fun `tmdbConnected is true when user has set a custom key`() = runTest {
+            every { settingsRepository.settings } returns flowOf(
+                AppSettings(tmdbApiKey = "user-key-123", defaultTmdbApiKeyAvailable = false)
+            )
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            assertTrue(vm.uiState.value.tmdbConnected)
+            assertFalse(vm.uiState.value.defaultTmdbApiKeyAvailable)
+        }
+
+        @Test
+        fun `defaultTmdbApiKeyAvailable is true when build has default key and user has no custom key`() = runTest {
+            every { settingsRepository.settings } returns flowOf(
+                AppSettings(tmdbApiKey = "", defaultTmdbApiKeyAvailable = true)
+            )
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            assertFalse(vm.uiState.value.tmdbConnected)
+            assertTrue(vm.uiState.value.defaultTmdbApiKeyAvailable)
+        }
+
+        @Test
+        fun `defaultTmdbApiKeyAvailable is false when user has custom key even if build has default`() = runTest {
+            every { settingsRepository.settings } returns flowOf(
+                AppSettings(tmdbApiKey = "user-key-123", defaultTmdbApiKeyAvailable = true)
+            )
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            assertTrue(vm.uiState.value.tmdbConnected)
+            assertFalse(vm.uiState.value.defaultTmdbApiKeyAvailable)
+        }
+
+        @Test
+        fun `disconnectTmdb restores defaultTmdbApiKeyAvailable when build has default key`() = runTest {
+            val savedSettings = AppSettings(tmdbApiKey = "user-key", defaultTmdbApiKeyAvailable = true)
+            every { settingsRepository.settings } returns flowOf(savedSettings)
+            coEvery { settingsRepository.saveSettings(any()) } returns Unit
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            vm.disconnectTmdb()
+            advanceUntilIdle()
+
+            assertFalse(vm.uiState.value.tmdbConnected)
+            assertTrue(vm.uiState.value.defaultTmdbApiKeyAvailable)
+        }
+
+        @Test
+        fun `saveTmdbApiKey hides default key banner after saving a custom key`() = runTest {
+            val savedSettings = AppSettings(tmdbApiKey = "", defaultTmdbApiKeyAvailable = true)
+            every { settingsRepository.settings } returns flowOf(savedSettings)
+            coEvery { settingsRepository.saveSettings(any()) } returns Unit
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            vm.setTmdbApiKey("my-new-key")
+            vm.saveTmdbApiKey()
+            advanceUntilIdle()
+
+            assertTrue(vm.uiState.value.tmdbConnected)
+            assertFalse(vm.uiState.value.defaultTmdbApiKeyAvailable)
         }
     }
 }

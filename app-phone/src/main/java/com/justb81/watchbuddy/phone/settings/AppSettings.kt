@@ -8,5 +8,7 @@ data class AppSettings(
     val directClientId: String = "",
     val companionEnabled: Boolean = false,
     val modelDownloadUrl: String = "",
-    val tmdbApiKey: String = ""
+    val tmdbApiKey: String = "",
+    /** True when a default TMDB API key was baked in at build time. */
+    val defaultTmdbApiKeyAvailable: Boolean = false
 )

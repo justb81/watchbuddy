@@ -36,6 +36,15 @@ object AppModule {
     @Singleton
     fun provideTokenBackendUrl(): String = BuildConfig.TOKEN_BACKEND_URL
 
+    /**
+     * Default TMDB API v3 key from BuildConfig (set via TMDB_API_KEY env var at build time).
+     * Empty string → no built-in key, users must supply their own in Settings.
+     */
+    @Provides
+    @Singleton
+    @Named("defaultTmdbApiKey")
+    fun provideDefaultTmdbApiKey(): String = BuildConfig.DEFAULT_TMDB_API_KEY
+
     /** Debug flag for NetworkModule (controls HTTP logging level). */
     @Provides
     @Singleton

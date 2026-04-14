@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.io.File
 import javax.inject.Inject
+import javax.inject.Named
 import javax.inject.Singleton
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
@@ -28,7 +29,8 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(na
 @Singleton
 class SettingsRepository @Inject constructor(
     @param:ApplicationContext private val context: Context,
-    private val tokenRepository: TokenRepository
+    private val tokenRepository: TokenRepository,
+    @Named("defaultTmdbApiKey") private val defaultTmdbApiKey: String
 ) {
     private object Keys {
         val AUTH_MODE = stringPreferencesKey("auth_mode")
@@ -62,7 +64,8 @@ class SettingsRepository @Inject constructor(
             directClientId = prefs[Keys.DIRECT_CLIENT_ID] ?: "",
             companionEnabled = prefs[Keys.COMPANION_ENABLED] ?: false,
             modelDownloadUrl = prefs[Keys.MODEL_DOWNLOAD_URL] ?: "",
-            tmdbApiKey = prefs[Keys.TMDB_API_KEY] ?: ""
+            tmdbApiKey = prefs[Keys.TMDB_API_KEY] ?: "",
+            defaultTmdbApiKeyAvailable = defaultTmdbApiKey.isNotBlank()
         )
     }
 
@@ -83,9 +86,17 @@ class SettingsRepository @Inject constructor(
         tokenRepository.saveClientSecret(secret)
     }
 
+    /**
+     * Returns the effective TMDB API key: the user's custom key when set, otherwise the
+     * default key baked in at build time.  Returns an empty string when neither is available.
+     */
     fun getTmdbApiKey(): Flow<String> = context.dataStore.data.map { prefs ->
-        prefs[Keys.TMDB_API_KEY] ?: ""
+        val userKey = prefs[Keys.TMDB_API_KEY] ?: ""
+        userKey.ifBlank { defaultTmdbApiKey }
     }
+
+    /** True when a default TMDB API key was embedded at build time. */
+    fun hasDefaultTmdbApiKey(): Boolean = defaultTmdbApiKey.isNotBlank()
 
     fun setModelReady(ready: Boolean) {
         scope.launch {

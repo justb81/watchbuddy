@@ -50,7 +50,10 @@
     <string name="settings_tmdb_account">TMDB-Konto</string>
     <string name="settings_tmdb_connected">Verbunden</string>
     <string name="settings_tmdb_api_key">TMDB-API-Schlüssel (v3 Auth)</string>
-    <string name="settings_tmdb_helper">Hol dir deinen kostenlosen API-Schlüssel auf themoviedb.org unter Einstellungen → API.</string>
+    <string name="settings_tmdb_helper">Kostenlosen API-Schlüssel auf themoviedb.org → Einstellungen → API holen</string>
+    <string name="settings_tmdb_helper_link">API-Schlüssel holen</string>
+    <string name="settings_tmdb_default_key_active">Integrierter Schlüssel aktiv</string>
+    <string name="settings_tmdb_default_key_hint">Ein integrierter TMDB-Schlüssel ist aktiv. Du kannst optional deinen eigenen Schlüssel eingeben, um ihn zu überschreiben.</string>
     <string name="settings_disconnect">Trennen</string>
     <string name="settings_companion">Companion-Dienst</string>
     <string name="settings_companion_running">Läuft (Port 8765)</string>

@@ -1,5 +1,6 @@
 package com.justb81.watchbuddy.phone.ui.settings
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -9,9 +10,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.justb81.watchbuddy.R
@@ -95,51 +98,102 @@ fun SettingsScreen(
             SettingsSectionHeader(stringResource(R.string.settings_tmdb))
 
             SettingsCard {
-                SettingsRow(
-                    label    = stringResource(R.string.settings_tmdb_account),
-                    value    = if (uiState.tmdbConnected)
-                                   stringResource(R.string.settings_tmdb_connected)
-                               else
-                                   stringResource(R.string.settings_not_connected),
-                    showDivider = true
-                )
-                if (uiState.tmdbConnected) {
-                    TextButton(
-                        onClick  = { viewModel.disconnectTmdb() },
-                        modifier = Modifier.padding(horizontal = 8.dp)
-                    ) {
-                        Text(
-                            stringResource(R.string.settings_disconnect),
-                            color = MaterialTheme.colorScheme.error
+                when {
+                    uiState.tmdbConnected -> {
+                        // User has saved their own API key
+                        SettingsRow(
+                            label    = stringResource(R.string.settings_tmdb_account),
+                            value    = stringResource(R.string.settings_tmdb_connected),
+                            showDivider = true
                         )
-                    }
-                } else {
-                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                        OutlinedTextField(
-                            value         = uiState.tmdbApiKey,
-                            onValueChange = viewModel::setTmdbApiKey,
-                            label         = { Text(stringResource(R.string.settings_tmdb_api_key)) },
-                            modifier      = Modifier.fillMaxWidth(),
-                            singleLine    = true,
-                            visualTransformation = PasswordVisualTransformation()
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            text  = stringResource(R.string.settings_tmdb_helper),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        Button(
-                            onClick  = { viewModel.saveTmdbApiKey() },
-                            modifier = Modifier.fillMaxWidth(),
-                            enabled  = uiState.tmdbApiKey.isNotBlank()
+                        TextButton(
+                            onClick  = { viewModel.disconnectTmdb() },
+                            modifier = Modifier.padding(horizontal = 8.dp)
                         ) {
-                            Text(stringResource(R.string.settings_save))
+                            Text(
+                                stringResource(R.string.settings_disconnect),
+                                color = MaterialTheme.colorScheme.error
+                            )
                         }
-                        Spacer(Modifier.height(4.dp))
+                    }
+                    uiState.defaultTmdbApiKeyAvailable -> {
+                        // No user key, but a built-in key is available
+                        SettingsRow(
+                            label    = stringResource(R.string.settings_tmdb_account),
+                            value    = stringResource(R.string.settings_tmdb_default_key_active),
+                            showDivider = true
+                        )
+                        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                            Text(
+                                text  = stringResource(R.string.settings_tmdb_default_key_hint),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value         = uiState.tmdbApiKey,
+                                onValueChange = viewModel::setTmdbApiKey,
+                                label         = { Text(stringResource(R.string.settings_tmdb_api_key)) },
+                                modifier      = Modifier.fillMaxWidth(),
+                                singleLine    = true,
+                                visualTransformation = PasswordVisualTransformation()
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            TmdbHelperLink()
+                            Spacer(Modifier.height(8.dp))
+                            Button(
+                                onClick  = { viewModel.saveTmdbApiKey() },
+                                modifier = Modifier.fillMaxWidth(),
+                                enabled  = uiState.tmdbApiKey.isNotBlank()
+                            ) {
+                                Text(stringResource(R.string.settings_save))
+                            }
+                            Spacer(Modifier.height(4.dp))
+                        }
+                    }
+                    else -> {
+                        // No key at all — user must enter one
+                        SettingsRow(
+                            label    = stringResource(R.string.settings_tmdb_account),
+                            value    = stringResource(R.string.settings_not_connected),
+                            showDivider = true
+                        )
+                        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                            OutlinedTextField(
+                                value         = uiState.tmdbApiKey,
+                                onValueChange = viewModel::setTmdbApiKey,
+                                label         = { Text(stringResource(R.string.settings_tmdb_api_key)) },
+                                modifier      = Modifier.fillMaxWidth(),
+                                singleLine    = true,
+                                visualTransformation = PasswordVisualTransformation()
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            TmdbHelperLink()
+                            Spacer(Modifier.height(8.dp))
+                            Button(
+                                onClick  = { viewModel.saveTmdbApiKey() },
+                                modifier = Modifier.fillMaxWidth(),
+                                enabled  = uiState.tmdbApiKey.isNotBlank()
+                            ) {
+                                Text(stringResource(R.string.settings_save))
+                            }
+                            Spacer(Modifier.height(4.dp))
+                        }
                     }
                 }
+
+                // TMDB attribution (always visible)
+                HorizontalDivider(
+                    color     = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                    thickness = 0.5.dp,
+                    modifier  = Modifier.padding(horizontal = 16.dp)
+                )
+                Text(
+                    text     = stringResource(R.string.settings_tmdb_attribution),
+                    style    = MaterialTheme.typography.labelSmall,
+                    color    = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
             }
 
             // ── Companion Service ─────────────────────────────────────────────
@@ -399,6 +453,30 @@ private fun AdvancedAuthSettings(uiState: SettingsUiState, viewModel: SettingsVi
         }
         Spacer(Modifier.height(12.dp))
     }
+}
+
+// ── TMDB helper link ──────────────────────────────────────────────────────────
+
+@Composable
+private fun TmdbHelperLink() {
+    val uriHandler = LocalUriHandler.current
+    val url = stringResource(R.string.settings_tmdb_api_url)
+    val linkText = stringResource(R.string.settings_tmdb_helper_link)
+    val helperText = stringResource(R.string.settings_tmdb_helper)
+
+    Text(
+        text  = helperText,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+    )
+    Spacer(Modifier.height(2.dp))
+    Text(
+        text            = linkText,
+        style           = MaterialTheme.typography.bodySmall,
+        color           = MaterialTheme.colorScheme.primary,
+        textDecoration  = TextDecoration.Underline,
+        modifier        = Modifier.clickable { uriHandler.openUri(url) }
+    )
 }
 
 // ── Reusable components ───────────────────────────────────────────────────────
