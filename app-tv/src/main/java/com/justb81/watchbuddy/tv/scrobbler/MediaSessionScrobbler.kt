@@ -206,70 +206,88 @@ class MediaSessionScrobbler @Inject constructor(
 
     /**
      * Sends a scrobble/start to Trakt for the given candidate.
+     * Scrobbles for every connected phone so all users watching together have
+     * the episode recorded on their own Trakt accounts.
      * Called automatically for high-confidence matches or via [ScrobbleViewModel] after user confirmation.
      */
     suspend fun autoScrobble(candidate: ScrobbleCandidate) {
-        val token = tvTokenCache.getToken()
-        if (token == null) {
-            Log.w(TAG, "No access token available — scrobble skipped")
+        val tokens = tvTokenCache.getAllTokens()
+        if (tokens.isEmpty()) {
+            Log.w(TAG, "No access tokens available — scrobble skipped")
             return
         }
 
         val show = candidate.matchedShow ?: return
         val episode = candidate.matchedEpisode ?: return
 
-        try {
-            traktApi.scrobbleStart(
-                bearer = "Bearer $token",
-                body = ScrobbleBody(
-                    show = show,
-                    episode = episode,
-                    progress = 0f
-                )
-            )
-            currentlyScrobbling = candidate.mediaTitle
-            Log.i(TAG, "Scrobble started: ${show.title} S${episode.season}E${episode.number}")
-        } catch (e: Exception) {
-            Log.e(TAG, "Scrobble start failed", e)
+        coroutineScope {
+            tokens.forEach { (phoneId, token) ->
+                launch {
+                    try {
+                        traktApi.scrobbleStart(
+                            bearer = "Bearer $token",
+                            body = ScrobbleBody(show = show, episode = episode, progress = 0f)
+                        )
+                        Log.i(TAG, "Scrobble started for $phoneId: ${show.title} S${episode.season}E${episode.number}")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Scrobble start failed for $phoneId", e)
+                    }
+                }
+            }
         }
+        currentlyScrobbling = candidate.mediaTitle
     }
 
     private suspend fun handleScrobblePause(rawTitle: String) {
         if (rawTitle != currentlyScrobbling) return
 
-        val token = tvTokenCache.getToken() ?: return
+        val tokens = tvTokenCache.getAllTokens()
+        if (tokens.isEmpty()) return
         val candidate = matchTitleToTrakt("", rawTitle) ?: return
         val show = candidate.matchedShow ?: return
         val episode = candidate.matchedEpisode ?: return
 
-        try {
-            traktApi.scrobblePause(
-                bearer = "Bearer $token",
-                body = ScrobbleBody(show = show, episode = episode, progress = 50f)
-            )
-            Log.i(TAG, "Scrobble paused: ${show.title}")
-        } catch (e: Exception) {
-            Log.e(TAG, "Scrobble pause failed", e)
+        coroutineScope {
+            tokens.forEach { (phoneId, token) ->
+                launch {
+                    try {
+                        traktApi.scrobblePause(
+                            bearer = "Bearer $token",
+                            body = ScrobbleBody(show = show, episode = episode, progress = 50f)
+                        )
+                        Log.i(TAG, "Scrobble paused for $phoneId: ${show.title}")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Scrobble pause failed for $phoneId", e)
+                    }
+                }
+            }
         }
     }
 
     private suspend fun handleScrobbleStop(rawTitle: String) {
         if (rawTitle != currentlyScrobbling) return
 
-        val token = tvTokenCache.getToken() ?: return
+        val tokens = tvTokenCache.getAllTokens()
+        if (tokens.isEmpty()) return
         val candidate = matchTitleToTrakt("", rawTitle) ?: return
         val show = candidate.matchedShow ?: return
         val episode = candidate.matchedEpisode ?: return
 
-        try {
-            traktApi.scrobbleStop(
-                bearer = "Bearer $token",
-                body = ScrobbleBody(show = show, episode = episode, progress = 100f)
-            )
-            currentlyScrobbling = null
-            Log.i(TAG, "Scrobble stopped (watched): ${show.title} S${episode.season}E${episode.number}")
-        } catch (e: Exception) {
-            Log.e(TAG, "Scrobble stop failed", e)
+        coroutineScope {
+            tokens.forEach { (phoneId, token) ->
+                launch {
+                    try {
+                        traktApi.scrobbleStop(
+                            bearer = "Bearer $token",
+                            body = ScrobbleBody(show = show, episode = episode, progress = 100f)
+                        )
+                        Log.i(TAG, "Scrobble stopped (watched) for $phoneId: ${show.title} S${episode.season}E${episode.number}")
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Scrobble stop failed for $phoneId", e)
+                    }
+                }
+            }
         }
+        currentlyScrobbling = null
     }
 }

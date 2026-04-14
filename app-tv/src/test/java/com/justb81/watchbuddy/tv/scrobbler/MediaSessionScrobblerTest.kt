@@ -33,6 +33,8 @@ class MediaSessionScrobblerTest {
         scrobbler = MediaSessionScrobbler(context, traktApi, tvShowCache, tvTokenCache)
     }
 
+    // ── normalize() ──────────────────────────────────────────────────────────
+
     @Nested
     @DisplayName("normalize()")
     inner class NormalizeTest {
@@ -77,6 +79,8 @@ class MediaSessionScrobblerTest {
             assertEquals("show name 2024", scrobbler.normalize("Show Name (2024)"))
         }
     }
+
+    // ── fuzzyScore() ─────────────────────────────────────────────────────────
 
     @Nested
     @DisplayName("fuzzyScore()")
@@ -145,73 +149,121 @@ class MediaSessionScrobblerTest {
         }
     }
 
+    // ── autoScrobble() ───────────────────────────────────────────────────────
+
     @Nested
     @DisplayName("autoScrobble()")
     inner class AutoScrobbleTest {
 
         private val testShow = TraktShow("Breaking Bad", 2008, TraktIds(trakt = 1))
         private val testEpisode = TraktEpisode(season = 1, number = 1)
+        private val testCandidate = ScrobbleCandidate(
+            "com.netflix", "Breaking Bad S01E01", 0.95f, testShow, testEpisode
+        )
 
-        @Test
-        fun `sends scrobble start to Trakt API`() = runTest {
-            coEvery { tvTokenCache.getToken() } returns "token"
+        private fun mockScrobbleResponse() {
             coEvery { traktApi.scrobbleStart(any(), any()) } returns ScrobbleResponse(
                 id = 1L, action = "start", progress = 0f,
                 show = testShow, episode = testEpisode
             )
+        }
 
-            val candidate = ScrobbleCandidate(
-                "com.netflix", "Breaking Bad S01E01", 0.95f, testShow, testEpisode
+        @Test
+        fun `sends scrobble start to Trakt API for single user`() = runTest {
+            coEvery { tvTokenCache.getAllTokens() } returns listOf(
+                TvTokenCache.PhoneToken("device-1", "token-1")
             )
-            scrobbler.autoScrobble(candidate)
+            mockScrobbleResponse()
+
+            scrobbler.autoScrobble(testCandidate)
 
             coVerify {
                 traktApi.scrobbleStart(
-                    "Bearer token",
+                    "Bearer token-1",
                     match<ScrobbleBody> { it.show == testShow && it.episode == testEpisode && it.progress == 0f }
                 )
             }
         }
 
         @Test
-        fun `skips when no token`() = runTest {
-            coEvery { tvTokenCache.getToken() } returns null
-
-            val candidate = ScrobbleCandidate(
-                "com.netflix", "Test", 0.95f, testShow, testEpisode
+        fun `scrobbles for each connected user when multiple phones present`() = runTest {
+            coEvery { tvTokenCache.getAllTokens() } returns listOf(
+                TvTokenCache.PhoneToken("device-1", "token-1"),
+                TvTokenCache.PhoneToken("device-2", "token-2")
             )
-            scrobbler.autoScrobble(candidate)
+            mockScrobbleResponse()
+
+            scrobbler.autoScrobble(testCandidate)
+
+            coVerify { traktApi.scrobbleStart("Bearer token-1", any()) }
+            coVerify { traktApi.scrobbleStart("Bearer token-2", any()) }
+            coVerify(exactly = 2) { traktApi.scrobbleStart(any(), any()) }
+        }
+
+        @Test
+        fun `skips when no tokens available`() = runTest {
+            coEvery { tvTokenCache.getAllTokens() } returns emptyList()
+
+            scrobbler.autoScrobble(testCandidate)
+
             coVerify(exactly = 0) { traktApi.scrobbleStart(any(), any()) }
         }
 
         @Test
         fun `skips when no matched show`() = runTest {
-            coEvery { tvTokenCache.getToken() } returns "token"
+            coEvery { tvTokenCache.getAllTokens() } returns listOf(
+                TvTokenCache.PhoneToken("device-1", "token-1")
+            )
 
             val candidate = ScrobbleCandidate("pkg", "Title", 0.95f, null, testEpisode)
             scrobbler.autoScrobble(candidate)
+
             coVerify(exactly = 0) { traktApi.scrobbleStart(any(), any()) }
         }
 
         @Test
         fun `skips when no matched episode`() = runTest {
-            coEvery { tvTokenCache.getToken() } returns "token"
+            coEvery { tvTokenCache.getAllTokens() } returns listOf(
+                TvTokenCache.PhoneToken("device-1", "token-1")
+            )
 
             val candidate = ScrobbleCandidate("pkg", "Title", 0.95f, testShow, null)
             scrobbler.autoScrobble(candidate)
+
             coVerify(exactly = 0) { traktApi.scrobbleStart(any(), any()) }
         }
 
         @Test
-        fun `handles API exception gracefully`() = runTest {
-            coEvery { tvTokenCache.getToken() } returns "token"
+        fun `handles API exception for one user without blocking others`() = runTest {
+            coEvery { tvTokenCache.getAllTokens() } returns listOf(
+                TvTokenCache.PhoneToken("device-1", "token-1"),
+                TvTokenCache.PhoneToken("device-2", "token-2")
+            )
+            coEvery { traktApi.scrobbleStart("Bearer token-1", any()) } throws RuntimeException("API Error")
+            coEvery { traktApi.scrobbleStart("Bearer token-2", any()) } returns ScrobbleResponse(
+                id = 2L, action = "start", progress = 0f, show = testShow, episode = testEpisode
+            )
+
+            // Should not throw — failure for one user is isolated
+            scrobbler.autoScrobble(testCandidate)
+
+            coVerify { traktApi.scrobbleStart("Bearer token-1", any()) }
+            coVerify { traktApi.scrobbleStart("Bearer token-2", any()) }
+        }
+
+        @Test
+        fun `handles single API exception gracefully`() = runTest {
+            coEvery { tvTokenCache.getAllTokens() } returns listOf(
+                TvTokenCache.PhoneToken("device-1", "token-1")
+            )
             coEvery { traktApi.scrobbleStart(any(), any()) } throws RuntimeException("API Error")
 
-            val candidate = ScrobbleCandidate("pkg", "Title", 0.95f, testShow, testEpisode)
             // Should not throw
-            scrobbler.autoScrobble(candidate)
+            scrobbler.autoScrobble(testCandidate)
         }
     }
+
+    // ── Levenshtein distance via fuzzyScore ──────────────────────────────────
 
     @Nested
     @DisplayName("Levenshtein distance via fuzzyScore")
