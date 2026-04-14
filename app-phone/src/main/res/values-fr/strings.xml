@@ -17,6 +17,13 @@
     <string name="onboarding_error_loading_code">Erreur lors du chargement du code : %1$s</string>
     <string name="onboarding_code_expired">Code expiré. Veuillez réessayer.</string>
     <string name="onboarding_not_configured">Trakt n\'est pas encore configuré. Vous pouvez configurer vos identifiants dans les paramètres.</string>
+    <string name="onboarding_not_configured_managed_no_client_id">Ce build ne contient pas de Client ID Trakt. Ouvrez Paramètres → Avancé et choisissez \"Propres identifiants\".</string>
+    <string name="onboarding_not_configured_managed_no_backend">Le backend de jetons n\'est pas configuré. Ouvrez Paramètres → Avancé pour changer de mode d\'authentification.</string>
+    <string name="onboarding_not_configured_self_hosted_no_url">URL du backend non définie. Entrez l\'URL de votre serveur proxy dans Paramètres → Avancé.</string>
+    <string name="onboarding_not_configured_self_hosted_no_id">Ce build ne contient pas de Client ID Trakt. Configurez-le dans Paramètres → Avancé.</string>
+    <string name="onboarding_not_configured_direct_no_credentials">Entrez votre Client ID et Client Secret Trakt dans Paramètres → Avancé.</string>
+    <string name="onboarding_open_settings">Ouvrir les paramètres</string>
+    <string name="onboarding_error_polling_network">Connexion perdue pendant l\'autorisation. Vérifiez votre connexion internet et réessayez.</string>
     <string name="onboarding_skip">Ignorer pour le moment</string>
     <string name="onboarding_reconnect_title">Se connecter à Trakt</string>
 

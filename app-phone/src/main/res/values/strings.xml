@@ -17,6 +17,13 @@
     <string name="onboarding_error_loading_code">Error loading code: %1$s</string>
     <string name="onboarding_code_expired">Code expired. Please try again.</string>
     <string name="onboarding_not_configured">Trakt is not configured yet. You can set up your credentials in Settings.</string>
+    <string name="onboarding_not_configured_managed_no_client_id">This build has no Trakt Client ID. Open Settings → Advanced and switch to \"Own credentials\".</string>
+    <string name="onboarding_not_configured_managed_no_backend">Token backend is not configured. Open Settings → Advanced to switch authentication mode.</string>
+    <string name="onboarding_not_configured_self_hosted_no_url">Backend URL not set. Enter your proxy server URL in Settings → Advanced.</string>
+    <string name="onboarding_not_configured_self_hosted_no_id">This build has no Trakt Client ID. Configure it in Settings → Advanced.</string>
+    <string name="onboarding_not_configured_direct_no_credentials">Enter your Trakt Client ID and Client Secret in Settings → Advanced.</string>
+    <string name="onboarding_open_settings">Open Settings</string>
+    <string name="onboarding_error_polling_network">Lost connection while waiting for authorization. Please check your internet connection and try again.</string>
     <string name="onboarding_skip">Skip for now</string>
     <string name="onboarding_reconnect_title">Connect to Trakt</string>
 

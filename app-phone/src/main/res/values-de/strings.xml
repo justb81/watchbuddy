@@ -17,6 +17,13 @@
     <string name="onboarding_error_loading_code">Fehler beim Laden des Codes: %1$s</string>
     <string name="onboarding_code_expired">Code abgelaufen. Bitte erneut versuchen.</string>
     <string name="onboarding_not_configured">Trakt ist noch nicht konfiguriert. Du kannst deine Zugangsdaten in den Einstellungen einrichten.</string>
+    <string name="onboarding_not_configured_managed_no_client_id">Dieses Build enthält keine Trakt-Client-ID. Öffne Einstellungen → Erweitert und wähle \"Eigene Zugangsdaten\".</string>
+    <string name="onboarding_not_configured_managed_no_backend">Das Token-Backend ist nicht konfiguriert. Öffne Einstellungen → Erweitert, um den Authentifizierungsmodus zu wechseln.</string>
+    <string name="onboarding_not_configured_self_hosted_no_url">Backend-URL nicht gesetzt. Trage deine Proxy-Server-URL in Einstellungen → Erweitert ein.</string>
+    <string name="onboarding_not_configured_self_hosted_no_id">Dieses Build enthält keine Trakt-Client-ID. Konfiguriere sie in Einstellungen → Erweitert.</string>
+    <string name="onboarding_not_configured_direct_no_credentials">Gib deine Trakt-Client-ID und dein Client-Secret in Einstellungen → Erweitert ein.</string>
+    <string name="onboarding_open_settings">Einstellungen öffnen</string>
+    <string name="onboarding_error_polling_network">Verbindung während der Autorisierung verloren. Bitte überprüfe deine Internetverbindung und versuche es erneut.</string>
     <string name="onboarding_skip">Jetzt überspringen</string>
     <string name="onboarding_reconnect_title">Mit Trakt verbinden</string>
 

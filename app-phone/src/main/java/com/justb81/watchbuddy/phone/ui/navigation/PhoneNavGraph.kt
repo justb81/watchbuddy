@@ -36,7 +36,8 @@ fun PhoneNavGraph(
                     navController.navigate(PhoneRoute.Home.route) {
                         popUpTo(PhoneRoute.Onboarding.route) { inclusive = true }
                     }
-                }
+                },
+                onOpenSettings = { navController.navigate(PhoneRoute.Settings.route) }
             )
         }
 
@@ -63,6 +64,7 @@ fun PhoneNavGraph(
             OnboardingScreen(
                 onSuccess = { navController.popBackStack() },
                 onSkip = { navController.popBackStack() },
+                onOpenSettings = { navController.navigate(PhoneRoute.Settings.route) },
                 isReconnect = true
             )
         }
