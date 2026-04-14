@@ -16,15 +16,12 @@ import com.justb81.watchbuddy.phone.settings.AppSettings
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.mockkStatic
-import io.mockk.unmockkAll
 import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -54,8 +51,6 @@ class SettingsViewModelTest {
 
     @BeforeEach
     fun setUp() {
-        mockkStatic(WorkManager::class)
-        every { WorkManager.getInstance(any()) } returns workManager
         every { workManager.getWorkInfosForUniqueWorkFlow(any()) } returns downloadWorkInfoFlow
         every { settingsRepository.settings } returns flowOf(AppSettings())
         every { settingsRepository.getClientSecret() } returns ""
@@ -68,13 +63,9 @@ class SettingsViewModelTest {
         )
     }
 
-    @AfterEach
-    fun tearDown() {
-        unmockkAll()
-    }
-
     private fun createViewModel(): SettingsViewModel = SettingsViewModel(
         application = application,
+        workManager = workManager,
         llmOrchestrator = llmOrchestrator,
         traktApi = traktApi,
         tokenRepository = tokenRepository,

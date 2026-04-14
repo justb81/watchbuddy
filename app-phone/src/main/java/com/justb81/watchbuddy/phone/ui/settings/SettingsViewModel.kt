@@ -50,14 +50,13 @@ data class SettingsUiState(
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     application: Application,
+    private val workManager: WorkManager,
     private val llmOrchestrator: LlmOrchestrator,
     private val traktApi: TraktApiService,
     private val tokenRepository: TokenRepository,
     private val deviceCapabilityProvider: DeviceCapabilityProvider,
     private val settingsRepository: SettingsRepository
 ) : AndroidViewModel(application) {
-
-    private val workManager = WorkManager.getInstance(application)
 
     private val _uiState = MutableStateFlow(SettingsUiState(
         llmBackend = application.getString(R.string.settings_llm_detecting),
