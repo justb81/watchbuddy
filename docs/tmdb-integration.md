@@ -25,10 +25,8 @@ All TMDB calls go through a single Retrofit interface defined in `core/src/main/
 
 | Method | Path | Parameters | Returns | Purpose |
 |--------|------|------------|---------|---------|
-| `searchShow` | `GET /search/tv` | `api_key`, `query`, `language` | `TmdbSearchResponse` | Search TV shows by title |
 | `getShow` | `GET /tv/{series_id}` | `series_id`, `api_key`, `language` | `TmdbShow` | Fetch show metadata (name, overview, poster, backdrop, air date) |
 | `getEpisode` | `GET /tv/{series_id}/season/{season}/episode/{episode}` | `series_id`, `season_number`, `episode_number`, `api_key`, `language` | `TmdbEpisode` | Fetch single episode details (name, overview, still image, air date) |
-| `getSeason` | `GET /tv/{series_id}/season/{season}` | `series_id`, `season_number`, `api_key`, `language` | `TmdbSeasonResponse` | Fetch all episodes in a season |
 
 All endpoints default to `language = "de-DE"`. The language parameter follows TMDB's `xx-YY` format (ISO 639-1 language + ISO 3166-1 region).
 
@@ -204,7 +202,6 @@ User opens show detail  ──►  ShowDetailViewModel.resolveDeepLink()
                               Substitute placeholders in template:
                               "{tmdb_id}" → tmdbId
                               "{slug}"    → Trakt slug (or title-based fallback)
-                              "{asin}"    → tmdbId (fallback mapping)
                               "{id}"      → tmdbId (fallback mapping)
                                       │
                                       ▼
@@ -218,7 +215,7 @@ User opens show detail  ──►  ShowDetailViewModel.resolveDeepLink()
 |---------|----------|
 | Netflix | `https://www.netflix.com/title/{tmdb_id}` |
 | Disney+ | `https://www.disneyplus.com/series/{slug}/{tmdb_id}` |
-| Prime Video | `https://app.primevideo.com/detail?asin={asin}` (TMDB ID as fallback) |
+| Prime Video | `https://www.primevideo.com/search?phrase={slug}` (title-based search) |
 | ARD Mediathek | `https://www.ardmediathek.de/video/{id}` (TMDB ID as fallback) |
 
 Note: This journey does **not** call the TMDB API directly. It only uses the TMDB ID already present in the Trakt data model.
@@ -327,9 +324,9 @@ The `FallbackProvider` is the safety net: it constructs a slideshow purely from 
 |-------|---------------|-----|---------|
 | `ShowRepository` (phone) | `List<TraktWatchedEntry>` from Trakt (contains TMDB IDs) | 5 minutes | In-memory |
 | `TvShowCache` (TV) | Show list for local fuzzy-matching | App lifetime (no TTL) | In-memory (volatile) |
-| TMDB responses | **Not cached** | N/A | N/A |
+| `TmdbCache` (phone) | `TmdbShow` and `TmdbEpisode` responses | 15 minutes | In-memory |
 
-TMDB show metadata and episode details are fetched fresh on every recap request. There is no disk or in-memory cache for TMDB API responses.
+`TmdbCache` is a `@Singleton` that caches `getShow` and `getEpisode` responses for 15 minutes. Repeated recap requests for the same show (e.g. after watching another episode) reuse cached data instead of hitting the TMDB API again. This reduces latency and helps stay within TMDB's rate limits.
 
 ### Localization
 

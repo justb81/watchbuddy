@@ -110,7 +110,7 @@ data class StreamingService(
 
 val KNOWN_STREAMING_SERVICES = listOf(
     StreamingService("netflix",   "Netflix",      "com.netflix.ninja",                    "https://www.netflix.com/title/{tmdb_id}"),
-    StreamingService("prime",     "Prime Video",  "com.amazon.amazonvideo.livingroom",     "https://app.primevideo.com/detail?asin={asin}"),
+    StreamingService("prime",     "Prime Video",  "com.amazon.amazonvideo.livingroom",     "https://www.primevideo.com/search?phrase={slug}"),
     StreamingService("disney",    "Disney+",      "com.disney.disneyplus",                "https://www.disneyplus.com/series/{slug}/{tmdb_id}"),
     StreamingService("waipu",     "WaipuTV",      "tv.waipu.app",                         "waipu://tv"),
     StreamingService("joyn",      "Joyn",         "de.prosiebensat1digital.android.joyn", "https://www.joyn.de/serien/{slug}"),

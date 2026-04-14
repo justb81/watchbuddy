@@ -140,7 +140,7 @@ Fuzzy match against local show cache (Levenshtein distance)
 | Service | Package | Link Template |
 |---------|---------|---------------|
 | Netflix | `com.netflix.ninja` | `https://www.netflix.com/title/{tmdb_id}` |
-| Prime Video | `com.amazon.amazonvideo.livingroom` | `https://app.primevideo.com/detail?asin={asin}` |
+| Prime Video | `com.amazon.amazonvideo.livingroom` | `https://www.primevideo.com/search?phrase={slug}` |
 | Disney+ | `com.disney.disneyplus` | `https://www.disneyplus.com/series/{slug}/{tmdb_id}` |
 | WaipuTV | `tv.waipu.app` | `waipu://tv` |
 | Joyn | `de.prosiebensat1digital.android.joyn` | `https://www.joyn.de/serien/{slug}` |

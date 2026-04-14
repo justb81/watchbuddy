@@ -3,6 +3,7 @@ package com.justb81.watchbuddy.phone.server
 import android.util.Log
 import com.justb81.watchbuddy.core.locale.LocaleHelper
 import com.justb81.watchbuddy.core.tmdb.TmdbApiService
+import com.justb81.watchbuddy.core.tmdb.TmdbCache
 import com.justb81.watchbuddy.phone.auth.TokenRepository
 import com.justb81.watchbuddy.phone.llm.RecapGenerator
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
@@ -41,6 +42,7 @@ class CompanionHttpServer @Inject constructor(
     private val showRepository: ShowRepository,
     private val tokenRepository: TokenRepository,
     private val tmdbApiService: TmdbApiService,
+    private val tmdbCache: TmdbCache,
     private val settingsRepository: SettingsRepository
 ) {
     companion object {
@@ -101,7 +103,9 @@ class CompanionHttpServer @Inject constructor(
                         val tmdbId = watchedEntry.show.ids.tmdb
                             ?: return@post call.respond(HttpStatusCode.NotFound, ErrorResponse("No TMDB ID for show"))
 
-                        val tmdbShow = tmdbApiService.getShow(tmdbId, apiKey, language = tmdbLanguage)
+                        val tmdbShow = tmdbCache.getShow(tmdbId)
+                            ?: tmdbApiService.getShow(tmdbId, apiKey, language = tmdbLanguage)
+                                .also { tmdbCache.putShow(tmdbId, it) }
 
                         // Collect watched episode numbers from Trakt data
                         val watchedEpisodeRefs = watchedEntry.seasons.flatMap { season ->
@@ -115,7 +119,9 @@ class CompanionHttpServer @Inject constructor(
                                 .map { (season, episode) ->
                                     async {
                                         try {
-                                            tmdbApiService.getEpisode(tmdbId, season, episode, apiKey, language = tmdbLanguage)
+                                            tmdbCache.getEpisode(tmdbId, season, episode)
+                                                ?: tmdbApiService.getEpisode(tmdbId, season, episode, apiKey, language = tmdbLanguage)
+                                                    .also { tmdbCache.putEpisode(tmdbId, season, episode, it) }
                                         } catch (e: Exception) {
                                             Log.w(TAG, "Failed to load TMDB episode S${season}E${episode}", e)
                                             null
