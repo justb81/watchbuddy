@@ -137,7 +137,7 @@ does not block the others.
 | | Phone APK | TV APK |
 |---|---|---|
 | Package name | `com.justb81.watchbuddy` | `com.justb81.watchbuddy` |
-| versionCode | ~1000 | ~2000 |
+| versionCode | run_number × 10 + 1 | run_number × 10 + 2 |
 | LAUNCHER | ✅ | ❌ |
 | LEANBACK_LAUNCHER | ❌ | ✅ |
 | touchscreen required | true | false |

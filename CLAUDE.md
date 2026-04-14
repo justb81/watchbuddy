@@ -146,7 +146,7 @@ The `release-please--` prefix is reserved for the automated release-please bot â
 ### Distribution
 - **Google Play Store:** AABs are automatically uploaded to the **internal** track on each release. Promote to production via Google Play Console.
 - **GitHub Releases:** Signed APKs and AABs are attached to each GitHub Release for sideloading.
-- **Multi-APK delivery:** Both apps share `applicationId = com.justb81.watchbuddy` with different versionCode offsets (phone 1000+, TV 2000+). The TV manifest requires `android.software.leanback` so Google Play serves the correct AAB per device type.
+- **Multi-APK delivery:** Both apps share `applicationId = com.justb81.watchbuddy` with a multiplier-based versionCode scheme (`run_number * 10 + 1` for phone, `run_number * 10 + 2` for TV) to guarantee no collisions. The TV manifest requires `android.software.leanback` so Google Play serves the correct AAB per device type.
 - **CI secrets for Play Store:** `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` (Google Cloud service account key with Google Play Android Developer API access). If not set, the Play Store upload step is skipped gracefully.
 
 ### Localization

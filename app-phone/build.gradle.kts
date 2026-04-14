@@ -15,10 +15,12 @@ android {
         minSdk = 26
         targetSdk = 35
 
-        // versionCode: CI sets VERSION_CODE (run_number). Phone offset 1000.
+        // versionCode: CI sets VERSION_CODE (run_number).
+        // Multiplier scheme avoids collisions between phone and TV APKs that
+        // share the same applicationId: phone = *10+1, TV = *10+2.
         val ciVersionCode = providers.environmentVariable("VERSION_CODE")
             .orElse("1").get().toIntOrNull() ?: 1
-        versionCode = 1000 + ciVersionCode
+        versionCode = ciVersionCode * 10 + 1
 
         // versionName: release-please sets VERSION_NAME, fallback to hardcoded value
         versionName = providers.environmentVariable("VERSION_NAME")
