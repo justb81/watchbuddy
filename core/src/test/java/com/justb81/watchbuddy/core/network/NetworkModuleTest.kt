@@ -1,6 +1,5 @@
 package com.justb81.watchbuddy.core.network
 
-import okhttp3.CertificatePinner
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.mockwebserver.MockResponse
@@ -53,7 +52,7 @@ class NetworkModuleTest {
         @Test
         fun `does not apply certificate pinning`() {
             val client = NetworkModule.provideOkHttpClient(isDebug = false)
-            assertEquals(CertificatePinner.DEFAULT, client.certificatePinner)
+            assertTrue(client.certificatePinner.pins.isEmpty())
         }
     }
 
