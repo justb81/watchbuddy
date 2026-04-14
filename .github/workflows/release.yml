@@ -25,7 +25,7 @@ jobs:
           manifest-file: .release-please-manifest.json
 
   build-release:
-    name: Build Release APKs
+    name: Build & Publish Release
     needs: release-please
     if: ${{ needs.release-please.outputs.release_created }}
     runs-on: ubuntu-latest
@@ -55,21 +55,21 @@ jobs:
             echo "available=false" >> "$GITHUB_OUTPUT"
           fi
 
-      # -- Release-signierte APKs (nur wenn Keystore vorhanden) -----------
-      - name: Build signed Phone APK
-        if: steps.keystore.outputs.available == 'true'
+      # -- Check Play Store credentials -----------------------------------
+      - name: Check Play Store credentials
+        id: play-store
         env:
-          KEYSTORE_FILE: /tmp/release.keystore
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          VERSION_NAME: ${{ needs.release-please.outputs.version }}
-          VERSION_CODE: ${{ github.run_number }}
-          TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
-          TOKEN_BACKEND_URL: ${{ secrets.TOKEN_BACKEND_URL }}
-        run: ./gradlew :app-phone:assembleRelease
+          GOOGLE_PLAY_KEY: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -n "$GOOGLE_PLAY_KEY" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::GOOGLE_PLAY_SERVICE_ACCOUNT_JSON secret not set — skipping Play Store upload."
+          fi
 
-      - name: Build signed TV APK
+      # -- Signed release builds (APK + AAB) ------------------------------
+      - name: Build signed Phone release (APK + AAB)
         if: steps.keystore.outputs.available == 'true'
         env:
           KEYSTORE_FILE: /tmp/release.keystore
@@ -80,7 +80,21 @@ jobs:
           VERSION_CODE: ${{ github.run_number }}
           TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
           TOKEN_BACKEND_URL: ${{ secrets.TOKEN_BACKEND_URL }}
-        run: ./gradlew :app-tv:assembleRelease
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+        run: ./gradlew :app-phone:assembleRelease :app-phone:bundleRelease
+
+      - name: Build signed TV release (APK + AAB)
+        if: steps.keystore.outputs.available == 'true'
+        env:
+          KEYSTORE_FILE: /tmp/release.keystore
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          VERSION_NAME: ${{ needs.release-please.outputs.version }}
+          VERSION_CODE: ${{ github.run_number }}
+          TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
+          TOKEN_BACKEND_URL: ${{ secrets.TOKEN_BACKEND_URL }}
+        run: ./gradlew :app-tv:assembleRelease :app-tv:bundleRelease
 
       # -- Debug APKs (always) — signed with release keystore when available -----
       - name: Build debug APKs (signed)
@@ -105,8 +119,8 @@ jobs:
           TOKEN_BACKEND_URL: ${{ secrets.TOKEN_BACKEND_URL }}
         run: ./gradlew :app-phone:assembleDebug :app-tv:assembleDebug
 
-      # -- APKs sammeln und umbenennen -------------------------------------
-      - name: Collect APKs
+      # -- Collect release artifacts ---------------------------------------
+      - name: Collect release artifacts
         run: |
           mkdir -p release-assets
 
@@ -116,7 +130,7 @@ jobs:
           cp app-tv/build/outputs/apk/debug/*.apk \
              "release-assets/watchbuddy-tv-${VERSION}-debug.apk"
 
-          # Release APKs (nur wenn vorhanden)
+          # Release APKs (when available)
           for apk in app-phone/build/outputs/apk/release/*.apk; do
             [ -f "$apk" ] && cp "$apk" "release-assets/watchbuddy-phone-${VERSION}-release.apk"
           done
@@ -124,15 +138,23 @@ jobs:
             [ -f "$apk" ] && cp "$apk" "release-assets/watchbuddy-tv-${VERSION}-release.apk"
           done
 
+          # Release AABs (when available)
+          for aab in app-phone/build/outputs/bundle/release/*.aab; do
+            [ -f "$aab" ] && cp "$aab" "release-assets/watchbuddy-phone-${VERSION}-release.aab"
+          done
+          for aab in app-tv/build/outputs/bundle/release/*.aab; do
+            [ -f "$aab" ] && cp "$aab" "release-assets/watchbuddy-tv-${VERSION}-release.aab"
+          done
+
           ls -lh release-assets/
 
-      # -- APKs an GitHub Release hochladen --------------------------------
-      - name: Upload APKs to GitHub Release
+      # -- Upload to GitHub Release ----------------------------------------
+      - name: Upload release assets to GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          for apk in release-assets/*.apk; do
-            gh release upload "${TAG}" "$apk" --clobber
+          for file in release-assets/*.apk release-assets/*.aab; do
+            [ -f "$file" ] && gh release upload "${TAG}" "$file" --clobber
           done
 
       # -- Download-Links in Release-Notes ergaenzen -----------------------
@@ -145,16 +167,16 @@ jobs:
 
           DOWNLOADS="---"
           DOWNLOADS="${DOWNLOADS}\n\n## Downloads\n"
-          DOWNLOADS="${DOWNLOADS}\n| APK | Link |"
-          DOWNLOADS="${DOWNLOADS}\n|-----|------|"
+          DOWNLOADS="${DOWNLOADS}\n| Asset | Link |"
+          DOWNLOADS="${DOWNLOADS}\n|-------|------|"
           DOWNLOADS="${DOWNLOADS}\n| Phone (debug) | [watchbuddy-phone-${VERSION}-debug.apk](${BASE}/watchbuddy-phone-${VERSION}-debug.apk) |"
           DOWNLOADS="${DOWNLOADS}\n| TV (debug) | [watchbuddy-tv-${VERSION}-debug.apk](${BASE}/watchbuddy-tv-${VERSION}-debug.apk) |"
 
           if [ -f "release-assets/watchbuddy-phone-${VERSION}-release.apk" ]; then
-            DOWNLOADS="${DOWNLOADS}\n| Phone (signed) | [watchbuddy-phone-${VERSION}-release.apk](${BASE}/watchbuddy-phone-${VERSION}-release.apk) |"
+            DOWNLOADS="${DOWNLOADS}\n| Phone (signed APK) | [watchbuddy-phone-${VERSION}-release.apk](${BASE}/watchbuddy-phone-${VERSION}-release.apk) |"
           fi
           if [ -f "release-assets/watchbuddy-tv-${VERSION}-release.apk" ]; then
-            DOWNLOADS="${DOWNLOADS}\n| TV (signed) | [watchbuddy-tv-${VERSION}-release.apk](${BASE}/watchbuddy-tv-${VERSION}-release.apk) |"
+            DOWNLOADS="${DOWNLOADS}\n| TV (signed APK) | [watchbuddy-tv-${VERSION}-release.apk](${BASE}/watchbuddy-tv-${VERSION}-release.apk) |"
           fi
 
           # Bestehende Notes holen und Download-Sektion anhaengen
@@ -162,11 +184,24 @@ jobs:
           UPDATED=$(printf "%s\n\n%b" "$EXISTING" "$DOWNLOADS")
           gh release edit "${TAG}" --notes "$UPDATED"
 
-      - name: Upload APKs as Artifacts
+      # -- Publish to Google Play Store ------------------------------------
+      - name: Upload to Google Play Store
+        if: steps.keystore.outputs.available == 'true' && steps.play-store.outputs.available == 'true'
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.justb81.watchbuddy
+          releaseFiles: release-assets/*-release.aab
+          track: internal
+          status: completed
+
+      - name: Upload release artifacts
         uses: actions/upload-artifact@v7
         with:
           name: watchbuddy-release-${{ needs.release-please.outputs.version }}
-          path: release-assets/*.apk
+          path: |
+            release-assets/*.apk
+            release-assets/*.aab
 
   update-stable:
     name: Update stable branch
