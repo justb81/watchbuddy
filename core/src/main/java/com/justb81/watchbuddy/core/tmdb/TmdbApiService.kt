@@ -11,14 +11,14 @@ interface TmdbApiService {
     suspend fun searchShow(
         @Query("api_key") apiKey: String,
         @Query("query") query: String,
-        @Query("language") language: String = "de-DE"
+        @Query("language") language: String = "en-US"
     ): TmdbSearchResponse
 
     @GET("tv/{series_id}")
     suspend fun getShow(
         @Path("series_id") id: Int,
         @Query("api_key") apiKey: String,
-        @Query("language") language: String = "de-DE"
+        @Query("language") language: String = "en-US"
     ): TmdbShow
 
     @GET("tv/{series_id}/season/{season_number}/episode/{episode_number}")
@@ -27,7 +27,7 @@ interface TmdbApiService {
         @Path("season_number") seasonNumber: Int,
         @Path("episode_number") episodeNumber: Int,
         @Query("api_key") apiKey: String,
-        @Query("language") language: String = "de-DE"
+        @Query("language") language: String = "en-US"
     ): TmdbEpisode
 
     @GET("tv/{series_id}/season/{season_number}")
@@ -35,7 +35,7 @@ interface TmdbApiService {
         @Path("series_id") seriesId: Int,
         @Path("season_number") seasonNumber: Int,
         @Query("api_key") apiKey: String,
-        @Query("language") language: String = "de-DE"
+        @Query("language") language: String = "en-US"
     ): TmdbSeasonResponse
 }
 
