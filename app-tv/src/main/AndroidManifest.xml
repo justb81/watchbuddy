@@ -13,6 +13,7 @@
     <!-- Background sync -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
     <!-- Play Store: TV app — no touchscreen, leanback required for correct
          multi-APK device targeting (prevents phone devices from receiving the
@@ -20,8 +21,23 @@
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
     <uses-feature android:name="android.software.leanback" android:required="true" />
 
-    <!-- 64-bit required from August 2026 (arm64 only) -->
+    <!-- Declare TV hardware support without requiring it — the leanback
+         requirement above is the primary gate for Play Store device targeting. -->
     <uses-feature android:name="android.hardware.type.television" android:required="false" />
+
+    <!-- Hardware features unavailable on TV — declared as not required to
+         prevent implicit feature requirements from library dependencies. -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
+    <uses-feature android:name="android.hardware.telephony" android:required="false" />
+    <uses-feature android:name="android.hardware.sensor.accelerometer" android:required="false" />
+    <uses-feature android:name="android.hardware.sensor.compass" android:required="false" />
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+    <uses-feature android:name="android.hardware.nfc" android:required="false" />
+    <uses-feature android:name="android.hardware.usb.host" android:required="false" />
+    <uses-feature android:name="android.hardware.wifi.direct" android:required="false" />
+    <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
 
     <application
         android:name=".WatchBuddyTvApp"
@@ -36,6 +52,7 @@
         <activity
             android:name=".tv.ui.TvMainActivity"
             android:exported="true"
+            android:screenOrientation="landscape"
             android:configChanges="keyboard|keyboardHidden|navigation"
             android:theme="@style/Theme.WatchBuddy">
             <intent-filter>
