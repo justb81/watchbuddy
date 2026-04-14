@@ -54,10 +54,34 @@ jobs:
           key: config-cache-${{ hashFiles('**/*.gradle.kts', 'gradle.properties', 'gradle/libs.versions.toml') }}
           restore-keys: config-cache-
 
+      # Decode release keystore when available so debug APKs are signed with the
+      # same certificate as release APKs.  This prevents INSTALL_FAILED_UPDATE_INCOMPATIBLE
+      # when users upgrade between debug and release builds.
+      - name: Decode Keystore
+        id: keystore
+        run: |
+          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > /tmp/release.keystore
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Run unit tests
         run: ./gradlew test
 
-      - name: Build Phone and TV debug APKs
+      - name: Build Phone and TV debug APKs (signed)
+        if: steps.keystore.outputs.available == 'true'
+        env:
+          VERSION_CODE: ${{ github.run_number }}
+          KEYSTORE_FILE: /tmp/release.keystore
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: ./gradlew :app-phone:assembleDebug :app-tv:assembleDebug
+
+      - name: Build Phone and TV debug APKs (unsigned fallback)
+        if: steps.keystore.outputs.available == 'false'
         env:
           VERSION_CODE: ${{ github.run_number }}
         run: ./gradlew :app-phone:assembleDebug :app-tv:assembleDebug
