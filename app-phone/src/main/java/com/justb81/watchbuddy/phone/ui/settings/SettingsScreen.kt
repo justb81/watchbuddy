@@ -319,7 +319,7 @@ fun SettingsScreen(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        stringResource(R.string.settings_auth_mode),
+                        stringResource(R.string.settings_advanced),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurface
                     )
@@ -367,6 +367,14 @@ fun SettingsScreen(
 @Composable
 private fun AdvancedAuthSettings(uiState: SettingsUiState, viewModel: SettingsViewModel) {
     Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+        // ── Authentication group ──
+        Text(
+            text  = stringResource(R.string.settings_auth_mode),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Spacer(Modifier.height(4.dp))
+
         // Auth mode selector
         AuthMode.entries.forEach { mode ->
             Row(
@@ -423,9 +431,14 @@ private fun AdvancedAuthSettings(uiState: SettingsUiState, viewModel: SettingsVi
             else -> {}
         }
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(12.dp))
+        HorizontalDivider(
+            color     = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+            thickness = 0.5.dp
+        )
+        Spacer(Modifier.height(12.dp))
 
-        // Model download URL override
+        // ── Model download group ──
         Text(
             text  = stringResource(R.string.settings_model_url_section),
             style = MaterialTheme.typography.labelMedium,
