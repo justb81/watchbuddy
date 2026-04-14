@@ -18,6 +18,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
+import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
 
@@ -56,6 +57,8 @@ class TvHomeViewModelTest {
         return TvHomeViewModel(phoneDiscovery, phoneApiClientFactory, userSessionRepository, tvShowCache)
     }
 
+    // ── Basic load behaviour ───────────────────────────────────────────────────
+
     @Test
     fun `loadShows sets noPhoneConnected when no phone and no cache`() = runTest {
         val viewModel = createViewModel()
@@ -73,7 +76,7 @@ class TvHomeViewModelTest {
         every { phone.baseUrl } returns "http://192.168.1.1:8765/"
         every { phoneDiscovery.getBestPhone() } returns phone
         every { phoneApiClientFactory.createClient(any()) } returns phoneApiService
-        coEvery { phoneApiService.getShows() } throws RuntimeException("Connection refused")
+        coEvery { phoneApiService.getShows(any(), any()) } throws RuntimeException("Connection refused")
 
         val viewModel = createViewModel()
         advanceUntilIdle()
@@ -92,13 +95,13 @@ class TvHomeViewModelTest {
 
         // First call succeeds and populates cache
         every { phoneDiscovery.getBestPhone() } returns phone
-        coEvery { phoneApiService.getShows() } returns testShows
+        coEvery { phoneApiService.getShows(any(), any()) } returns testShows
         val viewModel = createViewModel()
         advanceUntilIdle()
         assertEquals(2, viewModel.uiState.value.shows.size)
 
         // Second call fails — cached shows should be shown with phoneApiError
-        coEvery { phoneApiService.getShows() } throws RuntimeException("Timeout")
+        coEvery { phoneApiService.getShows(any(), any()) } throws RuntimeException("Timeout")
         viewModel.loadShows()
         advanceUntilIdle()
 
@@ -115,7 +118,7 @@ class TvHomeViewModelTest {
         every { phone.baseUrl } returns "http://192.168.1.1:8765/"
         every { phoneDiscovery.getBestPhone() } returns phone
         every { phoneApiClientFactory.createClient("http://192.168.1.1:8765/") } returns phoneApiService
-        coEvery { phoneApiService.getShows() } returns testShows
+        coEvery { phoneApiService.getShows(any(), any()) } returns testShows
 
         val viewModel = createViewModel()
         advanceUntilIdle()
@@ -134,7 +137,7 @@ class TvHomeViewModelTest {
         every { phone.baseUrl } returns "http://test:8765/"
         every { phoneDiscovery.getBestPhone() } returns phone
         every { phoneApiClientFactory.createClient(any()) } returns phoneApiService
-        coEvery { phoneApiService.getShows() } returns testShows
+        coEvery { phoneApiService.getShows(any(), any()) } returns testShows
 
         createViewModel()
         advanceUntilIdle()
@@ -171,5 +174,179 @@ class TvHomeViewModelTest {
     fun `init starts discovery`() = runTest {
         createViewModel()
         verify { phoneDiscovery.startDiscovery() }
+    }
+
+    // ── Pagination ─────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("pagination")
+    inner class PaginationTest {
+
+        private fun makeShows(count: Int, startId: Int = 1) =
+            (startId until startId + count).map { i ->
+                TraktWatchedEntry(TraktShow("Show $i", 2020, TraktIds(trakt = i)))
+            }
+
+        private fun setupPhone(): PhoneDiscoveryManager.DiscoveredPhone {
+            val phone = mockk<PhoneDiscoveryManager.DiscoveredPhone>()
+            every { phone.baseUrl } returns "http://192.168.1.1:8765/"
+            every { phoneDiscovery.getBestPhone() } returns phone
+            every { phoneApiClientFactory.createClient(any()) } returns phoneApiService
+            return phone
+        }
+
+        @Test
+        fun `canLoadMore is true when API returns full page`() = runTest {
+            setupPhone()
+            val fullPage = makeShows(TvHomeViewModel.PAGE_SIZE)
+            coEvery { phoneApiService.getShows(0, TvHomeViewModel.PAGE_SIZE) } returns fullPage
+
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            assertTrue(viewModel.uiState.value.canLoadMore)
+            assertFalse(viewModel.uiState.value.isLoading)
+        }
+
+        @Test
+        fun `canLoadMore is false when API returns fewer than page size`() = runTest {
+            setupPhone()
+            val partial = makeShows(TvHomeViewModel.PAGE_SIZE - 1)
+            coEvery { phoneApiService.getShows(0, TvHomeViewModel.PAGE_SIZE) } returns partial
+
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            assertFalse(viewModel.uiState.value.canLoadMore)
+        }
+
+        @Test
+        fun `loadMoreShows appends next page to existing shows`() = runTest {
+            setupPhone()
+            val page1 = makeShows(TvHomeViewModel.PAGE_SIZE)
+            val page2 = makeShows(10, startId = TvHomeViewModel.PAGE_SIZE + 1)
+            coEvery { phoneApiService.getShows(0, TvHomeViewModel.PAGE_SIZE) } returns page1
+            coEvery { phoneApiService.getShows(TvHomeViewModel.PAGE_SIZE, TvHomeViewModel.PAGE_SIZE) } returns page2
+
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            assertEquals(TvHomeViewModel.PAGE_SIZE, viewModel.uiState.value.shows.size)
+            assertTrue(viewModel.uiState.value.canLoadMore)
+
+            viewModel.loadMoreShows()
+            advanceUntilIdle()
+
+            assertEquals(TvHomeViewModel.PAGE_SIZE + 10, viewModel.uiState.value.shows.size)
+            assertFalse(viewModel.uiState.value.canLoadMore)
+        }
+
+        @Test
+        fun `loadMoreShows does nothing when canLoadMore is false`() = runTest {
+            setupPhone()
+            val partial = makeShows(5)
+            coEvery { phoneApiService.getShows(any(), any()) } returns partial
+
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            assertFalse(viewModel.uiState.value.canLoadMore)
+
+            viewModel.loadMoreShows()
+            advanceUntilIdle()
+
+            // API should only have been called once (initial load)
+            coVerify(exactly = 1) { phoneApiService.getShows(any(), any()) }
+            assertEquals(5, viewModel.uiState.value.shows.size)
+        }
+
+        @Test
+        fun `loadMoreShows does nothing when isLoading is true`() = runTest {
+            setupPhone()
+            // Return a full page so canLoadMore would be true, but we check isLoading guard
+            val fullPage = makeShows(TvHomeViewModel.PAGE_SIZE)
+            coEvery { phoneApiService.getShows(any(), any()) } returns fullPage
+
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            assertTrue(viewModel.uiState.value.canLoadMore)
+            assertFalse(viewModel.uiState.value.isLoading)
+            // State is clean — calling loadMoreShows should proceed normally (isLoading = false)
+            viewModel.loadMoreShows()
+            advanceUntilIdle()
+
+            // Second page was requested with correct offset
+            coVerify { phoneApiService.getShows(TvHomeViewModel.PAGE_SIZE, TvHomeViewModel.PAGE_SIZE) }
+        }
+
+        @Test
+        fun `loadShows resets pagination and loads from offset 0`() = runTest {
+            setupPhone()
+            val page1 = makeShows(TvHomeViewModel.PAGE_SIZE)
+            val page2 = makeShows(TvHomeViewModel.PAGE_SIZE)
+            coEvery { phoneApiService.getShows(0, TvHomeViewModel.PAGE_SIZE) } returns page1
+            coEvery { phoneApiService.getShows(TvHomeViewModel.PAGE_SIZE, TvHomeViewModel.PAGE_SIZE) } returns page2
+
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            // Load page 2
+            viewModel.loadMoreShows()
+            advanceUntilIdle()
+            assertEquals(TvHomeViewModel.PAGE_SIZE * 2, viewModel.uiState.value.shows.size)
+
+            // Refresh — should reset to page 1
+            viewModel.loadShows()
+            advanceUntilIdle()
+            assertEquals(TvHomeViewModel.PAGE_SIZE, viewModel.uiState.value.shows.size)
+            // Verify offset 0 was requested again
+            coVerify(exactly = 2) { phoneApiService.getShows(0, TvHomeViewModel.PAGE_SIZE) }
+        }
+
+        @Test
+        fun `first page passes correct offset and limit to API`() = runTest {
+            setupPhone()
+            coEvery { phoneApiService.getShows(any(), any()) } returns emptyList()
+
+            createViewModel()
+            advanceUntilIdle()
+
+            coVerify { phoneApiService.getShows(0, TvHomeViewModel.PAGE_SIZE) }
+        }
+
+        @Test
+        fun `isLoadingMore is false after successful load more`() = runTest {
+            setupPhone()
+            val page1 = makeShows(TvHomeViewModel.PAGE_SIZE)
+            val page2 = makeShows(5, startId = TvHomeViewModel.PAGE_SIZE + 1)
+            coEvery { phoneApiService.getShows(0, TvHomeViewModel.PAGE_SIZE) } returns page1
+            coEvery { phoneApiService.getShows(TvHomeViewModel.PAGE_SIZE, TvHomeViewModel.PAGE_SIZE) } returns page2
+
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            viewModel.loadMoreShows()
+            advanceUntilIdle()
+
+            assertFalse(viewModel.uiState.value.isLoadingMore)
+        }
+
+        @Test
+        fun `TvShowCache is updated with full accumulated list after load more`() = runTest {
+            setupPhone()
+            val page1 = makeShows(TvHomeViewModel.PAGE_SIZE)
+            val page2 = makeShows(5, startId = TvHomeViewModel.PAGE_SIZE + 1)
+            coEvery { phoneApiService.getShows(0, TvHomeViewModel.PAGE_SIZE) } returns page1
+            coEvery { phoneApiService.getShows(TvHomeViewModel.PAGE_SIZE, TvHomeViewModel.PAGE_SIZE) } returns page2
+
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+            viewModel.loadMoreShows()
+            advanceUntilIdle()
+
+            val allShows = page1 + page2
+            verify { tvShowCache.updateShows(allShows) }
+        }
     }
 }

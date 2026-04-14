@@ -5,11 +5,19 @@ import kotlinx.serialization.Serializable
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Path
+import retrofit2.http.Query
 
 interface PhoneApiService {
 
     @GET("/shows")
-    suspend fun getShows(): List<TraktWatchedEntry>
+    suspend fun getShows(
+        @Query("offset") offset: Int = 0,
+        @Query("limit") limit: Int = PAGE_SIZE
+    ): List<TraktWatchedEntry>
+
+    companion object {
+        const val PAGE_SIZE = 30
+    }
 
     @POST("/recap/{traktShowId}")
     suspend fun getRecap(@Path("traktShowId") showId: Int): RecapResponse

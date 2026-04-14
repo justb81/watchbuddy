@@ -3,8 +3,10 @@ package com.justb81.watchbuddy.tv.ui.home
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -124,7 +126,19 @@ fun TvHomeScreen(
                         if (uiState.phoneApiError) {
                             PhoneUnreachableBanner()
                         }
+                        val gridState = rememberLazyGridState()
+                        val loadMoreTrigger by remember {
+                            derivedStateOf {
+                                val totalItems = gridState.layoutInfo.totalItemsCount
+                                val lastVisible = gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+                                totalItems > 0 && lastVisible >= totalItems - 6
+                            }
+                        }
+                        LaunchedEffect(loadMoreTrigger) {
+                            if (loadMoreTrigger) viewModel.loadMoreShows()
+                        }
                         LazyVerticalGrid(
+                            state                 = gridState,
                             columns               = GridCells.Adaptive(minSize = 180.dp),
                             contentPadding        = PaddingValues(horizontal = 48.dp, vertical = 16.dp),
                             horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -136,6 +150,21 @@ fun TvHomeScreen(
                                     entry   = entry,
                                     onClick = { onShowClick(entry) }
                                 )
+                            }
+                            if (uiState.isLoadingMore) {
+                                item(span = { GridItemSpan(maxLineSpan) }) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 16.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        CircularProgressIndicator(
+                                            color    = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(32.dp)
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
