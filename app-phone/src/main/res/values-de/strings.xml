@@ -72,7 +72,9 @@
     <string name="settings_auth_client_id">Client ID</string>
     <string name="settings_auth_client_secret">Client Secret</string>
     <string name="settings_model_url_section">Modell-Download</string>
-    <string name="settings_model_url">Eigene Modell-Basis-URL</string>
+    <string name="settings_model_url">Eigene Download-URL</string>
+    <string name="settings_llm_validation_failed">Download fehlgeschlagen: Datei scheint ungültig zu sein</string>
+    <string name="settings_model_url_invalid">Die URL muss auf eine .litertlm-Datei zeigen</string>
     <string name="settings_save">Speichern</string>
     <string name="settings_saved">Einstellungen gespeichert</string>
     <string name="settings_cancel">Abbrechen</string>

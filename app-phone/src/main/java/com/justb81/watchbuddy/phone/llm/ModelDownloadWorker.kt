@@ -49,6 +49,15 @@ class ModelDownloadWorker @AssistedInject constructor(
             if (!tempFile.renameTo(outputFile)) {
                 throw RuntimeException("Failed to rename downloaded model to final path")
             }
+            // Sanity-check: a real .litertlm model is hundreds of MB; anything smaller
+            // is almost certainly an HTML error page or a corrupt response.
+            if (outputFile.length() < MIN_MODEL_SIZE_BYTES) {
+                val size = outputFile.length()
+                outputFile.delete()
+                return Result.failure(
+                    workDataOf(KEY_ERROR to "Validation: model file too small ($size bytes)")
+                )
+            }
             settingsRepository.setModelReady(true)
             setProgress(workDataOf(KEY_PROGRESS to 100))
             return Result.success(workDataOf(KEY_PROGRESS to 100))
@@ -133,5 +142,6 @@ class ModelDownloadWorker @AssistedInject constructor(
         private const val MAX_RETRIES = 3
         private const val BUFFER_SIZE = 8 * 1024
         private const val NOTIFICATION_ID = 2
+        private const val MIN_MODEL_SIZE_BYTES = 1_048_576L // 1 MB
     }
 }

@@ -42,7 +42,9 @@ data class SettingsUiState(
     val llmModelName: String?      = null,
     val llmDownloadProgress: Int?  = null,   // null = not downloading, 0-100 = progress
     val llmReady: Boolean          = false,
-    val modelBaseUrl: String        = "",
+    val llmValidationFailed: Boolean = false,
+    val modelDownloadUrl: String   = "",
+    val modelDownloadUrlError: Boolean = false,
     val freeRamMb: Int             = 0,
     val saveSuccess: Boolean       = false
 )
@@ -94,7 +96,7 @@ class SettingsViewModel @Inject constructor(
                 directClientId = saved.directClientId,
                 directClientSecret = clientSecret,
                 companionRunning = saved.companionEnabled,
-                modelBaseUrl = saved.modelBaseUrl,
+                modelDownloadUrl = saved.modelDownloadUrl,
                 tmdbApiKey = saved.tmdbApiKey,
                 tmdbConnected = saved.tmdbApiKey.isNotBlank()
             )
@@ -138,7 +140,14 @@ class SettingsViewModel @Inject constructor(
                                 llmReady = true
                             )
                         }
-                        WorkInfo.State.FAILED, WorkInfo.State.CANCELLED -> {
+                        WorkInfo.State.FAILED -> {
+                            val error = workInfo.outputData.getString(ModelDownloadWorker.KEY_ERROR) ?: ""
+                            _uiState.value = _uiState.value.copy(
+                                llmDownloadProgress = null,
+                                llmValidationFailed = error.startsWith("Validation:")
+                            )
+                        }
+                        WorkInfo.State.CANCELLED -> {
                             _uiState.value = _uiState.value.copy(llmDownloadProgress = null)
                         }
                         WorkInfo.State.ENQUEUED -> {
@@ -166,8 +175,12 @@ class SettingsViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(directClientSecret = secret)
     }
 
-    fun setModelBaseUrl(url: String) {
-        _uiState.value = _uiState.value.copy(modelBaseUrl = url)
+    fun setModelDownloadUrl(url: String) {
+        _uiState.value = _uiState.value.copy(
+            modelDownloadUrl = url,
+            llmValidationFailed = false,
+            modelDownloadUrlError = false
+        )
     }
 
     fun setTmdbApiKey(key: String) {
@@ -206,7 +219,7 @@ class SettingsViewModel @Inject constructor(
                     backendUrl = state.customBackendUrl,
                     directClientId = state.directClientId,
                     companionEnabled = state.companionRunning,
-                    modelBaseUrl = state.modelBaseUrl
+                    modelDownloadUrl = state.modelDownloadUrl
                 )
             )
             settingsRepository.saveClientSecret(state.directClientSecret)
@@ -242,12 +255,13 @@ class SettingsViewModel @Inject constructor(
     fun downloadModel() {
         val config = llmOrchestrator.selectConfig()
         val variant = config.modelVariant ?: return // no variant selected → nothing to download
-        val customBase = _uiState.value.modelBaseUrl
-        val modelUrl = if (customBase.isNotBlank()) {
-            "${customBase.trimEnd('/')}/${variant.fileName}"
-        } else {
-            variant.downloadUrl
+        val customUrl = _uiState.value.modelDownloadUrl.trim()
+        if (customUrl.isNotBlank() && !customUrl.endsWith(".litertlm", ignoreCase = true)) {
+            _uiState.value = _uiState.value.copy(modelDownloadUrlError = true)
+            return
         }
+        val modelUrl = customUrl.takeIf { it.isNotBlank() } ?: variant.downloadUrl
+        _uiState.value = _uiState.value.copy(llmValidationFailed = false, modelDownloadUrlError = false)
 
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)

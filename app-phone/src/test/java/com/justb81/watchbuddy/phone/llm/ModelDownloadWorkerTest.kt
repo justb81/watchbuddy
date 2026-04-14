@@ -178,6 +178,31 @@ class ModelDownloadWorkerTest {
             val tempFile = File(tempDir, "$MODEL_FILENAME.tmp")
             assertFalse(tempFile.exists())
         }
+
+        @Test
+        fun `returns validation failure when downloaded file is too small`() = runTest {
+            // Serve a tiny payload — any real .litertlm model is several hundred MB
+            server.enqueue(MockResponse().setBody("tiny"))
+
+            val worker = createWorker(server.url("/model.bin").toString(), attemptCount = 3)
+            val result = worker.doWork()
+
+            assertTrue(result is Result.Failure)
+            val error = (result as Result.Failure).outputData.getString(ModelDownloadWorker.KEY_ERROR)
+            assertTrue(error?.startsWith("Validation:") == true)
+            // Final model file must be cleaned up on validation failure
+            assertFalse(File(tempDir, MODEL_FILENAME).exists())
+        }
+
+        @Test
+        fun `does not call setModelReady when file is too small`() = runTest {
+            server.enqueue(MockResponse().setBody("tiny"))
+
+            val worker = createWorker(server.url("/model.bin").toString(), attemptCount = 3)
+            worker.doWork()
+
+            verify(exactly = 0) { settingsRepository.setModelReady(any()) }
+        }
     }
 
     @Nested

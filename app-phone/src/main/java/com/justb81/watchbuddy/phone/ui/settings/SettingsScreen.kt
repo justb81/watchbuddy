@@ -220,6 +220,20 @@ fun SettingsScreen(
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                         )
                     }
+                    uiState.llmValidationFailed -> {
+                        Text(
+                            text     = stringResource(R.string.settings_llm_validation_failed),
+                            style    = MaterialTheme.typography.bodySmall,
+                            color    = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                        )
+                        TextButton(
+                            onClick  = { viewModel.downloadModel() },
+                            modifier = Modifier.padding(horizontal = 8.dp)
+                        ) {
+                            Text(stringResource(R.string.settings_llm_download))
+                        }
+                    }
                     uiState.llmModelName != null -> {
                         TextButton(
                             onClick  = { viewModel.downloadModel() },
@@ -365,11 +379,15 @@ private fun AdvancedAuthSettings(uiState: SettingsUiState, viewModel: SettingsVi
         )
         Spacer(Modifier.height(4.dp))
         OutlinedTextField(
-            value         = uiState.modelBaseUrl,
-            onValueChange = viewModel::setModelBaseUrl,
+            value         = uiState.modelDownloadUrl,
+            onValueChange = viewModel::setModelDownloadUrl,
             label         = { Text(stringResource(R.string.settings_model_url)) },
             modifier      = Modifier.fillMaxWidth(),
-            singleLine    = true
+            singleLine    = true,
+            isError       = uiState.modelDownloadUrlError,
+            supportingText = if (uiState.modelDownloadUrlError) {
+                { Text(stringResource(R.string.settings_model_url_invalid)) }
+            } else null
         )
 
         Spacer(Modifier.height(12.dp))

@@ -35,7 +35,7 @@ class SettingsRepository @Inject constructor(
         val BACKEND_URL = stringPreferencesKey("backend_url")
         val DIRECT_CLIENT_ID = stringPreferencesKey("direct_client_id")
         val COMPANION_ENABLED = booleanPreferencesKey("companion_enabled")
-        val MODEL_BASE_URL = stringPreferencesKey("model_base_url")
+        val MODEL_DOWNLOAD_URL = stringPreferencesKey("model_download_url")
         val MODEL_READY = booleanPreferencesKey("model_ready")
         val TMDB_API_KEY = stringPreferencesKey("tmdb_api_key")
     }
@@ -61,7 +61,7 @@ class SettingsRepository @Inject constructor(
             backendUrl = prefs[Keys.BACKEND_URL] ?: "",
             directClientId = prefs[Keys.DIRECT_CLIENT_ID] ?: "",
             companionEnabled = prefs[Keys.COMPANION_ENABLED] ?: false,
-            modelBaseUrl = prefs[Keys.MODEL_BASE_URL] ?: "",
+            modelDownloadUrl = prefs[Keys.MODEL_DOWNLOAD_URL] ?: "",
             tmdbApiKey = prefs[Keys.TMDB_API_KEY] ?: ""
         )
     }
@@ -72,7 +72,7 @@ class SettingsRepository @Inject constructor(
             prefs[Keys.BACKEND_URL] = settings.backendUrl
             prefs[Keys.DIRECT_CLIENT_ID] = settings.directClientId
             prefs[Keys.COMPANION_ENABLED] = settings.companionEnabled
-            prefs[Keys.MODEL_BASE_URL] = settings.modelBaseUrl
+            prefs[Keys.MODEL_DOWNLOAD_URL] = settings.modelDownloadUrl
             prefs[Keys.TMDB_API_KEY] = settings.tmdbApiKey
         }
     }

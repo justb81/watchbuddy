@@ -116,6 +116,7 @@ class SettingsViewModelTest {
             val failedInfo = mockk<WorkInfo> {
                 every { state } returns WorkInfo.State.FAILED
                 every { progress } returns workDataOf()
+                every { outputData } returns workDataOf()
             }
 
             val vm = createViewModel()
@@ -125,6 +126,25 @@ class SettingsViewModelTest {
             advanceUntilIdle()
 
             assertNull(vm.uiState.value.llmDownloadProgress)
+            assertFalse(vm.uiState.value.llmValidationFailed)
+        }
+
+        @Test
+        fun `sets llmValidationFailed when failure error starts with Validation`() = runTest {
+            val failedInfo = mockk<WorkInfo> {
+                every { state } returns WorkInfo.State.FAILED
+                every { progress } returns workDataOf()
+                every { outputData } returns workDataOf(
+                    ModelDownloadWorker.KEY_ERROR to "Validation: model file too small (4 bytes)"
+                )
+            }
+
+            val vm = createViewModel()
+            downloadWorkInfoFlow.value = listOf(failedInfo)
+            advanceUntilIdle()
+
+            assertNull(vm.uiState.value.llmDownloadProgress)
+            assertTrue(vm.uiState.value.llmValidationFailed)
         }
 
         @Test
@@ -229,7 +249,7 @@ class SettingsViewModelTest {
         }
 
         @Test
-        fun `uses custom base URL when set`() = runTest {
+        fun `sets modelDownloadUrlError when URL does not end with litertlm`() = runTest {
             every { llmOrchestrator.selectConfig() } returns LlmOrchestrator.LlmConfig(
                 backend = LlmBackend.LITERT,
                 modelVariant = LlmOrchestrator.ModelVariant.GEMMA4_E2B,
@@ -237,7 +257,36 @@ class SettingsViewModelTest {
             )
 
             val vm = createViewModel()
-            vm.setModelBaseUrl("https://my-server.example.com")
+            vm.setModelDownloadUrl("https://example.com/model.bin")
+            vm.downloadModel()
+            advanceUntilIdle()
+
+            assertTrue(vm.uiState.value.modelDownloadUrlError)
+            verify(exactly = 0) {
+                workManager.enqueueUniqueWork(any<String>(), any<ExistingWorkPolicy>(), any<OneTimeWorkRequest>())
+            }
+        }
+
+        @Test
+        fun `clears modelDownloadUrlError when URL is corrected`() = runTest {
+            val vm = createViewModel()
+            vm.setModelDownloadUrl("https://example.com/model.bin")
+            vm.setModelDownloadUrl("https://example.com/model.litertlm")
+            advanceUntilIdle()
+
+            assertFalse(vm.uiState.value.modelDownloadUrlError)
+        }
+
+        @Test
+        fun `uses custom download URL when set`() = runTest {
+            every { llmOrchestrator.selectConfig() } returns LlmOrchestrator.LlmConfig(
+                backend = LlmBackend.LITERT,
+                modelVariant = LlmOrchestrator.ModelVariant.GEMMA4_E2B,
+                qualityScore = 70
+            )
+
+            val vm = createViewModel()
+            vm.setModelDownloadUrl("https://my-server.example.com/model.litertlm")
             vm.downloadModel()
             advanceUntilIdle()
 

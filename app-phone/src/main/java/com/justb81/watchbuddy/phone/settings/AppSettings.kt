@@ -7,6 +7,6 @@ data class AppSettings(
     val backendUrl: String = "",
     val directClientId: String = "",
     val companionEnabled: Boolean = false,
-    val modelBaseUrl: String = "",
+    val modelDownloadUrl: String = "",
     val tmdbApiKey: String = ""
 )
