@@ -25,7 +25,11 @@ sealed class RecapUiState {
     object Idle : RecapUiState()
     data class Generating(val deviceName: String) : RecapUiState()
     data class Ready(val html: String) : RecapUiState()
-    data class Fallback(val synopsis: String) : RecapUiState()
+    data class Fallback(
+        val synopsis: String,
+        /** True when phones were tried but all failed; false when no phones were available at all. */
+        val allPhonesFailed: Boolean = false
+    ) : RecapUiState()
     data class Error(val message: String) : RecapUiState()
 }
 
@@ -82,8 +86,8 @@ class RecapViewModel @Inject constructor(
                 }
             }
 
-            // All phones failed
-            _state.value = RecapUiState.Fallback(fallbackSynopsis)
+            // All phones were tried but all failed — distinguish from the "no phones" early return above.
+            _state.value = RecapUiState.Fallback(fallbackSynopsis, allPhonesFailed = true)
         }
     }
 

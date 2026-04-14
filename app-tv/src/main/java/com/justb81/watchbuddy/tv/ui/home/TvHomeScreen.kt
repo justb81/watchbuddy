@@ -102,6 +102,10 @@ fun TvHomeScreen(
                     NoPhoneConnectedState(onRetry = { viewModel.loadShows() })
                 }
 
+                uiState.phoneApiError && uiState.shows.isEmpty() -> {
+                    PhoneUnreachableState(onRetry = { viewModel.loadShows() })
+                }
+
                 uiState.shows.isEmpty() -> {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(
@@ -113,18 +117,23 @@ fun TvHomeScreen(
                 }
 
                 else -> {
-                    LazyVerticalGrid(
-                        columns            = GridCells.Adaptive(minSize = 180.dp),
-                        contentPadding     = PaddingValues(horizontal = 48.dp, vertical = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                        verticalArrangement   = Arrangement.spacedBy(16.dp),
-                        modifier           = Modifier.fillMaxSize()
-                    ) {
-                        items(uiState.shows, key = { it.show.ids.trakt ?: it.show.title }) { entry ->
-                            ShowCard(
-                                entry    = entry,
-                                onClick  = { onShowClick(entry) }
-                            )
+                    Column(Modifier.fillMaxSize()) {
+                        if (uiState.phoneApiError) {
+                            PhoneUnreachableBanner()
+                        }
+                        LazyVerticalGrid(
+                            columns               = GridCells.Adaptive(minSize = 180.dp),
+                            contentPadding        = PaddingValues(horizontal = 48.dp, vertical = 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            verticalArrangement   = Arrangement.spacedBy(16.dp),
+                            modifier              = Modifier.weight(1f).fillMaxWidth()
+                        ) {
+                            items(uiState.shows, key = { it.show.ids.trakt ?: it.show.title }) { entry ->
+                                ShowCard(
+                                    entry   = entry,
+                                    onClick = { onShowClick(entry) }
+                                )
+                            }
                         }
                     }
                 }
@@ -151,6 +160,43 @@ private fun NoPhoneConnectedState(onRetry: () -> Unit) {
                 Text(stringResource(R.string.tv_retry))
             }
         }
+    }
+}
+
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+private fun PhoneUnreachableState(onRetry: () -> Unit) {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text     = stringResource(R.string.tv_error_phone_unreachable_no_cache),
+                fontSize = 18.sp,
+                color    = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
+                modifier = Modifier.padding(bottom = 24.dp)
+            )
+            Button(
+                onClick = onRetry,
+                scale   = ButtonDefaults.scale(scale = 1f)
+            ) {
+                Text(stringResource(R.string.tv_retry))
+            }
+        }
+    }
+}
+
+@Composable
+private fun PhoneUnreachableBanner() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.errorContainer)
+            .padding(horizontal = 48.dp, vertical = 8.dp)
+    ) {
+        Text(
+            text     = stringResource(R.string.tv_error_phone_unreachable),
+            fontSize = 13.sp,
+            color    = MaterialTheme.colorScheme.onErrorContainer
+        )
     }
 }
 

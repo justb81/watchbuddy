@@ -126,7 +126,10 @@ fun RecapScreen(
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             Text(
-                                text     = stringResource(R.string.tv_recap_fallback),
+                                text     = stringResource(
+                                    if (s.allPhonesFailed) R.string.tv_recap_fallback_phones_failed
+                                    else R.string.tv_recap_fallback
+                                ),
                                 fontSize = 12.sp,
                                 color    = Color.White.copy(alpha = 0.4f)
                             )

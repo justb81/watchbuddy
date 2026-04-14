@@ -37,8 +37,13 @@
     <string name="tv_recap_generating_on">Generating recap on %1$s…</string>
     <string name="tv_recap_error">Could not load recap.</string>
     <string name="tv_recap_fallback">No AI summary available.\nBrief description from TMDB:</string>
+    <string name="tv_recap_fallback_phones_failed">Recap unavailable — companion app unreachable.\nShowing description from TMDB:</string>
     <string name="tv_recap_close">Close</string>
     <string name="tv_recap_watch_now">Watch now</string>
+
+    <!-- Error states -->
+    <string name="tv_error_phone_unreachable">Companion app unreachable. Showing cached data.</string>
+    <string name="tv_error_phone_unreachable_no_cache">Companion app unreachable. Make sure WatchBuddy is running on your phone.</string>
 
     <!-- Streaming settings -->
     <string name="tv_streaming_settings_button">Services</string>

@@ -37,8 +37,13 @@
     <string name="tv_recap_generating_on">Generando resumen en %1$s…</string>
     <string name="tv_recap_error">No se pudo cargar el resumen.</string>
     <string name="tv_recap_fallback">No hay resumen IA disponible.\nDescripción breve de TMDB:</string>
+    <string name="tv_recap_fallback_phones_failed">Resumen no disponible — aplicación compañera inaccesible.\nDescripción de TMDB:</string>
     <string name="tv_recap_close">Cerrar</string>
     <string name="tv_recap_watch_now">Ver ahora</string>
+
+    <!-- Error states -->
+    <string name="tv_error_phone_unreachable">Aplicación compañera inaccesible. Mostrando datos en caché.</string>
+    <string name="tv_error_phone_unreachable_no_cache">Aplicación compañera inaccesible. Asegúrate de que WatchBuddy está en ejecución en tu teléfono.</string>
 
     <!-- Streaming settings -->
     <string name="tv_streaming_settings_button">Servicios</string>

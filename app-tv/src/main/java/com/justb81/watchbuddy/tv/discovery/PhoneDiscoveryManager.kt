@@ -3,6 +3,7 @@ package com.justb81.watchbuddy.tv.discovery
 import android.content.Context
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
+import android.util.Log
 import com.justb81.watchbuddy.core.model.DeviceCapability
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,6 +30,7 @@ class PhoneDiscoveryManager @Inject constructor(
     companion object {
         const val SERVICE_TYPE = "_watchbuddy._tcp."
         const val CAPABILITY_PATH = "/capability"
+        private const val TAG = "PhoneDiscoveryManager"
     }
 
     private val _discoveredPhones = MutableStateFlow<List<DiscoveredPhone>>(emptyList())
@@ -95,7 +97,7 @@ class PhoneDiscoveryManager @Inject constructor(
                 .filter { it.serviceInfo.serviceName != serviceInfo.serviceName } + phone)
                 .sortedByDescending { it.score }
         } catch (e: Exception) {
-            // Phone unreachable — ignore
+            Log.w(TAG, "Phone discovered at $url but capability fetch failed: ${e.message}")
         }
     }
 

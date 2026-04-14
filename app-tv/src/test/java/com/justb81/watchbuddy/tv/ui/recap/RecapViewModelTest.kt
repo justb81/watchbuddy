@@ -43,13 +43,13 @@ class RecapViewModelTest {
     }
 
     @Test
-    fun `requestRecap with no phones returns Fallback`() = runTest {
+    fun `requestRecap with no phones returns Fallback with allPhonesFailed false`() = runTest {
         viewModel.requestRecap(123, "Fallback synopsis text")
         advanceUntilIdle()
 
-        val state = viewModel.state.value
-        assertTrue(state is RecapUiState.Fallback)
-        assertEquals("Fallback synopsis text", (state as RecapUiState.Fallback).synopsis)
+        val state = viewModel.state.value as RecapUiState.Fallback
+        assertEquals("Fallback synopsis text", state.synopsis)
+        assertFalse(state.allPhonesFailed)
     }
 
     @Test
@@ -62,7 +62,7 @@ class RecapViewModelTest {
     }
 
     @Test
-    fun `requestRecap with failing phones returns Fallback`() = runTest {
+    fun `requestRecap with failing phones returns Fallback with allPhonesFailed true`() = runTest {
         val phone = mockk<PhoneDiscoveryManager.DiscoveredPhone>()
         every { phone.capability } returns mockk {
             every { isAvailable } returns true
@@ -85,7 +85,8 @@ class RecapViewModelTest {
         viewModel.requestRecap(123, "Fallback text")
         advanceUntilIdle()
 
-        val state = viewModel.state.value
-        assertTrue(state is RecapUiState.Fallback)
+        val state = viewModel.state.value as RecapUiState.Fallback
+        assertEquals("Fallback text", state.synopsis)
+        assertTrue(state.allPhonesFailed)
     }
 }
