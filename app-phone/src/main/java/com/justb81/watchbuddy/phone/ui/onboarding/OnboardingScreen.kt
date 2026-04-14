@@ -23,6 +23,7 @@ import com.justb81.watchbuddy.R
 fun OnboardingScreen(
     onSuccess: () -> Unit,
     onSkip: () -> Unit,
+    isReconnect: Boolean = false,
     viewModel: OnboardingViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
@@ -50,7 +51,8 @@ fun OnboardingScreen(
         ) {
             // Logo / Title
             Text(
-                text = stringResource(R.string.app_name),
+                text = if (isReconnect) stringResource(R.string.onboarding_reconnect_title)
+                       else stringResource(R.string.app_name),
                 style = MaterialTheme.typography.displaySmall,
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.Bold
@@ -124,7 +126,10 @@ fun OnboardingScreen(
 
             TextButton(onClick = onSkip) {
                 Text(
-                    stringResource(R.string.onboarding_skip),
+                    stringResource(
+                        if (isReconnect) R.string.settings_cancel
+                        else R.string.onboarding_skip
+                    ),
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
                 )
             }

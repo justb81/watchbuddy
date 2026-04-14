@@ -4,19 +4,24 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.justb81.watchbuddy.R
+import com.justb81.watchbuddy.core.network.TokenProxyServiceFactory
 import com.justb81.watchbuddy.core.trakt.DeviceCodeRequest
 import com.justb81.watchbuddy.core.trakt.DeviceCodeResponse
+import com.justb81.watchbuddy.core.trakt.DeviceTokenRequest
 import com.justb81.watchbuddy.core.trakt.ProxyTokenRequest
 import com.justb81.watchbuddy.core.trakt.TokenProxyService
 import com.justb81.watchbuddy.core.trakt.TraktApiService
 import com.justb81.watchbuddy.phone.auth.TokenRepository
+import com.justb81.watchbuddy.phone.settings.SettingsRepository
+import com.justb81.watchbuddy.phone.ui.settings.AuthMode
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Named
@@ -33,8 +38,6 @@ sealed class OnboardingState {
     object Polling : OnboardingState()
     data class Success(val username: String) : OnboardingState()
     data class Error(val message: String) : OnboardingState()
-
-    /** Trakt nicht konfiguriert — CLIENT_ID oder TOKEN_BACKEND_URL fehlt. */
     object NotConfigured : OnboardingState()
 }
 
@@ -42,42 +45,53 @@ sealed class OnboardingState {
 class OnboardingViewModel @Inject constructor(
     application: Application,
     private val traktApi: TraktApiService,
-    /** Null, wenn TOKEN_BACKEND_URL in BuildConfig leer ist. */
     private val tokenProxy: TokenProxyService?,
-    @param:Named("traktClientId") private val clientId: String,
-    private val tokenRepository: TokenRepository
+    @param:Named("traktClientId") private val buildConfigClientId: String,
+    private val tokenRepository: TokenRepository,
+    private val settingsRepository: SettingsRepository,
+    private val tokenProxyServiceFactory: TokenProxyServiceFactory
 ) : AndroidViewModel(application) {
 
     private val _state = MutableStateFlow<OnboardingState>(OnboardingState.Idle)
     val state: StateFlow<OnboardingState> = _state.asStateFlow()
 
-    /**
-     * True, wenn sowohl CLIENT_ID als auch Token-Proxy konfiguriert sind.
-     * Wird vom UI genutzt, um den Trakt-Login-Button ein-/auszublenden.
-     */
-    val isTraktConfigured: Boolean
-        get() = clientId.isNotBlank() && tokenProxy != null
-
-    init {
-        if (!isTraktConfigured) {
-            _state.value = OnboardingState.NotConfigured
-        }
-    }
-
     private var countdownJob: Job? = null
     private var pollingJob: Job? = null
 
-    fun requestDeviceCode() {
-        if (!isTraktConfigured) {
-            _state.value = OnboardingState.NotConfigured
-            return
+    /**
+     * Resolves the effective client ID based on the current auth mode.
+     * Returns null if the required configuration for the active mode is missing.
+     */
+    private fun resolveClientId(authMode: AuthMode, backendUrl: String, directClientId: String): String? {
+        return when (authMode) {
+            AuthMode.MANAGED -> buildConfigClientId.takeIf {
+                it.isNotBlank() && tokenProxy != null
+            }
+            AuthMode.SELF_HOSTED -> buildConfigClientId.takeIf {
+                it.isNotBlank() && backendUrl.isNotBlank()
+            }
+            AuthMode.DIRECT -> directClientId.takeIf {
+                it.isNotBlank() && settingsRepository.getClientSecret().isNotBlank()
+            }
         }
+    }
+
+    fun requestDeviceCode() {
         viewModelScope.launch {
             _state.value = OnboardingState.LoadingCode
             try {
+                val settings = settingsRepository.settings.first()
+                val clientId = resolveClientId(
+                    settings.authMode, settings.backendUrl, settings.directClientId
+                )
+                if (clientId == null) {
+                    _state.value = OnboardingState.NotConfigured
+                    return@launch
+                }
+
                 val response = traktApi.requestDeviceCode(DeviceCodeRequest(clientId))
                 startCountdown(response)
-                startPolling(response)
+                startPolling(response, settings.authMode, settings.backendUrl, clientId)
             } catch (e: Exception) {
                 _state.value = OnboardingState.Error(
                     getApplication<Application>().getString(
@@ -108,27 +122,62 @@ class OnboardingViewModel @Inject constructor(
         }
     }
 
-    private fun startPolling(response: DeviceCodeResponse) {
+    private fun startPolling(
+        response: DeviceCodeResponse,
+        authMode: AuthMode,
+        backendUrl: String,
+        clientId: String
+    ) {
         pollingJob?.cancel()
         pollingJob = viewModelScope.launch {
-            val proxy = tokenProxy ?: run {
-                _state.value = OnboardingState.Error("Trakt not configured")
-                return@launch
-            }
             var attempts = 0
             val maxAttempts = response.expires_in / response.interval
             while (isActive && attempts < maxAttempts) {
                 delay(response.interval * 1_000L)
                 try {
-                    val token = proxy.exchangeDeviceCode(
-                        ProxyTokenRequest(code = response.device_code)
-                    )
+                    val accessToken: String
+                    val refreshToken: String
+                    val expiresIn: Int
+
+                    when (authMode) {
+                        AuthMode.MANAGED -> {
+                            val token = tokenProxy!!.exchangeDeviceCode(
+                                ProxyTokenRequest(code = response.device_code)
+                            )
+                            accessToken = token.access_token
+                            refreshToken = token.refresh_token
+                            expiresIn = token.expires_in
+                        }
+                        AuthMode.SELF_HOSTED -> {
+                            val proxy = tokenProxyServiceFactory.create(backendUrl)
+                            val token = proxy.exchangeDeviceCode(
+                                ProxyTokenRequest(code = response.device_code)
+                            )
+                            accessToken = token.access_token
+                            refreshToken = token.refresh_token
+                            expiresIn = token.expires_in
+                        }
+                        AuthMode.DIRECT -> {
+                            val secret = settingsRepository.getClientSecret()
+                            val token = traktApi.pollDeviceToken(
+                                DeviceTokenRequest(
+                                    code = response.device_code,
+                                    client_id = clientId,
+                                    client_secret = secret
+                                )
+                            )
+                            accessToken = token.access_token
+                            refreshToken = token.refresh_token
+                            expiresIn = token.expires_in
+                        }
+                    }
+
                     tokenRepository.saveTokens(
-                        accessToken  = token.access_token,
-                        refreshToken = token.refresh_token,
-                        expiresIn    = token.expires_in
+                        accessToken  = accessToken,
+                        refreshToken = refreshToken,
+                        expiresIn    = expiresIn
                     )
-                    val profile = traktApi.getProfile("Bearer ${token.access_token}")
+                    val profile = traktApi.getProfile("Bearer $accessToken")
                     countdownJob?.cancel()
                     _state.value = OnboardingState.Success(profile.username)
                     return@launch
