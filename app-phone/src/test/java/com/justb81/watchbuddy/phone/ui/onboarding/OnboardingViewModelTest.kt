@@ -26,6 +26,9 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
+import okhttp3.ResponseBody.Companion.toResponseBody
+import retrofit2.HttpException
+import retrofit2.Response
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @DisplayName("OnboardingViewModel")
@@ -80,25 +83,35 @@ class OnboardingViewModelTest {
     inner class ManagedMode {
 
         @Test
-        fun `shows NotConfigured when client ID is blank`() = runTest {
+        fun `shows NotConfigured with MANAGED_MISSING_CLIENT_ID when client ID is blank`() = runTest {
             every { settingsRepository.settings } returns flowOf(
                 AppSettings(authMode = AuthMode.MANAGED)
             )
             val vm = createViewModel(buildClientId = "")
             vm.requestDeviceCode()
             advanceUntilIdle()
-            assertEquals(OnboardingState.NotConfigured, vm.state.value)
+            val state = vm.state.value
+            assertTrue(state is OnboardingState.NotConfigured)
+            assertEquals(
+                NotConfiguredReason.MANAGED_MISSING_CLIENT_ID,
+                (state as OnboardingState.NotConfigured).reason
+            )
         }
 
         @Test
-        fun `shows NotConfigured when token proxy is null`() = runTest {
+        fun `shows NotConfigured with MANAGED_MISSING_BACKEND when token proxy is null`() = runTest {
             every { settingsRepository.settings } returns flowOf(
                 AppSettings(authMode = AuthMode.MANAGED)
             )
             val vm = createViewModel(proxy = null)
             vm.requestDeviceCode()
             advanceUntilIdle()
-            assertEquals(OnboardingState.NotConfigured, vm.state.value)
+            val state = vm.state.value
+            assertTrue(state is OnboardingState.NotConfigured)
+            assertEquals(
+                NotConfiguredReason.MANAGED_MISSING_BACKEND,
+                (state as OnboardingState.NotConfigured).reason
+            )
         }
 
         @Test
@@ -124,25 +137,35 @@ class OnboardingViewModelTest {
     inner class SelfHostedMode {
 
         @Test
-        fun `shows NotConfigured when backend URL is blank`() = runTest {
+        fun `shows NotConfigured with SELF_HOSTED_MISSING_URL when backend URL is blank`() = runTest {
             every { settingsRepository.settings } returns flowOf(
                 AppSettings(authMode = AuthMode.SELF_HOSTED, backendUrl = "")
             )
             val vm = createViewModel()
             vm.requestDeviceCode()
             advanceUntilIdle()
-            assertEquals(OnboardingState.NotConfigured, vm.state.value)
+            val state = vm.state.value
+            assertTrue(state is OnboardingState.NotConfigured)
+            assertEquals(
+                NotConfiguredReason.SELF_HOSTED_MISSING_URL,
+                (state as OnboardingState.NotConfigured).reason
+            )
         }
 
         @Test
-        fun `shows NotConfigured when client ID is blank`() = runTest {
+        fun `shows NotConfigured with SELF_HOSTED_MISSING_CLIENT_ID when client ID is blank`() = runTest {
             every { settingsRepository.settings } returns flowOf(
                 AppSettings(authMode = AuthMode.SELF_HOSTED, backendUrl = CUSTOM_BACKEND_URL)
             )
             val vm = createViewModel(buildClientId = "")
             vm.requestDeviceCode()
             advanceUntilIdle()
-            assertEquals(OnboardingState.NotConfigured, vm.state.value)
+            val state = vm.state.value
+            assertTrue(state is OnboardingState.NotConfigured)
+            assertEquals(
+                NotConfiguredReason.SELF_HOSTED_MISSING_CLIENT_ID,
+                (state as OnboardingState.NotConfigured).reason
+            )
         }
 
         @Test
@@ -165,7 +188,7 @@ class OnboardingViewModelTest {
     inner class DirectMode {
 
         @Test
-        fun `shows NotConfigured when direct client ID is blank`() = runTest {
+        fun `shows NotConfigured with DIRECT_MISSING_CREDENTIALS when direct client ID is blank`() = runTest {
             every { settingsRepository.settings } returns flowOf(
                 AppSettings(authMode = AuthMode.DIRECT, directClientId = "")
             )
@@ -174,11 +197,16 @@ class OnboardingViewModelTest {
             val vm = createViewModel()
             vm.requestDeviceCode()
             advanceUntilIdle()
-            assertEquals(OnboardingState.NotConfigured, vm.state.value)
+            val state = vm.state.value
+            assertTrue(state is OnboardingState.NotConfigured)
+            assertEquals(
+                NotConfiguredReason.DIRECT_MISSING_CREDENTIALS,
+                (state as OnboardingState.NotConfigured).reason
+            )
         }
 
         @Test
-        fun `shows NotConfigured when client secret is blank`() = runTest {
+        fun `shows NotConfigured with DIRECT_MISSING_CREDENTIALS when client secret is blank`() = runTest {
             every { settingsRepository.settings } returns flowOf(
                 AppSettings(authMode = AuthMode.DIRECT, directClientId = DIRECT_CLIENT_ID)
             )
@@ -187,7 +215,12 @@ class OnboardingViewModelTest {
             val vm = createViewModel()
             vm.requestDeviceCode()
             advanceUntilIdle()
-            assertEquals(OnboardingState.NotConfigured, vm.state.value)
+            val state = vm.state.value
+            assertTrue(state is OnboardingState.NotConfigured)
+            assertEquals(
+                NotConfiguredReason.DIRECT_MISSING_CREDENTIALS,
+                (state as OnboardingState.NotConfigured).reason
+            )
         }
 
         @Test
@@ -234,6 +267,92 @@ class OnboardingViewModelTest {
             advanceUntilIdle()
 
             assertTrue(vm.state.value is OnboardingState.Error)
+        }
+    }
+
+    @Nested
+    @DisplayName("Polling error handling")
+    inner class PollingErrorHandling {
+
+        private val proxyTokenResponse = ProxyTokenResponse(
+            access_token = "acc",
+            refresh_token = "ref",
+            expires_in = 7776000,
+            token_type = "Bearer",
+            scope = "public"
+        )
+
+        @Test
+        fun `shows Error after 3 consecutive network failures during polling`() = runTest {
+            every { settingsRepository.settings } returns flowOf(
+                AppSettings(authMode = AuthMode.MANAGED)
+            )
+            coEvery { traktApi.requestDeviceCode(any()) } returns deviceCodeResponse
+            // First call succeeds to get to polling phase; subsequent calls throw network errors
+            coEvery { tokenProxy.exchangeDeviceCode(any()) } throws RuntimeException("Connection refused")
+            every { application.getString(any<Int>()) } returns "Network error"
+
+            val vm = createViewModel()
+            vm.requestDeviceCode()
+            advanceUntilIdle()
+
+            assertTrue(vm.state.value is OnboardingState.Error)
+        }
+
+        @Test
+        fun `continues polling when HTTP 400 is returned (PIN pending)`() = runTest {
+            every { settingsRepository.settings } returns flowOf(
+                AppSettings(authMode = AuthMode.MANAGED)
+            )
+            coEvery { traktApi.requestDeviceCode(any()) } returns deviceCodeResponse
+
+            var callCount = 0
+            coEvery { tokenProxy.exchangeDeviceCode(any()) } answers {
+                callCount++
+                if (callCount < 3) {
+                    // HTTP 400 = pending
+                    throw HttpException(Response.error<Any>(400, "".toResponseBody()))
+                } else {
+                    proxyTokenResponse
+                }
+            }
+            coEvery { traktApi.getProfile(any()) } returns TraktUserProfile(username = "user1")
+
+            val vm = createViewModel()
+            vm.requestDeviceCode()
+            advanceUntilIdle()
+
+            // After the third attempt succeeds, state should be Success
+            assertTrue(vm.state.value is OnboardingState.Success)
+        }
+
+        @Test
+        fun `resets consecutive failure count after a successful HTTP 400 response`() = runTest {
+            every { settingsRepository.settings } returns flowOf(
+                AppSettings(authMode = AuthMode.MANAGED)
+            )
+            coEvery { traktApi.requestDeviceCode(any()) } returns deviceCodeResponse
+
+            var callCount = 0
+            coEvery { tokenProxy.exchangeDeviceCode(any()) } answers {
+                callCount++
+                when (callCount) {
+                    1 -> throw RuntimeException("network blip")  // counts as 1
+                    2 -> throw HttpException(Response.error<Any>(400, "".toResponseBody())) // resets to 0
+                    3 -> throw RuntimeException("network blip")  // counts as 1 again
+                    4 -> throw RuntimeException("network blip")  // counts as 2
+                    5 -> proxyTokenResponse                       // succeeds before reaching 3
+                    else -> proxyTokenResponse
+                }
+            }
+            coEvery { traktApi.getProfile(any()) } returns TraktUserProfile(username = "user1")
+
+            val vm = createViewModel()
+            vm.requestDeviceCode()
+            advanceUntilIdle()
+
+            // Should succeed because the HTTP 400 reset the failure counter before we hit 3
+            assertTrue(vm.state.value is OnboardingState.Success)
         }
     }
 }

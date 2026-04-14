@@ -5,6 +5,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,6 +25,7 @@ import com.justb81.watchbuddy.R
 fun OnboardingScreen(
     onSuccess: () -> Unit,
     onSkip: () -> Unit,
+    onOpenSettings: () -> Unit = {},
     isReconnect: Boolean = false,
     viewModel: OnboardingViewModel = hiltViewModel()
 ) {
@@ -110,14 +113,10 @@ fun OnboardingScreen(
                     }
 
                     is OnboardingState.NotConfigured -> {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                text = stringResource(R.string.onboarding_not_configured),
-                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
-                                textAlign = TextAlign.Center,
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                        }
+                        NotConfiguredCard(
+                            reason = currentState.reason,
+                            onOpenSettings = onOpenSettings
+                        )
                     }
 
                     else -> {}
@@ -133,6 +132,52 @@ fun OnboardingScreen(
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun NotConfiguredCard(
+    reason: NotConfiguredReason,
+    onOpenSettings: () -> Unit
+) {
+    val messageRes = when (reason) {
+        NotConfiguredReason.MANAGED_MISSING_CLIENT_ID ->
+            R.string.onboarding_not_configured_managed_no_client_id
+        NotConfiguredReason.MANAGED_MISSING_BACKEND ->
+            R.string.onboarding_not_configured_managed_no_backend
+        NotConfiguredReason.SELF_HOSTED_MISSING_URL ->
+            R.string.onboarding_not_configured_self_hosted_no_url
+        NotConfiguredReason.SELF_HOSTED_MISSING_CLIENT_ID ->
+            R.string.onboarding_not_configured_self_hosted_no_id
+        NotConfiguredReason.DIRECT_MISSING_CREDENTIALS ->
+            R.string.onboarding_not_configured_direct_no_credentials
+    }
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Icon(
+            imageVector = Icons.Default.Warning,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.error,
+            modifier = Modifier.size(40.dp)
+        )
+        Text(
+            text = stringResource(messageRes),
+            color = MaterialTheme.colorScheme.error,
+            textAlign = TextAlign.Center,
+            style = MaterialTheme.typography.bodyMedium
+        )
+        Spacer(Modifier.height(4.dp))
+        Button(
+            onClick = onOpenSettings,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.errorContainer,
+                contentColor = MaterialTheme.colorScheme.onErrorContainer
+            )
+        ) {
+            Text(stringResource(R.string.onboarding_open_settings))
         }
     }
 }

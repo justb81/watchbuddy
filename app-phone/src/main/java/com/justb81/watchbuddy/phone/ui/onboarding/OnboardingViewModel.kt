@@ -23,8 +23,22 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import retrofit2.HttpException
 import javax.inject.Inject
 import javax.inject.Named
+
+enum class NotConfiguredReason {
+    /** MANAGED mode: the build-time TRAKT_CLIENT_ID is empty. */
+    MANAGED_MISSING_CLIENT_ID,
+    /** MANAGED mode: the compiled-in token proxy is not available. */
+    MANAGED_MISSING_BACKEND,
+    /** SELF_HOSTED mode: the user has not entered a backend URL. */
+    SELF_HOSTED_MISSING_URL,
+    /** SELF_HOSTED mode: the build-time TRAKT_CLIENT_ID is empty. */
+    SELF_HOSTED_MISSING_CLIENT_ID,
+    /** DIRECT mode: either the Client ID or Client Secret is missing. */
+    DIRECT_MISSING_CREDENTIALS,
+}
 
 sealed class OnboardingState {
     object Idle : OnboardingState()
@@ -38,7 +52,7 @@ sealed class OnboardingState {
     object Polling : OnboardingState()
     data class Success(val username: String) : OnboardingState()
     data class Error(val message: String) : OnboardingState()
-    object NotConfigured : OnboardingState()
+    data class NotConfigured(val reason: NotConfiguredReason) : OnboardingState()
 }
 
 @HiltViewModel
@@ -60,18 +74,30 @@ class OnboardingViewModel @Inject constructor(
 
     /**
      * Resolves the effective client ID based on the current auth mode.
-     * Returns null if the required configuration for the active mode is missing.
+     * Returns a [Pair] of (clientId, reason): if clientId is non-null the config is complete;
+     * if null, reason describes why it is missing.
      */
-    private fun resolveClientId(authMode: AuthMode, backendUrl: String, directClientId: String): String? {
-        return when (authMode) {
-            AuthMode.MANAGED -> buildConfigClientId.takeIf {
-                it.isNotBlank() && tokenProxy != null
-            }
-            AuthMode.SELF_HOSTED -> buildConfigClientId.takeIf {
-                it.isNotBlank() && backendUrl.isNotBlank()
-            }
-            AuthMode.DIRECT -> directClientId.takeIf {
-                it.isNotBlank() && settingsRepository.getClientSecret().isNotBlank()
+    private fun resolveClientId(
+        authMode: AuthMode,
+        backendUrl: String,
+        directClientId: String
+    ): Pair<String?, NotConfiguredReason?> = when (authMode) {
+        AuthMode.MANAGED -> when {
+            buildConfigClientId.isBlank() -> null to NotConfiguredReason.MANAGED_MISSING_CLIENT_ID
+            tokenProxy == null -> null to NotConfiguredReason.MANAGED_MISSING_BACKEND
+            else -> buildConfigClientId to null
+        }
+        AuthMode.SELF_HOSTED -> when {
+            backendUrl.isBlank() -> null to NotConfiguredReason.SELF_HOSTED_MISSING_URL
+            buildConfigClientId.isBlank() -> null to NotConfiguredReason.SELF_HOSTED_MISSING_CLIENT_ID
+            else -> buildConfigClientId to null
+        }
+        AuthMode.DIRECT -> {
+            val secret = settingsRepository.getClientSecret()
+            if (directClientId.isBlank() || secret.isBlank()) {
+                null to NotConfiguredReason.DIRECT_MISSING_CREDENTIALS
+            } else {
+                directClientId to null
             }
         }
     }
@@ -81,11 +107,11 @@ class OnboardingViewModel @Inject constructor(
             _state.value = OnboardingState.LoadingCode
             try {
                 val settings = settingsRepository.settings.first()
-                val clientId = resolveClientId(
+                val (clientId, reason) = resolveClientId(
                     settings.authMode, settings.backendUrl, settings.directClientId
                 )
                 if (clientId == null) {
-                    _state.value = OnboardingState.NotConfigured
+                    _state.value = OnboardingState.NotConfigured(reason!!)
                     return@launch
                 }
 
@@ -131,6 +157,7 @@ class OnboardingViewModel @Inject constructor(
         pollingJob?.cancel()
         pollingJob = viewModelScope.launch {
             var attempts = 0
+            var consecutiveNetworkFailures = 0
             val maxAttempts = response.expires_in / response.interval
             while (isActive && attempts < maxAttempts) {
                 delay(response.interval * 1_000L)
@@ -181,8 +208,24 @@ class OnboardingViewModel @Inject constructor(
                     countdownJob?.cancel()
                     _state.value = OnboardingState.Success(profile.username)
                     return@launch
-                } catch (_: Exception) {
-                    // HTTP 400 = PIN not yet confirmed, 410 = expired — keep polling
+                } catch (e: Exception) {
+                    // HTTP 400 = PIN not yet confirmed — this is expected, keep polling.
+                    // Any other exception (network error, HTTP 410/418/429, etc.) counts as a failure.
+                    val isPinPending = e is HttpException && e.code() == 400
+                    if (isPinPending) {
+                        consecutiveNetworkFailures = 0
+                    } else {
+                        consecutiveNetworkFailures++
+                        if (consecutiveNetworkFailures >= 3) {
+                            countdownJob?.cancel()
+                            _state.value = OnboardingState.Error(
+                                getApplication<Application>().getString(
+                                    R.string.onboarding_error_polling_network
+                                )
+                            )
+                            return@launch
+                        }
+                    }
                 }
                 attempts++
             }
