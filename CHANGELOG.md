@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.4.0](https://github.com/justb81/watchbuddy/compare/v0.3.0...v0.4.0) (2026-04-14)
+
+
+### Features
+
+* implement AICore LLM provider with Gemini Nano ([#101](https://github.com/justb81/watchbuddy/issues/101)) ([fcbc388](https://github.com/justb81/watchbuddy/commit/fcbc3887300d776b58fdeecca2d170debe933409)), closes [#83](https://github.com/justb81/watchbuddy/issues/83)
+
+
+### Bug Fixes
+
+* make Connect with Trakt work for all auth modes ([#104](https://github.com/justb81/watchbuddy/issues/104)) ([4583f3c](https://github.com/justb81/watchbuddy/commit/4583f3c6928c823f788ffbf06c56f23e9b756438))
+* prevent OOM crash during model download and add GPU fallback ([#103](https://github.com/justb81/watchbuddy/issues/103)) ([b5eb14d](https://github.com/justb81/watchbuddy/commit/b5eb14d41b1675603753862df85f44f3147207ea))
+
 ## [0.3.0](https://github.com/justb81/watchbuddy/compare/v0.2.2...v0.3.0) (2026-04-13)
 
 
