@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.5.0](https://github.com/justb81/watchbuddy/compare/v0.4.0...v0.5.0) (2026-04-14)
+
+
+### Features
+
+* **backend:** add debug request logging toggled via DEBUG_MODE env var ([#121](https://github.com/justb81/watchbuddy/issues/121)) ([1d24dd4](https://github.com/justb81/watchbuddy/commit/1d24dd4a0ee4597356a9c9dfa89e6b016b33f114)), closes [#106](https://github.com/justb81/watchbuddy/issues/106)
+
+
+### Bug Fixes
+
+* resolve TMDB language, API key validation, HTML encoding, and parallel fetches ([#119](https://github.com/justb81/watchbuddy/issues/119)) ([daa3cc9](https://github.com/justb81/watchbuddy/commit/daa3cc900594ecc6d89121f2ecc330883d56c2f6))
+
 ## [0.4.0](https://github.com/justb81/watchbuddy/compare/v0.3.0...v0.4.0) (2026-04-14)
 
 
