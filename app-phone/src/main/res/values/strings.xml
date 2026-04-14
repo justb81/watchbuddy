@@ -72,7 +72,9 @@
     <string name="settings_auth_client_id">Client ID</string>
     <string name="settings_auth_client_secret">Client Secret</string>
     <string name="settings_model_url_section">Model download</string>
-    <string name="settings_model_url">Custom model base URL</string>
+    <string name="settings_model_url">Custom download URL</string>
+    <string name="settings_llm_validation_failed">Download failed: file appears invalid</string>
+    <string name="settings_model_url_invalid">URL must point to a .litertlm file</string>
     <string name="settings_save">Save</string>
     <string name="settings_saved">Settings saved</string>
     <string name="settings_cancel">Cancel</string>
@@ -90,6 +92,12 @@
     <string name="companion_channel_description">Shows when the companion server is active for TV connections</string>
     <string name="companion_notification_title">WatchBuddy Companion</string>
     <string name="companion_notification_text">Ready for TV connection</string>
+
+    <!-- Model Download -->
+    <string name="model_download_channel_name">Model Download</string>
+    <string name="model_download_channel_description">Shows progress while downloading the AI model</string>
+    <string name="model_download_notification_title">Downloading AI model</string>
+    <string name="model_download_notification_text">WatchBuddy is downloading the AI model in the background</string>
 
     <!-- Common -->
     <string name="no_description">No description available.</string>

@@ -65,5 +65,13 @@
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
+        <!-- WorkManager foreground service — required for long-running downloads on Android 10+.
+             Merges with WorkManager's own SystemForegroundService manifest entry to declare
+             the dataSync foreground service type used by ModelDownloadWorker. -->
+        <service
+            android:name="androidx.work.impl.foreground.SystemForegroundService"
+            android:foregroundServiceType="dataSync"
+            tools:node="merge" />
+
     </application>
 </manifest>

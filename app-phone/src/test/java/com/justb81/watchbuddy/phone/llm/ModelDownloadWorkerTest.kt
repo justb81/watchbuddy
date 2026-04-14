@@ -31,6 +31,8 @@ class ModelDownloadWorkerTest {
 
     companion object {
         private const val MODEL_FILENAME = "gemma-4-E2B-it.litertlm"
+        // 1 MB + 1 byte — just over the validation threshold so successful downloads pass
+        private val VALID_MODEL_CONTENT = "x".repeat(1_048_577)
     }
 
     private lateinit var server: MockWebServer
@@ -73,6 +75,8 @@ class ModelDownloadWorkerTest {
             ModelDownloadWorker(context, workerParams, settingsRepository, downloadClient)
         )
         coEvery { worker.setProgress(any()) } just Runs
+        coEvery { worker.setForeground(any()) } just Runs
+        every { worker.createForegroundInfo() } returns mockk(relaxed = true)
         return worker
     }
 
@@ -82,11 +86,10 @@ class ModelDownloadWorkerTest {
 
         @Test
         fun `downloads file using dedicated download client`() = runTest {
-            val content = "model binary data"
             server.enqueue(
                 MockResponse()
-                    .setBody(content)
-                    .setHeader("Content-Length", content.length)
+                    .setBody(VALID_MODEL_CONTENT)
+                    .setHeader("Content-Length", VALID_MODEL_CONTENT.length)
             )
 
             val worker = createWorker(server.url("/model.bin").toString())
@@ -99,12 +102,12 @@ class ModelDownloadWorkerTest {
 
             val outputFile = File(tempDir, MODEL_FILENAME)
             assertTrue(outputFile.exists())
-            assertEquals(content, outputFile.readText())
+            assertEquals(VALID_MODEL_CONTENT.length.toLong(), outputFile.length())
         }
 
         @Test
         fun `sets model ready on successful download`() = runTest {
-            server.enqueue(MockResponse().setBody("data"))
+            server.enqueue(MockResponse().setBody(VALID_MODEL_CONTENT))
 
             val worker = createWorker(server.url("/model.bin").toString())
             worker.doWork()
@@ -176,6 +179,31 @@ class ModelDownloadWorkerTest {
             val tempFile = File(tempDir, "$MODEL_FILENAME.tmp")
             assertFalse(tempFile.exists())
         }
+
+        @Test
+        fun `returns validation failure when downloaded file is too small`() = runTest {
+            // Serve a tiny payload — any real .litertlm model is several hundred MB
+            server.enqueue(MockResponse().setBody("tiny"))
+
+            val worker = createWorker(server.url("/model.bin").toString(), attemptCount = 3)
+            val result = worker.doWork()
+
+            assertTrue(result is Result.Failure)
+            val error = (result as Result.Failure).outputData.getString(ModelDownloadWorker.KEY_ERROR)
+            assertTrue(error?.startsWith("Validation:") == true)
+            // Final model file must be cleaned up on validation failure
+            assertFalse(File(tempDir, MODEL_FILENAME).exists())
+        }
+
+        @Test
+        fun `does not call setModelReady when file is too small`() = runTest {
+            server.enqueue(MockResponse().setBody("tiny"))
+
+            val worker = createWorker(server.url("/model.bin").toString(), attemptCount = 3)
+            worker.doWork()
+
+            verify(exactly = 0) { settingsRepository.setModelReady(any()) }
+        }
     }
 
     @Nested
@@ -203,18 +231,17 @@ class ModelDownloadWorkerTest {
 
         @Test
         fun `succeeds when content-length matches downloaded bytes`() = runTest {
-            val content = "exact content"
             server.enqueue(
                 MockResponse()
-                    .setBody(content)
-                    .setHeader("Content-Length", content.length)
+                    .setBody(VALID_MODEL_CONTENT)
+                    .setHeader("Content-Length", VALID_MODEL_CONTENT.length)
             )
 
             val worker = createWorker(server.url("/model.bin").toString())
             val result = worker.doWork()
 
             assertTrue(result is Result.Success)
-            assertEquals(content, File(tempDir, MODEL_FILENAME).readText())
+            assertEquals(VALID_MODEL_CONTENT.length.toLong(), File(tempDir, MODEL_FILENAME).length())
         }
     }
 

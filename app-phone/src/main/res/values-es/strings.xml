@@ -72,7 +72,9 @@
     <string name="settings_auth_client_id">Client ID</string>
     <string name="settings_auth_client_secret">Client Secret</string>
     <string name="settings_model_url_section">Descarga del modelo</string>
-    <string name="settings_model_url">URL base personalizada</string>
+    <string name="settings_model_url">URL de descarga personalizada</string>
+    <string name="settings_llm_validation_failed">Error de descarga: el archivo parece inválido</string>
+    <string name="settings_model_url_invalid">La URL debe apuntar a un archivo .litertlm</string>
     <string name="settings_save">Guardar</string>
     <string name="settings_saved">Ajustes guardados</string>
     <string name="settings_cancel">Cancelar</string>

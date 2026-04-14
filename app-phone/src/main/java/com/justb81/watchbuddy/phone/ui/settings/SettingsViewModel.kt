@@ -42,7 +42,9 @@ data class SettingsUiState(
     val llmModelName: String?      = null,
     val llmDownloadProgress: Int?  = null,   // null = not downloading, 0-100 = progress
     val llmReady: Boolean          = false,
-    val modelBaseUrl: String        = "",
+    val llmValidationFailed: Boolean = false,
+    val modelDownloadUrl: String   = "",
+    val modelDownloadUrlError: Boolean = false,
     val freeRamMb: Int             = 0,
     val saveSuccess: Boolean       = false
 )
@@ -50,14 +52,13 @@ data class SettingsUiState(
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     application: Application,
+    private val workManager: WorkManager,
     private val llmOrchestrator: LlmOrchestrator,
     private val traktApi: TraktApiService,
     private val tokenRepository: TokenRepository,
     private val deviceCapabilityProvider: DeviceCapabilityProvider,
     private val settingsRepository: SettingsRepository
 ) : AndroidViewModel(application) {
-
-    private val workManager = WorkManager.getInstance(application)
 
     private val _uiState = MutableStateFlow(SettingsUiState(
         llmBackend = application.getString(R.string.settings_llm_detecting),
@@ -70,6 +71,7 @@ class SettingsViewModel @Inject constructor(
         loadTraktUsername()
         detectLlm()
         observeModelReadyState()
+        observeDownloadProgress()
     }
 
     private fun loadTraktUsername() {
@@ -94,7 +96,7 @@ class SettingsViewModel @Inject constructor(
                 directClientId = saved.directClientId,
                 directClientSecret = clientSecret,
                 companionRunning = saved.companionEnabled,
-                modelBaseUrl = saved.modelBaseUrl,
+                modelDownloadUrl = saved.modelDownloadUrl,
                 tmdbApiKey = saved.tmdbApiKey,
                 tmdbConnected = saved.tmdbApiKey.isNotBlank()
             )
@@ -120,6 +122,43 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    private fun observeDownloadProgress() {
+        viewModelScope.launch {
+            workManager.getWorkInfosForUniqueWorkFlow(ModelDownloadWorker.UNIQUE_WORK_NAME)
+                .collect { workInfoList ->
+                    val workInfo = workInfoList.firstOrNull() ?: return@collect
+                    when (workInfo.state) {
+                        WorkInfo.State.RUNNING -> {
+                            val progress = workInfo.progress.getInt(
+                                ModelDownloadWorker.KEY_PROGRESS, 0
+                            )
+                            _uiState.value = _uiState.value.copy(llmDownloadProgress = progress)
+                        }
+                        WorkInfo.State.SUCCEEDED -> {
+                            _uiState.value = _uiState.value.copy(
+                                llmDownloadProgress = null,
+                                llmReady = true
+                            )
+                        }
+                        WorkInfo.State.FAILED -> {
+                            val error = workInfo.outputData.getString(ModelDownloadWorker.KEY_ERROR) ?: ""
+                            _uiState.value = _uiState.value.copy(
+                                llmDownloadProgress = null,
+                                llmValidationFailed = error.startsWith("Validation:")
+                            )
+                        }
+                        WorkInfo.State.CANCELLED -> {
+                            _uiState.value = _uiState.value.copy(llmDownloadProgress = null)
+                        }
+                        WorkInfo.State.ENQUEUED -> {
+                            _uiState.value = _uiState.value.copy(llmDownloadProgress = 0)
+                        }
+                        else -> { /* BLOCKED — no UI update needed */ }
+                    }
+                }
+        }
+    }
+
     fun setAuthMode(mode: AuthMode) {
         _uiState.value = _uiState.value.copy(authMode = mode)
     }
@@ -136,8 +175,12 @@ class SettingsViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(directClientSecret = secret)
     }
 
-    fun setModelBaseUrl(url: String) {
-        _uiState.value = _uiState.value.copy(modelBaseUrl = url)
+    fun setModelDownloadUrl(url: String) {
+        _uiState.value = _uiState.value.copy(
+            modelDownloadUrl = url,
+            llmValidationFailed = false,
+            modelDownloadUrlError = false
+        )
     }
 
     fun setTmdbApiKey(key: String) {
@@ -176,7 +219,7 @@ class SettingsViewModel @Inject constructor(
                     backendUrl = state.customBackendUrl,
                     directClientId = state.directClientId,
                     companionEnabled = state.companionRunning,
-                    modelBaseUrl = state.modelBaseUrl
+                    modelDownloadUrl = state.modelDownloadUrl
                 )
             )
             settingsRepository.saveClientSecret(state.directClientSecret)
@@ -212,12 +255,13 @@ class SettingsViewModel @Inject constructor(
     fun downloadModel() {
         val config = llmOrchestrator.selectConfig()
         val variant = config.modelVariant ?: return // no variant selected → nothing to download
-        val customBase = _uiState.value.modelBaseUrl
-        val modelUrl = if (customBase.isNotBlank()) {
-            "${customBase.trimEnd('/')}/${variant.fileName}"
-        } else {
-            variant.downloadUrl
+        val customUrl = _uiState.value.modelDownloadUrl.trim()
+        if (customUrl.isNotBlank() && !customUrl.endsWith(".litertlm", ignoreCase = true)) {
+            _uiState.value = _uiState.value.copy(modelDownloadUrlError = true)
+            return
         }
+        val modelUrl = customUrl.takeIf { it.isNotBlank() } ?: variant.downloadUrl
+        _uiState.value = _uiState.value.copy(llmValidationFailed = false, modelDownloadUrlError = false)
 
         val constraints = Constraints.Builder()
             .setRequiredNetworkType(NetworkType.CONNECTED)
@@ -237,41 +281,7 @@ class SettingsViewModel @Inject constructor(
             ExistingWorkPolicy.KEEP,
             workRequest
         )
-
-        // Observe work progress
-        viewModelScope.launch {
-            workManager.getWorkInfoByIdFlow(workRequest.id).collect { workInfo ->
-                if (workInfo == null) return@collect
-                when (workInfo.state) {
-                    WorkInfo.State.RUNNING -> {
-                        val progress = workInfo.progress.getInt(
-                            ModelDownloadWorker.KEY_PROGRESS, 0
-                        )
-                        _uiState.value = _uiState.value.copy(
-                            llmDownloadProgress = progress
-                        )
-                    }
-                    WorkInfo.State.SUCCEEDED -> {
-                        _uiState.value = _uiState.value.copy(
-                            llmDownloadProgress = null,
-                            llmReady = true
-                        )
-                    }
-                    WorkInfo.State.FAILED -> {
-                        _uiState.value = _uiState.value.copy(
-                            llmDownloadProgress = null,
-                            llmReady = false
-                        )
-                    }
-                    WorkInfo.State.ENQUEUED -> {
-                        _uiState.value = _uiState.value.copy(
-                            llmDownloadProgress = 0
-                        )
-                    }
-                    else -> { /* BLOCKED, CANCELLED — no UI update needed */ }
-                }
-            }
-        }
+        // Progress is tracked by observeDownloadProgress() running since init
     }
 
 }

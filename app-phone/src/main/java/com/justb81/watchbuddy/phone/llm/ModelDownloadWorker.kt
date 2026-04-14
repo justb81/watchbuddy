@@ -1,11 +1,18 @@
 package com.justb81.watchbuddy.phone.llm
 
+import android.app.Notification
 import android.content.Context
+import android.content.pm.ServiceInfo
+import android.os.Build
 import android.util.Log
+import androidx.core.app.NotificationCompat
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
+import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
+import com.justb81.watchbuddy.R
+import com.justb81.watchbuddy.WatchBuddyPhoneApp
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
@@ -31,6 +38,8 @@ class ModelDownloadWorker @AssistedInject constructor(
             ?: return Result.failure(workDataOf(KEY_ERROR to "No model URL provided"))
         val modelFileName = inputData.getString(KEY_MODEL_FILENAME) ?: "model.bin"
 
+        setForeground(createForegroundInfo())
+
         val outputDir = settingsRepository.modelDir()
         val outputFile = File(outputDir, modelFileName)
         val tempFile = File(outputDir, "$modelFileName.tmp")
@@ -39,6 +48,15 @@ class ModelDownloadWorker @AssistedInject constructor(
             downloadFile(modelUrl, tempFile)
             if (!tempFile.renameTo(outputFile)) {
                 throw RuntimeException("Failed to rename downloaded model to final path")
+            }
+            // Sanity-check: a real .litertlm model is hundreds of MB; anything smaller
+            // is almost certainly an HTML error page or a corrupt response.
+            if (outputFile.length() < MIN_MODEL_SIZE_BYTES) {
+                val size = outputFile.length()
+                outputFile.delete()
+                return Result.failure(
+                    workDataOf(KEY_ERROR to "Validation: model file too small ($size bytes)")
+                )
             }
             settingsRepository.setModelReady(true)
             setProgress(workDataOf(KEY_PROGRESS to 100))
@@ -53,6 +71,23 @@ class ModelDownloadWorker @AssistedInject constructor(
             }
         }
     }
+
+    internal fun createForegroundInfo(): ForegroundInfo {
+        val notification = buildNotification()
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ForegroundInfo(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+        } else {
+            ForegroundInfo(NOTIFICATION_ID, notification)
+        }
+    }
+
+    private fun buildNotification(): Notification =
+        NotificationCompat.Builder(applicationContext, WatchBuddyPhoneApp.MODEL_DOWNLOAD_CHANNEL_ID)
+            .setContentTitle(applicationContext.getString(R.string.model_download_notification_title))
+            .setContentText(applicationContext.getString(R.string.model_download_notification_text))
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setOngoing(true)
+            .build()
 
     private suspend fun downloadFile(url: String, target: File) = withContext(Dispatchers.IO) {
         val request = Request.Builder().url(url).build()
@@ -106,5 +141,7 @@ class ModelDownloadWorker @AssistedInject constructor(
         private const val TAG = "ModelDownloadWorker"
         private const val MAX_RETRIES = 3
         private const val BUFFER_SIZE = 8 * 1024
+        private const val NOTIFICATION_ID = 2
+        private const val MIN_MODEL_SIZE_BYTES = 1_048_576L // 1 MB
     }
 }
