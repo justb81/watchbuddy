@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.6.0](https://github.com/justb81/watchbuddy/compare/v0.5.1...v0.6.0) (2026-04-14)
+
+
+### Features
+
+* **accessibility:** add contentDescriptions to interactive TV UI elements for TalkBack ([#129](https://github.com/justb81/watchbuddy/issues/129)) ([bc23e6e](https://github.com/justb81/watchbuddy/commit/bc23e6e8fdbd046e71f412500d18e70e1ab5ccad))
+* **tv:** add pagination to TvHomeViewModel show loading for large libraries ([#131](https://github.com/justb81/watchbuddy/issues/131)) ([f69e2e1](https://github.com/justb81/watchbuddy/commit/f69e2e18117c540b90a87b22b822c962322efb47))
+
+
+### Bug Fixes
+
+* **build:** sign debug APKs with release keystore to enable seamless upgrades ([#128](https://github.com/justb81/watchbuddy/issues/128)) ([9582c0b](https://github.com/justb81/watchbuddy/commit/9582c0b7983376ec22761a7cc8d8f518ce096553)), closes [#105](https://github.com/justb81/watchbuddy/issues/105)
+
 ## [0.5.1](https://github.com/justb81/watchbuddy/compare/v0.5.0...v0.5.1) (2026-04-14)
 
 
