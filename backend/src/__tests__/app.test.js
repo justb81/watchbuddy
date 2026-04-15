@@ -34,11 +34,19 @@ function buildApp(fetchFn, overrides = {}) {
 // ── Health endpoint ─────────────────────────────────────────────────────────
 
 describe('GET /health', () => {
-  it('returns 200 with status ok', async () => {
+  it('returns 503 with status starting before verification', async () => {
     const app = buildApp(mockFetch(200, {}));
     const res = await request(app).get('/health');
+    expect(res.status).toBe(503);
+    expect(res.body).toEqual({ status: 'starting', trakt: 'pending' });
+  });
+
+  it('returns 200 with status ok after successful verification', async () => {
+    const app = buildApp(mockFetch(200, {}));
+    await app.verifyCredentials();
+    const res = await request(app).get('/health');
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ status: 'ok' });
+    expect(res.body).toEqual({ status: 'ok', trakt: 'connected' });
   });
 });
 
@@ -401,6 +409,181 @@ describe('Unknown routes', () => {
   });
 });
 
+// ── Credential verification ────────────────────────────────────────────────
+
+describe('Credential verification', () => {
+  let logSpy;
+  let errorSpy;
+
+  beforeEach(() => {
+    logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    logSpy.mockRestore();
+    errorSpy.mockRestore();
+  });
+
+  it('exposes verifyCredentials as a function on the app', () => {
+    const app = buildApp(mockFetch(200, {}));
+    expect(typeof app.verifyCredentials).toBe('function');
+  });
+
+  it('sends correct headers to Trakt /languages/shows', async () => {
+    const fetchFn = mockFetch(200, []);
+    const app = buildApp(fetchFn);
+    await app.verifyCredentials();
+    expect(fetchFn).toHaveBeenCalledWith(
+      'https://api.trakt.tv/languages/shows',
+      expect.objectContaining({
+        method: 'GET',
+        headers: expect.objectContaining({
+          'trakt-api-key': 'test-client-id',
+          'trakt-api-version': '2',
+        }),
+      }),
+    );
+  });
+
+  it('health returns 200 connected after successful verification', async () => {
+    const app = buildApp(mockFetch(200, []));
+    await app.verifyCredentials();
+    const res = await request(app).get('/health');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ status: 'ok', trakt: 'connected' });
+  });
+
+  it('health returns 503 invalid_client_id when Trakt returns 403', async () => {
+    const app = buildApp(mockFetch(403, { error: 'invalid_api_key' }));
+    await app.verifyCredentials();
+    const res = await request(app).get('/health');
+    expect(res.status).toBe(503);
+    expect(res.body.status).toBe('unhealthy');
+    expect(res.body.trakt).toBe('invalid_client_id');
+    expect(res.body.error).toMatch(/TRAKT_CLIENT_ID/);
+  });
+
+  it('health returns 503 with trakt_http_500 on server error', async () => {
+    const app = buildApp(mockFetch(500, {}));
+    await app.verifyCredentials();
+    const res = await request(app).get('/health');
+    expect(res.status).toBe(503);
+    expect(res.body.status).toBe('unhealthy');
+    expect(res.body.trakt).toBe('trakt_http_500');
+  });
+
+  it('health returns 503 timeout when verification times out', async () => {
+    const hangingFetch = vi.fn().mockImplementation((_url, options) => {
+      return new Promise((_resolve, reject) => {
+        if (options?.signal) {
+          options.signal.addEventListener('abort', () => {
+            const err = new Error('The operation was aborted');
+            err.name = 'AbortError';
+            reject(err);
+          });
+        }
+      });
+    });
+    const app = buildApp(hangingFetch, { fetchTimeoutMs: 50 });
+    await app.verifyCredentials();
+    const res = await request(app).get('/health');
+    expect(res.status).toBe(503);
+    expect(res.body.status).toBe('unhealthy');
+    expect(res.body.trakt).toBe('timeout');
+  });
+
+  it('health returns 503 network_error when fetch rejects', async () => {
+    const failFetch = vi.fn().mockRejectedValue(new Error('ECONNREFUSED'));
+    const app = buildApp(failFetch);
+    await app.verifyCredentials();
+    const res = await request(app).get('/health');
+    expect(res.status).toBe(503);
+    expect(res.body.status).toBe('unhealthy');
+    expect(res.body.trakt).toBe('network_error');
+    expect(res.body.error).toBe('ECONNREFUSED');
+  });
+
+  it('logs success message on valid credentials', async () => {
+    const app = buildApp(mockFetch(200, []));
+    await app.verifyCredentials();
+    expect(logSpy).toHaveBeenCalledWith('Trakt credential verification: OK');
+  });
+
+  it('logs error with TRAKT_CLIENT_ID hint on 403', async () => {
+    const app = buildApp(mockFetch(403, {}));
+    await app.verifyCredentials();
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('TRAKT_CLIENT_ID'),
+    );
+  });
+});
+
+// ── Error logging ──────────────────────────────────────────────────────────
+
+describe('Error logging improvements', () => {
+  let errorSpy;
+
+  beforeEach(() => {
+    errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    errorSpy.mockRestore();
+  });
+
+  it('logs body snippet when Trakt returns non-OK on token exchange', async () => {
+    const app = buildApp(mockFetch(403, { error: 'invalid_api_key' }));
+    await request(app).post('/trakt/token').send({ code: 'test-code' });
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('HTTP 403'),
+    );
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('invalid_api_key'),
+    );
+  });
+
+  it('logs TRAKT_CLIENT_ID hint on 403 for token exchange', async () => {
+    const app = buildApp(mockFetch(403, { error: 'invalid_api_key' }));
+    await request(app).post('/trakt/token').send({ code: 'test-code' });
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('TRAKT_CLIENT_ID'),
+    );
+  });
+
+  it('logs TRAKT_CLIENT_ID hint on 403 for token refresh', async () => {
+    const app = buildApp(mockFetch(403, { error: 'invalid_api_key' }));
+    await request(app).post('/trakt/token/refresh').send({ refresh_token: 'old-token' });
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('TRAKT_CLIENT_ID'),
+    );
+  });
+
+  it('logs network error code on ECONNREFUSED for token exchange', async () => {
+    const err = new Error('connect ECONNREFUSED');
+    err.code = 'ECONNREFUSED';
+    const failFetch = vi.fn().mockRejectedValue(err);
+    const app = buildApp(failFetch);
+    await request(app).post('/trakt/token').send({ code: 'test-code' });
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('network error (ECONNREFUSED)'),
+      expect.any(String),
+    );
+  });
+
+  it('logs network error code on ECONNREFUSED for token refresh', async () => {
+    const err = new Error('connect ECONNREFUSED');
+    err.code = 'ECONNREFUSED';
+    const failFetch = vi.fn().mockRejectedValue(err);
+    const app = buildApp(failFetch);
+    await request(app).post('/trakt/token/refresh').send({ refresh_token: 'old-token' });
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('network error (ECONNREFUSED)'),
+      expect.any(String),
+    );
+  });
+});
+
 // ── Debug logging ───────────────────────────────────────────────────────────
 
 describe('Debug logging (debug: true)', () => {
@@ -416,6 +599,7 @@ describe('Debug logging (debug: true)', () => {
 
   it('logs a debug line for GET /health when debug is enabled', async () => {
     const app = buildApp(mockFetch(200, {}), { debug: true });
+    await app.verifyCredentials();
     await request(app).get('/health');
     expect(debugSpy).toHaveBeenCalledOnce();
     expect(debugSpy.mock.calls[0][0]).toMatch(/\[DEBUG\].*GET.*\/health.*200/);

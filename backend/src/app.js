@@ -58,6 +58,53 @@ export function createApp(config) {
     }
   }
 
+  // Credential verification state
+  let traktStatus = 'pending';
+  let traktError = null;
+  let credentialsVerified = false;
+
+  async function verifyCredentials() {
+    try {
+      const res = await fetchWithTimeout(`${traktApi}/languages/shows`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'trakt-api-key': clientId,
+          'trakt-api-version': '2',
+        },
+      });
+
+      if (res.ok) {
+        traktStatus = 'connected';
+        traktError = null;
+        credentialsVerified = true;
+        console.log('Trakt credential verification: OK');
+      } else if (res.status === 403) {
+        traktStatus = 'invalid_client_id';
+        traktError = 'Trakt returned 403 Forbidden — check that TRAKT_CLIENT_ID is correct.';
+        credentialsVerified = false;
+        console.error('Trakt credential verification failed: HTTP 403 — TRAKT_CLIENT_ID may be invalid.');
+      } else {
+        traktStatus = `trakt_http_${res.status}`;
+        traktError = `Trakt returned HTTP ${res.status} during credential check`;
+        credentialsVerified = false;
+        console.error(`Trakt credential verification failed: HTTP ${res.status}`);
+      }
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        traktStatus = 'timeout';
+        traktError = 'Trakt API did not respond within timeout';
+        credentialsVerified = false;
+        console.error('Trakt credential verification failed: timeout');
+      } else {
+        traktStatus = 'network_error';
+        traktError = err.message;
+        credentialsVerified = false;
+        console.error('Trakt credential verification failed: network error:', err.message);
+      }
+    }
+  }
+
   const app = express();
   app.use(helmet());
   app.use(express.json());
@@ -114,6 +161,11 @@ export function createApp(config) {
       }
 
       if (!traktRes.ok) {
+        const bodySnippet = JSON.stringify(data).slice(0, 200);
+        console.error(`Token exchange: Trakt returned HTTP ${traktRes.status}: ${bodySnippet}`);
+        if (traktRes.status === 403) {
+          console.error('Hint: HTTP 403 from Trakt usually means TRAKT_CLIENT_ID is invalid or revoked.');
+        }
         return res.status(traktRes.status).json(data);
       }
 
@@ -127,10 +179,13 @@ export function createApp(config) {
       });
     } catch (err) {
       if (err.name === 'AbortError') {
-        console.error('Token exchange timeout');
+        console.error('Token exchange: upstream timeout after', fetchTimeoutMs, 'ms');
         return res.status(504).json({ error: 'Upstream timeout' });
       }
-      console.error('Token exchange error:', err);
+      const category = err.code
+        ? `network error (${err.code})`
+        : `unexpected error (${err.name})`;
+      console.error(`Token exchange: ${category}:`, err.message);
       return res.status(502).json({ error: 'Upstream error' });
     }
   });
@@ -163,7 +218,14 @@ export function createApp(config) {
           error: `Upstream returned non-JSON response (HTTP ${traktRes.status})`,
         });
       }
-      if (!traktRes.ok) return res.status(traktRes.status).json(data);
+      if (!traktRes.ok) {
+        const bodySnippet = JSON.stringify(data).slice(0, 200);
+        console.error(`Token refresh: Trakt returned HTTP ${traktRes.status}: ${bodySnippet}`);
+        if (traktRes.status === 403) {
+          console.error('Hint: HTTP 403 from Trakt usually means TRAKT_CLIENT_ID is invalid or revoked.');
+        }
+        return res.status(traktRes.status).json(data);
+      }
 
       return res.json({
         access_token: data.access_token,
@@ -172,16 +234,33 @@ export function createApp(config) {
       });
     } catch (err) {
       if (err.name === 'AbortError') {
-        console.error('Token refresh timeout');
+        console.error('Token refresh: upstream timeout after', fetchTimeoutMs, 'ms');
         return res.status(504).json({ error: 'Upstream timeout' });
       }
-      console.error('Token refresh error:', err);
+      const category = err.code
+        ? `network error (${err.code})`
+        : `unexpected error (${err.name})`;
+      console.error(`Token refresh: ${category}:`, err.message);
       return res.status(502).json({ error: 'Upstream error' });
     }
   });
 
   // ── GET /health ─────────────────────────────────────────────────────────────
-  app.get('/health', (_req, res) => res.json({ status: 'ok' }));
+  app.get('/health', (_req, res) => {
+    if (traktStatus === 'pending') {
+      return res.status(503).json({ status: 'starting', trakt: 'pending' });
+    }
+    if (credentialsVerified) {
+      return res.json({ status: 'ok', trakt: 'connected' });
+    }
+    return res.status(503).json({
+      status: 'unhealthy',
+      trakt: traktStatus,
+      error: traktError,
+    });
+  });
+
+  app.verifyCredentials = verifyCredentials;
 
   return app;
 }

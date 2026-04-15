@@ -37,4 +37,7 @@ app.listen(PORT, () => {
   if (debug) {
     console.log('Debug mode enabled — request logging is active');
   }
+  // Verify Trakt credentials in the background — health endpoint
+  // will report "starting" until this completes.
+  app.verifyCredentials();
 });
