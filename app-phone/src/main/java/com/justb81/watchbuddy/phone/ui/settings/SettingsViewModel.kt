@@ -90,30 +90,39 @@ class SettingsViewModel @Inject constructor(
 
     private fun loadPersistedSettings() {
         viewModelScope.launch {
-            val saved = settingsRepository.settings.first()
-            val clientSecret = settingsRepository.getClientSecret()
-            _uiState.value = _uiState.value.copy(
-                authMode = saved.authMode,
-                customBackendUrl = saved.backendUrl,
-                directClientId = saved.directClientId,
-                directClientSecret = clientSecret,
-                companionRunning = saved.companionEnabled,
-                modelDownloadUrl = saved.modelDownloadUrl,
-                tmdbApiKey = saved.tmdbApiKey,
-                tmdbConnected = saved.tmdbApiKey.isNotBlank(),
-                defaultTmdbApiKeyAvailable = saved.defaultTmdbApiKeyAvailable && saved.tmdbApiKey.isBlank()
-            )
+            try {
+                val saved = settingsRepository.settings.first()
+                val clientSecret = settingsRepository.getClientSecret()
+                _uiState.value = _uiState.value.copy(
+                    authMode = saved.authMode,
+                    customBackendUrl = saved.backendUrl,
+                    directClientId = saved.directClientId,
+                    directClientSecret = clientSecret,
+                    companionRunning = saved.companionEnabled,
+                    modelDownloadUrl = saved.modelDownloadUrl,
+                    tmdbApiKey = saved.tmdbApiKey,
+                    tmdbConnected = saved.tmdbApiKey.isNotBlank(),
+                    defaultTmdbApiKeyAvailable = saved.defaultTmdbApiKeyAvailable && saved.tmdbApiKey.isBlank()
+                )
+            } catch (_: Exception) {
+                // Settings failed to load (e.g. Keystore unavailable) — keep defaults.
+                // App remains usable; user can still configure settings manually.
+            }
         }
     }
 
     private fun detectLlm() {
         viewModelScope.launch {
-            val config = llmOrchestrator.selectConfig()
-            _uiState.value = _uiState.value.copy(
-                llmBackend  = config.backend.name,
-                llmModelName = config.modelVariant?.fileName,
-                llmReady    = settingsRepository.modelReady.value
-            )
+            try {
+                val config = llmOrchestrator.selectConfig()
+                _uiState.value = _uiState.value.copy(
+                    llmBackend  = config.backend.name,
+                    llmModelName = config.modelVariant?.fileName,
+                    llmReady    = settingsRepository.modelReady.value
+                )
+            } catch (_: Exception) {
+                // LLM detection failed (e.g. system service unavailable) — keep default state.
+            }
         }
     }
 
@@ -218,8 +227,9 @@ class SettingsViewModel @Inject constructor(
     fun saveAdvancedSettings() {
         viewModelScope.launch {
             val state = _uiState.value
+            val current = settingsRepository.settings.first()
             settingsRepository.saveSettings(
-                AppSettings(
+                current.copy(
                     authMode = state.authMode,
                     backendUrl = state.customBackendUrl,
                     directClientId = state.directClientId,
