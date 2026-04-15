@@ -12,6 +12,7 @@ import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.justb81.watchbuddy.R
+import com.justb81.watchbuddy.phone.llm.LlmOrchestrator
 import com.justb81.watchbuddy.phone.server.CompanionHttpServer
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
@@ -23,8 +24,9 @@ class CompanionService : Service() {
         private const val TAG = "CompanionService"
         const val CHANNEL_ID = "companion_service"
         private const val NOTIFICATION_ID = 1
-        private const val NSD_SERVICE_TYPE = "_http._tcp."
+        private const val NSD_SERVICE_TYPE = "_watchbuddy._tcp."
         private const val NSD_SERVICE_NAME = "watchbuddy-companion"
+        private const val NSD_TXT_VERSION = "1"
 
         fun start(context: Context) {
             val intent = Intent(context, CompanionService::class.java)
@@ -37,6 +39,7 @@ class CompanionService : Service() {
     }
 
     @Inject lateinit var companionHttpServer: CompanionHttpServer
+    @Inject lateinit var llmOrchestrator: LlmOrchestrator
 
     private var nsdManager: NsdManager? = null
     private var nsdRegistrationListener: NsdManager.RegistrationListener? = null
@@ -83,10 +86,14 @@ class CompanionService : Service() {
             .build()
 
     private fun registerNsd() {
+        val llmConfig = llmOrchestrator.selectConfig()
         val serviceInfo = NsdServiceInfo().apply {
             serviceName = NSD_SERVICE_NAME
             serviceType = NSD_SERVICE_TYPE
             port = CompanionHttpServer.PORT
+            setAttribute("version", NSD_TXT_VERSION)
+            setAttribute("modelQuality", llmConfig.qualityScore.toString())
+            setAttribute("llmBackend", llmConfig.backend.name)
         }
 
         val listener = object : NsdManager.RegistrationListener {

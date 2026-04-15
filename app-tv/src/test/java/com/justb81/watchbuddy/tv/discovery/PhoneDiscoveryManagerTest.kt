@@ -27,42 +27,63 @@ class PhoneDiscoveryManagerTest {
         manager = PhoneDiscoveryManager(context, httpClient)
     }
 
+    // ── DiscoveredPhone construction helpers ───────────────────────────────────
+
+    private fun makePhone(
+        capability: DeviceCapability?,
+        txtRecord: PhoneDiscoveryManager.PhoneTxtRecord? = null,
+        score: Int = 0,
+        name: String = "test"
+    ): PhoneDiscoveryManager.DiscoveredPhone {
+        val serviceInfo = mockk<NsdServiceInfo>()
+        every { serviceInfo.serviceName } returns name
+        return PhoneDiscoveryManager.DiscoveredPhone(
+            serviceInfo = serviceInfo,
+            txtRecord = txtRecord,
+            capability = capability,
+            score = score,
+            baseUrl = "http://test/"
+        )
+    }
+
+    private fun makeTxtRecord(
+        modelQuality: Int = 70,
+        llmBackend: LlmBackend = LlmBackend.LITERT,
+        version: String = "1"
+    ) = PhoneDiscoveryManager.PhoneTxtRecord(
+        version = version,
+        modelQuality = modelQuality,
+        llmBackend = llmBackend
+    )
+
+    // ── getBestPhone ───────────────────────────────────────────────────────────
+
     @Nested
-    @DisplayName("calculateScore")
-    inner class CalculateScoreTest {
+    @DisplayName("getBestPhone")
+    inner class GetBestPhoneTest {
 
-        private fun makePhone(
-            capability: DeviceCapability?,
-            score: Int = 0,
-            name: String = "test"
-        ): PhoneDiscoveryManager.DiscoveredPhone {
-            val serviceInfo = mockk<NsdServiceInfo>()
-            every { serviceInfo.serviceName } returns name
-            return PhoneDiscoveryManager.DiscoveredPhone(serviceInfo, capability, score, "http://test/")
-        }
-
-        @Test
-        fun `getBestPhone returns null when no phones discovered`() {
-            assertNull(manager.getBestPhone())
-        }
-
-        @Test
-        fun `getBestPhone returns highest scoring available phone`() {
-            val cap1 = DeviceCapability("d1", "u1", null, "P1", LlmBackend.NONE, 0, 1000, true)
-            val cap2 = DeviceCapability("d2", "u2", null, "P2", LlmBackend.AICORE, 150, 8000, true)
-
-            // Simulate phones being added via the StateFlow
-            // We can't easily trigger NSD discovery, so test getBestPhone with pre-set phones
-            // by testing the discoveredPhones StateFlow directly
-            val phone1 = makePhone(cap1, score = 0, name = "phone1")
-            val phone2 = makePhone(cap2, score = 160, name = "phone2")
-
-            // Access the private _discoveredPhones field to set test data
+        private fun setPhones(vararg phones: PhoneDiscoveryManager.DiscoveredPhone) {
             val field = PhoneDiscoveryManager::class.java.getDeclaredField("_discoveredPhones")
             field.isAccessible = true
             @Suppress("UNCHECKED_CAST")
             val flow = field.get(manager) as kotlinx.coroutines.flow.MutableStateFlow<List<PhoneDiscoveryManager.DiscoveredPhone>>
-            flow.value = listOf(phone1, phone2)
+            flow.value = phones.toList()
+        }
+
+        @Test
+        fun `returns null when no phones discovered`() {
+            assertNull(manager.getBestPhone())
+        }
+
+        @Test
+        fun `returns highest scoring available phone`() {
+            val cap1 = DeviceCapability("d1", "u1", null, "P1", LlmBackend.NONE, 0, 1000, true)
+            val cap2 = DeviceCapability("d2", "u2", null, "P2", LlmBackend.AICORE, 150, 8000, true)
+
+            val phone1 = makePhone(cap1, score = 0, name = "phone1")
+            val phone2 = makePhone(cap2, score = 160, name = "phone2")
+
+            setPhones(phone1, phone2)
 
             val best = manager.getBestPhone()
             assertNotNull(best)
@@ -70,68 +91,248 @@ class PhoneDiscoveryManagerTest {
         }
 
         @Test
-        fun `getBestPhone excludes unavailable phones`() {
+        fun `excludes phones where capability marks them unavailable`() {
             val cap = DeviceCapability("d1", "u1", null, "P1", LlmBackend.AICORE, 150, 8000, false)
             val phone = makePhone(cap, score = 160, name = "phone1")
-
-            val field = PhoneDiscoveryManager::class.java.getDeclaredField("_discoveredPhones")
-            field.isAccessible = true
-            @Suppress("UNCHECKED_CAST")
-            val flow = field.get(manager) as kotlinx.coroutines.flow.MutableStateFlow<List<PhoneDiscoveryManager.DiscoveredPhone>>
-            flow.value = listOf(phone)
+            setPhones(phone)
 
             assertNull(manager.getBestPhone())
         }
-    }
 
-    @Nested
-    @DisplayName("scoring formula")
-    inner class ScoringFormulaTest {
+        @Test
+        fun `includes TXT-only phones (no capability) in ranking`() {
+            val txt = makeTxtRecord(modelQuality = 90, llmBackend = LlmBackend.LITERT)
+            val phone = makePhone(capability = null, txtRecord = txt, score = 90, name = "txt-only")
+            setPhones(phone)
 
-        // Test calculateScore indirectly via reflection since it's private
-        private fun calculateScore(cap: DeviceCapability?): Int {
-            val method = PhoneDiscoveryManager::class.java.getDeclaredMethod(
-                "calculateScore", DeviceCapability::class.java
-            )
-            method.isAccessible = true
-            return method.invoke(manager, cap) as Int
+            assertNotNull(manager.getBestPhone())
         }
 
         @Test
-        fun `returns 0 for null capability`() {
-            assertEquals(0, calculateScore(null))
+        fun `prefers phone with capability over TXT-only phone when score is higher`() {
+            val capPhone = makePhone(
+                capability = DeviceCapability("d1", "u1", null, "P1", LlmBackend.AICORE, 150, 8000, true),
+                score = 160,
+                name = "cap-phone"
+            )
+            val txtPhone = makePhone(
+                capability = null,
+                txtRecord = makeTxtRecord(modelQuality = 90),
+                score = 90,
+                name = "txt-phone"
+            )
+            setPhones(txtPhone, capPhone)
+
+            val best = manager.getBestPhone()
+            assertEquals("cap-phone", best?.serviceInfo?.serviceName)
+        }
+    }
+
+    // ── calculateScore ─────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("calculateScore")
+    inner class CalculateScoreTest {
+
+        private fun calculateScore(
+            txt: PhoneDiscoveryManager.PhoneTxtRecord?,
+            cap: DeviceCapability?
+        ): Int {
+            val method = PhoneDiscoveryManager::class.java.getDeclaredMethod(
+                "calculateScore",
+                PhoneDiscoveryManager.PhoneTxtRecord::class.java,
+                DeviceCapability::class.java
+            )
+            method.isAccessible = true
+            return method.invoke(manager, txt, cap) as Int
+        }
+
+        @Test
+        fun `returns 0 when both txt and capability are null`() {
+            assertEquals(0, calculateScore(null, null))
+        }
+
+        @Test
+        fun `returns modelQuality from TXT when capability is null`() {
+            val txt = makeTxtRecord(modelQuality = 70)
+            assertEquals(70, calculateScore(txt, null))
+        }
+
+        @Test
+        fun `returns 0 when txt is null and capability is null`() {
+            assertEquals(0, calculateScore(null, null))
+        }
+
+        @Test
+        fun `uses capability score when capability is present (ignores txt)`() {
+            val txt = makeTxtRecord(modelQuality = 70)
+            val cap = DeviceCapability("d", "u", null, "P", LlmBackend.AICORE, 150, 8000, true)
+            // Capability wins: 150 (modelQuality) + 10 (ramBonus for >=6000 MB) = 160
+            assertEquals(160, calculateScore(txt, cap))
         }
 
         @Test
         fun `adds ramBonus 10 for at least 6000 MB`() {
             val cap = DeviceCapability("d", "u", null, "P", LlmBackend.NONE, 50, 6000, true)
-            assertEquals(60, calculateScore(cap)) // 50 + 10
+            assertEquals(60, calculateScore(null, cap)) // 50 + 10
         }
 
         @Test
         fun `adds ramBonus 6 for at least 4000 MB`() {
             val cap = DeviceCapability("d", "u", null, "P", LlmBackend.NONE, 50, 4500, true)
-            assertEquals(56, calculateScore(cap)) // 50 + 6
+            assertEquals(56, calculateScore(null, cap)) // 50 + 6
         }
 
         @Test
         fun `adds ramBonus 3 for at least 3000 MB`() {
             val cap = DeviceCapability("d", "u", null, "P", LlmBackend.NONE, 50, 3500, true)
-            assertEquals(53, calculateScore(cap)) // 50 + 3
+            assertEquals(53, calculateScore(null, cap)) // 50 + 3
         }
 
         @Test
         fun `adds ramBonus 0 for less than 3000 MB`() {
             val cap = DeviceCapability("d", "u", null, "P", LlmBackend.NONE, 50, 2000, true)
-            assertEquals(50, calculateScore(cap)) // 50 + 0
+            assertEquals(50, calculateScore(null, cap)) // 50 + 0
         }
 
         @Test
-        fun `adds modelQuality to ramBonus`() {
+        fun `adds modelQuality to ramBonus for AICore with large RAM`() {
             val cap = DeviceCapability("d", "u", null, "P", LlmBackend.AICORE, 150, 8000, true)
-            assertEquals(160, calculateScore(cap)) // 150 + 10
+            assertEquals(160, calculateScore(null, cap)) // 150 + 10
         }
     }
+
+    // ── parseTxtRecord ─────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("parseTxtRecord")
+    inner class ParseTxtRecordTest {
+
+        private fun parseTxtRecord(serviceInfo: NsdServiceInfo): PhoneDiscoveryManager.PhoneTxtRecord? {
+            val method = PhoneDiscoveryManager::class.java.getDeclaredMethod(
+                "parseTxtRecord", NsdServiceInfo::class.java
+            )
+            method.isAccessible = true
+            @Suppress("UNCHECKED_CAST")
+            return method.invoke(manager, serviceInfo) as PhoneDiscoveryManager.PhoneTxtRecord?
+        }
+
+        private fun mockServiceInfo(attrs: Map<String, ByteArray>): NsdServiceInfo {
+            val info = mockk<NsdServiceInfo>()
+            every { info.attributes } returns attrs
+            return info
+        }
+
+        @Test
+        fun `parses valid TXT records`() {
+            val info = mockServiceInfo(
+                mapOf(
+                    "version" to "1".toByteArray(),
+                    "modelQuality" to "90".toByteArray(),
+                    "llmBackend" to "LITERT".toByteArray()
+                )
+            )
+            val result = parseTxtRecord(info)
+            assertNotNull(result)
+            assertEquals("1", result!!.version)
+            assertEquals(90, result.modelQuality)
+            assertEquals(LlmBackend.LITERT, result.llmBackend)
+        }
+
+        @Test
+        fun `parses AICORE backend`() {
+            val info = mockServiceInfo(
+                mapOf(
+                    "version" to "1".toByteArray(),
+                    "modelQuality" to "150".toByteArray(),
+                    "llmBackend" to "AICORE".toByteArray()
+                )
+            )
+            val result = parseTxtRecord(info)
+            assertNotNull(result)
+            assertEquals(LlmBackend.AICORE, result!!.llmBackend)
+            assertEquals(150, result.modelQuality)
+        }
+
+        @Test
+        fun `parses NONE backend`() {
+            val info = mockServiceInfo(
+                mapOf(
+                    "version" to "1".toByteArray(),
+                    "modelQuality" to "0".toByteArray(),
+                    "llmBackend" to "NONE".toByteArray()
+                )
+            )
+            val result = parseTxtRecord(info)
+            assertNotNull(result)
+            assertEquals(LlmBackend.NONE, result!!.llmBackend)
+        }
+
+        @Test
+        fun `returns null when version attribute is missing`() {
+            val info = mockServiceInfo(
+                mapOf(
+                    "modelQuality" to "70".toByteArray(),
+                    "llmBackend" to "LITERT".toByteArray()
+                )
+            )
+            assertNull(parseTxtRecord(info))
+        }
+
+        @Test
+        fun `returns null when modelQuality attribute is missing`() {
+            val info = mockServiceInfo(
+                mapOf(
+                    "version" to "1".toByteArray(),
+                    "llmBackend" to "LITERT".toByteArray()
+                )
+            )
+            assertNull(parseTxtRecord(info))
+        }
+
+        @Test
+        fun `returns null when llmBackend attribute is missing`() {
+            val info = mockServiceInfo(
+                mapOf(
+                    "version" to "1".toByteArray(),
+                    "modelQuality" to "70".toByteArray()
+                )
+            )
+            assertNull(parseTxtRecord(info))
+        }
+
+        @Test
+        fun `returns null when modelQuality is not a valid integer`() {
+            val info = mockServiceInfo(
+                mapOf(
+                    "version" to "1".toByteArray(),
+                    "modelQuality" to "not-a-number".toByteArray(),
+                    "llmBackend" to "LITERT".toByteArray()
+                )
+            )
+            assertNull(parseTxtRecord(info))
+        }
+
+        @Test
+        fun `returns null when llmBackend is an unknown value`() {
+            val info = mockServiceInfo(
+                mapOf(
+                    "version" to "1".toByteArray(),
+                    "modelQuality" to "70".toByteArray(),
+                    "llmBackend" to "UNKNOWN_BACKEND".toByteArray()
+                )
+            )
+            assertNull(parseTxtRecord(info))
+        }
+
+        @Test
+        fun `returns null when all attributes map is empty`() {
+            val info = mockServiceInfo(emptyMap())
+            assertNull(parseTxtRecord(info))
+        }
+    }
+
+    // ── constants ──────────────────────────────────────────────────────────────
 
     @Test
     fun `SERVICE_TYPE constant is correct`() {
@@ -145,7 +346,6 @@ class PhoneDiscoveryManagerTest {
 
     @Test
     fun `stopDiscovery does not throw`() {
-        // Should handle gracefully even if discovery was never started
         manager.stopDiscovery()
     }
 }

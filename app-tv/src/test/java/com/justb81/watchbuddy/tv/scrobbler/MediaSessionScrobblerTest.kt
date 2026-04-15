@@ -61,6 +61,7 @@ class MediaSessionScrobblerTest {
         )
         return PhoneDiscoveryManager.DiscoveredPhone(
             serviceInfo = mockk<NsdServiceInfo>(relaxed = true),
+            txtRecord = null,
             capability = capability,
             score = 75,
             baseUrl = baseUrl
@@ -255,6 +256,7 @@ class MediaSessionScrobblerTest {
             )
             val offlinePhone = PhoneDiscoveryManager.DiscoveredPhone(
                 serviceInfo = mockk(relaxed = true),
+                txtRecord = null,
                 capability = unavailableCapability,
                 score = 0,
                 baseUrl = "http://offline:8765/"
