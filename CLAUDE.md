@@ -22,6 +22,7 @@ watchbuddy/
 │       │   ├── navigation/ PhoneNavGraph
 │       │   ├── onboarding/ OnboardingScreen, OnboardingViewModel
 │       │   ├── settings/   SettingsScreen, SettingsViewModel
+│       │   ├── showdetail/ ShowDetailScreen, ShowDetailViewModel
 │       │   └── theme/      Material 3 theme
 │       └── (service/)  CompanionService (foreground NSD server)
 ├── app-tv/             Google TV app (Kotlin, Compose for TV)

@@ -27,8 +27,9 @@ All TMDB calls go through a single Retrofit interface defined in `core/src/main/
 |--------|------|------------|---------|---------|
 | `getShow` | `GET /tv/{series_id}` | `series_id`, `api_key`, `language` | `TmdbShow` | Fetch show metadata (name, overview, poster, backdrop, air date) |
 | `getEpisode` | `GET /tv/{series_id}/season/{season}/episode/{episode}` | `series_id`, `season_number`, `episode_number`, `api_key`, `language` | `TmdbEpisode` | Fetch single episode details (name, overview, still image, air date) |
+| `searchTv` | `GET /search/tv` | `query`, `api_key`, `page` | `TmdbTvSearchResponse` | Search shows by title (used by TV scrobbler as Trakt-search fallback) |
 
-All endpoints default to `language = "de-DE"`. The language parameter follows TMDB's `xx-YY` format (ISO 639-1 language + ISO 3166-1 region).
+`getShow` and `getEpisode` default to `language = "en-US"`. The language parameter follows TMDB's `xx-YY` format (ISO 639-1 language + ISO 3166-1 region). `searchTv` does not use a language parameter (search results are language-independent).
 
 ### Data Models
 
@@ -75,7 +76,9 @@ All methods accept a custom `width` parameter and return `null` when the input p
 
 ## Trakt-to-TMDB ID Mapping
 
-TMDB is never queried by show title. Instead, the Trakt API provides a `tmdb` field inside its `TraktIds` object:
+For the recap and deep-link flows, TMDB is always queried by ID (not title) — the Trakt API provides a `tmdb` field inside its `TraktIds` object that serves as the bridge:
+
+> **Exception:** The TV's `MediaSessionScrobbler` calls `searchTv(query)` by title when the local fuzzy-match cache returns no confident match. This is a title-based search solely for the purpose of identifying which show is being watched, not for metadata enrichment.
 
 ```kotlin
 data class TraktIds(
@@ -222,7 +225,7 @@ Note: This journey does **not** call the TMDB API directly. It only uses the TMD
 
 ### 3. Device Capability Reporting
 
-When the TV discovers a phone on the network, it calls `GET /capability`. The response includes a `tmdbConfigured` boolean that indicates whether the user has entered a TMDB API key.
+When the TV discovers a phone on the network, it calls `GET /capability`. The response includes the TMDB API key so the TV can call TMDB directly (for title search during scrobble matching and for show/movie data).
 
 ```
 TV App                       Phone App
@@ -234,11 +237,14 @@ GET /capability  ──────►  DeviceCapabilityProvider.getCapability()
                                      │
                                      ▼
                           tmdbConfigured = key.isNotBlank()
+                          tmdbApiKey    = key (null when blank)
                                      │
-◄───────────────────────  DeviceCapability { ..., tmdbConfigured: true }
+◄───────────────────────  DeviceCapability { ..., tmdbConfigured: true, tmdbApiKey: "..." }
 ```
 
-The TV can use this flag to determine whether recap generation is available on a given phone before attempting it.
+The TV uses `tmdbApiKey` for:
+- Title search (`searchTv`) in `MediaSessionScrobbler` when the fuzzy cache match is below threshold
+- Any other direct TMDB lookups the TV performs (show details, images)
 
 ---
 
@@ -340,16 +346,19 @@ Separately, `LocaleHelper.getLlmResponseLanguage()` reads the device's system lo
 
 | Module | File | TMDB Role |
 |--------|------|-----------|
-| **core** | `tmdb/TmdbApiService.kt` | Retrofit interface, response DTOs, `TmdbImageHelper` |
-| **core** | `model/Models.kt` | `TmdbShow`, `TmdbEpisode` data classes; `TraktIds.tmdb` mapping; `KNOWN_STREAMING_SERVICES` with `{tmdb_id}` templates |
+| **core** | `tmdb/TmdbApiService.kt` | Retrofit interface (`getShow`, `getEpisode`, `searchTv`), response DTOs, `TmdbImageHelper` |
+| **core** | `model/Models.kt` | `TmdbShow`, `TmdbEpisode`, `TmdbTvSearchResponse` data classes; `TraktIds.tmdb` mapping; `KNOWN_STREAMING_SERVICES` with `{tmdb_id}` templates |
 | **core** | `network/NetworkModule.kt` | OkHttpClient with cert pinning, TMDB Retrofit instance, Hilt DI |
 | **app-phone** | `server/CompanionHttpServer.kt` | Recap endpoint: calls `getShow()` + `getEpisode()`, passes data to `RecapGenerator` |
 | **app-phone** | `llm/RecapGenerator.kt` | Builds LLM prompt from TMDB data, replaces still image placeholders |
 | **app-phone** | `llm/FallbackProvider.kt` | Generates HTML recap from TMDB synopses alone (no LLM) |
 | **app-phone** | `llm/LlmProviderFactory.kt` | Cascade with `FallbackProvider` (TMDB-only) as last resort |
-| **app-phone** | `server/DeviceCapabilityProvider.kt` | Reports `tmdbConfigured` flag to TV |
+| **app-phone** | `server/DeviceCapabilityProvider.kt` | Exposes `tmdbConfigured` flag and `tmdbApiKey` to TV via `/capability` |
 | **app-phone** | `settings/SettingsRepository.kt` | Stores and retrieves user's TMDB API key |
+| **app-phone** | `ui/home/HomeViewModel.kt` | Loads TMDB posters for each show in the library (parallel `getShow()` calls after sync) |
+| **app-phone** | `ui/showdetail/ShowDetailViewModel.kt` | Loads TMDB poster + overview for a single show's detail screen |
 | **app-tv** | `ui/showdetail/ShowDetailViewModel.kt` | Substitutes `{tmdb_id}` in streaming deep link templates |
+| **app-tv** | `scrobbler/MediaSessionScrobbler.kt` | Uses `searchTv()` as fallback when fuzzy-matching media titles against the local show cache |
 
 ---
 
@@ -358,4 +367,4 @@ Separately, `LocaleHelper.getLlmResponseLanguage()` reads the device's system lo
 - **API key scope:** TMDB API keys are read-only by default (TMDB v3 uses a single API key for read access). No write operations are performed.
 - **HTML sanitization:** LLM-generated HTML containing TMDB data is sanitized before rendering in WebView — `<script>`, `<iframe>`, `on*` event handlers, and `javascript:` URLs are stripped (`RecapGenerator.sanitizeHtml()`).
 - **Certificate pinning:** TMDB API connections are pinned to Let's Encrypt intermediate CA certificates, preventing MITM attacks even if a rogue CA is trusted by the device.
-- **No secrets in transit to TV:** The TMDB API key stays on the phone. The TV receives only the rendered HTML recap, never the API key itself (unless explicitly sent in the optional `tmdbApiKey` request body field).
+- **TMDB key exposure to TV:** The TMDB API key is sent from the phone to the TV as part of the `GET /capability` response (`DeviceCapability.tmdbApiKey`). This is intentional — the TV needs the key to call TMDB directly for title search (scrobble matching) and show data. Both devices are on the same trusted local WiFi network. Users should treat the phone–TV link as a trusted local connection.
