@@ -16,6 +16,7 @@ jobs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
       version: ${{ steps.release.outputs.version }}
+      body: ${{ steps.release.outputs.body }}
     steps:
       - uses: googleapis/release-please-action@v4
         id: release
@@ -181,6 +182,40 @@ jobs:
           UPDATED=$(printf "%s\n\n%b" "$EXISTING" "$DOWNLOADS")
           gh release edit "${TAG}" --notes "$UPDATED"
 
+      # -- Extract changelog for Play Store --------------------------------
+      - name: Generate Play Store changelog
+        env:
+          RELEASE_BODY: ${{ needs.release-please.outputs.body }}
+        run: |
+          # Strip markdown formatting for plain-text Play Store listing
+          NOTES=$(echo "$RELEASE_BODY" | sed -E \
+            -e 's/^\*\*([^*]+)\*\*/\1/g' \
+            -e 's/\*\*//g' \
+            -e 's/\[#[0-9]+\]\([^)]*\)//g' \
+            -e 's/\[([^]]*)\]\([^)]*\)/\1/g' \
+            -e 's/\([0-9a-f]{7}\)//g' \
+            -e 's/, *closes *//g' \
+            -e 's/[[:space:]]*$//g')
+
+          # Trim leading/trailing blank lines
+          NOTES=$(echo "$NOTES" | sed '/./,$!d' | sed -e :a -e '/^[[:space:]]*$/{ $d; N; ba; }')
+
+          # Play Store limits "What's New" to 500 characters
+          if [ ${#NOTES} -gt 500 ]; then
+            NOTES="${NOTES:0:497}..."
+          fi
+
+          # Write locale files — all locales get the same English text
+          # (matches supported languages: EN, DE, FR, ES)
+          mkdir -p whatsnew
+          for LOCALE in en-US de-DE fr-FR es-ES; do
+            echo "$NOTES" > "whatsnew/${LOCALE}"
+          done
+
+          echo "--- Play Store changelog (en-US) ---"
+          cat whatsnew/en-US
+          echo "--- ${#NOTES} characters ---"
+
       # -- Determine Play Store release status ------------------------------
       - name: Determine Play Store release status
         id: play-status
@@ -202,6 +237,7 @@ jobs:
           releaseFiles: release-assets/*-release.aab
           track: internal
           status: ${{ steps.play-status.outputs.status }}
+          whatsNewDirectory: whatsnew
 
       - name: Upload release artifacts
         uses: actions/upload-artifact@v7
