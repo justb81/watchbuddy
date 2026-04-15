@@ -26,6 +26,22 @@ function validateField(value, fieldName) {
   return null;
 }
 
+const SECRET_KEYS = ['client_secret', 'refresh_token', 'access_token'];
+
+/**
+ * Returns a shallow copy of `obj` with sensitive values masked (first 4 chars + "***").
+ */
+function maskSecrets(obj) {
+  if (!obj || typeof obj !== 'object') return obj;
+  const masked = { ...obj };
+  for (const key of SECRET_KEYS) {
+    if (masked[key] && typeof masked[key] === 'string') {
+      masked[key] = masked[key].slice(0, 4) + '***';
+    }
+  }
+  return masked;
+}
+
 /**
  * Creates a configured Express app for the Trakt token proxy.
  *
@@ -48,6 +64,12 @@ export function createApp(config) {
     debug = false,
   } = config;
 
+  const traktHeaders = {
+    'Content-Type': 'application/json',
+    'trakt-api-key': clientId,
+    'trakt-api-version': '2',
+  };
+
   async function fetchWithTimeout(url, options) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), fetchTimeoutMs);
@@ -58,21 +80,49 @@ export function createApp(config) {
     }
   }
 
+  /**
+   * Logs full request/response details for a Trakt API call when debug mode is on.
+   */
+  function logTraktCall(label, url, options, traktRes, data) {
+    if (!debug) return;
+
+    const outgoingBody = options.body
+      ? maskSecrets(JSON.parse(options.body))
+      : undefined;
+
+    const responseHeaders = {};
+    if (traktRes.headers?.forEach) {
+      traktRes.headers.forEach((value, key) => {
+        responseHeaders[key] = value;
+      });
+    }
+
+    console.debug(`[DEBUG] ${label} → ${options.method} ${url}`);
+    console.debug(`[DEBUG] ${label} request headers:`, JSON.stringify(options.headers));
+    if (outgoingBody) {
+      console.debug(`[DEBUG] ${label} request body:`, JSON.stringify(outgoingBody));
+    }
+    console.debug(`[DEBUG] ${label} response status: ${traktRes.status}`);
+    console.debug(`[DEBUG] ${label} response headers:`, JSON.stringify(responseHeaders));
+    if (data !== undefined) {
+      const maskedData = maskSecrets(data);
+      const snippet = JSON.stringify(maskedData).slice(0, 500);
+      console.debug(`[DEBUG] ${label} response body:`, snippet);
+    }
+  }
+
   // Credential verification state
   let traktStatus = 'pending';
   let traktError = null;
   let credentialsVerified = false;
 
   async function verifyCredentials() {
+    const url = `${traktApi}/languages/shows`;
+    const options = { method: 'GET', headers: traktHeaders };
     try {
-      const res = await fetchWithTimeout(`${traktApi}/languages/shows`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'trakt-api-key': clientId,
-          'trakt-api-version': '2',
-        },
-      });
+      const res = await fetchWithTimeout(url, options);
+
+      logTraktCall('Credential check', url, options, res);
 
       if (res.ok) {
         traktStatus = 'connected';
@@ -139,26 +189,32 @@ export function createApp(config) {
     const codeError = validateField(code, 'code');
     if (codeError) return res.status(400).json({ error: codeError });
 
+    const url = `${traktApi}/oauth/device/token`;
+    const options = {
+      method: 'POST',
+      headers: traktHeaders,
+      body: JSON.stringify({
+        code,
+        client_id: clientId,
+        client_secret: clientSecret,
+      }),
+    };
+
     try {
-      const traktRes = await fetchWithTimeout(`${traktApi}/oauth/device/token`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          code,
-          client_id: clientId,
-          client_secret: clientSecret,
-        }),
-      });
+      const traktRes = await fetchWithTimeout(url, options);
 
       let data;
       try {
         data = await traktRes.json();
       } catch (_parseErr) {
         console.error(`Token exchange: Trakt returned non-JSON response (HTTP ${traktRes.status})`);
+        logTraktCall('Token exchange (non-JSON)', url, options, traktRes);
         return res.status(502).json({
           error: `Upstream returned non-JSON response (HTTP ${traktRes.status})`,
         });
       }
+
+      logTraktCall('Token exchange', url, options, traktRes, data);
 
       if (!traktRes.ok) {
         const bodySnippet = JSON.stringify(data).slice(0, 200);
@@ -197,27 +253,35 @@ export function createApp(config) {
     const rtError = validateField(refresh_token, 'refresh_token');
     if (rtError) return res.status(400).json({ error: rtError });
 
+    const url = `${traktApi}/oauth/token`;
+    const options = {
+      method: 'POST',
+      headers: traktHeaders,
+      body: JSON.stringify({
+        refresh_token,
+        client_id: clientId,
+        client_secret: clientSecret,
+        redirect_uri: 'urn:ietf:wg:oauth:2.0:oob',
+        grant_type: 'refresh_token',
+      }),
+    };
+
     try {
-      const traktRes = await fetchWithTimeout(`${traktApi}/oauth/token`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          refresh_token,
-          client_id: clientId,
-          client_secret: clientSecret,
-          grant_type: 'refresh_token',
-        }),
-      });
+      const traktRes = await fetchWithTimeout(url, options);
 
       let data;
       try {
         data = await traktRes.json();
       } catch (_parseErr) {
         console.error(`Token refresh: Trakt returned non-JSON response (HTTP ${traktRes.status})`);
+        logTraktCall('Token refresh (non-JSON)', url, options, traktRes);
         return res.status(502).json({
           error: `Upstream returned non-JSON response (HTTP ${traktRes.status})`,
         });
       }
+
+      logTraktCall('Token refresh', url, options, traktRes, data);
+
       if (!traktRes.ok) {
         const bodySnippet = JSON.stringify(data).slice(0, 200);
         console.error(`Token refresh: Trakt returned HTTP ${traktRes.status}: ${bodySnippet}`);

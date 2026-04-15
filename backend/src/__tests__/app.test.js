@@ -3,11 +3,12 @@ import request from 'supertest';
 import { createApp } from '../app.js';
 
 /** Helper: build a mock fetch that resolves with the given status and body. */
-function mockFetch(status, body) {
+function mockFetch(status, body, headers = new Map()) {
   return vi.fn().mockResolvedValue({
     ok: status >= 200 && status < 300,
     status,
     json: () => Promise.resolve(body),
+    headers: { forEach: (cb) => headers.forEach((v, k) => cb(v, k)) },
   });
 }
 
@@ -17,6 +18,7 @@ function mockFetchHtml(status) {
     ok: status >= 200 && status < 300,
     status,
     json: () => Promise.reject(new SyntaxError("Unexpected token '<', \"<html>...\" is not valid JSON")),
+    headers: { forEach: (cb) => new Map().forEach((v, k) => cb(v, k)) },
   });
 }
 
@@ -109,7 +111,11 @@ describe('POST /trakt/token', () => {
       'https://api.trakt.tv/oauth/device/token',
       expect.objectContaining({
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'trakt-api-key': 'test-client-id',
+          'trakt-api-version': '2',
+        },
         body: JSON.stringify({
           code: 'device-code-abc',
           client_id: 'test-client-id',
@@ -282,15 +288,29 @@ describe('POST /trakt/token/refresh', () => {
       'https://api.trakt.tv/oauth/token',
       expect.objectContaining({
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'trakt-api-key': 'test-client-id',
+          'trakt-api-version': '2',
+        },
         body: JSON.stringify({
           refresh_token: 'old-ref-token',
           client_id: 'test-client-id',
           client_secret: 'test-client-secret',
+          redirect_uri: 'urn:ietf:wg:oauth:2.0:oob',
           grant_type: 'refresh_token',
         }),
       }),
     );
+  });
+
+  it('includes redirect_uri in the refresh payload', async () => {
+    await request(app)
+      .post('/trakt/token/refresh')
+      .send({ refresh_token: 'old-ref-token' });
+
+    const callBody = JSON.parse(fetchFn.mock.calls[0][1].body);
+    expect(callBody.redirect_uri).toBe('urn:ietf:wg:oauth:2.0:oob');
   });
 
   it('does not leak client_secret in response', async () => {
@@ -601,27 +621,29 @@ describe('Debug logging (debug: true)', () => {
     const app = buildApp(mockFetch(200, {}), { debug: true });
     await app.verifyCredentials();
     await request(app).get('/health');
-    expect(debugSpy).toHaveBeenCalledOnce();
-    expect(debugSpy.mock.calls[0][0]).toMatch(/\[DEBUG\].*GET.*\/health.*200/);
+    const healthLog = debugSpy.mock.calls.find(([msg]) =>
+      /\[DEBUG\].*GET.*\/health.*200/.test(msg),
+    );
+    expect(healthLog).toBeDefined();
   });
 
   it('log line includes method, path, status, and timing', async () => {
     const app = buildApp(mockFetch(200, {}), { debug: true });
     await request(app).post('/trakt/token').send({ code: 'device-code-abc' });
-    expect(debugSpy).toHaveBeenCalledOnce();
-    const msg = debugSpy.mock.calls[0][0];
-    expect(msg).toMatch(/\[DEBUG\]/);
-    expect(msg).toMatch(/POST/);
-    expect(msg).toMatch(/\/trakt\/token/);
-    expect(msg).toMatch(/200/);
-    expect(msg).toMatch(/\d+ms/);
+    // The debug middleware logs request timing; logTraktCall also logs Trakt API details
+    const requestLog = debugSpy.mock.calls.find(([msg]) =>
+      /\[DEBUG\].*POST.*\/trakt\/token.*\d+ms/.test(msg),
+    );
+    expect(requestLog).toBeDefined();
   });
 
   it('logs debug line even when the endpoint returns an error status', async () => {
     const app = buildApp(mockFetch(400, { error: 'invalid_grant' }), { debug: true });
     await request(app).post('/trakt/token').send({ code: 'bad-code' });
-    expect(debugSpy).toHaveBeenCalledOnce();
-    expect(debugSpy.mock.calls[0][0]).toMatch(/400/);
+    const requestLog = debugSpy.mock.calls.find(([msg]) =>
+      /\[DEBUG\].*400.*ms/.test(msg),
+    );
+    expect(requestLog).toBeDefined();
   });
 
   it('logs one line per request for multiple requests', async () => {
@@ -653,5 +675,127 @@ describe('Debug logging (debug: false / default)', () => {
     const app = buildApp(mockFetch(200, {}));
     await request(app).get('/health');
     expect(debugSpy).not.toHaveBeenCalled();
+  });
+});
+
+// ── Trakt API call debug logging ──────────────────────────────────────────
+
+describe('Debug logging — Trakt API call details (debug: true)', () => {
+  let debugSpy;
+
+  beforeEach(() => {
+    debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    debugSpy.mockRestore();
+  });
+
+  it('logs outgoing request details for token exchange', async () => {
+    const app = buildApp(mockFetch(200, {
+      access_token: 'acc-123',
+      refresh_token: 'ref-456',
+      expires_in: 7776000,
+      token_type: 'Bearer',
+      scope: 'public',
+    }), { debug: true });
+
+    await request(app).post('/trakt/token').send({ code: 'device-code-abc' });
+
+    const allLogs = debugSpy.mock.calls.map(c => c.join(' '));
+    expect(allLogs.some(l => l.includes('Token exchange') && l.includes('/oauth/device/token'))).toBe(true);
+    expect(allLogs.some(l => l.includes('Token exchange') && l.includes('request body'))).toBe(true);
+    expect(allLogs.some(l => l.includes('Token exchange') && l.includes('response status') && l.includes('200'))).toBe(true);
+    expect(allLogs.some(l => l.includes('Token exchange') && l.includes('response body'))).toBe(true);
+  });
+
+  it('logs outgoing request details for token refresh', async () => {
+    const app = buildApp(mockFetch(200, {
+      access_token: 'new-acc-789',
+      refresh_token: 'new-ref-012',
+      expires_in: 7776000,
+    }), { debug: true });
+
+    await request(app).post('/trakt/token/refresh').send({ refresh_token: 'old-ref-token' });
+
+    const allLogs = debugSpy.mock.calls.map(c => c.join(' '));
+    expect(allLogs.some(l => l.includes('Token refresh') && l.includes('/oauth/token'))).toBe(true);
+    expect(allLogs.some(l => l.includes('Token refresh') && l.includes('request body'))).toBe(true);
+    expect(allLogs.some(l => l.includes('Token refresh') && l.includes('response status') && l.includes('200'))).toBe(true);
+  });
+
+  it('masks client_secret in debug logs', async () => {
+    const app = buildApp(mockFetch(200, {
+      access_token: 'acc-123',
+      refresh_token: 'ref-456',
+      expires_in: 7776000,
+      token_type: 'Bearer',
+      scope: 'public',
+    }), { debug: true });
+
+    await request(app).post('/trakt/token').send({ code: 'device-code-abc' });
+
+    const allLogs = debugSpy.mock.calls.map(c => c.join(' '));
+    const bodyLog = allLogs.find(l => l.includes('request body'));
+    expect(bodyLog).toBeDefined();
+    expect(bodyLog).not.toContain('test-client-secret');
+    expect(bodyLog).toContain('test***');
+  });
+
+  it('masks access_token and refresh_token in response body debug logs', async () => {
+    const app = buildApp(mockFetch(200, {
+      access_token: 'acc-full-secret-token',
+      refresh_token: 'ref-full-secret-token',
+      expires_in: 7776000,
+      token_type: 'Bearer',
+      scope: 'public',
+    }), { debug: true });
+
+    await request(app).post('/trakt/token').send({ code: 'device-code-abc' });
+
+    const allLogs = debugSpy.mock.calls.map(c => c.join(' '));
+    const bodyLog = allLogs.find(l => l.includes('response body'));
+    expect(bodyLog).toBeDefined();
+    expect(bodyLog).not.toContain('acc-full-secret-token');
+    expect(bodyLog).not.toContain('ref-full-secret-token');
+    expect(bodyLog).toContain('acc-***');
+    expect(bodyLog).toContain('ref-***');
+  });
+
+  it('logs response headers when present', async () => {
+    const headers = new Map([
+      ['x-ratelimit-limit', '1000'],
+      ['content-type', 'application/json'],
+    ]);
+    const app = buildApp(mockFetch(200, {
+      access_token: 'acc-123',
+      refresh_token: 'ref-456',
+      expires_in: 7776000,
+      token_type: 'Bearer',
+      scope: 'public',
+    }, headers), { debug: true });
+
+    await request(app).post('/trakt/token').send({ code: 'device-code-abc' });
+
+    const allLogs = debugSpy.mock.calls.map(c => c.join(' '));
+    const headerLog = allLogs.find(l => l.includes('response headers'));
+    expect(headerLog).toBeDefined();
+    expect(headerLog).toContain('x-ratelimit-limit');
+    expect(headerLog).toContain('1000');
+  });
+
+  it('does not log Trakt API call details when debug is false', async () => {
+    const app = buildApp(mockFetch(200, {
+      access_token: 'acc-123',
+      refresh_token: 'ref-456',
+      expires_in: 7776000,
+      token_type: 'Bearer',
+      scope: 'public',
+    }));
+
+    await request(app).post('/trakt/token').send({ code: 'device-code-abc' });
+
+    const allLogs = debugSpy.mock.calls.map(c => c.join(' '));
+    expect(allLogs.some(l => l.includes('Token exchange'))).toBe(false);
   });
 });
