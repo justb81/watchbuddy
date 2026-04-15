@@ -144,14 +144,15 @@ class CompanionHttpServerTest {
         }
 
         @Test
-        fun `returns 500 when show repository throws`() = testApp {
+        fun `returns 500 when show repository throws — no exception detail leaked`() = testApp {
             every { tokenRepository.getAccessToken() } returns "test-token"
             coEvery { showRepository.getShows() } throws RuntimeException("Trakt API down")
 
             val response = client.get("/shows")
 
             assertEquals(HttpStatusCode.InternalServerError, response.status)
-            assertTrue(response.bodyAsText().contains("Trakt API down"))
+            assertTrue(response.bodyAsText().contains("Internal server error"))
+            assertFalse(response.bodyAsText().contains("Trakt API down"))
         }
 
         @Test
@@ -449,7 +450,7 @@ class CompanionHttpServerTest {
         }
 
         @Test
-        fun `returns 503 when recap generation throws`() = testApp {
+        fun `returns 503 when recap generation throws — no exception detail leaked`() = testApp {
             every { tokenRepository.getAccessToken() } returns "token"
             coEvery { showRepository.getShows() } returns listOf(watchedEntry)
             coEvery { tmdbApiService.getShow(100, "api-key", any()) } returns tmdbShow
@@ -462,6 +463,8 @@ class CompanionHttpServerTest {
             }
 
             assertEquals(HttpStatusCode.ServiceUnavailable, response.status)
+            assertTrue(response.bodyAsText().contains("Recap generation failed"))
+            assertFalse(response.bodyAsText().contains("LLM crashed"))
         }
 
         @Test
