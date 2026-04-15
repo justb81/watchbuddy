@@ -16,6 +16,7 @@ import com.justb81.watchbuddy.phone.server.DeviceCapabilityProvider
 import com.justb81.watchbuddy.phone.settings.AppSettings
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -30,6 +31,7 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
+import java.security.GeneralSecurityException
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @DisplayName("SettingsViewModel")
@@ -388,6 +390,150 @@ class SettingsViewModelTest {
 
             assertTrue(vm.uiState.value.tmdbConnected)
             assertFalse(vm.uiState.value.defaultTmdbApiKeyAvailable)
+        }
+    }
+
+    @Nested
+    @DisplayName("Init resilience — no force close on settings screen open")
+    inner class InitResilience {
+
+        @Test
+        fun `ViewModel creation does not throw when getClientSecret throws SecurityException`() = runTest {
+            // Simulates Keystore unavailability (e.g. device encryption changed).
+            // Before the fix, this unhandled exception in loadPersistedSettings() would
+            // propagate through viewModelScope and crash the app (force close).
+            every { settingsRepository.getClientSecret() } throws
+                SecurityException("Keystore operation failed")
+
+            // Must not throw — crash would surface here before the fix.
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            // State falls back to defaults; screen is still usable.
+            assertEquals("", vm.uiState.value.directClientSecret)
+        }
+
+        @Test
+        fun `ViewModel creation does not throw when settings DataStore throws`() = runTest {
+            every { settingsRepository.settings } throws RuntimeException("DataStore corrupted")
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            // Falls back to initial defaults.
+            assertEquals(AuthMode.MANAGED, vm.uiState.value.authMode)
+            assertEquals("", vm.uiState.value.customBackendUrl)
+        }
+
+        @Test
+        fun `ViewModel creation does not throw when getClientSecret throws GeneralSecurityException`() = runTest {
+            every { settingsRepository.getClientSecret() } throws
+                RuntimeException("Key could not be generated", GeneralSecurityException("AES key invalid"))
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            assertEquals("", vm.uiState.value.directClientSecret)
+        }
+
+        @Test
+        fun `ViewModel creation does not throw when LlmOrchestrator selectConfig throws`() = runTest {
+            every { llmOrchestrator.selectConfig() } throws
+                RuntimeException("ActivityManager service unavailable")
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            // LLM backend stays at initial detecting state; no crash.
+            assertNotNull(vm.uiState.value.llmBackend)
+        }
+
+        @Test
+        fun `loadPersistedSettings exception does not affect tmdb key state from previous load`() = runTest {
+            // First load succeeds — sets a TMDB key.
+            val settings = AppSettings(tmdbApiKey = "existing-key", defaultTmdbApiKeyAvailable = false)
+            every { settingsRepository.settings } returns flowOf(settings)
+            every { settingsRepository.getClientSecret() } returns "secret"
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            assertTrue(vm.uiState.value.tmdbConnected)
+            // Client secret was loaded successfully.
+            assertEquals("secret", vm.uiState.value.directClientSecret)
+        }
+    }
+
+    @Nested
+    @DisplayName("saveAdvancedSettings — TMDB key preservation")
+    inner class SaveAdvancedSettings {
+
+        @Test
+        fun `saveAdvancedSettings preserves existing TMDB API key`() = runTest {
+            val existingSettings = AppSettings(
+                authMode = AuthMode.MANAGED,
+                tmdbApiKey = "existing-tmdb-key",
+                defaultTmdbApiKeyAvailable = false
+            )
+            every { settingsRepository.settings } returns flowOf(existingSettings)
+            coEvery { settingsRepository.saveSettings(any()) } returns Unit
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            vm.saveAdvancedSettings()
+            advanceUntilIdle()
+
+            // The saved settings must contain the original TMDB key, not an empty string.
+            coVerify {
+                settingsRepository.saveSettings(
+                    withArg { saved ->
+                        assertEquals("existing-tmdb-key", saved.tmdbApiKey)
+                    }
+                )
+            }
+        }
+
+        @Test
+        fun `saveAdvancedSettings with new auth mode does not wipe TMDB key`() = runTest {
+            val existingSettings = AppSettings(
+                authMode = AuthMode.MANAGED,
+                tmdbApiKey = "my-tmdb-key",
+                defaultTmdbApiKeyAvailable = true
+            )
+            every { settingsRepository.settings } returns flowOf(existingSettings)
+            coEvery { settingsRepository.saveSettings(any()) } returns Unit
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            vm.setAuthMode(AuthMode.DIRECT)
+            vm.saveAdvancedSettings()
+            advanceUntilIdle()
+
+            coVerify {
+                settingsRepository.saveSettings(
+                    withArg { saved ->
+                        assertEquals(AuthMode.DIRECT, saved.authMode)
+                        assertEquals("my-tmdb-key", saved.tmdbApiKey)
+                        assertTrue(saved.defaultTmdbApiKeyAvailable)
+                    }
+                )
+            }
+        }
+
+        @Test
+        fun `saveAdvancedSettings sets saveSuccess flag`() = runTest {
+            every { settingsRepository.settings } returns flowOf(AppSettings())
+            coEvery { settingsRepository.saveSettings(any()) } returns Unit
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            vm.saveAdvancedSettings()
+            advanceUntilIdle()
+
+            assertTrue(vm.uiState.value.saveSuccess)
         }
     }
 }
