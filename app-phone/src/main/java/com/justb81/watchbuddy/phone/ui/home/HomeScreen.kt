@@ -9,10 +9,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -222,7 +220,7 @@ private fun WatchingTvToggle(
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Icon(
-                Icons.Default.Tv,
+                Icons.Default.PlayArrow,
                 contentDescription = null,
                 tint = if (isWatching)
                     MaterialTheme.colorScheme.onPrimaryContainer
@@ -260,8 +258,8 @@ private fun WatchingTvToggle(
 private fun NowWatchingCard(event: ScrobbleDisplayEvent) {
     val (actionText, actionIcon) = when (event.action) {
         ScrobbleAction.START -> stringResource(R.string.home_scrobble_started) to Icons.Default.PlayArrow
-        ScrobbleAction.PAUSE -> stringResource(R.string.home_scrobble_paused) to Icons.Default.Pause
-        ScrobbleAction.STOP  -> stringResource(R.string.home_scrobble_stopped) to Icons.Default.Stop
+        ScrobbleAction.PAUSE -> stringResource(R.string.home_scrobble_paused) to Icons.Default.PlayArrow
+        ScrobbleAction.STOP  -> stringResource(R.string.home_scrobble_stopped) to Icons.Default.Check
     }
 
     Card(
