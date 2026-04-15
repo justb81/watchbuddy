@@ -5,6 +5,7 @@ import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import android.util.Log
 import com.justb81.watchbuddy.core.model.DeviceCapability
+import com.justb81.watchbuddy.core.model.LlmBackend
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -17,10 +18,15 @@ import javax.inject.Singleton
 /**
  * Discovers WatchBuddy companion phones on the local network via NSD (mDNS).
  *
- * Service pattern: trakt-companion-{username}._tcp.local (port 8765)
+ * Service pattern: watchbuddy-companion._watchbuddy._tcp.local (port 8765)
  *
- * Also ranks phones by capability score for recap generation:
- *   Score = modelQuality (0–150) + speedBonus (0–20) + ramBonus (0–10)
+ * Discovery flow:
+ *   1. NSD resolves a service → TXT records are parsed immediately for fast scoring.
+ *   2. /capability is fetched for full data (tmdbApiKey, freeRamMb, userAvatarUrl).
+ *   3. If /capability fails, the phone is still added using TXT record data alone.
+ *
+ * Ranking formula:
+ *   Score = modelQuality (0–150) + ramBonus (0–10, only when capability is available)
  */
 @Singleton
 class PhoneDiscoveryManager @Inject constructor(
@@ -38,8 +44,19 @@ class PhoneDiscoveryManager @Inject constructor(
 
     private val nsdManager = context.getSystemService(Context.NSD_SERVICE) as NsdManager
 
+    /**
+     * Lightweight device info extracted from NSD TXT records.
+     * Available immediately after service resolution without any HTTP round-trip.
+     */
+    data class PhoneTxtRecord(
+        val version: String,
+        val modelQuality: Int,
+        val llmBackend: LlmBackend,
+    )
+
     data class DiscoveredPhone(
         val serviceInfo: NsdServiceInfo,
+        val txtRecord: PhoneTxtRecord?,
         val capability: DeviceCapability?,
         val score: Int,
         val baseUrl: String
@@ -75,44 +92,87 @@ class PhoneDiscoveryManager @Inject constructor(
         runCatching { nsdManager.stopServiceDiscovery(discoveryListener) }
     }
 
-    /** Returns the best available phone for recap generation, or null if none available. */
+    /**
+     * Returns the best available phone for recap generation, or null if none available.
+     *
+     * Phones that have TXT records but no capability (e.g. /capability fetch failed) are
+     * included in the ranking and treated as available unless capability explicitly marks
+     * them unavailable.
+     */
     fun getBestPhone(): DiscoveredPhone? =
         _discoveredPhones.value
-            .filter { it.capability?.isAvailable == true }
+            .filter { it.capability?.isAvailable != false }
             .maxByOrNull { it.score }
 
     private fun fetchCapabilityAndAdd(serviceInfo: NsdServiceInfo) {
         @Suppress("DEPRECATION")
         val hostAddress = serviceInfo.host?.hostAddress ?: return
+        val baseUrl = "http://${hostAddress}:${serviceInfo.port}/"
+        val txtRecord = parseTxtRecord(serviceInfo)
+
         val url = "http://${hostAddress}:${serviceInfo.port}${CAPABILITY_PATH}"
         try {
             val response = httpClient.newCall(Request.Builder().url(url).build()).execute()
             val capability = response.body?.string()?.let {
                 Json.decodeFromString<DeviceCapability>(it)
             }
-            val score = calculateScore(capability)
-            val baseUrl = "http://${hostAddress}:${serviceInfo.port}/"
-            val phone = DiscoveredPhone(serviceInfo, capability, score, baseUrl)
-            _discoveredPhones.value = (_discoveredPhones.value
-                .filter { it.serviceInfo.serviceName != serviceInfo.serviceName } + phone)
-                .sortedByDescending { it.score }
+            val score = calculateScore(txtRecord, capability)
+            addOrUpdatePhone(DiscoveredPhone(serviceInfo, txtRecord, capability, score, baseUrl))
         } catch (e: Exception) {
             Log.w(TAG, "Phone discovered at $url but capability fetch failed: ${e.message}")
+            if (txtRecord != null) {
+                // Still add the phone using TXT record data so it appears in the ranked list
+                val score = calculateScore(txtRecord, null)
+                addOrUpdatePhone(DiscoveredPhone(serviceInfo, txtRecord, null, score, baseUrl))
+            }
         }
     }
 
     /**
-     * Device ranking formula:
-     *   Score = modelQuality (0–150) + RAM bonus (0–10) + availability bonus
+     * Parses WatchBuddy TXT records from a resolved NsdServiceInfo.
+     * Returns null if any required field is missing or unparseable.
      */
-    private fun calculateScore(cap: DeviceCapability?): Int {
-        if (cap == null) return 0
-        val ramBonus = when {
-            cap.freeRamMb >= 6_000 -> 10
-            cap.freeRamMb >= 4_000 -> 6
-            cap.freeRamMb >= 3_000 -> 3
-            else -> 0
+    private fun parseTxtRecord(serviceInfo: NsdServiceInfo): PhoneTxtRecord? {
+        return try {
+            val attrs = serviceInfo.attributes
+            val version = attrs["version"]?.toString(Charsets.UTF_8) ?: return null
+            val modelQuality = attrs["modelQuality"]?.toString(Charsets.UTF_8)?.toIntOrNull()
+                ?: return null
+            val llmBackendStr = attrs["llmBackend"]?.toString(Charsets.UTF_8) ?: return null
+            val llmBackend = try {
+                LlmBackend.valueOf(llmBackendStr)
+            } catch (_: IllegalArgumentException) {
+                return null
+            }
+            PhoneTxtRecord(version = version, modelQuality = modelQuality, llmBackend = llmBackend)
+        } catch (_: Exception) {
+            null
         }
-        return cap.modelQuality + ramBonus
+    }
+
+    private fun addOrUpdatePhone(phone: DiscoveredPhone) {
+        _discoveredPhones.value = (_discoveredPhones.value
+            .filter { it.serviceInfo.serviceName != phone.serviceInfo.serviceName } + phone)
+            .sortedByDescending { it.score }
+    }
+
+    /**
+     * Device ranking formula:
+     *   Score = modelQuality (0–150) + RAM bonus (0–10, only when capability is available)
+     *
+     * When only TXT records are available (capability fetch failed), modelQuality from
+     * TXT records is used directly with no RAM bonus.
+     */
+    private fun calculateScore(txt: PhoneTxtRecord?, cap: DeviceCapability?): Int {
+        if (cap != null) {
+            val ramBonus = when {
+                cap.freeRamMb >= 6_000 -> 10
+                cap.freeRamMb >= 4_000 -> 6
+                cap.freeRamMb >= 3_000 -> 3
+                else -> 0
+            }
+            return cap.modelQuality + ramBonus
+        }
+        return txt?.modelQuality ?: 0
     }
 }
