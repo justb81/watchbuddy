@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.9.0](https://github.com/justb81/watchbuddy/compare/v0.8.0...v0.9.0) (2026-04-15)
+
+
+### Features
+
+* show Trakt library on phone app + fix [#167](https://github.com/justb81/watchbuddy/issues/167)/[#169](https://github.com/justb81/watchbuddy/issues/169) ([#171](https://github.com/justb81/watchbuddy/issues/171)) ([1f56f52](https://github.com/justb81/watchbuddy/commit/1f56f5272e9bdf9236b9a8358fbbaf7327a04007))
+
+
+### Bug Fixes
+
+* **phone:** prevent force close when opening settings screen ([#170](https://github.com/justb81/watchbuddy/issues/170)) ([d3c1c3c](https://github.com/justb81/watchbuddy/commit/d3c1c3ca5646beb8edd76d49da0156c2699d09b0)), closes [#168](https://github.com/justb81/watchbuddy/issues/168)
+
 ## [0.8.0](https://github.com/justb81/watchbuddy/compare/v0.7.2...v0.8.0) (2026-04-15)
 
 
