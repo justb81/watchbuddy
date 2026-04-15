@@ -14,13 +14,12 @@
  * that injects the server-side client_secret.
  */
 
-import 'dotenv/config';
 import { createApp } from './app.js';
 
 const { TRAKT_CLIENT_ID, TRAKT_CLIENT_SECRET, PORT = 3000, DEBUG_MODE } = process.env;
 
 if (!TRAKT_CLIENT_ID || !TRAKT_CLIENT_SECRET) {
-  console.error('ERROR: TRAKT_CLIENT_ID and TRAKT_CLIENT_SECRET must be set in .env');
+  console.error('ERROR: TRAKT_CLIENT_ID and TRAKT_CLIENT_SECRET must be set as environment variables');
   process.exit(1);
 }
 
