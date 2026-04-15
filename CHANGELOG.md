@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.0](https://github.com/justb81/watchbuddy/compare/v0.12.0...v0.13.0) (2026-04-15)
+
+
+### Features
+
+* **backend:** use runtime environment variables instead of .env file ([#194](https://github.com/justb81/watchbuddy/issues/194)) ([c63c45a](https://github.com/justb81/watchbuddy/commit/c63c45ada9e116609e0b48d800fa94400b7bf680))
+
 ## [0.12.0](https://github.com/justb81/watchbuddy/compare/v0.11.1...v0.12.0) (2026-04-15)
 
 
