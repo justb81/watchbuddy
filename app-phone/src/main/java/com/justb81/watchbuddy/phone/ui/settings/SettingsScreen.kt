@@ -409,6 +409,14 @@ private fun AdvancedAuthSettings(uiState: SettingsUiState, viewModel: SettingsVi
                     modifier      = Modifier.fillMaxWidth(),
                     singleLine    = true
                 )
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value         = uiState.directClientId,
+                    onValueChange = viewModel::setDirectClientId,
+                    label         = { Text(stringResource(R.string.settings_auth_client_id)) },
+                    modifier      = Modifier.fillMaxWidth(),
+                    singleLine    = true
+                )
             }
             AuthMode.DIRECT -> {
                 OutlinedTextField(

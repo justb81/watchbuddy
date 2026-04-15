@@ -21,7 +21,7 @@
     <string name="onboarding_not_configured_managed_no_client_id">Ce build ne contient pas de Client ID Trakt. Ouvrez Paramètres → Avancé et choisissez \"Propres identifiants\".</string>
     <string name="onboarding_not_configured_managed_no_backend">Le backend de jetons n\'est pas configuré. Ouvrez Paramètres → Avancé pour changer de mode d\'authentification.</string>
     <string name="onboarding_not_configured_self_hosted_no_url">URL du backend non définie. Entrez l\'URL de votre serveur proxy dans Paramètres → Avancé.</string>
-    <string name="onboarding_not_configured_self_hosted_no_id">Ce build ne contient pas de Client ID Trakt. Configurez-le dans Paramètres → Avancé.</string>
+    <string name="onboarding_not_configured_self_hosted_no_id">Entrez votre Client ID Trakt dans Paramètres → Avancé.</string>
     <string name="onboarding_not_configured_direct_no_credentials">Entrez votre Client ID et Client Secret Trakt dans Paramètres → Avancé.</string>
     <string name="onboarding_open_settings">Ouvrir les paramètres</string>
     <string name="onboarding_error_polling_network">Connexion perdue pendant l\'autorisation. Vérifiez votre connexion internet et réessayez.</string>

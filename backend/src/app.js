@@ -103,7 +103,15 @@ export function createApp(config) {
         }),
       });
 
-      const data = await traktRes.json();
+      let data;
+      try {
+        data = await traktRes.json();
+      } catch (_parseErr) {
+        console.error(`Token exchange: Trakt returned non-JSON response (HTTP ${traktRes.status})`);
+        return res.status(502).json({
+          error: `Upstream returned non-JSON response (HTTP ${traktRes.status})`,
+        });
+      }
 
       if (!traktRes.ok) {
         return res.status(traktRes.status).json(data);
@@ -146,7 +154,15 @@ export function createApp(config) {
         }),
       });
 
-      const data = await traktRes.json();
+      let data;
+      try {
+        data = await traktRes.json();
+      } catch (_parseErr) {
+        console.error(`Token refresh: Trakt returned non-JSON response (HTTP ${traktRes.status})`);
+        return res.status(502).json({
+          error: `Upstream returned non-JSON response (HTTP ${traktRes.status})`,
+        });
+      }
       if (!traktRes.ok) return res.status(traktRes.status).json(data);
 
       return res.json({

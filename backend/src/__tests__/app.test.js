@@ -11,6 +11,15 @@ function mockFetch(status, body) {
   });
 }
 
+/** Helper: build a mock fetch that resolves with the given status but returns non-JSON (HTML) body. */
+function mockFetchHtml(status) {
+  return vi.fn().mockResolvedValue({
+    ok: status >= 200 && status < 300,
+    status,
+    json: () => Promise.reject(new SyntaxError("Unexpected token '<', \"<html>...\" is not valid JSON")),
+  });
+}
+
 /** Default config with fake credentials and a mock fetch. */
 function buildApp(fetchFn, overrides = {}) {
   return createApp({
@@ -192,6 +201,32 @@ describe('POST /trakt/token', () => {
     expect(res.status).toBe(504);
     expect(res.body).toEqual({ error: 'Upstream timeout' });
   });
+
+  it('returns 502 when Trakt responds with non-JSON (HTML) on a 2xx status', async () => {
+    const htmlFetch = mockFetchHtml(200);
+    const htmlApp = buildApp(htmlFetch);
+
+    const res = await request(htmlApp)
+      .post('/trakt/token')
+      .send({ code: 'device-code-abc' });
+
+    expect(res.status).toBe(502);
+    expect(res.body.error).toMatch(/non-JSON/i);
+    expect(res.body.error).toContain('200');
+  });
+
+  it('returns 502 when Trakt responds with non-JSON (HTML) on an error status', async () => {
+    const htmlFetch = mockFetchHtml(503);
+    const htmlApp = buildApp(htmlFetch);
+
+    const res = await request(htmlApp)
+      .post('/trakt/token')
+      .send({ code: 'device-code-abc' });
+
+    expect(res.status).toBe(502);
+    expect(res.body.error).toMatch(/non-JSON/i);
+    expect(res.body.error).toContain('503');
+  });
 });
 
 // ── Token refresh endpoint ──────────────────────────────────────────────────
@@ -327,6 +362,32 @@ describe('POST /trakt/token/refresh', () => {
 
     expect(res.status).toBe(504);
     expect(res.body).toEqual({ error: 'Upstream timeout' });
+  });
+
+  it('returns 502 when Trakt responds with non-JSON (HTML) on a 2xx status', async () => {
+    const htmlFetch = mockFetchHtml(200);
+    const htmlApp = buildApp(htmlFetch);
+
+    const res = await request(htmlApp)
+      .post('/trakt/token/refresh')
+      .send({ refresh_token: 'old-ref-token' });
+
+    expect(res.status).toBe(502);
+    expect(res.body.error).toMatch(/non-JSON/i);
+    expect(res.body.error).toContain('200');
+  });
+
+  it('returns 502 when Trakt responds with non-JSON (HTML) on an error status', async () => {
+    const htmlFetch = mockFetchHtml(503);
+    const htmlApp = buildApp(htmlFetch);
+
+    const res = await request(htmlApp)
+      .post('/trakt/token/refresh')
+      .send({ refresh_token: 'old-ref-token' });
+
+    expect(res.status).toBe(502);
+    expect(res.body.error).toMatch(/non-JSON/i);
+    expect(res.body.error).toContain('503');
   });
 });
 

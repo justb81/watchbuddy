@@ -159,9 +159,9 @@ class OnboardingViewModelTest {
         }
 
         @Test
-        fun `shows NotConfigured with SELF_HOSTED_MISSING_CLIENT_ID when client ID is blank`() = runTest {
+        fun `shows NotConfigured with SELF_HOSTED_MISSING_CLIENT_ID when both build ID and user ID are blank`() = runTest {
             every { settingsRepository.settings } returns flowOf(
-                AppSettings(authMode = AuthMode.SELF_HOSTED, backendUrl = CUSTOM_BACKEND_URL)
+                AppSettings(authMode = AuthMode.SELF_HOSTED, backendUrl = CUSTOM_BACKEND_URL, directClientId = "")
             )
             val vm = createViewModel(buildClientId = "")
             vm.requestDeviceCode()
@@ -175,7 +175,7 @@ class OnboardingViewModelTest {
         }
 
         @Test
-        fun `requests device code when client ID and backend URL are present`() = runTest {
+        fun `requests device code when build-time client ID and backend URL are present`() = runTest {
             every { settingsRepository.settings } returns flowOf(
                 AppSettings(authMode = AuthMode.SELF_HOSTED, backendUrl = CUSTOM_BACKEND_URL)
             )
@@ -186,6 +186,44 @@ class OnboardingViewModelTest {
 
             val state = vm.state.value
             assertTrue(state is OnboardingState.WaitingForPin)
+        }
+
+        @Test
+        fun `requests device code using user-supplied client ID when build-time ID is blank`() = runTest {
+            every { settingsRepository.settings } returns flowOf(
+                AppSettings(
+                    authMode = AuthMode.SELF_HOSTED,
+                    backendUrl = CUSTOM_BACKEND_URL,
+                    directClientId = DIRECT_CLIENT_ID
+                )
+            )
+            coEvery { traktApi.requestDeviceCode(any()) } returns deviceCodeResponse
+
+            val vm = createViewModel(buildClientId = "")
+            vm.requestDeviceCode()
+
+            val state = vm.state.value
+            assertTrue(state is OnboardingState.WaitingForPin)
+            coVerify { traktApi.requestDeviceCode(match { it.client_id == DIRECT_CLIENT_ID }) }
+        }
+
+        @Test
+        fun `prefers build-time client ID over user-supplied one when both are present`() = runTest {
+            every { settingsRepository.settings } returns flowOf(
+                AppSettings(
+                    authMode = AuthMode.SELF_HOSTED,
+                    backendUrl = CUSTOM_BACKEND_URL,
+                    directClientId = DIRECT_CLIENT_ID
+                )
+            )
+            coEvery { traktApi.requestDeviceCode(any()) } returns deviceCodeResponse
+
+            val vm = createViewModel(buildClientId = BUILD_CLIENT_ID)
+            vm.requestDeviceCode()
+
+            val state = vm.state.value
+            assertTrue(state is OnboardingState.WaitingForPin)
+            coVerify { traktApi.requestDeviceCode(match { it.client_id == BUILD_CLIENT_ID }) }
         }
     }
 

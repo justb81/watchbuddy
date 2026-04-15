@@ -21,7 +21,7 @@
     <string name="onboarding_not_configured_managed_no_client_id">This build has no Trakt Client ID. Open Settings → Advanced and switch to \"Own credentials\".</string>
     <string name="onboarding_not_configured_managed_no_backend">Token backend is not configured. Open Settings → Advanced to switch authentication mode.</string>
     <string name="onboarding_not_configured_self_hosted_no_url">Backend URL not set. Enter your proxy server URL in Settings → Advanced.</string>
-    <string name="onboarding_not_configured_self_hosted_no_id">This build has no Trakt Client ID. Configure it in Settings → Advanced.</string>
+    <string name="onboarding_not_configured_self_hosted_no_id">Enter your Trakt Client ID in Settings → Advanced.</string>
     <string name="onboarding_not_configured_direct_no_credentials">Enter your Trakt Client ID and Client Secret in Settings → Advanced.</string>
     <string name="onboarding_open_settings">Open Settings</string>
     <string name="onboarding_error_polling_network">Lost connection while waiting for authorization. Please check your internet connection and try again.</string>
