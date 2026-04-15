@@ -73,7 +73,8 @@ To add a new language, create `values-<locale>/strings.xml` in both `app-phone/s
 ### Backend (Token Proxy)
 ```bash
 cd backend
-cp .env.example .env   # add your Trakt client_secret here
+export TRAKT_CLIENT_ID=your_trakt_client_id_here
+export TRAKT_CLIENT_SECRET=your_trakt_client_secret_here
 docker-compose up -d
 ```
 

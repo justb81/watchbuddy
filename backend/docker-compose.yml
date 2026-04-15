@@ -5,8 +5,11 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000"
-    env_file:
-      - .env
+    environment:
+      - TRAKT_CLIENT_ID
+      - TRAKT_CLIENT_SECRET
+      - PORT
+      - DEBUG_MODE
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
       interval: 30s

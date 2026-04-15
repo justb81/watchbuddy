@@ -28,8 +28,6 @@ local.defaults.properties
 # Node.js (backend)
 node_modules/
 dist/
-backend/.env
-backend/.env.local
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

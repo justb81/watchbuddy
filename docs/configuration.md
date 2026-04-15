@@ -28,7 +28,7 @@ Das Gradle-Skript liest diese Variablen via `System.getenv()` und priorisiert si
 
 ## Token-Proxy-Backend (`backend/`)
 
-**Datei:** `backend/.env` (aus `backend/.env.example` kopieren, **nie committen**)
+**Konfiguration:** Umgebungsvariablen werden direkt an den Docker-Container weitergereicht (siehe `backend/docker-compose.yml`).
 
 | Variable              | Beschreibung                                                      |
 |-----------------------|-------------------------------------------------------------------|
@@ -37,10 +37,10 @@ Das Gradle-Skript liest diese Variablen via `System.getenv()` und priorisiert si
 | `PORT`                | HTTP-Port des Backends (Default: `3000`).                         |
 
 ```bash
-# backend/.env (Beispiel)
-TRAKT_CLIENT_ID=your_trakt_client_id_here
-TRAKT_CLIENT_SECRET=your_trakt_client_secret_here
-PORT=3000
+# Umgebungsvariablen auf dem Host setzen (z.B. in der Shell oder in CI/CD)
+export TRAKT_CLIENT_ID=your_trakt_client_id_here
+export TRAKT_CLIENT_SECRET=your_trakt_client_secret_here
+export PORT=3000   # optional, Default: 3000
 ```
 
 ---
@@ -59,5 +59,5 @@ Alle Werte erhältst du unter: **https://trakt.tv/oauth/applications/new**
 - [ ] Trakt-App unter https://trakt.tv/oauth/applications registriert
 - [ ] `TRAKT_CLIENT_ID` in `app-phone/build.gradle.kts` (oder CI-Env) gesetzt
 - [ ] `TOKEN_BACKEND_URL` in `app-phone/build.gradle.kts` (oder CI-Env) gesetzt
-- [ ] `backend/.env` aus `backend/.env.example` erstellt und befüllt
+- [ ] Umgebungsvariablen `TRAKT_CLIENT_ID` und `TRAKT_CLIENT_SECRET` auf dem Host gesetzt
 - [ ] Backend deployed / lokal gestartet (`npm start` in `backend/`)
