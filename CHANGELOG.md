@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.11.0](https://github.com/justb81/watchbuddy/compare/v0.10.0...v0.11.0) (2026-04-15)
+
+
+### Features
+
+* **ci:** send changelog to Play Console on release ([#178](https://github.com/justb81/watchbuddy/issues/178)) ([9a6f3f2](https://github.com/justb81/watchbuddy/commit/9a6f3f2006e7ea84d6c2ffb9a5ff9f676b56fa9c))
+
+
+### Bug Fixes
+
+* **phone:** improve Trakt connect flow ([#176](https://github.com/justb81/watchbuddy/issues/176)) ([#180](https://github.com/justb81/watchbuddy/issues/180)) ([8df9751](https://github.com/justb81/watchbuddy/commit/8df9751d2d1c167d5dba96474b055d169ac210ef))
+* **phone:** prevent force close when opening settings screen ([#177](https://github.com/justb81/watchbuddy/issues/177)) ([#181](https://github.com/justb81/watchbuddy/issues/181)) ([7430f67](https://github.com/justb81/watchbuddy/commit/7430f67599c642f2b3fd51856151306ae8e0cd84))
+
 ## [0.10.0](https://github.com/justb81/watchbuddy/compare/v0.9.0...v0.10.0) (2026-04-15)
 
 
