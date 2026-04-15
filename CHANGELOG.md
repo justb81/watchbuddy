@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.8.0](https://github.com/justb81/watchbuddy/compare/v0.7.2...v0.8.0) (2026-04-15)
+
+
+### Features
+
+* **phone:** automatic Trakt token refresh via TokenRefreshManager ([#157](https://github.com/justb81/watchbuddy/issues/157)) ([3b186e0](https://github.com/justb81/watchbuddy/commit/3b186e07ecc34f72c495eb2266eeede2c7baaa7e))
+
+
+### Bug Fixes
+
+* **phone:** handle Trakt API exceptions in ShowRepository and serve stale cache ([#159](https://github.com/justb81/watchbuddy/issues/159)) ([19ed289](https://github.com/justb81/watchbuddy/commit/19ed2899908936c5cc41697f329bc5d494d6c814)), closes [#158](https://github.com/justb81/watchbuddy/issues/158)
+* **phone:** replace exception messages in HTTP error responses with generic strings ([#161](https://github.com/justb81/watchbuddy/issues/161)) ([752e3cb](https://github.com/justb81/watchbuddy/commit/752e3cb7f0ffdb03cc77681aefc890e32d877c62)), closes [#160](https://github.com/justb81/watchbuddy/issues/160)
+* R8 missing class + route TV scrobble events through phone HTTP API ([#165](https://github.com/justb81/watchbuddy/issues/165)) ([833127c](https://github.com/justb81/watchbuddy/commit/833127c4df85eeafaa920ebc55e32e32f47e5c63))
+* **tv:** add missing permission, recommended TV manifest settings, and optimize versionCode scheme ([#155](https://github.com/justb81/watchbuddy/issues/155)) ([d31973f](https://github.com/justb81/watchbuddy/commit/d31973f1c6f100f148dd9a3c9b02cfc55739c89b))
+
 ## [0.7.2](https://github.com/justb81/watchbuddy/compare/v0.7.1...v0.7.2) (2026-04-14)
 
 
