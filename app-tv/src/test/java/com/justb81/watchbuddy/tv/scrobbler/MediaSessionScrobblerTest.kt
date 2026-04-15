@@ -1,23 +1,29 @@
 package com.justb81.watchbuddy.tv.scrobbler
 
 import android.content.Context
+import com.justb81.watchbuddy.core.model.DeviceCapability
+import com.justb81.watchbuddy.core.model.LlmBackend
 import com.justb81.watchbuddy.core.model.ScrobbleCandidate
 import com.justb81.watchbuddy.core.model.TraktEpisode
 import com.justb81.watchbuddy.core.model.TraktIds
 import com.justb81.watchbuddy.core.model.TraktShow
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
-import com.justb81.watchbuddy.core.trakt.ScrobbleBody
-import com.justb81.watchbuddy.core.trakt.ScrobbleResponse
 import com.justb81.watchbuddy.core.trakt.TraktApiService
 import com.justb81.watchbuddy.tv.data.TvShowCache
+import com.justb81.watchbuddy.tv.discovery.PhoneApiClientFactory
+import com.justb81.watchbuddy.tv.discovery.PhoneApiService
+import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
+import com.justb81.watchbuddy.tv.discovery.PhoneScrobbleActionResponse
+import com.justb81.watchbuddy.tv.discovery.PhoneScrobbleRequest
 import io.mockk.*
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.params.ParameterizedTest
+import android.net.nsd.NsdServiceInfo
 
 @DisplayName("MediaSessionScrobbler")
 class MediaSessionScrobblerTest {
@@ -26,11 +32,34 @@ class MediaSessionScrobblerTest {
     private val traktApi: TraktApiService = mockk()
     private val tvShowCache: TvShowCache = mockk()
     private val tvTokenCache: TvTokenCache = mockk()
+    private val phoneDiscovery: PhoneDiscoveryManager = mockk()
+    private val phoneApiClientFactory: PhoneApiClientFactory = mockk()
     private lateinit var scrobbler: MediaSessionScrobbler
 
     @BeforeEach
     fun setUp() {
-        scrobbler = MediaSessionScrobbler(context, traktApi, tvShowCache, tvTokenCache)
+        scrobbler = MediaSessionScrobbler(
+            context, traktApi, tvShowCache, tvTokenCache, phoneDiscovery, phoneApiClientFactory
+        )
+    }
+
+    /** Helper: creates a mock DiscoveredPhone with a given base URL. */
+    private fun mockPhone(baseUrl: String): PhoneDiscoveryManager.DiscoveredPhone {
+        val capability = DeviceCapability(
+            deviceId = baseUrl,
+            userName = "user",
+            deviceName = "Phone",
+            llmBackend = LlmBackend.LITERT,
+            modelQuality = 75,
+            freeRamMb = 4096,
+            isAvailable = true
+        )
+        return PhoneDiscoveryManager.DiscoveredPhone(
+            serviceInfo = mockk<NsdServiceInfo>(relaxed = true),
+            capability = capability,
+            score = 75,
+            baseUrl = baseUrl
+        )
     }
 
     // ── normalize() ──────────────────────────────────────────────────────────
@@ -161,105 +190,134 @@ class MediaSessionScrobblerTest {
             "com.netflix", "Breaking Bad S01E01", 0.95f, testShow, testEpisode
         )
 
-        private fun mockScrobbleResponse() {
-            coEvery { traktApi.scrobbleStart(any(), any()) } returns ScrobbleResponse(
-                id = 1L, action = "start", progress = 0f,
-                show = testShow, episode = testEpisode
-            )
+        private fun mockPhoneApiService(): PhoneApiService = mockk<PhoneApiService>().also { svc ->
+            coEvery { svc.scrobbleStart(any()) } returns PhoneScrobbleActionResponse(true)
         }
 
         @Test
-        fun `sends scrobble start to Trakt API for single user`() = runTest {
-            coEvery { tvTokenCache.getAllTokens() } returns listOf(
-                TvTokenCache.PhoneToken("device-1", "token-1")
-            )
-            mockScrobbleResponse()
+        fun `calls scrobble start on single phone`() = runTest {
+            val phone = mockPhone("http://phone1:8765/")
+            every { phoneDiscovery.discoveredPhones } returns MutableStateFlow(listOf(phone))
+            val mockSvc = mockPhoneApiService()
+            every { phoneApiClientFactory.createClient("http://phone1:8765/") } returns mockSvc
 
             scrobbler.autoScrobble(testCandidate)
 
             coVerify {
-                traktApi.scrobbleStart(
-                    "Bearer token-1",
-                    match<ScrobbleBody> { it.show == testShow && it.episode == testEpisode && it.progress == 0f }
+                mockSvc.scrobbleStart(
+                    match<PhoneScrobbleRequest> {
+                        it.show == testShow && it.episode == testEpisode && it.progress == 0f
+                    }
                 )
             }
         }
 
         @Test
-        fun `scrobbles for each connected user when multiple phones present`() = runTest {
-            coEvery { tvTokenCache.getAllTokens() } returns listOf(
-                TvTokenCache.PhoneToken("device-1", "token-1"),
-                TvTokenCache.PhoneToken("device-2", "token-2")
-            )
-            mockScrobbleResponse()
+        fun `calls scrobble start on each connected phone independently`() = runTest {
+            val phone1 = mockPhone("http://phone1:8765/")
+            val phone2 = mockPhone("http://phone2:8765/")
+            every { phoneDiscovery.discoveredPhones } returns MutableStateFlow(listOf(phone1, phone2))
+            val mockSvc1 = mockPhoneApiService()
+            val mockSvc2 = mockPhoneApiService()
+            every { phoneApiClientFactory.createClient("http://phone1:8765/") } returns mockSvc1
+            every { phoneApiClientFactory.createClient("http://phone2:8765/") } returns mockSvc2
 
             scrobbler.autoScrobble(testCandidate)
 
-            coVerify { traktApi.scrobbleStart("Bearer token-1", any()) }
-            coVerify { traktApi.scrobbleStart("Bearer token-2", any()) }
-            coVerify(exactly = 2) { traktApi.scrobbleStart(any(), any()) }
+            coVerify { mockSvc1.scrobbleStart(any()) }
+            coVerify { mockSvc2.scrobbleStart(any()) }
         }
 
         @Test
-        fun `skips when no tokens available`() = runTest {
-            coEvery { tvTokenCache.getAllTokens() } returns emptyList()
+        fun `skips when no phones available`() = runTest {
+            every { phoneDiscovery.discoveredPhones } returns MutableStateFlow(emptyList())
 
             scrobbler.autoScrobble(testCandidate)
 
-            coVerify(exactly = 0) { traktApi.scrobbleStart(any(), any()) }
+            verify(exactly = 0) { phoneApiClientFactory.createClient(any()) }
+        }
+
+        @Test
+        fun `skips unavailable phones`() = runTest {
+            val unavailableCapability = DeviceCapability(
+                deviceId = "offline",
+                userName = "user",
+                deviceName = "Phone",
+                llmBackend = LlmBackend.NONE,
+                modelQuality = 0,
+                freeRamMb = 0,
+                isAvailable = false
+            )
+            val offlinePhone = PhoneDiscoveryManager.DiscoveredPhone(
+                serviceInfo = mockk(relaxed = true),
+                capability = unavailableCapability,
+                score = 0,
+                baseUrl = "http://offline:8765/"
+            )
+            every { phoneDiscovery.discoveredPhones } returns MutableStateFlow(listOf(offlinePhone))
+
+            scrobbler.autoScrobble(testCandidate)
+
+            verify(exactly = 0) { phoneApiClientFactory.createClient(any()) }
         }
 
         @Test
         fun `skips when no matched show`() = runTest {
-            coEvery { tvTokenCache.getAllTokens() } returns listOf(
-                TvTokenCache.PhoneToken("device-1", "token-1")
-            )
+            val phone = mockPhone("http://phone1:8765/")
+            every { phoneDiscovery.discoveredPhones } returns MutableStateFlow(listOf(phone))
+            val mockSvc = mockPhoneApiService()
+            every { phoneApiClientFactory.createClient(any()) } returns mockSvc
 
             val candidate = ScrobbleCandidate("pkg", "Title", 0.95f, null, testEpisode)
             scrobbler.autoScrobble(candidate)
 
-            coVerify(exactly = 0) { traktApi.scrobbleStart(any(), any()) }
+            coVerify(exactly = 0) { mockSvc.scrobbleStart(any()) }
         }
 
         @Test
         fun `skips when no matched episode`() = runTest {
-            coEvery { tvTokenCache.getAllTokens() } returns listOf(
-                TvTokenCache.PhoneToken("device-1", "token-1")
-            )
+            val phone = mockPhone("http://phone1:8765/")
+            every { phoneDiscovery.discoveredPhones } returns MutableStateFlow(listOf(phone))
+            val mockSvc = mockPhoneApiService()
+            every { phoneApiClientFactory.createClient(any()) } returns mockSvc
 
             val candidate = ScrobbleCandidate("pkg", "Title", 0.95f, testShow, null)
             scrobbler.autoScrobble(candidate)
 
-            coVerify(exactly = 0) { traktApi.scrobbleStart(any(), any()) }
+            coVerify(exactly = 0) { mockSvc.scrobbleStart(any()) }
         }
 
         @Test
-        fun `handles API exception for one user without blocking others`() = runTest {
-            coEvery { tvTokenCache.getAllTokens() } returns listOf(
-                TvTokenCache.PhoneToken("device-1", "token-1"),
-                TvTokenCache.PhoneToken("device-2", "token-2")
-            )
-            coEvery { traktApi.scrobbleStart("Bearer token-1", any()) } throws RuntimeException("API Error")
-            coEvery { traktApi.scrobbleStart("Bearer token-2", any()) } returns ScrobbleResponse(
-                id = 2L, action = "start", progress = 0f, show = testShow, episode = testEpisode
-            )
-
-            // Should not throw — failure for one user is isolated
-            scrobbler.autoScrobble(testCandidate)
-
-            coVerify { traktApi.scrobbleStart("Bearer token-1", any()) }
-            coVerify { traktApi.scrobbleStart("Bearer token-2", any()) }
-        }
-
-        @Test
-        fun `handles single API exception gracefully`() = runTest {
-            coEvery { tvTokenCache.getAllTokens() } returns listOf(
-                TvTokenCache.PhoneToken("device-1", "token-1")
-            )
-            coEvery { traktApi.scrobbleStart(any(), any()) } throws RuntimeException("API Error")
+        fun `phone API failure does not block scrobble for other phones`() = runTest {
+            val phone1 = mockPhone("http://phone1:8765/")
+            val phone2 = mockPhone("http://phone2:8765/")
+            every { phoneDiscovery.discoveredPhones } returns MutableStateFlow(listOf(phone1, phone2))
+            val failingSvc = mockk<PhoneApiService>()
+            val successSvc = mockk<PhoneApiService>()
+            coEvery { failingSvc.scrobbleStart(any()) } throws RuntimeException("Timeout")
+            coEvery { successSvc.scrobbleStart(any()) } returns PhoneScrobbleActionResponse(true)
+            every { phoneApiClientFactory.createClient("http://phone1:8765/") } returns failingSvc
+            every { phoneApiClientFactory.createClient("http://phone2:8765/") } returns successSvc
 
             // Should not throw
             scrobbler.autoScrobble(testCandidate)
+
+            coVerify { failingSvc.scrobbleStart(any()) }
+            coVerify { successSvc.scrobbleStart(any()) }
+        }
+
+        @Test
+        fun `does not call Trakt API directly for scrobbling`() = runTest {
+            val phone = mockPhone("http://phone1:8765/")
+            every { phoneDiscovery.discoveredPhones } returns MutableStateFlow(listOf(phone))
+            val mockSvc = mockPhoneApiService()
+            every { phoneApiClientFactory.createClient(any()) } returns mockSvc
+
+            scrobbler.autoScrobble(testCandidate)
+
+            coVerify(exactly = 0) { traktApi.scrobbleStart(any(), any()) }
+            coVerify(exactly = 0) { traktApi.scrobblePause(any(), any()) }
+            coVerify(exactly = 0) { traktApi.scrobbleStop(any(), any()) }
         }
     }
 

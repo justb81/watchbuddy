@@ -1,7 +1,10 @@
 package com.justb81.watchbuddy.tv.discovery
 
+import com.justb81.watchbuddy.core.model.TraktEpisode
+import com.justb81.watchbuddy.core.model.TraktShow
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
 import kotlinx.serialization.Serializable
+import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Path
@@ -24,6 +27,15 @@ interface PhoneApiService {
 
     @GET("/auth/token")
     suspend fun getAccessToken(): TokenResponse
+
+    @POST("/scrobble/start")
+    suspend fun scrobbleStart(@Body body: PhoneScrobbleRequest): PhoneScrobbleActionResponse
+
+    @POST("/scrobble/pause")
+    suspend fun scrobblePause(@Body body: PhoneScrobbleRequest): PhoneScrobbleActionResponse
+
+    @POST("/scrobble/stop")
+    suspend fun scrobbleStop(@Body body: PhoneScrobbleRequest): PhoneScrobbleActionResponse
 }
 
 @Serializable
@@ -31,3 +43,13 @@ data class TokenResponse(val accessToken: String)
 
 @Serializable
 data class RecapResponse(val html: String)
+
+@Serializable
+data class PhoneScrobbleRequest(
+    val show: TraktShow,
+    val episode: TraktEpisode,
+    val progress: Float
+)
+
+@Serializable
+data class PhoneScrobbleActionResponse(val success: Boolean)
