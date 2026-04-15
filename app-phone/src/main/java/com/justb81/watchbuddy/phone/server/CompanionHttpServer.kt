@@ -102,7 +102,7 @@ internal fun Application.configureCompanionRoutes(
                 call.respond(shows)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to fetch shows", e)
-                call.respond(HttpStatusCode.InternalServerError, ErrorResponse(e.message ?: "Unknown error"))
+                call.respond(HttpStatusCode.InternalServerError, ErrorResponse("Internal server error"))
             }
         }
 
@@ -181,7 +181,7 @@ internal fun Application.configureCompanionRoutes(
                 call.respond(mapOf("html" to html))
             } catch (e: Exception) {
                 Log.e(TAG, "Recap generation failed for show $showId", e)
-                call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("Recap generation failed: ${e.message}"))
+                call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("Recap generation failed"))
             }
         }
 
