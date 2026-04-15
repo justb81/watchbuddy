@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.1](https://github.com/justb81/watchbuddy/compare/v0.11.0...v0.11.1) (2026-04-15)
+
+
+### Bug Fixes
+
+* handle non-JSON Trakt responses and fix SELF_HOSTED client ID (closes [#182](https://github.com/justb81/watchbuddy/issues/182), closes [#183](https://github.com/justb81/watchbuddy/issues/183)) ([#185](https://github.com/justb81/watchbuddy/issues/185)) ([63b26fd](https://github.com/justb81/watchbuddy/commit/63b26fd5ed5422a449a5d173f12173238e2cff3a))
+
 ## [0.11.0](https://github.com/justb81/watchbuddy/compare/v0.10.0...v0.11.0) (2026-04-15)
 
 
