@@ -63,6 +63,20 @@ interface TraktApiService {
         @Query("query") query: String,
         @Query("limit") limit: Int = 5
     ): List<TraktSearchResult>
+
+    // ── Sync History ──────────────────────────────────────────────────────────
+
+    @POST("sync/history")
+    suspend fun addToHistory(
+        @Header("Authorization") bearer: String,
+        @Body body: SyncHistoryBody
+    ): SyncHistoryResult
+
+    @POST("sync/history/remove")
+    suspend fun removeFromHistory(
+        @Header("Authorization") bearer: String,
+        @Body body: SyncHistoryBody
+    ): SyncHistoryResult
 }
 
 // ── Request/Response DTOs ─────────────────────────────────────────────────────
@@ -132,3 +146,31 @@ interface TraktApiService {
     val score: Float? = null,
     val show: TraktShow? = null
 )
+
+@Serializable data class SyncHistoryBody(
+    val shows: List<SyncHistoryShowItem>
+)
+
+@Serializable data class SyncHistoryShowItem(
+    val ids: com.justb81.watchbuddy.core.model.TraktIds,
+    val seasons: List<SyncHistorySeasonItem>
+)
+
+@Serializable data class SyncHistorySeasonItem(
+    val number: Int,
+    val episodes: List<SyncHistoryEpisodeItem>
+)
+
+@Serializable data class SyncHistoryEpisodeItem(
+    val number: Int
+)
+
+@Serializable data class SyncHistoryResult(
+    val added: SyncHistoryCount? = null,
+    val deleted: SyncHistoryCount? = null,
+    val not_found: SyncHistoryNotFound? = null
+)
+
+@Serializable data class SyncHistoryCount(val episodes: Int = 0)
+
+@Serializable data class SyncHistoryNotFound(val shows: List<String> = emptyList())

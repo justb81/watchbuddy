@@ -1,6 +1,7 @@
 package com.justb81.watchbuddy.phone.ui.home
 
 import android.app.Application
+import com.justb81.watchbuddy.core.tmdb.TmdbApiService
 import com.justb81.watchbuddy.core.trakt.TraktApiService
 import com.justb81.watchbuddy.phone.MainDispatcherRule
 import com.justb81.watchbuddy.phone.TestFixtures
@@ -35,10 +36,12 @@ class HomeViewModelTest {
     private val traktApi: TraktApiService = mockk(relaxed = true)
     private val tokenRepository: TokenRepository = mockk(relaxed = true)
     private val settingsRepository: SettingsRepository = mockk(relaxed = true)
+    private val tmdbApiService: TmdbApiService = mockk(relaxed = true)
 
     @BeforeEach
     fun setUp() {
         every { settingsRepository.settings } returns flowOf(AppSettings())
+        every { settingsRepository.getTmdbApiKey() } returns flowOf("")
         every { tokenRepository.getAccessToken() } returns null
     }
 
@@ -46,7 +49,8 @@ class HomeViewModelTest {
         application = application,
         traktApi = traktApi,
         tokenRepository = tokenRepository,
-        settingsRepository = settingsRepository
+        settingsRepository = settingsRepository,
+        tmdbApiService = tmdbApiService
     )
 
     @Nested

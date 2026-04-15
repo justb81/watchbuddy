@@ -28,6 +28,7 @@ import com.justb81.watchbuddy.core.model.TraktWatchedEntry
 fun HomeScreen(
     onSettingsClick: () -> Unit,
     onConnectClick: () -> Unit,
+    onShowClick: (traktShowId: Int) -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -122,7 +123,13 @@ fun HomeScreen(
                                 SectionHeader(stringResource(R.string.home_continue_watching))
                             }
                             items(inProgress.take(5)) { entry ->
-                                ShowCard(entry = entry)
+                                ShowCard(
+                                    entry = entry,
+                                    posterUrl = entry.show.ids.tmdb?.let { uiState.posterUrls[it] },
+                                    onClick = {
+                                        entry.show.ids.trakt?.let { onShowClick(it) }
+                                    }
+                                )
                             }
                         }
 
@@ -131,7 +138,13 @@ fun HomeScreen(
                             SectionHeader(stringResource(R.string.home_all_shows))
                         }
                         items(uiState.shows) { entry ->
-                            ShowCard(entry = entry)
+                            ShowCard(
+                                entry = entry,
+                                posterUrl = entry.show.ids.tmdb?.let { uiState.posterUrls[it] },
+                                onClick = {
+                                    entry.show.ids.trakt?.let { onShowClick(it) }
+                                }
+                            )
                         }
 
                         // Last sync footer
@@ -164,13 +177,19 @@ private fun SectionHeader(title: String) {
 }
 
 @Composable
-private fun ShowCard(entry: TraktWatchedEntry) {
+private fun ShowCard(
+    entry: TraktWatchedEntry,
+    posterUrl: String?,
+    onClick: () -> Unit
+) {
     val totalEpisodes = entry.seasons.sumOf { it.episodes.size }
     val lastSeason    = entry.seasons.maxByOrNull { it.number }
     val lastEpisode   = lastSeason?.episodes?.maxByOrNull { it.number }
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
         shape    = RoundedCornerShape(12.dp),
         colors   = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant
@@ -181,13 +200,23 @@ private fun ShowCard(entry: TraktWatchedEntry) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Poster placeholder
-            Box(
-                modifier = Modifier
-                    .size(56.dp, 80.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.outline)
-            )
+            if (posterUrl != null) {
+                AsyncImage(
+                    model = posterUrl,
+                    contentDescription = entry.show.title,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(56.dp, 80.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(56.dp, 80.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.outline)
+                )
+            }
 
             Column(
                 modifier = Modifier.weight(1f),

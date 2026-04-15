@@ -96,6 +96,20 @@
     <string name="companion_notification_title">WatchBuddy Companion</string>
     <string name="companion_notification_text">Listo para conexión con TV</string>
 
+    <!-- Show Detail -->
+    <string name="show_detail_seasons">Temporadas</string>
+    <string name="show_detail_season">Temporada %1$d</string>
+    <string name="show_detail_episode">E%1$02d</string>
+    <string name="show_detail_watched">Visto</string>
+    <string name="show_detail_not_watched">No visto</string>
+    <string name="show_detail_mark_watched">Marcar como visto</string>
+    <string name="show_detail_mark_unwatched">Eliminar del historial</string>
+    <string name="show_detail_no_episodes">Aún no hay episodios vistos.</string>
+    <string name="show_detail_error_toggle">No se pudo actualizar el estado. Por favor, inténtalo de nuevo.</string>
+    <string name="show_detail_cd_back">Volver</string>
+    <string name="show_detail_cd_poster">Póster de la serie</string>
+    <string name="show_detail_cd_toggle_watched">Cambiar estado de visto del episodio %1$d de la temporada %2$d</string>
+
     <!-- Common -->
     <string name="no_description">No hay descripción disponible.</string>
     <string name="loading">Cargando…</string>

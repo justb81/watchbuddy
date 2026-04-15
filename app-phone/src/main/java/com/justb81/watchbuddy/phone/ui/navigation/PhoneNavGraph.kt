@@ -1,18 +1,24 @@
 package com.justb81.watchbuddy.phone.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.justb81.watchbuddy.phone.ui.home.HomeScreen
 import com.justb81.watchbuddy.phone.ui.onboarding.OnboardingScreen
 import com.justb81.watchbuddy.phone.ui.settings.SettingsScreen
+import com.justb81.watchbuddy.phone.ui.showdetail.ShowDetailScreen
 
 sealed class PhoneRoute(val route: String) {
-    object Onboarding : PhoneRoute("onboarding")
-    object Home       : PhoneRoute("home")
-    object Settings   : PhoneRoute("settings")
-    object Connect    : PhoneRoute("connect")
+    object Onboarding  : PhoneRoute("onboarding")
+    object Home        : PhoneRoute("home")
+    object Settings    : PhoneRoute("settings")
+    object Connect     : PhoneRoute("connect")
+    object ShowDetail  : PhoneRoute("show_detail/{traktShowId}") {
+        fun route(traktShowId: Int) = "show_detail/$traktShowId"
+    }
 }
 
 @Composable
@@ -44,7 +50,10 @@ fun PhoneNavGraph(
         composable(PhoneRoute.Home.route) {
             HomeScreen(
                 onSettingsClick = { navController.navigate(PhoneRoute.Settings.route) },
-                onConnectClick  = { navController.navigate(PhoneRoute.Connect.route) }
+                onConnectClick  = { navController.navigate(PhoneRoute.Connect.route) },
+                onShowClick     = { traktShowId ->
+                    navController.navigate(PhoneRoute.ShowDetail.route(traktShowId))
+                }
             )
         }
 
@@ -66,6 +75,15 @@ fun PhoneNavGraph(
                 onSkip = { navController.popBackStack() },
                 onOpenSettings = { navController.navigate(PhoneRoute.Settings.route) },
                 isReconnect = true
+            )
+        }
+
+        composable(
+            route = PhoneRoute.ShowDetail.route,
+            arguments = listOf(navArgument("traktShowId") { type = NavType.IntType })
+        ) {
+            ShowDetailScreen(
+                onBack = { navController.popBackStack() }
             )
         }
     }
