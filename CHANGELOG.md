@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.0](https://github.com/justb81/watchbuddy/compare/v0.9.0...v0.10.0) (2026-04-15)
+
+
+### Features
+
+* **discovery:** publish NSD TXT records on phone and cache them on TV for bestPhone ranking ([#174](https://github.com/justb81/watchbuddy/issues/174)) ([9d6c96d](https://github.com/justb81/watchbuddy/commit/9d6c96de3df26a1d430c10aa76a7a6e1dbf47b61))
+
 ## [0.9.0](https://github.com/justb81/watchbuddy/compare/v0.8.0...v0.9.0) (2026-04-15)
 
 
