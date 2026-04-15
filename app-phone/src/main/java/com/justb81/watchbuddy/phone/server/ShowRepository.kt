@@ -1,10 +1,13 @@
 package com.justb81.watchbuddy.phone.server
 
+import android.util.Log
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
 import com.justb81.watchbuddy.core.trakt.TraktApiService
 import com.justb81.watchbuddy.phone.auth.TokenRefreshManager
 import javax.inject.Inject
 import javax.inject.Singleton
+
+private const val TAG = "ShowRepository"
 
 @Singleton
 class ShowRepository @Inject constructor(
@@ -19,8 +22,13 @@ class ShowRepository @Inject constructor(
         if (now - lastFetch > CACHE_TTL || cachedShows.isEmpty()) {
             val token = tokenRefreshManager.getValidAccessToken()
                 ?: return emptyList()
-            cachedShows = traktApi.getWatchedShows("Bearer $token")
-            lastFetch = now
+            try {
+                cachedShows = traktApi.getWatchedShows("Bearer $token")
+                lastFetch = now
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to fetch shows from Trakt; serving ${cachedShows.size} cached entries", e)
+                // Do not update lastFetch so the next call retries the API.
+            }
         }
         return cachedShows
     }
