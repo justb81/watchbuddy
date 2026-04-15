@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.1](https://github.com/justb81/watchbuddy/compare/v0.13.0...v0.13.1) (2026-04-15)
+
+
+### Bug Fixes
+
+* **backend:** add missing Trakt API headers and redirect_uri to fix 403 errors ([#197](https://github.com/justb81/watchbuddy/issues/197)) ([ed79184](https://github.com/justb81/watchbuddy/commit/ed79184e05f76c421d798fbf51839a7f9ee67f5f))
+
 ## [0.13.0](https://github.com/justb81/watchbuddy/compare/v0.12.0...v0.13.0) (2026-04-15)
 
 
