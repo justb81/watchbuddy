@@ -21,7 +21,7 @@
     <string name="onboarding_not_configured_managed_no_client_id">Este build no tiene Client ID de Trakt. Abre Ajustes → Avanzado y selecciona \"Propias credenciales\".</string>
     <string name="onboarding_not_configured_managed_no_backend">El backend de tokens no está configurado. Abre Ajustes → Avanzado para cambiar el modo de autenticación.</string>
     <string name="onboarding_not_configured_self_hosted_no_url">URL del backend no configurada. Introduce la URL de tu servidor proxy en Ajustes → Avanzado.</string>
-    <string name="onboarding_not_configured_self_hosted_no_id">Este build no tiene Client ID de Trakt. Configúralo en Ajustes → Avanzado.</string>
+    <string name="onboarding_not_configured_self_hosted_no_id">Introduce tu Client ID de Trakt en Ajustes → Avanzado.</string>
     <string name="onboarding_not_configured_direct_no_credentials">Introduce tu Client ID y Client Secret de Trakt en Ajustes → Avanzado.</string>
     <string name="onboarding_open_settings">Abrir ajustes</string>
     <string name="onboarding_error_polling_network">Se perdió la conexión durante la autorización. Comprueba tu conexión a internet e inténtalo de nuevo.</string>

@@ -124,8 +124,9 @@ class OnboardingViewModel @Inject constructor(
         }
         AuthMode.SELF_HOSTED -> when {
             backendUrl.isBlank() -> null to NotConfiguredReason.SELF_HOSTED_MISSING_URL
-            buildConfigClientId.isBlank() -> null to NotConfiguredReason.SELF_HOSTED_MISSING_CLIENT_ID
-            else -> buildConfigClientId to null
+            buildConfigClientId.isBlank() && directClientId.isBlank() ->
+                null to NotConfiguredReason.SELF_HOSTED_MISSING_CLIENT_ID
+            else -> (buildConfigClientId.takeIf { it.isNotBlank() } ?: directClientId) to null
         }
         AuthMode.DIRECT -> {
             val secret = settingsRepository.getClientSecret()
