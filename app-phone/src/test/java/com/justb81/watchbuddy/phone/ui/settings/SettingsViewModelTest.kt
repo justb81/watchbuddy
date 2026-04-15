@@ -449,6 +449,21 @@ class SettingsViewModelTest {
         }
 
         @Test
+        fun `ViewModel creation does not throw when getAccessToken throws SecurityException`() = runTest {
+            // Simulates Keystore unavailability during loadTraktUsername().
+            // getAccessToken() was previously called outside the try/catch block,
+            // so a SecurityException would propagate and crash the app.
+            every { tokenRepository.getAccessToken() } throws
+                SecurityException("Keystore operation failed")
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            // Username stays null (not connected); no crash.
+            assertNull(vm.uiState.value.traktUsername)
+        }
+
+        @Test
         fun `loadPersistedSettings exception does not affect tmdb key state from previous load`() = runTest {
             // First load succeeds — sets a TMDB key.
             val settings = AppSettings(tmdbApiKey = "existing-key", defaultTmdbApiKeyAvailable = false)

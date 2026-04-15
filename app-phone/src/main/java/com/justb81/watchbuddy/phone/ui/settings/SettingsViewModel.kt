@@ -77,13 +77,13 @@ class SettingsViewModel @Inject constructor(
     }
 
     private fun loadTraktUsername() {
-        val accessToken = tokenRepository.getAccessToken() ?: return
         viewModelScope.launch {
             try {
+                val accessToken = tokenRepository.getAccessToken() ?: return@launch
                 val profile = traktApi.getProfile("Bearer $accessToken")
                 _uiState.value = _uiState.value.copy(traktUsername = profile.username)
             } catch (_: Exception) {
-                // Token may be expired or network unavailable — keep showing "Not connected"
+                // Keystore unavailable, token expired, or network error — keep "Not connected"
             }
         }
     }
