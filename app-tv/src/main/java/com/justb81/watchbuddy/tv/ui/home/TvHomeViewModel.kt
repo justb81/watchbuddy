@@ -61,7 +61,7 @@ class TvHomeViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         connectedPhones = phones.size,
-                        bestPhoneName   = best?.capability?.deviceName,
+                        bestPhoneName   = best?.capability?.userName,
                         bestPhoneBackend = best?.capability?.llmBackend?.name
                     )
                 }

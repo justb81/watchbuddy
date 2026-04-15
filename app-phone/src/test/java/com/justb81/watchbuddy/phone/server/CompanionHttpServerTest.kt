@@ -18,6 +18,7 @@ import com.justb81.watchbuddy.phone.auth.TokenRefreshManager
 import com.justb81.watchbuddy.phone.auth.TokenRepository
 import com.justb81.watchbuddy.phone.llm.RecapGenerator
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
+import com.justb81.watchbuddy.service.CompanionStateManager
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -44,6 +45,7 @@ class CompanionHttpServerTest {
     private val tmdbApiService: TmdbApiService = mockk()
     private val tmdbCache = TmdbCache()
     private val settingsRepository: SettingsRepository = mockk()
+    private val stateManager = CompanionStateManager()
 
     // ── Shared test fixtures ──────────────────────────────────────────────────
 
@@ -85,7 +87,8 @@ class CompanionHttpServerTest {
         application {
             configureCompanionRoutes(
                 recapGenerator, capabilityProvider, showRepository,
-                tokenRepository, tokenRefreshManager, traktApiService, tmdbApiService, tmdbCache, settingsRepository
+                tokenRepository, tokenRefreshManager, traktApiService, tmdbApiService, tmdbCache, settingsRepository,
+                stateManager
             )
         }
         block()

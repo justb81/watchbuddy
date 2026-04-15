@@ -24,7 +24,7 @@ watchbuddy/
 │       │   ├── settings/   SettingsScreen, SettingsViewModel
 │       │   ├── showdetail/ ShowDetailScreen, ShowDetailViewModel
 │       │   └── theme/      Material 3 theme
-│       └── (service/)  CompanionService (foreground NSD server)
+│       └── (service/)  CompanionService, CompanionStateManager (foreground NSD server + shared state)
 ├── app-tv/             Google TV app (Kotlin, Compose for TV)
 │   └── src/main/java/com/justb81/watchbuddy/tv/
 │       ├── data/       StreamingPreferencesRepository, UserSessionRepository, TvShowCache
@@ -185,6 +185,12 @@ The TV ranks connected phones by LLM quality and uses the best one. Failover cha
 
 ## Important Patterns
 
+- **Watching TV toggle:** The phone HomeScreen shows an "I am watching TV" toggle, gated by Trakt + TMDB availability. Toggling starts/stops the `CompanionService`. When the user swipes the app from recents, the service auto-stops via `onTaskRemoved()`.
+- **CompanionStateManager:** Hilt singleton (`service/CompanionStateManager.kt`) that is the shared state hub between `CompanionService`, `CompanionHttpServer`, and `HomeViewModel`. Tracks `lastCapabilityCheck`, `lastScrobbleEvent`, and `isServiceRunning`.
+- **Presence heartbeat (TV):** `PhoneDiscoveryManager` runs a heartbeat every 60s, re-fetching `/capability` for each phone. 3 consecutive failures → phone removed from discovered list. `MediaSessionScrobbler` skips phones with stale presence (> 2 min) before scrobbling.
+- **Presence timeout (phone):** If no TV polls `/capability` for 5 minutes, the companion service auto-deactivates.
+- **Auto-reconnect:** `CompanionService` registers a `ConnectivityManager.NetworkCallback` for Wi-Fi. On network loss, NSD is unregistered; on network available, NSD is re-registered.
+- **Scrobble display:** When a scrobble event is received on the phone, `CompanionStateManager.lastScrobbleEvent` is updated. The phone HomeScreen shows a "Now Watching" card with show/episode details, auto-hidden after 30 minutes.
 - **Scrobbling:** `MediaSessionScrobbler` listens to active media sessions on the TV, extracts package name + title, fuzzy-matches against the local show cache first, then falls back to TMDB title search (using the API key from the best phone's capability). Auto-scrobbles if confidence ≥ 95%, shows overlay confirmation between 70–95%, ignores below 70%. When a scrobble event occurs, `MediaSessionScrobbler` calls `POST /scrobble/{start|pause|stop}` on **every** connected phone in parallel via `PhoneDiscoveryManager` + `PhoneApiClientFactory` — each phone records the episode on its own user's Trakt account using its own stored credentials. A failure for one phone does not block the others. The TV never calls the Trakt API directly for any operation.
 - **LLM selection:** `LlmOrchestrator` checks AICore first, then falls back to LiteRT-LM with a Gemma 4 model (E4B or E2B) sized to available RAM.
 - **Auth modes:** Managed backend (default), self-hosted proxy, or direct Trakt credentials.

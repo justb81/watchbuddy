@@ -6,6 +6,10 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import android.os.IBinder
@@ -14,7 +18,15 @@ import androidx.core.app.NotificationCompat
 import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.phone.llm.LlmOrchestrator
 import com.justb81.watchbuddy.phone.server.CompanionHttpServer
+import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -28,6 +40,11 @@ class CompanionService : Service() {
         private const val NSD_SERVICE_NAME = "watchbuddy-companion"
         private const val NSD_TXT_VERSION = "1"
 
+        /** How often to check whether the TV is still polling us. */
+        private const val PRESENCE_CHECK_INTERVAL_MS = 60_000L
+        /** Auto-deactivate if no TV has polled /capability for this long. */
+        private const val PRESENCE_TIMEOUT_MS = 5 * 60_000L
+
         fun start(context: Context) {
             val intent = Intent(context, CompanionService::class.java)
             context.startForegroundService(intent)
@@ -40,9 +57,14 @@ class CompanionService : Service() {
 
     @Inject lateinit var companionHttpServer: CompanionHttpServer
     @Inject lateinit var llmOrchestrator: LlmOrchestrator
+    @Inject lateinit var stateManager: CompanionStateManager
+    @Inject lateinit var settingsRepository: SettingsRepository
 
     private var nsdManager: NsdManager? = null
     private var nsdRegistrationListener: NsdManager.RegistrationListener? = null
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private var presenceJob: Job? = null
+    private var networkCallback: ConnectivityManager.NetworkCallback? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -53,16 +75,85 @@ class CompanionService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         companionHttpServer.start()
         registerNsd()
+        stateManager.setServiceRunning(true)
+        registerNetworkCallback()
+        startPresenceMonitor()
         return START_STICKY
     }
 
     override fun onDestroy() {
+        presenceJob?.cancel()
+        unregisterNetworkCallback()
         unregisterNsd()
         companionHttpServer.stop()
+        stateManager.setServiceRunning(false)
+        serviceScope.cancel()
         super.onDestroy()
     }
 
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        serviceScope.launch {
+            settingsRepository.setCompanionEnabled(false)
+        }
+        stopSelf()
+        super.onTaskRemoved(rootIntent)
+    }
+
     override fun onBind(intent: Intent?): IBinder? = null
+
+    // ── Presence timeout ─────────────────────────────────────────────────────
+
+    private fun startPresenceMonitor() {
+        // Reset the timestamp so the first check doesn't immediately time out
+        stateManager.onCapabilityChecked()
+        presenceJob = serviceScope.launch {
+            while (true) {
+                delay(PRESENCE_CHECK_INTERVAL_MS)
+                val elapsed = System.currentTimeMillis() - stateManager.lastCapabilityCheck.value
+                if (elapsed > PRESENCE_TIMEOUT_MS) {
+                    Log.i(TAG, "No TV polled /capability for ${elapsed / 1000}s — auto-deactivating")
+                    settingsRepository.setCompanionEnabled(false)
+                    stopSelf()
+                    break
+                }
+            }
+        }
+    }
+
+    // ── Network reconnect ────────────────────────────────────────────────────
+
+    private fun registerNetworkCallback() {
+        val cm = getSystemService(ConnectivityManager::class.java) ?: return
+        val request = NetworkRequest.Builder()
+            .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+            .build()
+
+        val callback = object : ConnectivityManager.NetworkCallback() {
+            override fun onLost(network: Network) {
+                Log.i(TAG, "Wi-Fi lost — unregistering NSD")
+                unregisterNsd()
+            }
+
+            override fun onAvailable(network: Network) {
+                Log.i(TAG, "Wi-Fi available — re-registering NSD")
+                registerNsd()
+            }
+        }
+        networkCallback = callback
+        cm.registerNetworkCallback(request, callback)
+    }
+
+    private fun unregisterNetworkCallback() {
+        networkCallback?.let { cb ->
+            runCatching {
+                val cm = getSystemService(ConnectivityManager::class.java)
+                cm?.unregisterNetworkCallback(cb)
+            }
+        }
+        networkCallback = null
+    }
+
+    // ── Notification ─────────────────────────────────────────────────────────
 
     private fun ensureNotificationChannel() {
         val manager = getSystemService(NotificationManager::class.java)
@@ -85,7 +176,12 @@ class CompanionService : Service() {
             .setOngoing(true)
             .build()
 
+    // ── NSD ──────────────────────────────────────────────────────────────────
+
     private fun registerNsd() {
+        // Avoid double-registration
+        if (nsdRegistrationListener != null) return
+
         val llmConfig = llmOrchestrator.selectConfig()
         val serviceInfo = NsdServiceInfo().apply {
             serviceName = NSD_SERVICE_NAME
@@ -102,6 +198,7 @@ class CompanionService : Service() {
             }
             override fun onRegistrationFailed(info: NsdServiceInfo, errorCode: Int) {
                 Log.e(TAG, "NSD registration failed: error=$errorCode, service=${info.serviceName}")
+                nsdRegistrationListener = null
             }
             override fun onServiceUnregistered(info: NsdServiceInfo) {
                 Log.i(TAG, "NSD service unregistered: ${info.serviceName}")
@@ -119,7 +216,9 @@ class CompanionService : Service() {
 
     private fun unregisterNsd() {
         nsdRegistrationListener?.let { listener ->
-            nsdManager?.unregisterService(listener)
+            nsdManager?.let { mgr ->
+                runCatching { mgr.unregisterService(listener) }
+            }
         }
         nsdRegistrationListener = null
         nsdManager = null

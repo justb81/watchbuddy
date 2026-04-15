@@ -47,6 +47,8 @@ class MediaSessionScrobbler @Inject constructor(
         private const val TAG = "MediaSessionScrobbler"
         private const val AUTO_SCROBBLE_THRESHOLD = 0.95f
         private const val OVERLAY_THRESHOLD = 0.70f
+        /** Skip phones whose last successful heartbeat is older than this. */
+        private const val PRESENCE_STALENESS_MS = 2 * 60_000L
     }
 
     private val _pendingConfirmation = MutableSharedFlow<ScrobbleCandidate>()
@@ -226,8 +228,10 @@ class MediaSessionScrobbler @Inject constructor(
      * user confirmation.
      */
     suspend fun autoScrobble(candidate: ScrobbleCandidate) {
+        val now = System.currentTimeMillis()
         val phones = phoneDiscovery.discoveredPhones.value
             .filter { it.capability?.isAvailable == true }
+            .filter { now - it.lastSuccessfulCheck < PRESENCE_STALENESS_MS }
         if (phones.isEmpty()) {
             Log.w(TAG, "No phones available — scrobble skipped")
             return
@@ -255,8 +259,10 @@ class MediaSessionScrobbler @Inject constructor(
     private suspend fun handleScrobblePause(rawTitle: String) {
         if (rawTitle != currentlyScrobbling) return
 
+        val now = System.currentTimeMillis()
         val phones = phoneDiscovery.discoveredPhones.value
             .filter { it.capability?.isAvailable == true }
+            .filter { now - it.lastSuccessfulCheck < PRESENCE_STALENESS_MS }
         if (phones.isEmpty()) return
         val candidate = matchTitle("", rawTitle) ?: return
         val show = candidate.matchedShow ?: return
@@ -280,8 +286,10 @@ class MediaSessionScrobbler @Inject constructor(
     private suspend fun handleScrobbleStop(rawTitle: String) {
         if (rawTitle != currentlyScrobbling) return
 
+        val now = System.currentTimeMillis()
         val phones = phoneDiscovery.discoveredPhones.value
             .filter { it.capability?.isAvailable == true }
+            .filter { now - it.lastSuccessfulCheck < PRESENCE_STALENESS_MS }
         if (phones.isEmpty()) return
         val candidate = matchTitle("", rawTitle) ?: return
         val show = candidate.matchedShow ?: return

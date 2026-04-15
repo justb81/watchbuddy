@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.justb81.watchbuddy.R
+import com.justb81.watchbuddy.core.model.ScrobbleDisplayEvent
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
 import com.justb81.watchbuddy.core.tmdb.TmdbApiService
 import com.justb81.watchbuddy.core.tmdb.TmdbImageHelper
@@ -11,6 +12,7 @@ import com.justb81.watchbuddy.core.trakt.TraktApiService
 import com.justb81.watchbuddy.phone.auth.TokenRepository
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import com.justb81.watchbuddy.service.CompanionService
+import com.justb81.watchbuddy.service.CompanionStateManager
 import kotlinx.coroutines.flow.first
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,7 +28,10 @@ data class HomeUiState(
     val shows: List<TraktWatchedEntry> = emptyList(),
     val posterUrls: Map<Int, String?> = emptyMap(),  // key: TMDB ID
     val lastSyncTime: String? = null,
-    val error: String? = null
+    val error: String? = null,
+    val canWatch: Boolean = false,
+    val isWatchingTv: Boolean = false,
+    val latestScrobbleEvent: ScrobbleDisplayEvent? = null
 )
 
 @HiltViewModel
@@ -35,22 +40,63 @@ class HomeViewModel @Inject constructor(
     private val traktApi: TraktApiService,
     private val tokenRepository: TokenRepository,
     private val settingsRepository: SettingsRepository,
-    private val tmdbApiService: TmdbApiService
+    private val tmdbApiService: TmdbApiService,
+    private val companionStateManager: CompanionStateManager
 ) : AndroidViewModel(application) {
+
+    companion object {
+        /** Hide scrobble events older than 30 minutes. */
+        private const val SCROBBLE_DISPLAY_TTL_MS = 30 * 60_000L
+    }
 
     private val _uiState = MutableStateFlow(HomeUiState(isLoading = true))
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
     init {
         loadShows()
-        startCompanionIfEnabled()
+        checkServiceConnections()
+        observeCompanionState()
+        observeScrobbleEvents()
     }
 
-    private fun startCompanionIfEnabled() {
+    private fun checkServiceConnections() {
         viewModelScope.launch {
-            val settings = settingsRepository.settings.first()
-            if (settings.companionEnabled) {
+            val traktOk = tokenRepository.isTokenValid()
+            val tmdbOk = settingsRepository.getTmdbApiKey().first().isNotBlank()
+            _uiState.update { it.copy(canWatch = traktOk && tmdbOk) }
+        }
+    }
+
+    private fun observeCompanionState() {
+        viewModelScope.launch {
+            settingsRepository.settings.collect { settings ->
+                val wasWatching = _uiState.value.isWatchingTv
+                _uiState.update { it.copy(isWatchingTv = settings.companionEnabled) }
+                if (settings.companionEnabled && !wasWatching) {
+                    CompanionService.start(getApplication<Application>())
+                }
+            }
+        }
+    }
+
+    private fun observeScrobbleEvents() {
+        viewModelScope.launch {
+            companionStateManager.lastScrobbleEvent.collect { event ->
+                val displayEvent = if (event != null &&
+                    System.currentTimeMillis() - event.timestamp < SCROBBLE_DISPLAY_TTL_MS
+                ) event else null
+                _uiState.update { it.copy(latestScrobbleEvent = displayEvent) }
+            }
+        }
+    }
+
+    fun toggleWatchingTv(enabled: Boolean) {
+        viewModelScope.launch {
+            settingsRepository.setCompanionEnabled(enabled)
+            if (enabled) {
                 CompanionService.start(getApplication<Application>())
+            } else {
+                CompanionService.stop(getApplication<Application>())
             }
         }
     }

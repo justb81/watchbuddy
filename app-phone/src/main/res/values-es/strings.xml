@@ -42,6 +42,9 @@
     <string name="home_sync_failed">Error de sincronización: %1$s</string>
     <string name="home_cd_sync">Sincronizar</string>
     <string name="home_cd_settings">Ajustes</string>
+    <string name="home_watching_tv_toggle">Estoy viendo la tele</string>
+    <string name="home_watching_tv_description">Conectar con tu TV para scrobbling</string>
+    <string name="home_watching_tv_disabled_reason">Conéctate primero a Trakt y configura TMDB</string>
 
     <!-- Settings -->
     <string name="settings_title">Ajustes</string>
@@ -90,6 +93,12 @@
     <string name="settings_not_connected">No conectado</string>
     <string name="settings_connect_to_trakt">Conectar con Trakt</string>
     <string name="settings_llm_detecting">Detectando…</string>
+
+    <string name="home_now_watching">Viendo ahora</string>
+    <string name="home_scrobble_started">Reproducción iniciada</string>
+    <string name="home_scrobble_paused">En pausa</string>
+    <string name="home_scrobble_stopped">Reproducción terminada</string>
+    <string name="companion_auto_deactivated">Companion desactivado — TV no responde</string>
 
     <!-- Companion Service -->
     <string name="companion_channel_name">Servicio compañero</string>

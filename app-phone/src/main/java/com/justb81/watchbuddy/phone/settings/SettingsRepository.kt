@@ -106,6 +106,13 @@ class SettingsRepository @Inject constructor(
         }
     }
 
+    /** Updates only the companion-enabled flag without touching other settings. */
+    suspend fun setCompanionEnabled(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[Keys.COMPANION_ENABLED] = enabled
+        }
+    }
+
     /** Absolute path where downloaded model files are stored. */
     fun modelDir(): File = File(context.filesDir, "llm_models").also { it.mkdirs() }
 }

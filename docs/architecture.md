@@ -102,6 +102,50 @@ Multi-user: when multiple phones are connected, each user's watch history is rec
 independently — one `/scrobble/*` call per phone, in parallel. A failure for one user
 does not block the others. The TV never calls the Trakt API directly for any operation.
 
+## Companion Service Lifecycle (Phone)
+
+The phone's companion service is controlled via the "I am watching TV" toggle on the HomeScreen.
+The toggle is visible only when both Trakt and TMDB connections are configured.
+
+**State management:** `CompanionStateManager` (Hilt singleton) is the shared state hub between
+the `CompanionService`, `CompanionHttpServer`, and `HomeViewModel`. It tracks:
+- `lastCapabilityCheck` — timestamp of the most recent `/capability` request from a TV
+- `lastScrobbleEvent` — the latest scrobble event for display on the phone HomeScreen
+- `isServiceRunning` — whether the foreground service is active
+
+**Auto-reconnect:** The service registers a `ConnectivityManager.NetworkCallback` for Wi-Fi.
+When Wi-Fi is lost, NSD is unregistered (HTTP server stays alive). When Wi-Fi returns,
+NSD is re-registered so the TV can rediscover the phone.
+
+**Presence timeout:** A coroutine checks `lastCapabilityCheck` every 60 seconds. If no TV
+has polled `/capability` for 5 minutes, the service auto-deactivates and sets `companionEnabled = false`.
+
+**App close:** `onTaskRemoved()` stops the service and clears `companionEnabled` when the user
+swipes the app from recents.
+
+**Service health sync:** `onStartCommand()` includes a guard to avoid double-starting the HTTP
+server (`if server != null return`).
+
+## Presence Heartbeat (TV)
+
+The TV's `PhoneDiscoveryManager` runs a heartbeat coroutine every 60 seconds that re-fetches
+`GET /capability` for each discovered phone. This serves two purposes:
+
+1. **Presence verification** — if a phone fails 3 consecutive heartbeats, it is removed from
+   the discovered list and excluded from scrobbling.
+2. **Capability refresh** — updated capability data (RAM, LLM backend) is reflected immediately.
+
+The `MediaSessionScrobbler` additionally checks each phone's `lastSuccessfulCheck` timestamp
+before sending scrobble requests. Phones with stale presence (> 2 minutes) are skipped to
+avoid network timeouts during playback.
+
+## Scrobble Event Display (Phone)
+
+When the phone's HTTP server receives a scrobble event (`/scrobble/start|pause|stop`), it
+emits a `ScrobbleDisplayEvent` via `CompanionStateManager`. The phone's HomeScreen observes
+this flow and shows a "Now Watching" card with the show title, episode number, and action
+(started / paused / finished). Events older than 30 minutes are auto-hidden.
+
 ## Secret Storage Strategy
 
 ### Private APK (sideload)
