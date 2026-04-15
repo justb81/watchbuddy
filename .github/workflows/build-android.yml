@@ -83,22 +83,15 @@ jobs:
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
         run: ./gradlew :app-phone:assembleDebug :app-tv:assembleDebug
 
-      - name: Build Phone and TV debug APKs (unsigned fallback)
-        if: steps.keystore.outputs.available == 'false'
-        env:
-          VERSION_CODE: ${{ github.run_number }}
-          TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
-          TOKEN_BACKEND_URL: ${{ secrets.TOKEN_BACKEND_URL }}
-          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
-        run: ./gradlew :app-phone:assembleDebug :app-tv:assembleDebug
-
       - name: Upload Phone APK
+        if: steps.keystore.outputs.available == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: watchbuddy-phone-debug
           path: app-phone/build/outputs/apk/debug/*.apk
 
       - name: Upload TV APK
+        if: steps.keystore.outputs.available == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: watchbuddy-tv-debug
