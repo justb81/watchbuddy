@@ -4,11 +4,13 @@ import android.content.Context
 import com.justb81.watchbuddy.core.model.DeviceCapability
 import com.justb81.watchbuddy.core.model.LlmBackend
 import com.justb81.watchbuddy.core.model.ScrobbleCandidate
+import com.justb81.watchbuddy.core.model.TmdbShow
+import com.justb81.watchbuddy.core.model.TmdbTvSearchResponse
 import com.justb81.watchbuddy.core.model.TraktEpisode
 import com.justb81.watchbuddy.core.model.TraktIds
 import com.justb81.watchbuddy.core.model.TraktShow
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
-import com.justb81.watchbuddy.core.trakt.TraktApiService
+import com.justb81.watchbuddy.core.tmdb.TmdbApiService
 import com.justb81.watchbuddy.tv.data.TvShowCache
 import com.justb81.watchbuddy.tv.discovery.PhoneApiClientFactory
 import com.justb81.watchbuddy.tv.discovery.PhoneApiService
@@ -29,9 +31,8 @@ import android.net.nsd.NsdServiceInfo
 class MediaSessionScrobblerTest {
 
     private val context: Context = mockk(relaxed = true)
-    private val traktApi: TraktApiService = mockk()
+    private val tmdbApiService: TmdbApiService = mockk()
     private val tvShowCache: TvShowCache = mockk()
-    private val tvTokenCache: TvTokenCache = mockk()
     private val phoneDiscovery: PhoneDiscoveryManager = mockk()
     private val phoneApiClientFactory: PhoneApiClientFactory = mockk()
     private lateinit var scrobbler: MediaSessionScrobbler
@@ -39,12 +40,15 @@ class MediaSessionScrobblerTest {
     @BeforeEach
     fun setUp() {
         scrobbler = MediaSessionScrobbler(
-            context, traktApi, tvShowCache, tvTokenCache, phoneDiscovery, phoneApiClientFactory
+            context, tmdbApiService, tvShowCache, phoneDiscovery, phoneApiClientFactory
         )
     }
 
-    /** Helper: creates a mock DiscoveredPhone with a given base URL. */
-    private fun mockPhone(baseUrl: String): PhoneDiscoveryManager.DiscoveredPhone {
+    /** Helper: creates a mock DiscoveredPhone with a given base URL and optional TMDB API key. */
+    private fun mockPhone(
+        baseUrl: String,
+        tmdbApiKey: String? = "test-tmdb-key"
+    ): PhoneDiscoveryManager.DiscoveredPhone {
         val capability = DeviceCapability(
             deviceId = baseUrl,
             userName = "user",
@@ -52,7 +56,8 @@ class MediaSessionScrobblerTest {
             llmBackend = LlmBackend.LITERT,
             modelQuality = 75,
             freeRamMb = 4096,
-            isAvailable = true
+            isAvailable = true,
+            tmdbApiKey = tmdbApiKey
         )
         return PhoneDiscoveryManager.DiscoveredPhone(
             serviceInfo = mockk<NsdServiceInfo>(relaxed = true),
@@ -307,7 +312,7 @@ class MediaSessionScrobblerTest {
         }
 
         @Test
-        fun `does not call Trakt API directly for scrobbling`() = runTest {
+        fun `does not call TMDB API for scrobbling`() = runTest {
             val phone = mockPhone("http://phone1:8765/")
             every { phoneDiscovery.discoveredPhones } returns MutableStateFlow(listOf(phone))
             val mockSvc = mockPhoneApiService()
@@ -315,9 +320,8 @@ class MediaSessionScrobblerTest {
 
             scrobbler.autoScrobble(testCandidate)
 
-            coVerify(exactly = 0) { traktApi.scrobbleStart(any(), any()) }
-            coVerify(exactly = 0) { traktApi.scrobblePause(any(), any()) }
-            coVerify(exactly = 0) { traktApi.scrobbleStop(any(), any()) }
+            coVerify(exactly = 0) { tmdbApiService.searchTv(any(), any()) }
+            coVerify(exactly = 0) { tmdbApiService.getShow(any(), any()) }
         }
     }
 
@@ -343,6 +347,137 @@ class MediaSessionScrobblerTest {
         fun `completely different strings have low score`() {
             val score = scrobbler.fuzzyScore("abcdef", "zyxwvu")
             assertTrue(score < 0.3f)
+        }
+    }
+
+    // ── TMDB search fallback ─────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("TMDB search fallback")
+    inner class TmdbSearchFallbackTest {
+
+        private val breakingBadTmdb = TmdbShow(
+            id = 1396,
+            name = "Breaking Bad",
+            first_air_date = "2008-01-20"
+        )
+
+        @BeforeEach
+        fun setUpCache() {
+            every { tvShowCache.getCachedShows() } returns emptyList()
+        }
+
+        @Test
+        fun `uses TMDB search when cache is empty`() = runTest {
+            val phone = mockPhone("http://phone1:8765/")
+            every { phoneDiscovery.getBestPhone() } returns phone
+            coEvery {
+                tmdbApiService.searchTv("Breaking Bad", "test-tmdb-key")
+            } returns TmdbTvSearchResponse(listOf(breakingBadTmdb))
+
+            val candidate = scrobbler.matchTitle("com.netflix", "Breaking Bad S01E01")
+
+            assertNotNull(candidate)
+            assertEquals("Breaking Bad", candidate!!.matchedShow?.title)
+            assertEquals(TraktIds(tmdb = 1396), candidate.matchedShow?.ids)
+            assertEquals(2008, candidate.matchedShow?.year)
+            assertEquals(1, candidate.matchedEpisode?.season)
+            assertEquals(1, candidate.matchedEpisode?.number)
+        }
+
+        @Test
+        fun `returns null when no phone has TMDB API key`() = runTest {
+            val phone = mockPhone("http://phone1:8765/", tmdbApiKey = null)
+            every { phoneDiscovery.getBestPhone() } returns phone
+
+            val candidate = scrobbler.matchTitle("com.netflix", "Breaking Bad S01E01")
+
+            assertNull(candidate)
+            coVerify(exactly = 0) { tmdbApiService.searchTv(any(), any()) }
+        }
+
+        @Test
+        fun `returns null when no phone connected`() = runTest {
+            every { phoneDiscovery.getBestPhone() } returns null
+
+            val candidate = scrobbler.matchTitle("com.netflix", "Breaking Bad S01E01")
+
+            assertNull(candidate)
+            coVerify(exactly = 0) { tmdbApiService.searchTv(any(), any()) }
+        }
+
+        @Test
+        fun `returns null when TMDB search score too low`() = runTest {
+            val phone = mockPhone("http://phone1:8765/")
+            every { phoneDiscovery.getBestPhone() } returns phone
+            val unrelatedShow = TmdbShow(id = 999, name = "Completely Different Show")
+            coEvery {
+                tmdbApiService.searchTv(any(), any())
+            } returns TmdbTvSearchResponse(listOf(unrelatedShow))
+
+            val candidate = scrobbler.matchTitle("com.netflix", "Breaking Bad S01E01")
+
+            assertNull(candidate)
+        }
+
+        @Test
+        fun `returns null when TMDB search returns empty results`() = runTest {
+            val phone = mockPhone("http://phone1:8765/")
+            every { phoneDiscovery.getBestPhone() } returns phone
+            coEvery {
+                tmdbApiService.searchTv(any(), any())
+            } returns TmdbTvSearchResponse(emptyList())
+
+            val candidate = scrobbler.matchTitle("com.netflix", "Unknown Show")
+
+            assertNull(candidate)
+        }
+
+        @Test
+        fun `returns null when TMDB search throws`() = runTest {
+            val phone = mockPhone("http://phone1:8765/")
+            every { phoneDiscovery.getBestPhone() } returns phone
+            coEvery {
+                tmdbApiService.searchTv(any(), any())
+            } throws RuntimeException("Network error")
+
+            val candidate = scrobbler.matchTitle("com.netflix", "Breaking Bad S01E01")
+
+            assertNull(candidate)
+        }
+
+        @Test
+        fun `cache hit bypasses TMDB search`() = runTest {
+            val cachedShow = TraktShow(
+                title = "Breaking Bad",
+                ids = TraktIds(trakt = 1, tmdb = 1396)
+            )
+            every { tvShowCache.getCachedShows() } returns listOf(
+                TraktWatchedEntry(show = cachedShow)
+            )
+            val phone = mockPhone("http://phone1:8765/")
+            every { phoneDiscovery.getBestPhone() } returns phone
+
+            val candidate = scrobbler.matchTitle("com.netflix", "Breaking Bad S01E01")
+
+            assertNotNull(candidate)
+            assertEquals(cachedShow, candidate!!.matchedShow)
+            coVerify(exactly = 0) { tmdbApiService.searchTv(any(), any()) }
+        }
+
+        @Test
+        fun `TMDB result sets tmdb ID in TraktShow ids`() = runTest {
+            val phone = mockPhone("http://phone1:8765/")
+            every { phoneDiscovery.getBestPhone() } returns phone
+            coEvery {
+                tmdbApiService.searchTv(any(), any())
+            } returns TmdbTvSearchResponse(listOf(breakingBadTmdb))
+
+            val candidate = scrobbler.matchTitle("com.netflix", "Breaking Bad")
+
+            assertNotNull(candidate?.matchedShow?.ids?.tmdb)
+            assertEquals(1396, candidate!!.matchedShow!!.ids.tmdb)
+            assertNull(candidate.matchedShow!!.ids.trakt)
         }
     }
 }

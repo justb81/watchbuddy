@@ -27,8 +27,9 @@ All TMDB calls go through a single Retrofit interface defined in `core/src/main/
 |--------|------|------------|---------|---------|
 | `getShow` | `GET /tv/{series_id}` | `series_id`, `api_key`, `language` | `TmdbShow` | Fetch show metadata (name, overview, poster, backdrop, air date) |
 | `getEpisode` | `GET /tv/{series_id}/season/{season}/episode/{episode}` | `series_id`, `season_number`, `episode_number`, `api_key`, `language` | `TmdbEpisode` | Fetch single episode details (name, overview, still image, air date) |
+| `searchTv` | `GET /search/tv` | `query`, `api_key`, `page` | `TmdbTvSearchResponse` | Search shows by title (used by TV scrobbler as Trakt-search fallback) |
 
-All endpoints default to `language = "de-DE"`. The language parameter follows TMDB's `xx-YY` format (ISO 639-1 language + ISO 3166-1 region).
+`getShow` and `getEpisode` default to `language = "en-US"`. The language parameter follows TMDB's `xx-YY` format (ISO 639-1 language + ISO 3166-1 region). `searchTv` does not use a language parameter (search results are language-independent).
 
 ### Data Models
 
@@ -75,7 +76,9 @@ All methods accept a custom `width` parameter and return `null` when the input p
 
 ## Trakt-to-TMDB ID Mapping
 
-TMDB is never queried by show title. Instead, the Trakt API provides a `tmdb` field inside its `TraktIds` object:
+For the recap and deep-link flows, TMDB is always queried by ID (not title) — the Trakt API provides a `tmdb` field inside its `TraktIds` object that serves as the bridge:
+
+> **Exception:** The TV's `MediaSessionScrobbler` calls `searchTv(query)` by title when the local fuzzy-match cache returns no confident match. This is a title-based search solely for the purpose of identifying which show is being watched, not for metadata enrichment.
 
 ```kotlin
 data class TraktIds(
@@ -97,66 +100,40 @@ When Trakt's `GET /sync/watched/shows` returns a user's watch history, each show
 
 This is the main user journey that triggers TMDB API calls. It spans both devices.
 
-```
-TV App                         Phone App                      External APIs
-──────                         ─────────                      ─────────────
-User selects "Recap"
-on show detail screen
-        │
-        ▼
-POST /recap/{traktShowId}  ──► CompanionHttpServer receives
-    (via local WiFi)           request on port 8765
-                                       │
-                                       ▼
-                               Look up show in Trakt cache
-                               (ShowRepository, 5 min TTL)
-                                       │
-                                       ▼
-                               Extract TMDB ID from
-                               TraktIds.tmdb
-                                       │
-                                       ├──── tmdb == null → 404 "No TMDB ID"
-                                       │
-                                       ▼
-                               tmdbApiService.getShow()  ───► TMDB API
-                               (fetch show metadata)     ◄─── TmdbShow
-                                       │
-                                       ▼
-                               For each of last 8 watched
-                               episodes (from Trakt data):
-                               tmdbApiService.getEpisode() ─► TMDB API
-                               (fetch synopsis + still)  ◄─── TmdbEpisode
-                                       │
-                                       ├──── Individual failures logged,
-                                       │     skipped (partial OK)
-                                       │
-                                       ├──── All episodes failed → 404
-                                       │
-                                       ▼
-                               RecapGenerator.generateRecap()
-                                       │
-                                       ▼
-                               Build LLM prompt from TMDB
-                               episode overviews + show name
-                                       │
-                                       ▼
-                               LLM cascade:
-                               AICore → LiteRT-LM → FallbackProvider
-                                       │
-                                       ▼
-                               Replace <img data-tmdb-still="S02E04">
-                               placeholders with real TMDB
-                               image URLs via TmdbImageHelper
-                                       │
-                                       ▼
-                               Sanitize HTML (strip XSS vectors)
-                                       │
-                                       ▼
-◄──────────────────────────── Return { "html": "..." }
-        │
-        ▼
-Render HTML recap in
-WebView on TV screen
+```mermaid
+sequenceDiagram
+    participant TV as TV App
+    participant Phone as Phone App
+    participant TMDB as TMDB API
+
+    TV->>Phone: POST /recap/{traktShowId}<br/>(via local WiFi, port 8765)
+    Phone->>Phone: Look up show in Trakt cache<br/>(ShowRepository, 5-min TTL)
+    Phone->>Phone: Extract TMDB ID from TraktIds.tmdb
+
+    alt tmdb == null
+        Phone-->>TV: 404 "No TMDB ID"
+    end
+
+    Phone->>TMDB: getShow(tmdbId, apiKey)
+    TMDB-->>Phone: TmdbShow (name, overview, poster)
+
+    loop Last 8 watched episodes
+        Phone->>TMDB: getEpisode(tmdbId, season, episode, apiKey)
+        TMDB-->>Phone: TmdbEpisode (synopsis + still)
+        Note right of Phone: Individual failures logged,<br/>skipped (partial OK)
+    end
+
+    alt All episodes failed
+        Phone-->>TV: 404 "No episode data"
+    end
+
+    Phone->>Phone: RecapGenerator.generateRecap()<br/>Build LLM prompt from TMDB data
+    Phone->>Phone: LLM cascade:<br/>AICore → LiteRT-LM → FallbackProvider
+    Phone->>Phone: Replace still image placeholders<br/>with real TMDB URLs
+    Phone->>Phone: Sanitize HTML (strip XSS vectors)
+
+    Phone-->>TV: { "html": "..." }
+    TV->>TV: Render HTML recap in WebView
 ```
 
 **Key files involved:**
@@ -190,23 +167,14 @@ When no LLM backend is available (AICore unavailable, insufficient RAM for LiteR
 
 When the user views a show's detail screen on the TV, the app constructs deep links to streaming services using the TMDB ID.
 
-```
-User opens show detail  ──►  ShowDetailViewModel.resolveDeepLink()
-                                      │
-                                      ▼
-                              Extract tmdbId from entry.show.ids.tmdb
-                                      │
-                                      ├── tmdb == null → no deep link (returns null)
-                                      │
-                                      ▼
-                              Substitute placeholders in template:
-                              "{tmdb_id}" → tmdbId
-                              "{slug}"    → Trakt slug (or title-based fallback)
-                              "{id}"      → tmdbId (fallback mapping)
-                                      │
-                                      ▼
-                              Return resolved URL
-                              e.g. "https://www.netflix.com/title/1234"
+```mermaid
+flowchart TD
+    A["User opens show detail"] --> B["ShowDetailViewModel.resolveDeepLink()"]
+    B --> C["Extract tmdbId from\nentry.show.ids.tmdb"]
+    C --> D{"tmdb == null?"}
+    D -->|Yes| E["No deep link (return null)"]
+    D -->|No| F["Substitute placeholders in template:\n{tmdb_id} → tmdbId\n{slug} → Trakt slug\n{id} → tmdbId (fallback)"]
+    F --> G["Return resolved URL\ne.g. netflix.com/title/1234"]
 ```
 
 **Deep link templates using `{tmdb_id}`:**
@@ -222,23 +190,22 @@ Note: This journey does **not** call the TMDB API directly. It only uses the TMD
 
 ### 3. Device Capability Reporting
 
-When the TV discovers a phone on the network, it calls `GET /capability`. The response includes a `tmdbConfigured` boolean that indicates whether the user has entered a TMDB API key.
+When the TV discovers a phone on the network, it calls `GET /capability`. The response includes the TMDB API key so the TV can call TMDB directly (for title search during scrobble matching and for show/movie data).
 
-```
-TV App                       Phone App
-──────                       ─────────
-GET /capability  ──────►  DeviceCapabilityProvider.getCapability()
-                                     │
-                                     ▼
-                          settingsRepository.getTmdbApiKey()
-                                     │
-                                     ▼
-                          tmdbConfigured = key.isNotBlank()
-                                     │
-◄───────────────────────  DeviceCapability { ..., tmdbConfigured: true }
+```mermaid
+sequenceDiagram
+    participant TV as TV App
+    participant Phone as Phone App
+
+    TV->>Phone: GET /capability
+    Phone->>Phone: settingsRepository.getTmdbApiKey()
+    Phone->>Phone: tmdbConfigured = key.isNotBlank()<br/>tmdbApiKey = key (null when blank)
+    Phone-->>TV: DeviceCapability { ...,<br/>tmdbConfigured: true,<br/>tmdbApiKey: "..." }
 ```
 
-The TV can use this flag to determine whether recap generation is available on a given phone before attempting it.
+The TV uses `tmdbApiKey` for:
+- Title search (`searchTv`) in `MediaSessionScrobbler` when the fuzzy cache match is below threshold
+- Any other direct TMDB lookups the TV performs (show details, images)
 
 ---
 
@@ -303,17 +270,11 @@ If some episodes fail but others succeed, the recap proceeds with the available 
 
 Even when TMDB data is successfully fetched, the LLM may fail. The cascade:
 
-```
-AICore (Gemini Nano)
-   │ fails
-   ▼
-LiteRT-LM (Gemma 4 E4B or E2B)
-   │ fails
-   ▼
-FallbackProvider (TMDB synopsis only — always succeeds)
-   │ fails (should not happen)
-   ▼
-Minimal HTML: "Could not generate recap."
+```mermaid
+flowchart TD
+    A["AICore (Gemini Nano)"] -->|fails| B["LiteRT-LM (Gemma 4 E4B or E2B)"]
+    B -->|fails| C["FallbackProvider\n(TMDB synopsis only — always succeeds)"]
+    C -->|"fails (should not happen)"| D["Minimal HTML:\nCould not generate recap."]
 ```
 
 The `FallbackProvider` is the safety net: it constructs a slideshow purely from TMDB episode overviews and still images without any LLM inference, guaranteeing that if TMDB data was fetched successfully, the user always gets a recap.
@@ -340,16 +301,19 @@ Separately, `LocaleHelper.getLlmResponseLanguage()` reads the device's system lo
 
 | Module | File | TMDB Role |
 |--------|------|-----------|
-| **core** | `tmdb/TmdbApiService.kt` | Retrofit interface, response DTOs, `TmdbImageHelper` |
-| **core** | `model/Models.kt` | `TmdbShow`, `TmdbEpisode` data classes; `TraktIds.tmdb` mapping; `KNOWN_STREAMING_SERVICES` with `{tmdb_id}` templates |
+| **core** | `tmdb/TmdbApiService.kt` | Retrofit interface (`getShow`, `getEpisode`, `searchTv`), response DTOs, `TmdbImageHelper` |
+| **core** | `model/Models.kt` | `TmdbShow`, `TmdbEpisode`, `TmdbTvSearchResponse` data classes; `TraktIds.tmdb` mapping; `KNOWN_STREAMING_SERVICES` with `{tmdb_id}` templates |
 | **core** | `network/NetworkModule.kt` | OkHttpClient with cert pinning, TMDB Retrofit instance, Hilt DI |
 | **app-phone** | `server/CompanionHttpServer.kt` | Recap endpoint: calls `getShow()` + `getEpisode()`, passes data to `RecapGenerator` |
 | **app-phone** | `llm/RecapGenerator.kt` | Builds LLM prompt from TMDB data, replaces still image placeholders |
 | **app-phone** | `llm/FallbackProvider.kt` | Generates HTML recap from TMDB synopses alone (no LLM) |
 | **app-phone** | `llm/LlmProviderFactory.kt` | Cascade with `FallbackProvider` (TMDB-only) as last resort |
-| **app-phone** | `server/DeviceCapabilityProvider.kt` | Reports `tmdbConfigured` flag to TV |
+| **app-phone** | `server/DeviceCapabilityProvider.kt` | Exposes `tmdbConfigured` flag and `tmdbApiKey` to TV via `/capability` |
 | **app-phone** | `settings/SettingsRepository.kt` | Stores and retrieves user's TMDB API key |
+| **app-phone** | `ui/home/HomeViewModel.kt` | Loads TMDB posters for each show in the library (parallel `getShow()` calls after sync) |
+| **app-phone** | `ui/showdetail/ShowDetailViewModel.kt` | Loads TMDB poster + overview for a single show's detail screen |
 | **app-tv** | `ui/showdetail/ShowDetailViewModel.kt` | Substitutes `{tmdb_id}` in streaming deep link templates |
+| **app-tv** | `scrobbler/MediaSessionScrobbler.kt` | Uses `searchTv()` as fallback when fuzzy-matching media titles against the local show cache |
 
 ---
 
@@ -358,4 +322,4 @@ Separately, `LocaleHelper.getLlmResponseLanguage()` reads the device's system lo
 - **API key scope:** TMDB API keys are read-only by default (TMDB v3 uses a single API key for read access). No write operations are performed.
 - **HTML sanitization:** LLM-generated HTML containing TMDB data is sanitized before rendering in WebView — `<script>`, `<iframe>`, `on*` event handlers, and `javascript:` URLs are stripped (`RecapGenerator.sanitizeHtml()`).
 - **Certificate pinning:** TMDB API connections are pinned to Let's Encrypt intermediate CA certificates, preventing MITM attacks even if a rogue CA is trusted by the device.
-- **No secrets in transit to TV:** The TMDB API key stays on the phone. The TV receives only the rendered HTML recap, never the API key itself (unless explicitly sent in the optional `tmdbApiKey` request body field).
+- **TMDB key exposure to TV:** The TMDB API key is sent from the phone to the TV as part of the `GET /capability` response (`DeviceCapability.tmdbApiKey`). This is intentional — the TV needs the key to call TMDB directly for title search (scrobble matching) and show data. Both devices are on the same trusted local WiFi network. Users should treat the phone–TV link as a trusted local connection.

@@ -9,7 +9,7 @@ This document describes the full user journey and technical flow for connecting 
 1. [High-Level Overview](#high-level-overview)
 2. [Phase 1: Authentication (Phone)](#phase-1-authentication-phone)
 3. [Phase 2: Phone Companion Server](#phase-2-phone-companion-server)
-4. [Phase 3: TV Discovery and Token Sharing](#phase-3-tv-discovery-and-token-sharing)
+4. [Phase 3: TV Discovery](#phase-3-tv-discovery)
 5. [Phase 4: Show Sync](#phase-4-show-sync)
 6. [Phase 5: Scrobbling](#phase-5-scrobbling)
 7. [Phase 6: Deep Linking](#phase-6-deep-linking)
@@ -23,32 +23,21 @@ This document describes the full user journey and technical flow for connecting 
 
 ## High-Level Overview
 
-```
-┌──────────────────────────────────────────────────────────────────────┐
-│                         LOCAL WIFI NETWORK                           │
-│                                                                      │
-│  ┌──────────────────┐   NSD/mDNS + HTTP   ┌──────────────────────┐  │
-│  │   Google TV      │◄────────────────────►│   Android Phone(s)   │  │
-│  │   (app-tv)       │     port 8765        │   (app-phone)        │  │
-│  │                  │                      │                      │  │
-│  │  Scrobbler       │  GET /shows          │  Trakt OAuth login   │  │
-│  │  Show grid       │  GET /auth/token     │  Token storage       │  │
-│  │  Deep links      │  POST /recap/{id}    │  LLM recap engine    │  │
-│  │  Recap WebView   │  GET /capability     │  Show cache          │  │
-│  └────────┬─────────┘                      └──────────┬───────────┘  │
-│           │                                           │              │
-└───────────┼───────────────────────────────────────────┼──────────────┘
-            │ Internet                                  │ Internet
-   ┌────────▼─────────┐                       ┌────────▼──────────┐
-   │   Trakt API      │                       │  Token Proxy      │
-   │   trakt.tv/api   │                       │  Backend (Docker) │
-   │                  │                       │  Injects client   │
-   │  Scrobble calls  │                       │  secret server-   │
-   │  Show search     │                       │  side             │
-   └──────────────────┘                       └───────────────────┘
+```mermaid
+graph TB
+    subgraph WIFI["LOCAL WIFI NETWORK"]
+        TV["Google TV (app-tv)\n─────────────\nScrobbler\nShow grid\nDeep links\nRecap WebView"]
+        Phone["Android Phone(s) (app-phone)\n─────────────\nTrakt OAuth login\nToken storage\nLLM recap engine\nShow cache"]
+        TV <-->|"NSD/mDNS + HTTP\nport 8765\nGET /shows · GET /capability\nPOST /recap · POST /scrobble/*"| Phone
+    end
+
+    Phone -->|"Auth · sync · scrobble"| Trakt["Trakt API\ntrakt.tv/api"]
+    Phone -->|"Token exchange"| Backend["Token Proxy Backend\n(Docker)\nInjects client_secret\nserver-side"]
+    Phone -->|"Episode metadata\nPoster images"| TMDB["TMDB API\napi.tmdb.org"]
+    TV -->|"Title search\nShow details · images"| TMDB
 ```
 
-The phone app owns the Trakt connection. The TV app has **no Trakt credentials** — it discovers all phones on the local network, borrows each phone's access token, and uses those tokens for scrobbling (one Trakt call per connected user) and show lookups.
+The phone app owns the Trakt connection. The TV app has **no Trakt credentials** — it discovers phones on the local network and uses each phone's HTTP API for all Trakt-related operations (scrobbling, show library). The TV calls TMDB directly for show metadata and title search, using the API key obtained from the phone's `/capability` endpoint.
 
 ---
 
@@ -65,44 +54,20 @@ The phone app owns the Trakt connection. The TV app has **no Trakt credentials**
 
 ### Technical Flow
 
-```
-OnboardingViewModel.requestDeviceCode()
-    │
-    ▼
-POST https://api.trakt.tv/oauth/device/code
-    Body: { "client_id": "<TRAKT_CLIENT_ID>" }
-    │
-    ▼
-Response: { device_code, user_code, verification_url, expires_in, interval }
-    │
-    ▼
-UI displays user_code + countdown (expires_in seconds)
-    │
-    ▼
-OnboardingViewModel.startPolling()  ← polls every {interval} seconds
-    │
-    ├── MANAGED mode ──► POST backend/trakt/token  { "code": device_code }
-    │                      Backend injects client_secret, calls Trakt upstream
-    │
-    ├── SELF_HOSTED mode ──► POST {user_url}/trakt/token  { "code": device_code }
-    │                          Same protocol, user-provided backend
-    │
-    └── DIRECT mode ──► POST trakt.tv/oauth/device/token
-                          { code, client_id, client_secret }
-                          Secret stored locally in Keystore
-    │
-    ▼
-Response: { access_token, refresh_token, expires_in, token_type }
-    │
-    ▼
-TokenRepository.saveTokens(accessToken, refreshToken, expiresIn)
-    │  Stored in EncryptedSharedPreferences (AES-256-GCM, Android Keystore)
-    │
-    ▼
-GET https://api.trakt.tv/users/me  (Bearer token)
-    │
-    ▼
-OnboardingState.Success(username)
+```mermaid
+flowchart TD
+    A["OnboardingViewModel.requestDeviceCode()"] --> B["POST trakt.tv/oauth/device/code\n{ client_id }"]
+    B --> C["Response:\n{ device_code, user_code,\nverification_url, expires_in, interval }"]
+    C --> D["UI: display user_code + countdown"]
+    D --> E["OnboardingViewModel.startPolling()\npolls every interval seconds"]
+    E --> F{"Auth mode?"}
+    F -->|MANAGED| G["POST backend/trakt/token\n{ code: device_code }\nBackend injects client_secret"]
+    F -->|SELF_HOSTED| H["POST user_url/trakt/token\n{ code: device_code }\nSame protocol, user-operated"]
+    F -->|DIRECT| I["POST trakt.tv/oauth/device/token\n{ code, client_id, client_secret }\nSecret from Android Keystore"]
+    G & H & I --> J["Response:\n{ access_token, refresh_token, expires_in }"]
+    J --> K["TokenRepository.saveTokens()\nEncryptedSharedPreferences\n(AES-256-GCM, Android Keystore)"]
+    K --> L["GET trakt.tv/users/me\n(Bearer token)"]
+    L --> M["OnboardingState.Success(username)"]
 ```
 
 ### Key Classes
@@ -127,83 +92,49 @@ OnboardingState.Success(username)
 
 ### Technical Flow
 
-```
-SettingsViewModel.toggleCompanionService()
-    │
-    ▼
-CompanionService starts (foreground, persistent notification)
-    │
-    ├── Starts CompanionHttpServer (Ktor Netty, port 8765)
-    │
-    └── Registers NSD (mDNS) service:
-            Service name:  watchbuddy-{username}
-            Service type:  _watchbuddy._tcp.
-            Port:          8765
-            TXT records:   version=1, modelQuality=90, llmBackend=LITERT
+```mermaid
+flowchart TD
+    A["SettingsViewModel.toggleCompanionService()"] --> B["CompanionService starts\n(foreground, persistent notification)"]
+    B --> C["Starts CompanionHttpServer\n(Ktor Netty, port 8765)"]
+    B --> D["Registers NSD (mDNS) service:\nname: watchbuddy-username\ntype: _watchbuddy._tcp.\nport: 8765\nTXT: version=1, modelQuality=90, llmBackend=LITERT"]
 ```
 
 ### HTTP Endpoints (Phone Serves)
 
 | Method | Path | Description | Auth |
 |--------|------|-------------|------|
-| `GET` | `/capability` | Device info, LLM backend, RAM, model quality score | No |
+| `GET` | `/capability` | Device info, LLM backend, RAM, model quality score, TMDB API key | No |
 | `GET` | `/shows` | User's Trakt watched shows (5-min cache) | Token required |
 | `POST` | `/recap/{traktShowId}` | Generate HTML recap via LLM | Token required |
 | `GET` | `/auth/token` | Return current Trakt access token | Token required |
+| `POST` | `/scrobble/start` | Forward scrobble start to Trakt | Token required |
+| `POST` | `/scrobble/pause` | Forward scrobble pause to Trakt | Token required |
+| `POST` | `/scrobble/stop` | Forward scrobble stop to Trakt | Token required |
 
 ---
 
-## Phase 3: TV Discovery and Token Sharing
+## Phase 3: TV Discovery
 
 ### User Journey
 
 1. User launches the TV app on Google TV.
 2. The TV automatically discovers phone(s) on the network.
 3. The TV home screen shows a connection badge ("1 phone connected — Pixel 8 Pro").
-4. No Trakt login required on the TV — it borrows the phone's token transparently.
+4. No Trakt login required on the TV — all Trakt operations are proxied through the phone's HTTP API.
 
 ### Technical Flow
 
+```mermaid
+flowchart TD
+    A["TV app starts"] --> B["PhoneDiscoveryManager.startDiscovery()\nListens for NSD type: _watchbuddy._tcp."]
+    B --> C["Phone discovered\nresolve IP + port"]
+    C --> D["GET http://phone_ip:8765/capability"]
+    D --> E["Response: DeviceCapability\n{ deviceName, userName, llmBackend,\nmodelQuality, freeRamMb, tmdbApiKey }"]
+    E --> F["Rank phone:\nscore = modelQuality (0–150)\n+ ramBonus (0–10)"]
+    F --> G["getBestPhone()\nhighest-scoring phone\n(used for show loading, recaps, TMDB key)"]
 ```
-TV app starts
-    │
-    ▼
-PhoneDiscoveryManager.startDiscovery()
-    │  Listens for NSD service type: _watchbuddy._tcp.
-    │
-    ▼
-Phone discovered → resolve IP + port
-    │
-    ▼
-GET http://{phone_ip}:8765/capability
-    │
-    ▼
-Response: DeviceCapability { deviceName, userName, llmBackend, modelQuality, freeRamMb }
-    │
-    ▼
-Rank phone:  score = modelQuality (0–150) + ramBonus (0–10)
-    │
-    │  RAM bonus:  ≥6 GB → +10  |  4–6 GB → +6  |  3–4 GB → +3  |  <3 GB → 0
-    │
-    ▼
-getBestPhone() → highest-scoring phone (used for single-token ops like search)
-    │
-    ▼
-TvTokenCache — per-phone token cache (ConcurrentHashMap, 30-min TTL per phone)
-    │
-    ├── getToken()       → token for best phone only   (Trakt search)
-    └── getAllTokens()   → tokens for ALL available phones  (scrobbling)
-              │
-              └── For each available phone in parallel:
-                    Check per-phone cache (30-min TTL)
-                    If expired → GET http://{phone}:8765/auth/token
-                                      │
-                                      ▼
-                                 Response: { "accessToken": "..." }
-                                      │
-                                      ▼
-                                 Cache token keyed by phone baseUrl
-```
+
+RAM bonus calculation: ≥ 6 GB → +10 | 4–6 GB → +6 | 3–4 GB → +3 | < 3 GB → 0
 
 ### Key Classes
 
@@ -212,7 +143,6 @@ TvTokenCache — per-phone token cache (ConcurrentHashMap, 30-min TTL per phone)
 | `PhoneDiscoveryManager` | NSD listener, phone ranking, best-phone selection |
 | `PhoneApiService` | Retrofit interface for phone HTTP endpoints |
 | `PhoneApiClientFactory` | Creates per-phone Retrofit clients (cached by base URL) |
-| `TvTokenCache` | In-memory token cache with 30-minute TTL |
 
 ---
 
@@ -226,46 +156,28 @@ TvTokenCache — per-phone token cache (ConcurrentHashMap, 30-min TTL per phone)
 
 ### Technical Flow
 
-```
-TvHomeViewModel.loadShows()
-    │
-    ▼
-PhoneDiscoveryManager.getBestPhone()
-    │
-    ▼
-PhoneApiClientFactory.createClient(bestPhone.baseUrl)
-    │
-    ▼
-GET http://{phone}:8765/shows
-    │
-    ├── Phone side: ShowRepository.getShows()
-    │     ├── Check in-memory cache (5-min TTL)
-    │     └── If stale → GET https://api.trakt.tv/sync/watched/shows (Bearer token)
-    │                       │
-    │                       ▼
-    │                  Cache result, return List<TraktWatchedEntry>
-    │
-    ▼
-TV receives List<TraktWatchedEntry>
-    │
-    ├── Update TvShowCache (in-memory, used by scrobbler for matching)
-    │
-    └── Emit to TvHomeUiState → UI renders show grid
+```mermaid
+flowchart TD
+    A["TvHomeViewModel.loadShows()"] --> B["PhoneDiscoveryManager.getBestPhone()"]
+    B --> C["PhoneApiClientFactory.createClient(bestPhone.baseUrl)"]
+    C --> D["GET http://phone:8765/shows"]
+    D --> E["Phone side: ShowRepository.getShows()"]
+    E --> F{"Cache fresh?\n(5-min TTL)"}
+    F -->|Yes| G["Return cached List of TraktWatchedEntry"]
+    F -->|No| H["GET trakt.tv/sync/watched/shows\n(Bearer token)"]
+    H --> G
+    G --> I["TV receives List of TraktWatchedEntry"]
+    I --> J["Update TvShowCache\n(in-memory, used by scrobbler)"]
+    I --> K["Emit to TvHomeUiState\nUI renders show grid"]
 ```
 
 ### Failover Chain
 
-```
-Best phone available → fetch shows from phone
-    │ unavailable
-    ▼
-Next best phone → try next in ranking
-    │ unavailable
-    ▼
-Local TV cache → show stale data
-    │ empty
-    ▼
-Empty state → "No phone connected" message
+```mermaid
+flowchart LR
+    A["Best phone"] -->|unavailable| B["Next best phone"]
+    B -->|unavailable| C["Local TV cache\n(stale data)"]
+    C -->|empty| D["Empty state:\nNo phone connected"]
 ```
 
 ---
@@ -275,74 +187,46 @@ Empty state → "No phone connected" message
 ### User Journey
 
 1. User opens a streaming app (Netflix, Disney+, etc.) on the TV and starts watching a show.
-2. **Auto-scrobble (≥95% confidence):** The episode is silently reported to Trakt — no UI interruption.
+2. **Auto-scrobble (≥ 95% confidence):** The episode is silently reported to Trakt via the phone — no UI interruption.
 3. **Confirmation overlay (70–95%):** A small overlay appears in the bottom-right corner: "Watching Breaking Bad S01E03?" with Yes/No buttons. Auto-confirms after 15 seconds.
 4. **Below 70%:** Ignored entirely — no UI, no scrobble.
 5. When the user pauses, the scrobble state updates. When playback stops, the episode is marked as watched on Trakt.
 
 ### Technical Flow
 
+```mermaid
+flowchart TD
+    A["MediaSessionScrobbler\n(NotificationListenerService)\nPolls getActiveSessions() every 30 s"] --> B["Extract from active session:\npackage name + media title"]
+    B --> C["Parse episode info:\nregex S01E03"]
+    C --> D["matchTitle() — two-tier fuzzy matching"]
+    D --> E["Tier 1: Local cache (TvShowCache)\nnormalize → fuzzyScore\n(exact/prefix/Levenshtein)"]
+    E -->|"score >= 0.70"| H["Use cached match"]
+    E -->|"score < 0.70"| F["Tier 2: TMDB searchTv() fallback\nAPI key from best phone's /capability"]
+    F -->|"best result >= 0.50"| H
+    F -->|"best result < 0.50"| G["No match — return null"]
+    H --> I["Create ScrobbleCandidate\n{ packageName, mediaTitle,\nconfidence, matchedShow, matchedEpisode }"]
+    I --> J{"Confidence?"}
+    J -->|">= 0.95"| K["Auto-scrobble"]
+    J -->|"0.70 – 0.95"| L["Emit to pendingConfirmation SharedFlow\nScrobbleOverlay displayed"]
+    J -->|"< 0.70"| M["Ignored"]
+    L -->|"User confirms\nor 15 s timeout"| K
+    L -->|"User dismisses\n(remembered in session)"| M
+    K --> N["For each connected phone (in parallel):\nPOST http://phone:8765/scrobble/start\n{ show, episode, progress }\nPhone forwards to Trakt internally\nFailure for one user does not block others"]
 ```
-MediaSessionScrobbler (NotificationListenerService)
-    │  Polls MediaSessionManager.getActiveSessions() every 30 seconds
-    │
-    ▼
-Extract from active session:
-    - Package name (e.g., com.netflix.ninja)
-    - Media title from METADATA_KEY_TITLE (e.g., "Breaking Bad S01E03")
-    │
-    ▼
-Parse episode info:  regex (?i)S(\d{1,2})E(\d{1,2})
-    │
-    ▼
-matchTitleToTrakt() — two-tier fuzzy matching:
-    │
-    ├── Tier 1: Local cache (TvShowCache)
-    │     normalize(title) → lowercase, strip specials, remove "the", collapse spaces
-    │     fuzzyScore():
-    │       - Exact match → 1.0
-    │       - Prefix match → 0.95
-    │       - Levenshtein distance → 0.0–1.0
-    │     If score ≥ 0.70 → use cached match
-    │
-    └── Tier 2: Trakt API fallback
-          TvTokenCache.getToken() → token from best phone
-          GET https://api.trakt.tv/search/show?query={title}&limit=5 (Bearer token)
-          If best result score ≥ 0.50 → use API match
-    │
-    ▼
-Create ScrobbleCandidate { packageName, mediaTitle, confidence, matchedShow, matchedEpisode }
-    │
-    ├── confidence ≥ 0.95 → autoScrobble()
-    │     TvTokenCache.getAllTokens() → tokens for ALL connected phones
-    │     For each phone token (in parallel):
-    │       POST https://api.trakt.tv/scrobble/start
-    │         Body: { show, episode, progress: 0.0 }
-    │       Failure for one user does not block the others
-    │
-    ├── confidence 0.70–0.95 → emit to pendingConfirmation SharedFlow
-    │     │
-    │     ▼
-    │   ScrobbleViewModel collects → ScrobbleOverlay displayed
-    │     │
-    │     ├── User confirms → autoScrobble()  (same multi-user flow above)
-    │     ├── User dismisses → remembered in session (won't re-show)
-    │     └── 15s timeout → auto-confirms
-    │
-    └── confidence < 0.70 → ignored
 
-Playback state changes (each fires for ALL connected phones in parallel):
-    ├── PLAYING  → scrobbleStart()  { progress: 0.0 }
-    ├── PAUSED   → scrobblePause()  { progress: 50.0 }
-    └── STOPPED  → scrobbleStop()   { progress: 100.0 }  ← marks episode as watched
-```
+**Playback state changes** (each fires for ALL connected phones in parallel via their `/scrobble/*` endpoints):
+
+| State | Phone endpoint | Progress | Effect |
+|-------|---------------|----------|--------|
+| PLAYING | `POST /scrobble/start` | 0.0 | Start watching |
+| PAUSED | `POST /scrobble/pause` | 50.0 | Pause |
+| STOPPED | `POST /scrobble/stop` | 100.0 | Marks episode as watched |
 
 ### Key Classes
 
 | Class | Responsibility |
 |-------|----------------|
-| `MediaSessionScrobbler` | Polls media sessions, fuzzy matches, scrobbles to Trakt for all connected users |
-| `TvTokenCache` | Per-phone token cache; `getToken()` for best phone, `getAllTokens()` for all phones |
+| `MediaSessionScrobbler` | Polls media sessions, fuzzy matches, scrobbles via phone HTTP API for all connected users |
 | `TvShowCache` | In-memory show cache for first-pass matching |
 | `ScrobbleViewModel` | Bridges pending confirmations to the overlay UI |
 | `ScrobbleOverlay` | Composable confirmation overlay (D-pad navigable) |
@@ -359,29 +243,25 @@ Playback state changes (each fires for ALL connected phones in parallel):
 
 ### Technical Flow
 
+```mermaid
+flowchart TD
+    A["ShowDetailViewModel.resolveDeepLink()"] --> B["Get subscribed streaming services\nfrom StreamingPreferencesRepository"]
+    B --> C["Match show against service\ndeep link templates"]
+    C --> D["Replace placeholders with IDs\nfrom TraktShow.ids\n(tmdb, slug, imdb)"]
+    D --> E["startActivity(Intent(\nACTION_VIEW,\nUri.parse(deepLink)\n))"]
 ```
-ShowDetailViewModel.resolveDeepLink()
-    │
-    ▼
-Get subscribed streaming services from StreamingPreferencesRepository
-    │
-    ▼
-Match show against service deep link templates:
-    │
-    │  Netflix:      https://www.netflix.com/title/{tmdb_id}
-    │  Prime Video:  https://www.primevideo.com/search?phrase={slug}
-    │  Disney+:      https://www.disneyplus.com/series/{slug}/{tmdb_id}
-    │  WaipuTV:      waipu://tv
-    │  Joyn:         https://www.joyn.de/serien/{slug}
-    │  ARD:          https://www.ardmediathek.de/video/{id}
-    │  ZDF:          https://www.zdf.de/serien/{slug}
-    │
-    ▼
-Replace placeholders with IDs from TraktShow.ids (tmdb, slug, imdb)
-    │
-    ▼
-startActivity(Intent(ACTION_VIEW, Uri.parse(deepLink)))
-```
+
+**Deep link templates:**
+
+| Service | Template |
+|---------|----------|
+| Netflix | `https://www.netflix.com/title/{tmdb_id}` |
+| Prime Video | `https://www.primevideo.com/search?phrase={slug}` |
+| Disney+ | `https://www.disneyplus.com/series/{slug}/{tmdb_id}` |
+| WaipuTV | `waipu://tv` |
+| Joyn | `https://www.joyn.de/serien/{slug}` |
+| ARD | `https://www.ardmediathek.de/video/{id}` |
+| ZDF | `https://www.zdf.de/serien/{slug}` |
 
 ---
 
@@ -391,11 +271,10 @@ WatchBuddy supports three authentication modes, configurable in Advanced Setting
 
 ### 1. Managed (Default)
 
-```
-Phone ──► WatchBuddy Backend (api.watchbuddy.app) ──► Trakt API
-               │
-               └── Injects client_secret server-side
-                   APK only contains client_id (public)
+```mermaid
+flowchart LR
+    Phone["Phone"] -->|"POST /trakt/token\n{ code }"| Backend["WatchBuddy Backend\napi.watchbuddy.app\nInjects client_secret"]
+    Backend -->|"POST /oauth/device/token\n{ code, client_id, client_secret }"| Trakt["Trakt API"]
 ```
 
 - **Setup:** No configuration needed (works out of the box).
@@ -404,10 +283,10 @@ Phone ──► WatchBuddy Backend (api.watchbuddy.app) ──► Trakt API
 
 ### 2. Self-Hosted
 
-```
-Phone ──► User's own backend (custom URL) ──► Trakt API
-               │
-               └── Same protocol as managed, user-operated
+```mermaid
+flowchart LR
+    Phone["Phone"] -->|"POST /trakt/token\n{ code }"| Backend["User's own backend\n(custom URL)\nSame protocol as managed"]
+    Backend -->|"POST /oauth/device/token\n+ client_secret"| Trakt["Trakt API"]
 ```
 
 - **Setup:** User enters their backend URL in Advanced Settings.
@@ -416,11 +295,9 @@ Phone ──► User's own backend (custom URL) ──► Trakt API
 
 ### 3. Direct
 
-```
-Phone ──► Trakt API (no proxy)
-               │
-               └── client_id + client_secret sent directly
-                   Secret stored in Android Keystore
+```mermaid
+flowchart LR
+    Phone["Phone"] -->|"POST /oauth/device/token\n{ code, client_id, client_secret }\nSecret from Android Keystore"| Trakt["Trakt API\n(no proxy)"]
 ```
 
 - **Setup:** User enters their own Trakt app `client_id` and `client_secret` in Advanced Settings.
@@ -453,23 +330,28 @@ fun resolveClientId(authMode, backendUrl, directClientId): String? = when (authM
 
 ### Token Flow Across Devices
 
+```mermaid
+sequenceDiagram
+    participant Alice as Phone A (Alice)
+    participant Bob as Phone B (Bob)
+    participant TV as TV
+
+    Note over Alice: Token in Android Keystore
+    Note over Bob: Token in Android Keystore
+    Note over TV: No Trakt tokens stored
+
+    TV->>Alice: POST /scrobble/start { show, episode }
+    Alice->>Alice: Use own stored token
+    Alice-->>TV: 200 OK
+
+    TV->>Bob: POST /scrobble/start { show, episode }
+    Bob->>Bob: Use own stored token
+    Bob-->>TV: 200 OK
+
+    Note over TV,Bob: Each phone uses its own token.<br/>TV never touches Trakt directly.
 ```
-Phone A (Alice)  Phone B (Bob)       TV (borrows tokens)
-───────────────  ─────────────       ───────────────────
-TokenRepository  TokenRepository     TvTokenCache
-  │                │                   │
-  │  token in      │  token in         │  Per-phone ConcurrentHashMap
-  │  Keystore      │  Keystore         │  30-min TTL per phone
-  │                │                   │
-  │                │                   │  getToken()    → best phone only (search)
-  │                │                   │  getAllTokens() → all available phones (scrobble)
-  │                │                   │
-  │◄── GET /auth/token ───────────────│   On cache miss per phone:
-  │                │◄── GET /auth/token│     GET http://{phone}:8765/auth/token
-  ▼                ▼                   ▼
-  Alice's token    Bob's token         Both cached and used independently
-                                       for parallel Trakt scrobble calls
-```
+
+The TV has **no Trakt tokens**. All Trakt operations are proxied through each phone's HTTP API endpoints (`/scrobble/*`, `/shows`). Each phone uses its own stored credentials to call Trakt on behalf of its user.
 
 ### Refresh
 
@@ -481,17 +363,16 @@ The `TraktApiService` and `TokenProxyService` both define refresh endpoints (`PO
 
 | Constant | Value | Location |
 |----------|-------|----------|
-| Scrobble auto-confirm threshold | ≥ 0.95 | `MediaSessionScrobbler` |
+| Scrobble auto-confirm threshold | >= 0.95 | `MediaSessionScrobbler` |
 | Scrobble overlay threshold | 0.70 – 0.95 | `MediaSessionScrobbler` |
 | Scrobble ignore threshold | < 0.70 | `MediaSessionScrobbler` |
+| TMDB search fallback threshold | >= 0.50 | `MediaSessionScrobbler` |
 | Overlay auto-dismiss timeout | 15 seconds | `ScrobbleOverlay` |
 | Media session poll interval | 30 seconds | `MediaSessionScrobbler` |
-| TV token cache TTL | 30 minutes | `TvTokenCache` |
 | Phone show cache TTL | 5 minutes | `ShowRepository` |
 | Companion server port | 8765 | `CompanionHttpServer` |
 | NSD service type | `_watchbuddy._tcp.` | `CompanionService` |
 | Backend rate limit | 60 req/min per IP | `backend/src/app.js` |
-| Trakt search result limit | 5 | `TraktApiService` |
 | Recap episode context | Last 8 episodes | `RecapGenerator` |
 
 ---
@@ -500,77 +381,83 @@ The `TraktApiService` and `TokenProxyService` both define refresh endpoints (`PO
 
 ### Full Authentication Sequence
 
-```
- User          Phone App         Backend          Trakt API
-  │                │                │                │
-  │  Tap Connect   │                │                │
-  │───────────────►│                │                │
-  │                │  POST /oauth/device/code        │
-  │                │────────────────────────────────►│
-  │                │◄────────────────────────────────│
-  │                │  { user_code, device_code }     │
-  │  Show code     │                │                │
-  │◄───────────────│                │                │
-  │                │                │                │
-  │  Open browser, enter code on trakt.tv/activate   │
-  │──────────────────────────────────────────────────│
-  │                │                │                │
-  │                │  Poll: POST /trakt/token         │
-  │                │───────────────►│                │
-  │                │                │  POST /oauth/device/token
-  │                │                │  + client_secret│
-  │                │                │───────────────►│
-  │                │                │◄───────────────│
-  │                │◄───────────────│                │
-  │                │  { access_token, refresh_token } │
-  │                │                │                │
-  │                │  GET /users/me (Bearer token)   │
-  │                │────────────────────────────────►│
-  │                │◄────────────────────────────────│
-  │  "Connected    │  { username }  │                │
-  │   as Alice"    │                │                │
-  │◄───────────────│                │                │
+```mermaid
+sequenceDiagram
+    actor User
+    participant Phone as Phone App
+    participant Backend as Backend
+    participant Trakt as Trakt API
+
+    User->>Phone: Tap "Connect to Trakt"
+    Phone->>Trakt: POST /oauth/device/code<br/>{ client_id }
+    Trakt-->>Phone: { user_code, device_code }
+    Phone-->>User: Display user_code + countdown
+
+    User->>Trakt: Open browser, enter code on trakt.tv/activate
+
+    loop Poll every interval seconds
+        Phone->>Backend: POST /trakt/token { code: device_code }
+        Backend->>Trakt: POST /oauth/device/token<br/>+ client_secret
+        Trakt-->>Backend: { access_token, refresh_token }
+        Backend-->>Phone: { access_token, refresh_token }
+    end
+
+    Phone->>Trakt: GET /users/me (Bearer token)
+    Trakt-->>Phone: { username }
+    Phone-->>User: "Connected as Alice"
 ```
 
 ### Full Scrobble Sequence (multi-user)
 
-```
- Streaming App    TV Scrobbler    Phone A (Alice)   Phone B (Bob)    Trakt API
-  │                │                │                │                │
-  │  Playing       │                │                │                │
-  │  media session │                │                │                │
-  │───────────────►│                │                │                │
-  │                │  Extract title + package        │                │
-  │                │                │                │                │
-  │                │  Fuzzy match (local cache)      │                │
-  │                │  Score: 0.97 → auto-scrobble    │                │
-  │                │                │                │                │
-  │                │  getAllTokens() — fetch from all phones in parallel
-  │                │  GET /auth/token│               │                │
-  │                │───────────────►│                │                │
-  │                │  GET /auth/token│               │                │
-  │                │────────────────────────────────►│                │
-  │                │◄───────────────│                │                │
-  │                │  { Alice token }│               │                │
-  │                │◄────────────────────────────────│                │
-  │                │                │  { Bob token } │                │
-  │                │                │                │                │
-  │                │  POST /scrobble/start (Alice)   │                │
-  │                │  { show, episode, progress: 0 } │                │
-  │                │────────────────────────────────────────────────►│
-  │                │  POST /scrobble/start (Bob) ← parallel          │
-  │                │────────────────────────────────────────────────►│
-  │                │◄────────────────────────────────────────────────│
-  │                │                │                │                │
-  │  Paused        │                │                │                │
-  │───────────────►│                │                │                │
-  │                │  POST /scrobble/pause (Alice + Bob, parallel)   │
-  │                │────────────────────────────────────────────────►│
-  │                │                │                │                │
-  │  Stopped       │                │                │                │
-  │───────────────►│                │                │                │
-  │                │  POST /scrobble/stop (Alice + Bob) ← watched   │
-  │                │────────────────────────────────────────────────►│
+```mermaid
+sequenceDiagram
+    participant App as Streaming App
+    participant TV as TV Scrobbler
+    participant TMDB as TMDB API
+    participant PA as Phone A (Alice)
+    participant PB as Phone B (Bob)
+    participant Trakt as Trakt API
+
+    App->>TV: Playing media session
+    TV->>TV: Extract title + package
+    TV->>TV: Fuzzy match (local cache)
+
+    alt Cache match < 0.70
+        TV->>TMDB: GET /search/tv?query=title<br/>(key from /capability)
+        TMDB-->>TV: Search results
+    end
+
+    TV->>TV: Score: 0.97 — auto-scrobble
+
+    par Scrobble Alice
+        TV->>PA: POST /scrobble/start<br/>{ show, episode, progress: 0 }
+        PA->>Trakt: POST /scrobble/start (Alice's token)
+        Trakt-->>PA: 200 OK
+        PA-->>TV: 200 OK
+    and Scrobble Bob
+        TV->>PB: POST /scrobble/start<br/>{ show, episode, progress: 0 }
+        PB->>Trakt: POST /scrobble/start (Bob's token)
+        Trakt-->>PB: 200 OK
+        PB-->>TV: 200 OK
+    end
+
+    App->>TV: Paused
+    par
+        TV->>PA: POST /scrobble/pause
+        PA->>Trakt: POST /scrobble/pause
+    and
+        TV->>PB: POST /scrobble/pause
+        PB->>Trakt: POST /scrobble/pause
+    end
+
+    App->>TV: Stopped
+    par
+        TV->>PA: POST /scrobble/stop (marks as watched)
+        PA->>Trakt: POST /scrobble/stop
+    and
+        TV->>PB: POST /scrobble/stop (marks as watched)
+        PB->>Trakt: POST /scrobble/stop
+    end
 ```
 
 ---
@@ -591,27 +478,35 @@ The `TraktApiService` and `TokenProxyService` both define refresh endpoints (`PO
 
 | File | Purpose |
 |------|---------|
-| `app-phone/.../server/CompanionHttpServer.kt` | Ktor HTTP server (4 endpoints) |
+| `app-phone/.../server/CompanionHttpServer.kt` | Ktor HTTP server (endpoints listed above) |
 | `app-phone/.../server/ShowRepository.kt` | Trakt show cache with 5-min TTL |
-| `app-phone/.../server/DeviceCapabilityProvider.kt` | Device info for `/capability` endpoint |
+| `app-phone/.../server/DeviceCapabilityProvider.kt` | Device info + TMDB API key for `/capability` |
 | `app-phone/.../service/CompanionService.kt` | Foreground service, NSD registration |
 
-### TV App — Discovery and Token
+### Phone App — Library UI
+
+| File | Purpose |
+|------|---------|
+| `app-phone/.../ui/home/HomeViewModel.kt` | Show loading, TMDB poster fetching, companion auto-start |
+| `app-phone/.../ui/home/HomeScreen.kt` | Show list with posters, navigate to detail |
+| `app-phone/.../ui/showdetail/ShowDetailViewModel.kt` | Show detail, TMDB poster/overview, watched toggle |
+| `app-phone/.../ui/showdetail/ShowDetailScreen.kt` | Detail screen with seasons, episodes, toggle buttons |
+
+### TV App — Discovery
 
 | File | Purpose |
 |------|---------|
 | `app-tv/.../discovery/PhoneDiscoveryManager.kt` | NSD listener, phone ranking |
 | `app-tv/.../discovery/PhoneApiService.kt` | Retrofit interface for phone HTTP API |
 | `app-tv/.../discovery/PhoneApiClientFactory.kt` | Per-phone Retrofit client factory |
-| `app-tv/.../scrobbler/TvTokenCache.kt` | Per-phone token cache (ConcurrentHashMap, 30-min TTL); `getAllTokens()` for multi-user scrobbling |
 
 ### TV App — Scrobbling
 
 | File | Purpose |
 |------|---------|
-| `app-tv/.../scrobbler/MediaSessionScrobbler.kt` | Media session polling, fuzzy matching, scrobble calls |
+| `app-tv/.../scrobbler/MediaSessionScrobbler.kt` | Media session polling, fuzzy matching, scrobbles via phone API |
 | `app-tv/.../ui/scrobble/ScrobbleOverlay.kt` | Confirmation overlay composable |
-| `app-tv/.../ui/scrobble/ScrobbleViewModel.kt` | Bridges scrobbler → overlay UI |
+| `app-tv/.../ui/scrobble/ScrobbleViewModel.kt` | Bridges scrobbler to overlay UI |
 | `app-tv/.../data/TvShowCache.kt` | In-memory show cache for matching |
 
 ### TV App — UI
@@ -629,8 +524,9 @@ The `TraktApiService` and `TokenProxyService` both define refresh endpoints (`PO
 
 | File | Purpose |
 |------|---------|
-| `core/.../trakt/TraktApiService.kt` | Retrofit client: OAuth, shows, scrobble, search |
+| `core/.../trakt/TraktApiService.kt` | Retrofit client: OAuth, shows, scrobble, search, sync history |
 | `core/.../trakt/TokenProxyService.kt` | Retrofit client: backend token exchange + refresh |
+| `core/.../tmdb/TmdbApiService.kt` | Retrofit client: show details, episode data, title search |
 | `core/.../network/NetworkModule.kt` | OkHttp (cert pinning), Retrofit instances |
 | `core/.../network/TokenProxyServiceFactory.kt` | Dynamic Retrofit client for self-hosted backends |
 | `core/.../model/Models.kt` | Shared data models (TraktShow, ScrobbleCandidate, etc.) |

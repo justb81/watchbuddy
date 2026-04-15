@@ -53,7 +53,8 @@ class DeviceCapabilityProvider @Inject constructor(
             modelQuality = config.qualityScore,
             freeRamMb = freeRamMb,
             isAvailable = true,
-            tmdbConfigured = tmdbKey.isNotBlank()
+            tmdbConfigured = tmdbKey.isNotBlank(),
+            tmdbApiKey = tmdbKey.ifBlank { null }
         )
     }
 
