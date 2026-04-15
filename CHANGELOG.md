@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.12.0](https://github.com/justb81/watchbuddy/compare/v0.11.1...v0.12.0) (2026-04-15)
+
+
+### Features
+
+* refactor watch/checkin process ([#188](https://github.com/justb81/watchbuddy/issues/188)) ([#189](https://github.com/justb81/watchbuddy/issues/189)) ([80eb399](https://github.com/justb81/watchbuddy/commit/80eb3995f6d2cb4b2c1bbbc8fe59d5851755131d))
+
+
+### Bug Fixes
+
+* **backend:** validate Trakt credentials at startup and improve error logging ([#190](https://github.com/justb81/watchbuddy/issues/190)) ([d3c9727](https://github.com/justb81/watchbuddy/commit/d3c97270d0b46d37aa7931650de2b4c3b8fde6ee))
+
 ## [0.11.1](https://github.com/justb81/watchbuddy/compare/v0.11.0...v0.11.1) (2026-04-15)
 
 
