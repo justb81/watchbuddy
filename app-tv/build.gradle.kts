@@ -116,6 +116,10 @@ dependencies {
     // WorkManager (background Trakt sync / scrobble history)
     implementation(libs.work.runtime)
 
+    // Error-prone annotations — compileOnly so R8 can resolve references from Tink
+    // without bundling the annotation library in the APK.
+    compileOnly(libs.errorprone.annotations)
+
     // Testing
     testImplementation(libs.junit5.api)
     testImplementation(libs.junit5.params)
