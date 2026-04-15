@@ -12,7 +12,7 @@ android {
 
     defaultConfig {
         applicationId = "com.justb81.watchbuddy"   // same package as phone app!
-        minSdk = 26
+        minSdk = 31
         targetSdk = 35
 
         // versionCode: CI sets VERSION_CODE (run_number).
