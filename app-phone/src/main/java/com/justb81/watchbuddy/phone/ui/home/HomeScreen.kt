@@ -9,6 +9,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -21,6 +23,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.justb81.watchbuddy.R
+import com.justb81.watchbuddy.core.model.ScrobbleAction
+import com.justb81.watchbuddy.core.model.ScrobbleDisplayEvent
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -116,6 +120,23 @@ fun HomeScreen(
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
+                        // Watching TV toggle
+                        if (uiState.canWatch) {
+                            item {
+                                WatchingTvToggle(
+                                    isWatching = uiState.isWatchingTv,
+                                    onToggle = { viewModel.toggleWatchingTv(it) }
+                                )
+                            }
+                        }
+
+                        // Now watching card (scrobble event from TV)
+                        uiState.latestScrobbleEvent?.let { event ->
+                            item {
+                                NowWatchingCard(event = event)
+                            }
+                        }
+
                         // Continue watching section
                         val inProgress = uiState.shows.filter { it.seasons.isNotEmpty() }
                         if (inProgress.isNotEmpty()) {
@@ -174,6 +195,117 @@ private fun SectionHeader(title: String) {
         color      = MaterialTheme.colorScheme.onBackground,
         modifier   = Modifier.padding(vertical = 4.dp)
     )
+}
+
+@Composable
+private fun WatchingTvToggle(
+    isWatching: Boolean,
+    onToggle: (Boolean) -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isWatching)
+                MaterialTheme.colorScheme.primaryContainer
+            else
+                MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(
+                Icons.Default.PlayArrow,
+                contentDescription = null,
+                tint = if (isWatching)
+                    MaterialTheme.colorScheme.onPrimaryContainer
+                else
+                    MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.home_watching_tv_toggle),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (isWatching)
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    else
+                        MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = stringResource(R.string.home_watching_tv_description),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (isWatching)
+                        MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                    else
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+            }
+            Switch(
+                checked = isWatching,
+                onCheckedChange = onToggle
+            )
+        }
+    }
+}
+
+@Composable
+private fun NowWatchingCard(event: ScrobbleDisplayEvent) {
+    val (actionText, actionIcon) = when (event.action) {
+        ScrobbleAction.START -> stringResource(R.string.home_scrobble_started) to Icons.Default.PlayArrow
+        ScrobbleAction.PAUSE -> stringResource(R.string.home_scrobble_paused) to Icons.Default.PlayArrow
+        ScrobbleAction.STOP  -> stringResource(R.string.home_scrobble_stopped) to Icons.Default.Check
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.tertiaryContainer
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Icon(
+                actionIcon,
+                contentDescription = actionText,
+                tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                modifier = Modifier.size(28.dp)
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.home_now_watching),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f)
+                )
+                Text(
+                    text = event.show.title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer
+                )
+                Text(
+                    text = "S%02dE%02d — %s".format(
+                        event.episode.season,
+                        event.episode.number,
+                        actionText
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f)
+                )
+            }
+        }
+    }
 }
 
 @Composable

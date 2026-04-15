@@ -13,6 +13,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -22,6 +23,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.ui.graphics.Color
 import androidx.tv.material3.*
+import coil.compose.SubcomposeAsyncImage
 import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.core.model.DeviceCapability
 import com.justb81.watchbuddy.core.model.LlmBackend
@@ -139,23 +141,22 @@ private fun UserAvatar(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            // Avatar circle with initials
-            Box(
-                modifier = Modifier
-                    .size(56.dp)
-                    .clip(CircleShape)
-                    .background(
-                        if (isSelected) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.extendedColors.outline
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text       = initials,
-                    fontSize   = 22.sp,
-                    fontWeight = FontWeight.Bold,
-                    color      = Color.White
+            // Avatar: Trakt profile image with initials fallback
+            val avatarBackground = if (isSelected) MaterialTheme.colorScheme.primary
+                else MaterialTheme.extendedColors.outline
+            if (user.userAvatarUrl != null) {
+                SubcomposeAsyncImage(
+                    model = user.userAvatarUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(CircleShape),
+                    loading = { InitialsCircle(initials, avatarBackground) },
+                    error = { InitialsCircle(initials, avatarBackground) }
                 )
+            } else {
+                InitialsCircle(initials, avatarBackground)
             }
 
             Spacer(Modifier.height(8.dp))
@@ -174,6 +175,24 @@ private fun UserAvatar(
                 color    = llmColor(user.llmBackend)
             )
         }
+    }
+}
+
+@Composable
+private fun InitialsCircle(initials: String, backgroundColor: Color) {
+    Box(
+        modifier = Modifier
+            .size(56.dp)
+            .clip(CircleShape)
+            .background(backgroundColor),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = initials,
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.White
+        )
     }
 }
 

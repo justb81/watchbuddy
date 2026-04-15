@@ -42,6 +42,9 @@
     <string name="home_sync_failed">Sync failed: %1$s</string>
     <string name="home_cd_sync">Sync</string>
     <string name="home_cd_settings">Settings</string>
+    <string name="home_watching_tv_toggle">I am watching TV</string>
+    <string name="home_watching_tv_description">Connect with your TV for scrobbling</string>
+    <string name="home_watching_tv_disabled_reason">Connect to Trakt and configure TMDB first</string>
 
     <!-- Settings -->
     <string name="settings_title">Settings</string>
@@ -92,6 +95,12 @@
     <string name="settings_not_connected">Not connected</string>
     <string name="settings_connect_to_trakt">Connect to Trakt</string>
     <string name="settings_llm_detecting">Detecting…</string>
+
+    <string name="home_now_watching">Now Watching</string>
+    <string name="home_scrobble_started">Started watching</string>
+    <string name="home_scrobble_paused">Paused</string>
+    <string name="home_scrobble_stopped">Finished watching</string>
+    <string name="companion_auto_deactivated">Companion deactivated — TV not responding</string>
 
     <!-- Companion Service -->
     <string name="companion_channel_name">Companion Service</string>

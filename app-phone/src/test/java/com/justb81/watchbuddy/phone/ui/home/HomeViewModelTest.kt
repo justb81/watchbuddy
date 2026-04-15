@@ -8,6 +8,7 @@ import com.justb81.watchbuddy.phone.TestFixtures
 import com.justb81.watchbuddy.phone.auth.TokenRepository
 import com.justb81.watchbuddy.phone.settings.AppSettings
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
+import com.justb81.watchbuddy.service.CompanionStateManager
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -37,6 +38,7 @@ class HomeViewModelTest {
     private val tokenRepository: TokenRepository = mockk(relaxed = true)
     private val settingsRepository: SettingsRepository = mockk(relaxed = true)
     private val tmdbApiService: TmdbApiService = mockk(relaxed = true)
+    private val companionStateManager = CompanionStateManager()
 
     @BeforeEach
     fun setUp() {
@@ -50,7 +52,8 @@ class HomeViewModelTest {
         traktApi = traktApi,
         tokenRepository = tokenRepository,
         settingsRepository = settingsRepository,
-        tmdbApiService = tmdbApiService
+        tmdbApiService = tmdbApiService,
+        companionStateManager = companionStateManager
     )
 
     @Nested

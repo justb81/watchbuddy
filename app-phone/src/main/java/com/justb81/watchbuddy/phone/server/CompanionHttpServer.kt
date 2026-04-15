@@ -2,6 +2,8 @@ package com.justb81.watchbuddy.phone.server
 
 import android.util.Log
 import com.justb81.watchbuddy.core.locale.LocaleHelper
+import com.justb81.watchbuddy.core.model.ScrobbleAction
+import com.justb81.watchbuddy.core.model.ScrobbleDisplayEvent
 import com.justb81.watchbuddy.core.model.TraktEpisode
 import com.justb81.watchbuddy.core.model.TraktShow
 import com.justb81.watchbuddy.core.tmdb.TmdbApiService
@@ -12,6 +14,7 @@ import com.justb81.watchbuddy.phone.auth.TokenRefreshManager
 import com.justb81.watchbuddy.phone.auth.TokenRepository
 import com.justb81.watchbuddy.phone.llm.RecapGenerator
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
+import com.justb81.watchbuddy.service.CompanionStateManager
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -57,7 +60,8 @@ class CompanionHttpServer @Inject constructor(
     private val traktApiService: TraktApiService,
     private val tmdbApiService: TmdbApiService,
     private val tmdbCache: TmdbCache,
-    private val settingsRepository: SettingsRepository
+    private val settingsRepository: SettingsRepository,
+    private val stateManager: CompanionStateManager
 ) {
     companion object {
         const val PORT = 8765
@@ -66,10 +70,12 @@ class CompanionHttpServer @Inject constructor(
     private var server: EmbeddedServer<*, *>? = null
 
     fun start() {
+        if (server != null) return
         server = embeddedServer(Netty, port = PORT) {
             configureCompanionRoutes(
                 recapGenerator, capabilityProvider, showRepository,
-                tokenRepository, tokenRefreshManager, traktApiService, tmdbApiService, tmdbCache, settingsRepository
+                tokenRepository, tokenRefreshManager, traktApiService, tmdbApiService, tmdbCache,
+                settingsRepository, stateManager
             )
         }.start(wait = false)
     }
@@ -93,13 +99,15 @@ internal fun Application.configureCompanionRoutes(
     traktApiService: TraktApiService,
     tmdbApiService: TmdbApiService,
     tmdbCache: TmdbCache,
-    settingsRepository: SettingsRepository
+    settingsRepository: SettingsRepository,
+    stateManager: CompanionStateManager
 ) {
     install(ContentNegotiation) {
         json(Json { ignoreUnknownKeys = true })
     }
     routing {
         get("/capability") {
+            stateManager.onCapabilityChecked()
             call.respond(capabilityProvider.getCapability())
         }
 
@@ -214,6 +222,9 @@ internal fun Application.configureCompanionRoutes(
                     bearer = "Bearer $token",
                     body = ScrobbleBody(show = body.show, episode = body.episode, progress = body.progress)
                 )
+                stateManager.onScrobbleEvent(
+                    ScrobbleDisplayEvent(ScrobbleAction.START, body.show, body.episode, body.progress, System.currentTimeMillis())
+                )
                 call.respond(ScrobbleActionResponse(success = true))
             } catch (e: Exception) {
                 Log.e(TAG, "Scrobble start failed", e)
@@ -232,6 +243,9 @@ internal fun Application.configureCompanionRoutes(
                     bearer = "Bearer $token",
                     body = ScrobbleBody(show = body.show, episode = body.episode, progress = body.progress)
                 )
+                stateManager.onScrobbleEvent(
+                    ScrobbleDisplayEvent(ScrobbleAction.PAUSE, body.show, body.episode, body.progress, System.currentTimeMillis())
+                )
                 call.respond(ScrobbleActionResponse(success = true))
             } catch (e: Exception) {
                 Log.e(TAG, "Scrobble pause failed", e)
@@ -249,6 +263,9 @@ internal fun Application.configureCompanionRoutes(
                 traktApiService.scrobbleStop(
                     bearer = "Bearer $token",
                     body = ScrobbleBody(show = body.show, episode = body.episode, progress = body.progress)
+                )
+                stateManager.onScrobbleEvent(
+                    ScrobbleDisplayEvent(ScrobbleAction.STOP, body.show, body.episode, body.progress, System.currentTimeMillis())
                 )
                 call.respond(ScrobbleActionResponse(success = true))
             } catch (e: Exception) {

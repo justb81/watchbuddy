@@ -7,8 +7,14 @@ import android.util.Log
 import com.justb81.watchbuddy.core.model.DeviceCapability
 import com.justb81.watchbuddy.core.model.LlmBackend
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -37,12 +43,16 @@ class PhoneDiscoveryManager @Inject constructor(
         const val SERVICE_TYPE = "_watchbuddy._tcp."
         const val CAPABILITY_PATH = "/capability"
         private const val TAG = "PhoneDiscoveryManager"
+        private const val HEARTBEAT_INTERVAL_MS = 60_000L
+        private const val MAX_FAIL_COUNT = 3
     }
 
     private val _discoveredPhones = MutableStateFlow<List<DiscoveredPhone>>(emptyList())
     val discoveredPhones: StateFlow<List<DiscoveredPhone>> = _discoveredPhones
 
     private val nsdManager = context.getSystemService(Context.NSD_SERVICE) as NsdManager
+    private val heartbeatScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var heartbeatJob: Job? = null
 
     /**
      * Lightweight device info extracted from NSD TXT records.
@@ -59,7 +69,9 @@ class PhoneDiscoveryManager @Inject constructor(
         val txtRecord: PhoneTxtRecord?,
         val capability: DeviceCapability?,
         val score: Int,
-        val baseUrl: String
+        val baseUrl: String,
+        val failCount: Int = 0,
+        val lastSuccessfulCheck: Long = System.currentTimeMillis()
     )
 
     private val discoveryListener = object : NsdManager.DiscoveryListener {
@@ -86,10 +98,52 @@ class PhoneDiscoveryManager @Inject constructor(
 
     fun startDiscovery() {
         nsdManager.discoverServices(SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, discoveryListener)
+        startHeartbeat()
     }
 
     fun stopDiscovery() {
+        heartbeatJob?.cancel()
         runCatching { nsdManager.stopServiceDiscovery(discoveryListener) }
+    }
+
+    private fun startHeartbeat() {
+        heartbeatJob = heartbeatScope.launch {
+            while (true) {
+                delay(HEARTBEAT_INTERVAL_MS)
+                checkAllPhones()
+            }
+        }
+    }
+
+    private fun checkAllPhones() {
+        val phones = _discoveredPhones.value
+        if (phones.isEmpty()) return
+
+        val updated = phones.mapNotNull { phone ->
+            val url = "${phone.baseUrl}${CAPABILITY_PATH}".replace("//capability", "/capability")
+            try {
+                val response = httpClient.newCall(Request.Builder().url(url).build()).execute()
+                val capability = response.body?.string()?.let {
+                    Json.decodeFromString<DeviceCapability>(it)
+                }
+                val newScore = calculateScore(phone.txtRecord, capability)
+                phone.copy(
+                    capability = capability ?: phone.capability,
+                    score = newScore,
+                    failCount = 0,
+                    lastSuccessfulCheck = System.currentTimeMillis()
+                )
+            } catch (e: Exception) {
+                val newFailCount = phone.failCount + 1
+                if (newFailCount >= MAX_FAIL_COUNT) {
+                    Log.i(TAG, "Removing phone ${phone.baseUrl} after $MAX_FAIL_COUNT failed heartbeats")
+                    null
+                } else {
+                    phone.copy(failCount = newFailCount)
+                }
+            }
+        }
+        _discoveredPhones.value = updated.sortedByDescending { it.score }
     }
 
     /**
