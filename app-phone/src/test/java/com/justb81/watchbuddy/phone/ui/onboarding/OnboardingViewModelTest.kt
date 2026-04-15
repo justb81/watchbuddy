@@ -1,6 +1,7 @@
 package com.justb81.watchbuddy.phone.ui.onboarding
 
 import android.app.Application
+import androidx.lifecycle.SavedStateHandle
 import com.justb81.watchbuddy.core.network.TokenProxyServiceFactory
 import com.justb81.watchbuddy.core.trakt.DeviceCodeResponse
 import com.justb81.watchbuddy.core.trakt.DeviceTokenResponse
@@ -14,10 +15,13 @@ import com.justb81.watchbuddy.phone.settings.AppSettings
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import com.justb81.watchbuddy.phone.ui.settings.AuthMode
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.*
@@ -67,9 +71,11 @@ class OnboardingViewModelTest {
 
     private fun createViewModel(
         buildClientId: String = BUILD_CLIENT_ID,
-        proxy: TokenProxyService? = tokenProxy
+        proxy: TokenProxyService? = tokenProxy,
+        savedStateHandle: SavedStateHandle = SavedStateHandle()
     ): OnboardingViewModel = OnboardingViewModel(
         application = application,
+        savedStateHandle = savedStateHandle,
         traktApi = traktApi,
         tokenProxy = proxy,
         buildConfigClientId = buildClientId,
@@ -353,6 +359,82 @@ class OnboardingViewModelTest {
 
             // Should succeed because the HTTP 400 reset the failure counter before we hit 3
             assertTrue(vm.state.value is OnboardingState.Success)
+        }
+    }
+
+    @Nested
+    @DisplayName("Process death survival")
+    inner class ProcessDeathSurvival {
+
+        private val json = Json { ignoreUnknownKeys = true }
+
+        private fun savedStateWithCode(
+            response: DeviceCodeResponse = deviceCodeResponse,
+            timestamp: Long = System.currentTimeMillis()
+        ): SavedStateHandle = SavedStateHandle(
+            mapOf(
+                "device_code_json" to json.encodeToString(response),
+                "device_code_timestamp" to timestamp
+            )
+        )
+
+        @Test
+        fun `restores saved device code instead of requesting a new one`() = runTest {
+            every { settingsRepository.settings } returns flowOf(
+                AppSettings(authMode = AuthMode.MANAGED)
+            )
+            coEvery { traktApi.requestDeviceCode(any()) } returns deviceCodeResponse
+
+            val handle = savedStateWithCode()
+            val vm = createViewModel(savedStateHandle = handle)
+            vm.requestDeviceCode()
+
+            val state = vm.state.value
+            assertTrue(state is OnboardingState.WaitingForPin)
+            assertEquals("ABC123", (state as OnboardingState.WaitingForPin).userCode)
+            coVerify(exactly = 0) { traktApi.requestDeviceCode(any()) }
+        }
+
+        @Test
+        fun `requests new code when saved code has expired`() = runTest {
+            every { settingsRepository.settings } returns flowOf(
+                AppSettings(authMode = AuthMode.MANAGED)
+            )
+            coEvery { traktApi.requestDeviceCode(any()) } returns deviceCodeResponse
+
+            val expiredTimestamp = System.currentTimeMillis() - 700_000L // 700s ago, code was 600s
+            val handle = savedStateWithCode(timestamp = expiredTimestamp)
+            val vm = createViewModel(savedStateHandle = handle)
+            vm.requestDeviceCode()
+
+            val state = vm.state.value
+            assertTrue(state is OnboardingState.WaitingForPin)
+            coVerify(exactly = 1) { traktApi.requestDeviceCode(any()) }
+        }
+
+        @Test
+        fun `clears saved state on successful authentication`() = runTest {
+            every { settingsRepository.settings } returns flowOf(
+                AppSettings(authMode = AuthMode.MANAGED)
+            )
+            coEvery { traktApi.requestDeviceCode(any()) } returns deviceCodeResponse
+            coEvery { tokenProxy.exchangeDeviceCode(any()) } returns ProxyTokenResponse(
+                access_token = "acc",
+                refresh_token = "ref",
+                expires_in = 7776000,
+                token_type = "Bearer",
+                scope = "public"
+            )
+            coEvery { traktApi.getProfile(any()) } returns TraktUserProfile(username = "user1")
+
+            val handle = SavedStateHandle()
+            val vm = createViewModel(savedStateHandle = handle)
+            vm.requestDeviceCode()
+            advanceUntilIdle()
+
+            assertTrue(vm.state.value is OnboardingState.Success)
+            assertNull(handle.get<String>("device_code_json"))
+            assertNull(handle.get<Long>("device_code_timestamp"))
         }
     }
 }

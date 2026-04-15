@@ -13,6 +13,7 @@
     <string name="onboarding_success">¡Conectado! Bienvenido/a, %1$s</string>
     <string name="onboarding_error">La conexión ha fallado. Por favor, inténtalo de nuevo.</string>
     <string name="onboarding_retry">Reintentar</string>
+    <string name="onboarding_code_copied">Código copiado al portapapeles</string>
     <string name="onboarding_code_expires">El código expira en %1$d segundos</string>
     <string name="onboarding_error_loading_code">Error al cargar el código: %1$s</string>
     <string name="onboarding_code_expired">Código expirado. Por favor, inténtalo de nuevo.</string>

@@ -1,8 +1,10 @@
 package com.justb81.watchbuddy.phone.ui.onboarding
 
+import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -12,10 +14,15 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -184,6 +191,11 @@ private fun NotConfiguredCard(
 
 @Composable
 private fun PinCard(userCode: String, verificationUrl: String, expiresIn: Int) {
+    val uriHandler = LocalUriHandler.current
+    val clipboardManager = LocalClipboardManager.current
+    val context = LocalContext.current
+    val copiedMessage = stringResource(R.string.onboarding_code_copied)
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -195,10 +207,12 @@ private fun PinCard(userCode: String, verificationUrl: String, expiresIn: Int) {
             color = MaterialTheme.colorScheme.onBackground
         )
         Text(
-            text       = stringResource(R.string.onboarding_activate_url),
-            style      = MaterialTheme.typography.titleMedium,
-            color      = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.Bold
+            text           = stringResource(R.string.onboarding_activate_url),
+            style          = MaterialTheme.typography.titleMedium,
+            color          = MaterialTheme.colorScheme.primary,
+            fontWeight     = FontWeight.Bold,
+            textDecoration = TextDecoration.Underline,
+            modifier       = Modifier.clickable { uriHandler.openUri("https://trakt.tv/activate") }
         )
 
         // Step 2
@@ -220,7 +234,11 @@ private fun PinCard(userCode: String, verificationUrl: String, expiresIn: Int) {
                     color = MaterialTheme.colorScheme.primary,
                     shape = RoundedCornerShape(12.dp)
                 )
-                .padding(horizontal = 32.dp, vertical = 16.dp),
+                .padding(horizontal = 32.dp, vertical = 16.dp)
+                .clickable {
+                    clipboardManager.setText(AnnotatedString(userCode))
+                    Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
+                },
             contentAlignment = Alignment.Center
         ) {
             Text(
