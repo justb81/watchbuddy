@@ -2,6 +2,7 @@ package com.justb81.watchbuddy.phone.ui.onboarding
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.core.network.TokenProxyServiceFactory
@@ -16,6 +17,8 @@ import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import com.justb81.watchbuddy.phone.ui.settings.AuthMode
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -58,6 +61,7 @@ sealed class OnboardingState {
 @HiltViewModel
 class OnboardingViewModel @Inject constructor(
     application: Application,
+    private val savedStateHandle: SavedStateHandle,
     private val traktApi: TraktApiService,
     private val tokenProxy: TokenProxyService?,
     @param:Named("traktClientId") private val buildConfigClientId: String,
@@ -71,6 +75,37 @@ class OnboardingViewModel @Inject constructor(
 
     private var countdownJob: Job? = null
     private var pollingJob: Job? = null
+
+    private val json = Json { ignoreUnknownKeys = true }
+
+    private fun saveDeviceCodeToState(response: DeviceCodeResponse) {
+        savedStateHandle[KEY_DEVICE_CODE_JSON] = json.encodeToString(response)
+        savedStateHandle[KEY_DEVICE_CODE_TIMESTAMP] = System.currentTimeMillis()
+    }
+
+    private fun restoreDeviceCodeFromState(): DeviceCodeResponse? {
+        val jsonStr = savedStateHandle.get<String>(KEY_DEVICE_CODE_JSON) ?: return null
+        val timestamp = savedStateHandle.get<Long>(KEY_DEVICE_CODE_TIMESTAMP) ?: return null
+        return try {
+            val response = json.decodeFromString<DeviceCodeResponse>(jsonStr)
+            val elapsedSeconds = ((System.currentTimeMillis() - timestamp) / 1000).toInt()
+            val remainingSeconds = response.expires_in - elapsedSeconds
+            if (remainingSeconds > 0) {
+                response.copy(expires_in = remainingSeconds)
+            } else {
+                clearSavedDeviceCode()
+                null
+            }
+        } catch (_: Exception) {
+            clearSavedDeviceCode()
+            null
+        }
+    }
+
+    private fun clearSavedDeviceCode() {
+        savedStateHandle.remove<String>(KEY_DEVICE_CODE_JSON)
+        savedStateHandle.remove<Long>(KEY_DEVICE_CODE_TIMESTAMP)
+    }
 
     /**
      * Resolves the effective client ID based on the current auth mode.
@@ -115,7 +150,15 @@ class OnboardingViewModel @Inject constructor(
                     return@launch
                 }
 
-                val response = traktApi.requestDeviceCode(DeviceCodeRequest(clientId))
+                val restored = restoreDeviceCodeFromState()
+                val response = if (restored != null) {
+                    restored
+                } else {
+                    val fresh = traktApi.requestDeviceCode(DeviceCodeRequest(clientId))
+                    saveDeviceCodeToState(fresh)
+                    fresh
+                }
+
                 startCountdown(response)
                 startPolling(response, settings.authMode, settings.backendUrl, clientId)
             } catch (e: Exception) {
@@ -142,6 +185,7 @@ class OnboardingViewModel @Inject constructor(
                 delay(1_000)
                 remaining--
             }
+            clearSavedDeviceCode()
             _state.value = OnboardingState.Error(
                 getApplication<Application>().getString(R.string.onboarding_code_expired)
             )
@@ -206,6 +250,7 @@ class OnboardingViewModel @Inject constructor(
                     )
                     val profile = traktApi.getProfile("Bearer $accessToken")
                     countdownJob?.cancel()
+                    clearSavedDeviceCode()
                     _state.value = OnboardingState.Success(profile.username)
                     return@launch
                 } catch (e: Exception) {
@@ -218,6 +263,7 @@ class OnboardingViewModel @Inject constructor(
                         consecutiveNetworkFailures++
                         if (consecutiveNetworkFailures >= 3) {
                             countdownJob?.cancel()
+                            clearSavedDeviceCode()
                             _state.value = OnboardingState.Error(
                                 getApplication<Application>().getString(
                                     R.string.onboarding_error_polling_network
@@ -230,5 +276,10 @@ class OnboardingViewModel @Inject constructor(
                 attempts++
             }
         }
+    }
+
+    private companion object {
+        const val KEY_DEVICE_CODE_JSON = "device_code_json"
+        const val KEY_DEVICE_CODE_TIMESTAMP = "device_code_timestamp"
     }
 }
