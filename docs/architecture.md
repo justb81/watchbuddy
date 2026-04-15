@@ -51,10 +51,18 @@ TXT records:   version=1, modelQuality=70, llmBackend=LITERT
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/capability` | Device info + LLM score |
+| GET | `/capability` | Device info + LLM score + TMDB API key |
 | GET | `/shows` | User's Trakt watched shows (cached) |
 | POST | `/recap/{traktShowId}` | Generate HTML recap for a show |
-| GET | `/auth/token` | Current access token for TV app usage |
+| GET | `/auth/token` | Current access token (server-side, not used by TV) |
+| POST | `/scrobble/start` | Forward scrobble start to this user's Trakt account |
+| POST | `/scrobble/pause` | Forward scrobble pause to this user's Trakt account |
+| POST | `/scrobble/stop` | Forward scrobble stop to this user's Trakt account |
+
+**TV app API boundaries:**
+- **TMDB API** — show/movie details, images, search (direct call from TV using key from `/capability`)
+- **Phone API** — user library (`/shows`), scrobbling (`/scrobble/*`), recaps (`/recap/*`)
+- **Trakt API** — never called directly by the TV; all Trakt operations are proxied via the phone
 
 ### Device Ranking (TV side)
 ```
@@ -97,12 +105,13 @@ Package name + media title extracted
     │
     ▼
 Fuzzy match against local show cache (Levenshtein distance)
-    │ Falls back to Trakt API search via best phone if no good cache match
+    │ Falls back to TMDB search API (key sourced from best phone's /capability)
+    │ if no good cache match is found
     │
     ├── Confidence ≥ 95% → auto-scrobble
     │                           │
     │                     For each connected phone:
-    │                       fetch token → Trakt /scrobble/start
+    │                       POST /scrobble/start (phone calls Trakt internally)
     │                       (parallel, failures isolated per user)
     │
     ├── Confidence 70–95% → ScrobbleOverlay: user confirms or rejects
@@ -114,8 +123,8 @@ Fuzzy match against local show cache (Levenshtein distance)
 ```
 
 Multi-user: when multiple phones are connected, each user's watch history is recorded
-independently — one Trakt scrobble call per phone, in parallel. A failure for one user
-does not block the others.
+independently — one `/scrobble/*` call per phone, in parallel. A failure for one user
+does not block the others. The TV never calls the Trakt API directly for any operation.
 
 ## Secret Storage Strategy
 

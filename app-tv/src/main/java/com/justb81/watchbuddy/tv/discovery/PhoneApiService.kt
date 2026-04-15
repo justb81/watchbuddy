@@ -25,9 +25,6 @@ interface PhoneApiService {
     @POST("/recap/{traktShowId}")
     suspend fun getRecap(@Path("traktShowId") showId: Int): RecapResponse
 
-    @GET("/auth/token")
-    suspend fun getAccessToken(): TokenResponse
-
     @POST("/scrobble/start")
     suspend fun scrobbleStart(@Body body: PhoneScrobbleRequest): PhoneScrobbleActionResponse
 
@@ -37,9 +34,6 @@ interface PhoneApiService {
     @POST("/scrobble/stop")
     suspend fun scrobbleStop(@Body body: PhoneScrobbleRequest): PhoneScrobbleActionResponse
 }
-
-@Serializable
-data class TokenResponse(val accessToken: String)
 
 @Serializable
 data class RecapResponse(val html: String)

@@ -2,6 +2,7 @@ package com.justb81.watchbuddy.core.tmdb
 
 import com.justb81.watchbuddy.core.model.TmdbEpisode
 import com.justb81.watchbuddy.core.model.TmdbShow
+import com.justb81.watchbuddy.core.model.TmdbTvSearchResponse
 import retrofit2.http.*
 
 interface TmdbApiService {
@@ -21,6 +22,13 @@ interface TmdbApiService {
         @Query("api_key") apiKey: String,
         @Query("language") language: String = "en-US"
     ): TmdbEpisode
+
+    @GET("search/tv")
+    suspend fun searchTv(
+        @Query("query") query: String,
+        @Query("api_key") apiKey: String,
+        @Query("page") page: Int = 1
+    ): TmdbTvSearchResponse
 }
 
 // Image URL helper

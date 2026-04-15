@@ -7,7 +7,9 @@ import android.media.session.PlaybackState
 import android.util.Log
 import com.justb81.watchbuddy.core.model.ScrobbleCandidate
 import com.justb81.watchbuddy.core.model.TraktEpisode
-import com.justb81.watchbuddy.core.trakt.TraktApiService
+import com.justb81.watchbuddy.core.model.TraktIds
+import com.justb81.watchbuddy.core.model.TraktShow
+import com.justb81.watchbuddy.core.tmdb.TmdbApiService
 import com.justb81.watchbuddy.tv.data.TvShowCache
 import com.justb81.watchbuddy.tv.discovery.PhoneApiClientFactory
 import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
@@ -25,20 +27,19 @@ import javax.inject.Singleton
  * How it works:
  *   1. MediaSessionManager.getActiveSessions() returns all active sessions
  *   2. Extract package name + media title from session metadata
- *   3. Fuzzy-match title against user's Trakt watchlist (local cache first, then API)
+ *   3. Fuzzy-match title against user's watchlist (local cache first, then TMDB search)
  *   4. Confidence ≥ 0.95 → auto-scrobble; 0.70–0.95 → emit for UI confirmation; < 0.70 → ignore
  *   5. On playback stop/pause → call phone's /scrobble/stop or /scrobble/pause endpoint
  *
  * Scrobble operations are always forwarded to each connected phone's HTTP API.
- * The phone then calls Trakt with its own credentials — the TV never calls Trakt directly
- * for scrobbling.
+ * The phone then calls Trakt with its own credentials — the TV never calls Trakt directly.
+ * Show search uses the TMDB API with the API key provided by the connected phone.
  */
 @Singleton
 class MediaSessionScrobbler @Inject constructor(
     @param:ApplicationContext private val context: Context,
-    private val traktApi: TraktApiService,
+    private val tmdbApiService: TmdbApiService,
     private val tvShowCache: TvShowCache,
-    private val tvTokenCache: TvTokenCache,
     private val phoneDiscovery: PhoneDiscoveryManager,
     private val phoneApiClientFactory: PhoneApiClientFactory
 ) {
@@ -98,7 +99,7 @@ class MediaSessionScrobbler @Inject constructor(
     private suspend fun processPlayingMedia(packageName: String, rawTitle: String) {
         if (rawTitle == currentlyScrobbling) return // already handling this title
 
-        val candidate = matchTitleToTrakt(packageName, rawTitle) ?: return
+        val candidate = matchTitle(packageName, rawTitle) ?: return
 
         if (candidate.confidence >= AUTO_SCROBBLE_THRESHOLD) {
             autoScrobble(candidate)
@@ -108,14 +109,15 @@ class MediaSessionScrobbler @Inject constructor(
         // confidence < 0.70 → too uncertain, don't scrobble
     }
 
-    // ── Fuzzy Matching (Issue #15) ───────────────────────────────────────────
+    // ── Fuzzy Matching ───────────────────────────────────────────────────────
 
     /**
-     * Fuzzy-match the media title to a show+episode in the user's Trakt history.
-     * Searches the local show cache first, then falls back to the Trakt search API
-     * using a token from the best connected phone.
+     * Fuzzy-match the media title to a show+episode.
+     * Searches the local show cache first. If no good match is found, falls back
+     * to TMDB search using the API key provided by the best connected phone.
+     * The TV never calls the Trakt API directly.
      */
-    private suspend fun matchTitleToTrakt(packageName: String, rawTitle: String): ScrobbleCandidate? {
+    internal suspend fun matchTitle(packageName: String, rawTitle: String): ScrobbleCandidate? {
         val episodePattern = Regex("""(?i)S(\d{1,2})E(\d{1,2})""")
         val match = episodePattern.find(rawTitle)
 
@@ -125,7 +127,7 @@ class MediaSessionScrobbler @Inject constructor(
 
         if (showTitle.isBlank()) return null
 
-        // 1. Search local cache first
+        // 1. Search local cache first (shows come from the phone's /shows endpoint)
         val cachedShows = tvShowCache.getCachedShows()
         if (cachedShows.isNotEmpty()) {
             val bestCacheMatch = cachedShows.maxByOrNull { fuzzyScore(it.show.title, showTitle) }
@@ -143,27 +145,29 @@ class MediaSessionScrobbler @Inject constructor(
             }
         }
 
-        // 2. API fallback when cache has no good match — uses phone token for Trakt search
-        val token = tvTokenCache.getToken() ?: return null
+        // 2. TMDB search fallback — uses TMDB API key provided by the best connected phone
+        val tmdbApiKey = phoneDiscovery.getBestPhone()?.capability?.tmdbApiKey ?: return null
         return try {
-            val apiResults = traktApi.searchShow("Bearer $token", showTitle)
-            val apiMatch = apiResults
-                .filter { it.show != null }
-                .maxByOrNull { fuzzyScore(it.show!!.title, showTitle) }
-            val apiScore = apiMatch?.show?.let { fuzzyScore(it.title, showTitle) } ?: 0f
+            val tmdbResults = tmdbApiService.searchTv(showTitle, tmdbApiKey).results
+            val bestTmdbMatch = tmdbResults.maxByOrNull { fuzzyScore(it.name, showTitle) }
+            val tmdbScore = bestTmdbMatch?.let { fuzzyScore(it.name, showTitle) } ?: 0f
 
-            if (apiScore < 0.50f || apiMatch?.show == null) return null
+            if (tmdbScore < 0.50f || bestTmdbMatch == null) return null
 
             ScrobbleCandidate(
                 packageName = packageName,
                 mediaTitle = rawTitle,
-                confidence = apiScore,
-                matchedShow = apiMatch.show,
+                confidence = tmdbScore,
+                matchedShow = TraktShow(
+                    title = bestTmdbMatch.name,
+                    year = bestTmdbMatch.first_air_date?.take(4)?.toIntOrNull(),
+                    ids = TraktIds(tmdb = bestTmdbMatch.id)
+                ),
                 matchedEpisode = if (season != null && episode != null)
                     TraktEpisode(season = season, number = episode) else null
             )
         } catch (e: Exception) {
-            Log.w(TAG, "Trakt search API failed for '$showTitle'", e)
+            Log.w(TAG, "TMDB search failed for '$showTitle'", e)
             null
         }
     }
@@ -254,7 +258,7 @@ class MediaSessionScrobbler @Inject constructor(
         val phones = phoneDiscovery.discoveredPhones.value
             .filter { it.capability?.isAvailable == true }
         if (phones.isEmpty()) return
-        val candidate = matchTitleToTrakt("", rawTitle) ?: return
+        val candidate = matchTitle("", rawTitle) ?: return
         val show = candidate.matchedShow ?: return
         val episode = candidate.matchedEpisode ?: return
         val request = PhoneScrobbleRequest(show = show, episode = episode, progress = 50f)
@@ -279,7 +283,7 @@ class MediaSessionScrobbler @Inject constructor(
         val phones = phoneDiscovery.discoveredPhones.value
             .filter { it.capability?.isAvailable == true }
         if (phones.isEmpty()) return
-        val candidate = matchTitleToTrakt("", rawTitle) ?: return
+        val candidate = matchTitle("", rawTitle) ?: return
         val show = candidate.matchedShow ?: return
         val episode = candidate.matchedEpisode ?: return
         val request = PhoneScrobbleRequest(show = show, episode = episode, progress = 100f)

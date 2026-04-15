@@ -60,6 +60,11 @@ data class TmdbShow(
 )
 
 @Serializable
+data class TmdbTvSearchResponse(
+    val results: List<TmdbShow> = emptyList()
+)
+
+@Serializable
 data class TmdbEpisode(
     val id: Int,
     val name: String,
@@ -82,7 +87,8 @@ data class DeviceCapability(
     val modelQuality: Int,              // 0–150 (see scoring docs)
     val freeRamMb: Int,
     val isAvailable: Boolean = true,
-    val tmdbConfigured: Boolean = false
+    val tmdbConfigured: Boolean = false,
+    val tmdbApiKey: String? = null      // populated by phone so TV can call TMDB directly
 )
 
 enum class LlmBackend { AICORE, LITERT, NONE }
