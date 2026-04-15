@@ -71,7 +71,7 @@ class ShowRepositoryTest {
 
     @Test
     fun `getShows returns empty list when API throws with no prior cache`() = runTest {
-        every { tokenRepository.getAccessToken() } returns "test-token"
+        coEvery { tokenRefreshManager.getValidAccessToken() } returns "test-token"
         coEvery { traktApi.getWatchedShows(any()) } throws RuntimeException("Network error")
 
         val result = repository.getShows()
@@ -81,7 +81,7 @@ class ShowRepositoryTest {
 
     @Test
     fun `getShows returns stale cached data when API throws after a successful fetch`() = runTest {
-        every { tokenRepository.getAccessToken() } returns "test-token"
+        coEvery { tokenRefreshManager.getValidAccessToken() } returns "test-token"
         coEvery { traktApi.getWatchedShows(any()) } returns testShows
 
         // Prime the cache with a successful fetch
@@ -106,7 +106,7 @@ class ShowRepositoryTest {
 
     @Test
     fun `getShows retries API on next call after a failure`() = runTest {
-        every { tokenRepository.getAccessToken() } returns "test-token"
+        coEvery { tokenRefreshManager.getValidAccessToken() } returns "test-token"
         // First call: API throws
         coEvery { traktApi.getWatchedShows(any()) } throws RuntimeException("Network error")
         repository.getShows()

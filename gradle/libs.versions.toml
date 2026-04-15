@@ -24,6 +24,7 @@ turbine = "1.1.0"
 robolectric = "4.13"
 androidx-test-core = "1.6.1"
 androidx-arch-core = "2.2.0"
+errorprone-annotations = "2.36.0"
 
 [libraries]
 # AndroidX Core
@@ -103,6 +104,7 @@ okhttp-mockwebserver = { group = "com.squareup.okhttp3", name = "mockwebserver",
 robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
 androidx-test-core = { group = "androidx.test", name = "core-ktx", version.ref = "androidx-test-core" }
 androidx-arch-core-testing = { group = "androidx.arch.core", name = "core-testing", version.ref = "androidx-arch-core" }
+errorprone-annotations = { group = "com.google.errorprone", name = "error_prone_annotations", version.ref = "errorprone-annotations" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

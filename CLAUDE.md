@@ -170,13 +170,18 @@ The phone acts as an NSD/mDNS server on port 8765. The TV discovers phone(s) on 
 | GET | `/capability` | Device info + LLM quality score |
 | GET | `/shows` | User's Trakt watched shows |
 | POST | `/recap/{traktShowId}` | Generate HTML recap |
-| GET | `/auth/token` | Current access token for TV app usage |
+| GET | `/auth/token` | Current access token (used by TV for Trakt show search) |
+| POST | `/scrobble/start` | Forward scrobble start to this user's Trakt account |
+| POST | `/scrobble/pause` | Forward scrobble pause to this user's Trakt account |
+| POST | `/scrobble/stop` | Forward scrobble stop to this user's Trakt account |
+
+The TV never calls the Trakt API directly for scrobbling. All scrobble events (`/scrobble/*`) are forwarded to each connected phone's HTTP API; the phone uses its own stored Trakt credentials to record the episode. This keeps Trakt credentials on the phone and ensures each user's account is updated independently.
 
 The TV ranks connected phones by LLM quality and uses the best one. Failover chain: best phone → next phone → local cache → TMDB synopsis only.
 
 ## Important Patterns
 
-- **Scrobbling:** `MediaSessionScrobbler` listens to active media sessions on the TV, extracts package name + title, fuzzy-matches against Trakt watchlist. Auto-scrobbles if confidence ≥ 95%, shows overlay confirmation between 70–95%, ignores below 70%. When multiple phones are connected, scrobbling fires in parallel for **every** connected user via `TvTokenCache.getAllTokens()` — each user's Trakt account is updated independently and a failure for one user does not block the others.
+- **Scrobbling:** `MediaSessionScrobbler` listens to active media sessions on the TV, extracts package name + title, fuzzy-matches against Trakt watchlist. Auto-scrobbles if confidence ≥ 95%, shows overlay confirmation between 70–95%, ignores below 70%. When a scrobble event occurs, `MediaSessionScrobbler` calls `POST /scrobble/{start|pause|stop}` on **every** connected phone in parallel via `PhoneDiscoveryManager` + `PhoneApiClientFactory` — each phone records the episode on its own user's Trakt account using its own stored credentials. A failure for one phone does not block the others. The TV never calls the Trakt API directly for scrobble operations.
 - **LLM selection:** `LlmOrchestrator` checks AICore first, then falls back to LiteRT-LM with a Gemma 4 model (E4B or E2B) sized to available RAM.
 - **Auth modes:** Managed backend (default), self-hosted proxy, or direct Trakt credentials.
 - **Multi-user:** Multiple phones can connect to one TV simultaneously; scrobbling records the episode for each connected user independently; shared watch mode avoids recap spoilers.

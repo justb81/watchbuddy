@@ -2,8 +2,12 @@ package com.justb81.watchbuddy.phone.server
 
 import android.util.Log
 import com.justb81.watchbuddy.core.locale.LocaleHelper
+import com.justb81.watchbuddy.core.model.TraktEpisode
+import com.justb81.watchbuddy.core.model.TraktShow
 import com.justb81.watchbuddy.core.tmdb.TmdbApiService
 import com.justb81.watchbuddy.core.tmdb.TmdbCache
+import com.justb81.watchbuddy.core.trakt.ScrobbleBody
+import com.justb81.watchbuddy.core.trakt.TraktApiService
 import com.justb81.watchbuddy.phone.auth.TokenRefreshManager
 import com.justb81.watchbuddy.phone.auth.TokenRepository
 import com.justb81.watchbuddy.phone.llm.RecapGenerator
@@ -38,7 +42,10 @@ private const val MAX_PAGE_SIZE = 200
  *   GET  /capability           → DeviceCapability (device score, RAM, LLM backend)
  *   GET  /shows                → List of watched shows for this user (from Trakt cache)
  *   POST /recap/{traktShowId}  → Generate + return HTML recap for a show
- *   GET  /auth/token           → Current access token for TV app usage
+ *   GET  /auth/token           → Current access token for TV app usage (show search)
+ *   POST /scrobble/start       → Forward scrobble start to this user's Trakt account
+ *   POST /scrobble/pause       → Forward scrobble pause to this user's Trakt account
+ *   POST /scrobble/stop        → Forward scrobble stop to this user's Trakt account
  */
 @Singleton
 class CompanionHttpServer @Inject constructor(
@@ -47,6 +54,7 @@ class CompanionHttpServer @Inject constructor(
     private val showRepository: ShowRepository,
     private val tokenRepository: TokenRepository,
     private val tokenRefreshManager: TokenRefreshManager,
+    private val traktApiService: TraktApiService,
     private val tmdbApiService: TmdbApiService,
     private val tmdbCache: TmdbCache,
     private val settingsRepository: SettingsRepository
@@ -61,7 +69,7 @@ class CompanionHttpServer @Inject constructor(
         server = embeddedServer(Netty, port = PORT) {
             configureCompanionRoutes(
                 recapGenerator, capabilityProvider, showRepository,
-                tokenRepository, tokenRefreshManager, tmdbApiService, tmdbCache, settingsRepository
+                tokenRepository, tokenRefreshManager, traktApiService, tmdbApiService, tmdbCache, settingsRepository
             )
         }.start(wait = false)
     }
@@ -82,6 +90,7 @@ internal fun Application.configureCompanionRoutes(
     showRepository: ShowRepository,
     tokenRepository: TokenRepository,
     tokenRefreshManager: TokenRefreshManager,
+    traktApiService: TraktApiService,
     tmdbApiService: TmdbApiService,
     tmdbCache: TmdbCache,
     settingsRepository: SettingsRepository
@@ -193,6 +202,60 @@ internal fun Application.configureCompanionRoutes(
                 ?: return@get call.respond(HttpStatusCode.Unauthorized, ErrorResponse("No access token"))
             call.respond(TokenResponse(accessToken = token))
         }
+
+        post("/scrobble/start") {
+            val token = tokenRefreshManager.getValidAccessToken()
+                ?: return@post call.respond(HttpStatusCode.Unauthorized, ErrorResponse("No access token"))
+            val body = try { call.receive<ScrobbleRequestBody>() } catch (_: Exception) {
+                return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid request body"))
+            }
+            try {
+                traktApiService.scrobbleStart(
+                    bearer = "Bearer $token",
+                    body = ScrobbleBody(show = body.show, episode = body.episode, progress = body.progress)
+                )
+                call.respond(ScrobbleActionResponse(success = true))
+            } catch (e: Exception) {
+                Log.e(TAG, "Scrobble start failed", e)
+                call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("Scrobble failed"))
+            }
+        }
+
+        post("/scrobble/pause") {
+            val token = tokenRefreshManager.getValidAccessToken()
+                ?: return@post call.respond(HttpStatusCode.Unauthorized, ErrorResponse("No access token"))
+            val body = try { call.receive<ScrobbleRequestBody>() } catch (_: Exception) {
+                return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid request body"))
+            }
+            try {
+                traktApiService.scrobblePause(
+                    bearer = "Bearer $token",
+                    body = ScrobbleBody(show = body.show, episode = body.episode, progress = body.progress)
+                )
+                call.respond(ScrobbleActionResponse(success = true))
+            } catch (e: Exception) {
+                Log.e(TAG, "Scrobble pause failed", e)
+                call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("Scrobble failed"))
+            }
+        }
+
+        post("/scrobble/stop") {
+            val token = tokenRefreshManager.getValidAccessToken()
+                ?: return@post call.respond(HttpStatusCode.Unauthorized, ErrorResponse("No access token"))
+            val body = try { call.receive<ScrobbleRequestBody>() } catch (_: Exception) {
+                return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid request body"))
+            }
+            try {
+                traktApiService.scrobbleStop(
+                    bearer = "Bearer $token",
+                    body = ScrobbleBody(show = body.show, episode = body.episode, progress = body.progress)
+                )
+                call.respond(ScrobbleActionResponse(success = true))
+            } catch (e: Exception) {
+                Log.e(TAG, "Scrobble stop failed", e)
+                call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("Scrobble failed"))
+            }
+        }
     }
 }
 
@@ -209,4 +272,16 @@ private data class TokenResponse(
 @Serializable
 private data class ErrorResponse(
     val error: String
+)
+
+@Serializable
+private data class ScrobbleRequestBody(
+    val show: TraktShow,
+    val episode: TraktEpisode,
+    val progress: Float
+)
+
+@Serializable
+private data class ScrobbleActionResponse(
+    val success: Boolean
 )

@@ -4,6 +4,7 @@ import com.justb81.watchbuddy.core.model.LlmBackend
 import com.justb81.watchbuddy.core.model.DeviceCapability
 import com.justb81.watchbuddy.core.model.TmdbEpisode
 import com.justb81.watchbuddy.core.model.TmdbShow
+import com.justb81.watchbuddy.core.model.TraktEpisode
 import com.justb81.watchbuddy.core.model.TraktIds
 import com.justb81.watchbuddy.core.model.TraktShow
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
@@ -11,6 +12,8 @@ import com.justb81.watchbuddy.core.model.TraktWatchedEpisode
 import com.justb81.watchbuddy.core.model.TraktWatchedSeason
 import com.justb81.watchbuddy.core.tmdb.TmdbApiService
 import com.justb81.watchbuddy.core.tmdb.TmdbCache
+import com.justb81.watchbuddy.core.trakt.ScrobbleResponse
+import com.justb81.watchbuddy.core.trakt.TraktApiService
 import com.justb81.watchbuddy.phone.auth.TokenRefreshManager
 import com.justb81.watchbuddy.phone.auth.TokenRepository
 import com.justb81.watchbuddy.phone.llm.RecapGenerator
@@ -37,6 +40,7 @@ class CompanionHttpServerTest {
     private val showRepository: ShowRepository = mockk()
     private val tokenRepository: TokenRepository = mockk()
     private val tokenRefreshManager: TokenRefreshManager = mockk()
+    private val traktApiService: TraktApiService = mockk()
     private val tmdbApiService: TmdbApiService = mockk()
     private val tmdbCache = TmdbCache()
     private val settingsRepository: SettingsRepository = mockk()
@@ -81,7 +85,7 @@ class CompanionHttpServerTest {
         application {
             configureCompanionRoutes(
                 recapGenerator, capabilityProvider, showRepository,
-                tokenRepository, tokenRefreshManager, tmdbApiService, tmdbCache, settingsRepository
+                tokenRepository, tokenRefreshManager, traktApiService, tmdbApiService, tmdbCache, settingsRepository
             )
         }
         block()
@@ -544,6 +548,157 @@ class CompanionHttpServerTest {
 
             assertEquals(HttpStatusCode.OK, response.status)
             assertTrue(response.bodyAsText().contains("my-secret-token"))
+        }
+    }
+
+    // ── POST /scrobble/start, /scrobble/pause, /scrobble/stop ────────────────
+
+    @Nested
+    @DisplayName("POST /scrobble/*")
+    inner class ScrobbleEndpoints {
+
+        private val show = TraktShow("Breaking Bad", 2008, TraktIds(trakt = 1))
+        private val episode = TraktEpisode(season = 1, number = 1)
+        private val scrobbleBody = """{"show":{"title":"Breaking Bad","year":2008,"ids":{"trakt":1}},"episode":{"season":1,"number":1,"ids":{}},"progress":0.0}"""
+
+        private fun stubSuccessfulScrobbleStart() {
+            coEvery { traktApiService.scrobbleStart(any(), any()) } returns ScrobbleResponse(
+                id = 1L, action = "start", progress = 0f, show = show, episode = episode
+            )
+        }
+
+        private fun stubSuccessfulScrobblePause() {
+            coEvery { traktApiService.scrobblePause(any(), any()) } returns ScrobbleResponse(
+                id = 1L, action = "pause", progress = 50f, show = show, episode = episode
+            )
+        }
+
+        private fun stubSuccessfulScrobbleStop() {
+            coEvery { traktApiService.scrobbleStop(any(), any()) } returns ScrobbleResponse(
+                id = 1L, action = "stop", progress = 100f, show = show, episode = episode
+            )
+        }
+
+        @Test
+        fun `scrobble start returns 401 when no access token`() = testApp {
+            coEvery { tokenRefreshManager.getValidAccessToken() } returns null
+
+            val response = client.post("/scrobble/start") {
+                contentType(ContentType.Application.Json)
+                setBody(scrobbleBody)
+            }
+
+            assertEquals(HttpStatusCode.Unauthorized, response.status)
+        }
+
+        @Test
+        fun `scrobble start returns 400 when body is invalid`() = testApp {
+            coEvery { tokenRefreshManager.getValidAccessToken() } returns "token"
+
+            val response = client.post("/scrobble/start") {
+                contentType(ContentType.Application.Json)
+                setBody("not-valid-json")
+            }
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+        }
+
+        @Test
+        fun `scrobble start returns 200 and calls Trakt API`() = testApp {
+            coEvery { tokenRefreshManager.getValidAccessToken() } returns "test-token"
+            stubSuccessfulScrobbleStart()
+
+            val response = client.post("/scrobble/start") {
+                contentType(ContentType.Application.Json)
+                setBody(scrobbleBody)
+            }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertTrue(response.bodyAsText().contains("true"))
+            coVerify { traktApiService.scrobbleStart("Bearer test-token", any()) }
+        }
+
+        @Test
+        fun `scrobble start returns 503 when Trakt API throws`() = testApp {
+            coEvery { tokenRefreshManager.getValidAccessToken() } returns "token"
+            coEvery { traktApiService.scrobbleStart(any(), any()) } throws RuntimeException("Trakt down")
+
+            val response = client.post("/scrobble/start") {
+                contentType(ContentType.Application.Json)
+                setBody(scrobbleBody)
+            }
+
+            assertEquals(HttpStatusCode.ServiceUnavailable, response.status)
+            assertFalse(response.bodyAsText().contains("Trakt down"))
+        }
+
+        @Test
+        fun `scrobble pause returns 401 when no access token`() = testApp {
+            coEvery { tokenRefreshManager.getValidAccessToken() } returns null
+
+            val response = client.post("/scrobble/pause") {
+                contentType(ContentType.Application.Json)
+                setBody(scrobbleBody)
+            }
+
+            assertEquals(HttpStatusCode.Unauthorized, response.status)
+        }
+
+        @Test
+        fun `scrobble pause returns 200 and calls Trakt API`() = testApp {
+            coEvery { tokenRefreshManager.getValidAccessToken() } returns "test-token"
+            stubSuccessfulScrobblePause()
+
+            val pauseBody = """{"show":{"title":"Breaking Bad","year":2008,"ids":{"trakt":1}},"episode":{"season":1,"number":1,"ids":{}},"progress":50.0}"""
+            val response = client.post("/scrobble/pause") {
+                contentType(ContentType.Application.Json)
+                setBody(pauseBody)
+            }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            coVerify { traktApiService.scrobblePause("Bearer test-token", any()) }
+        }
+
+        @Test
+        fun `scrobble stop returns 401 when no access token`() = testApp {
+            coEvery { tokenRefreshManager.getValidAccessToken() } returns null
+
+            val response = client.post("/scrobble/stop") {
+                contentType(ContentType.Application.Json)
+                setBody(scrobbleBody)
+            }
+
+            assertEquals(HttpStatusCode.Unauthorized, response.status)
+        }
+
+        @Test
+        fun `scrobble stop returns 200 and calls Trakt API`() = testApp {
+            coEvery { tokenRefreshManager.getValidAccessToken() } returns "test-token"
+            stubSuccessfulScrobbleStop()
+
+            val stopBody = """{"show":{"title":"Breaking Bad","year":2008,"ids":{"trakt":1}},"episode":{"season":1,"number":1,"ids":{}},"progress":100.0}"""
+            val response = client.post("/scrobble/stop") {
+                contentType(ContentType.Application.Json)
+                setBody(stopBody)
+            }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            coVerify { traktApiService.scrobbleStop("Bearer test-token", any()) }
+        }
+
+        @Test
+        fun `scrobble stop returns 503 when Trakt API throws — no exception detail leaked`() = testApp {
+            coEvery { tokenRefreshManager.getValidAccessToken() } returns "token"
+            coEvery { traktApiService.scrobbleStop(any(), any()) } throws RuntimeException("Network error")
+
+            val stopBody = """{"show":{"title":"Breaking Bad","year":2008,"ids":{"trakt":1}},"episode":{"season":1,"number":1,"ids":{}},"progress":100.0}"""
+            val response = client.post("/scrobble/stop") {
+                contentType(ContentType.Application.Json)
+                setBody(stopBody)
+            }
+
+            assertEquals(HttpStatusCode.ServiceUnavailable, response.status)
+            assertFalse(response.bodyAsText().contains("Network error"))
         }
     }
 }
