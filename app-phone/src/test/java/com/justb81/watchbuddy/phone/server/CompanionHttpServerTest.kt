@@ -11,6 +11,7 @@ import com.justb81.watchbuddy.core.model.TraktWatchedEpisode
 import com.justb81.watchbuddy.core.model.TraktWatchedSeason
 import com.justb81.watchbuddy.core.tmdb.TmdbApiService
 import com.justb81.watchbuddy.core.tmdb.TmdbCache
+import com.justb81.watchbuddy.phone.auth.TokenRefreshManager
 import com.justb81.watchbuddy.phone.auth.TokenRepository
 import com.justb81.watchbuddy.phone.llm.RecapGenerator
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
@@ -35,6 +36,7 @@ class CompanionHttpServerTest {
     private val capabilityProvider: DeviceCapabilityProvider = mockk()
     private val showRepository: ShowRepository = mockk()
     private val tokenRepository: TokenRepository = mockk()
+    private val tokenRefreshManager: TokenRefreshManager = mockk()
     private val tmdbApiService: TmdbApiService = mockk()
     private val tmdbCache = TmdbCache()
     private val settingsRepository: SettingsRepository = mockk()
@@ -79,7 +81,7 @@ class CompanionHttpServerTest {
         application {
             configureCompanionRoutes(
                 recapGenerator, capabilityProvider, showRepository,
-                tokenRepository, tmdbApiService, tmdbCache, settingsRepository
+                tokenRepository, tokenRefreshManager, tmdbApiService, tmdbCache, settingsRepository
             )
         }
         block()
@@ -523,8 +525,8 @@ class CompanionHttpServerTest {
     inner class AuthTokenEndpoint {
 
         @Test
-        fun `returns 401 when no access token`() = testApp {
-            every { tokenRepository.getAccessToken() } returns null
+        fun `returns 401 when token refresh returns null`() = testApp {
+            coEvery { tokenRefreshManager.getValidAccessToken() } returns null
 
             val response = client.get("/auth/token")
 
@@ -532,8 +534,8 @@ class CompanionHttpServerTest {
         }
 
         @Test
-        fun `returns 200 with access token`() = testApp {
-            every { tokenRepository.getAccessToken() } returns "my-secret-token"
+        fun `returns 200 with valid access token after refresh`() = testApp {
+            coEvery { tokenRefreshManager.getValidAccessToken() } returns "my-secret-token"
 
             val response = client.get("/auth/token")
 
