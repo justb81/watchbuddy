@@ -257,6 +257,17 @@ class CompanionHttpServerTest {
             assertEquals(HttpStatusCode.OK, response.status)
             assertTrue(response.bodyAsText().contains("Breaking Bad"))
         }
+
+        @Test
+        fun `returns 503 when getAccessToken throws SecurityException`() = testApp {
+            every { tokenRepository.getAccessToken() } throws
+                SecurityException("Keystore operation failed")
+
+            val response = client.get("/shows")
+
+            assertEquals(HttpStatusCode.ServiceUnavailable, response.status)
+            assertTrue(response.bodyAsText().contains("Service unavailable"))
+        }
     }
 
     // ── POST /recap/{traktShowId} ─────────────────────────────────────────────
@@ -525,6 +536,20 @@ class CompanionHttpServerTest {
             // First 2 episodes (S1E1, S1E2) should NOT be fetched
             coVerify(exactly = 0) { tmdbApiService.getEpisode(100, 1, 1, any(), any()) }
             coVerify(exactly = 0) { tmdbApiService.getEpisode(100, 1, 2, any(), any()) }
+        }
+
+        @Test
+        fun `returns 503 when getAccessToken throws SecurityException`() = testApp {
+            every { tokenRepository.getAccessToken() } throws
+                SecurityException("Keystore operation failed")
+
+            val response = client.post("/recap/1") {
+                contentType(ContentType.Application.Json)
+                setBody("""{"tmdbApiKey":"api-key"}""")
+            }
+
+            assertEquals(HttpStatusCode.ServiceUnavailable, response.status)
+            assertTrue(response.bodyAsText().contains("Service unavailable"))
         }
     }
 

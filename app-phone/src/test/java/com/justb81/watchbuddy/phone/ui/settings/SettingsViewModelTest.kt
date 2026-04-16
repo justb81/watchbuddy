@@ -480,6 +480,26 @@ class SettingsViewModelTest {
     }
 
     @Nested
+    @DisplayName("disconnectTrakt resilience")
+    inner class DisconnectTraktResilience {
+
+        @Test
+        fun `disconnectTrakt does not throw when clearTokens throws SecurityException`() = runTest {
+            every { tokenRepository.clearTokens() } throws
+                SecurityException("Keystore operation failed")
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            vm.disconnectTrakt()
+
+            // UI state still updated; cache still invalidated
+            assertNull(vm.uiState.value.traktUsername)
+            verify { deviceCapabilityProvider.invalidateCache() }
+        }
+    }
+
+    @Nested
     @DisplayName("saveAdvancedSettings — TMDB key preservation")
     inner class SaveAdvancedSettings {
 

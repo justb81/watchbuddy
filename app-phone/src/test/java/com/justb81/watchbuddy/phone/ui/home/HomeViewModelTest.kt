@@ -189,6 +189,35 @@ class HomeViewModelTest {
     }
 
     @Nested
+    @DisplayName("Init resilience — no force close on home screen open")
+    inner class InitResilience {
+
+        @Test
+        fun `ViewModel creation does not throw when isTokenValid throws SecurityException`() = runTest {
+            every { tokenRepository.isTokenValid() } throws
+                SecurityException("Keystore operation failed")
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            assertFalse(vm.uiState.value.canWatch)
+        }
+
+        @Test
+        fun `ViewModel creation does not throw when getAccessToken throws SecurityException`() = runTest {
+            every { tokenRepository.getAccessToken() } throws
+                SecurityException("Keystore operation failed")
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            // loadShows() catches via existing broad catch; checkServiceConnections() catches via new try-catch
+            assertFalse(vm.uiState.value.canWatch)
+            assertNotNull(vm.uiState.value.error)
+        }
+    }
+
+    @Nested
     @DisplayName("companion service auto-start")
     inner class CompanionServiceTest {
 

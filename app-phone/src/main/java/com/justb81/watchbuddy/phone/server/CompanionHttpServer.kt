@@ -112,14 +112,17 @@ internal fun Application.configureCompanionRoutes(
         }
 
         get("/shows") {
-            tokenRepository.getAccessToken()
-                ?: return@get call.respond(HttpStatusCode.Unauthorized, ErrorResponse("No access token"))
             try {
+                tokenRepository.getAccessToken()
+                    ?: return@get call.respond(HttpStatusCode.Unauthorized, ErrorResponse("No access token"))
                 val offset = call.request.queryParameters["offset"]?.toIntOrNull()?.coerceAtLeast(0) ?: 0
                 val limit = call.request.queryParameters["limit"]?.toIntOrNull()
                     ?.coerceIn(1, MAX_PAGE_SIZE) ?: DEFAULT_PAGE_SIZE
                 val shows = showRepository.getShows().drop(offset).take(limit)
                 call.respond(shows)
+            } catch (e: SecurityException) {
+                Log.e(TAG, "Keystore unavailable", e)
+                call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("Service unavailable"))
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to fetch shows", e)
                 call.respond(HttpStatusCode.InternalServerError, ErrorResponse("Internal server error"))
@@ -130,10 +133,10 @@ internal fun Application.configureCompanionRoutes(
             val showId = call.parameters["traktShowId"]?.toIntOrNull()
                 ?: return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid show ID"))
 
-            tokenRepository.getAccessToken()
-                ?: return@post call.respond(HttpStatusCode.Unauthorized, ErrorResponse("No access token"))
-
             try {
+                tokenRepository.getAccessToken()
+                    ?: return@post call.respond(HttpStatusCode.Unauthorized, ErrorResponse("No access token"))
+
                 val body = try { call.receive<RecapRequest>() } catch (_: Exception) { RecapRequest() }
                 val apiKey = body.tmdbApiKey.ifBlank {
                     settingsRepository.getTmdbApiKey().first()
@@ -199,6 +202,9 @@ internal fun Application.configureCompanionRoutes(
                     apiKey = apiKey
                 )
                 call.respond(mapOf("html" to html))
+            } catch (e: SecurityException) {
+                Log.e(TAG, "Keystore unavailable", e)
+                call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("Service unavailable"))
             } catch (e: Exception) {
                 Log.e(TAG, "Recap generation failed for show $showId", e)
                 call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("Recap generation failed"))
