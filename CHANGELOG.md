@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.7](https://github.com/justb81/watchbuddy/compare/v0.13.6...v0.13.7) (2026-04-16)
+
+
+### Bug Fixes
+
+* resolve Trakt auth errors — trust proxy, 401/403 handling ([#210](https://github.com/justb81/watchbuddy/issues/210), [#211](https://github.com/justb81/watchbuddy/issues/211)) ([#213](https://github.com/justb81/watchbuddy/issues/213)) ([dee1052](https://github.com/justb81/watchbuddy/commit/dee10528556b889c57915a524058317ddc4f7b26))
+
 ## [0.13.6](https://github.com/justb81/watchbuddy/compare/v0.13.5...v0.13.6) (2026-04-16)
 
 
