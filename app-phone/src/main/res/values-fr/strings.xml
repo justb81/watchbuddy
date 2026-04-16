@@ -17,6 +17,7 @@
     <string name="onboarding_code_expires">Le code expire dans %1$d secondes</string>
     <string name="onboarding_error_loading_code">Erreur lors du chargement du code : %1$s</string>
     <string name="onboarding_code_expired">Code expiré. Veuillez réessayer.</string>
+    <string name="onboarding_error_denied">L\'autorisation a été refusée. Veuillez réessayer.</string>
     <string name="onboarding_not_configured">Trakt n\'est pas encore configuré. Vous pouvez configurer vos identifiants dans les paramètres.</string>
     <string name="onboarding_not_configured_managed_no_client_id">Ce build ne contient pas de Client ID Trakt. Ouvrez Paramètres → Avancé et choisissez \"Propres identifiants\".</string>
     <string name="onboarding_not_configured_managed_no_backend">Le backend de jetons n\'est pas configuré. Ouvrez Paramètres → Avancé pour changer de mode d\'authentification.</string>

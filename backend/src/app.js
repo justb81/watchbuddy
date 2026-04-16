@@ -115,10 +115,25 @@ export function createApp(config) {
   let traktStatus = 'pending';
   let traktError = null;
   let credentialsVerified = false;
+  let retryTimer = null;
 
-  async function verifyCredentials() {
-    const url = `${traktApi}/certifications/shows`;
-    const options = { method: 'GET', headers: traktHeaders };
+  // Retry delays: 5s, 15s, 30s, 60s, then stay at 60s
+  const RETRY_DELAYS = [5_000, 15_000, 30_000, 60_000];
+
+  function scheduleRetry(attempt) {
+    const delay = RETRY_DELAYS[Math.min(attempt, RETRY_DELAYS.length - 1)];
+    console.log(`Scheduling credential re-verification in ${delay / 1000}s (attempt ${attempt + 1})…`);
+    retryTimer = setTimeout(() => verifyCredentials(attempt + 1), delay);
+  }
+
+  async function verifyCredentials(attempt = 0) {
+    if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
+    const url = `${traktApi}/oauth/device/code`;
+    const options = {
+      method: 'POST',
+      headers: traktHeaders,
+      body: JSON.stringify({ client_id: clientId }),
+    };
     try {
       const res = await fetchWithTimeout(url, options);
 
@@ -145,6 +160,7 @@ export function createApp(config) {
           console.error(`Credential check: Trakt response body: ${bodySnippet}`);
         }
         console.error(`Trakt credential verification failed: HTTP ${res.status} — TRAKT_CLIENT_ID may be invalid.`);
+        // Do not retry on 401/403 — credentials are definitively wrong
       } else {
         traktStatus = `trakt_http_${res.status}`;
         traktError = `Trakt returned HTTP ${res.status} during credential check`;
@@ -154,6 +170,7 @@ export function createApp(config) {
           console.error(`Credential check: Trakt response body: ${bodySnippet}`);
         }
         console.error(`Trakt credential verification failed: HTTP ${res.status}`);
+        scheduleRetry(attempt);
       }
     } catch (err) {
       if (err.name === 'AbortError') {
@@ -167,6 +184,7 @@ export function createApp(config) {
         credentialsVerified = false;
         console.error('Trakt credential verification failed: network error:', err.message);
       }
+      scheduleRetry(attempt);
     }
   }
 
@@ -233,9 +251,15 @@ export function createApp(config) {
 
       if (!traktRes.ok) {
         const bodySnippet = JSON.stringify(data).slice(0, 200);
-        console.error(`Token exchange: Trakt returned HTTP ${traktRes.status}: ${bodySnippet}`);
-        if (traktRes.status === 403) {
-          console.error('Hint: HTTP 403 from Trakt usually means TRAKT_CLIENT_ID is invalid or revoked.');
+        if (traktRes.status === 400) {
+          // Expected during device flow polling — user hasn't authorized yet
+        } else if ([409, 410, 418, 429].includes(traktRes.status)) {
+          console.warn(`Token exchange: Trakt returned HTTP ${traktRes.status}: ${bodySnippet}`);
+        } else {
+          console.error(`Token exchange: Trakt returned HTTP ${traktRes.status}: ${bodySnippet}`);
+          if (traktRes.status === 403) {
+            console.error('Hint: HTTP 403 from Trakt usually means TRAKT_CLIENT_ID is invalid or revoked.');
+          }
         }
         return res.status(traktRes.status).json(data);
       }
@@ -310,6 +334,8 @@ export function createApp(config) {
         access_token: data.access_token,
         refresh_token: data.refresh_token,
         expires_in: data.expires_in,
+        token_type: data.token_type,
+        scope: data.scope,
       });
     } catch (err) {
       if (err.name === 'AbortError') {
@@ -330,7 +356,7 @@ export function createApp(config) {
       return res.status(503).json({ status: 'starting', trakt: 'pending' });
     }
     if (credentialsVerified) {
-      return res.json({ status: 'ok', trakt: 'connected', validated: 'client_id_only' });
+      return res.json({ status: 'ok', trakt: 'connected', validated: 'client_id_via_oauth' });
     }
     return res.status(503).json({
       status: 'unhealthy',
@@ -340,6 +366,7 @@ export function createApp(config) {
   });
 
   app.verifyCredentials = verifyCredentials;
+  app.clearRetryTimer = () => { if (retryTimer) clearTimeout(retryTimer); };
 
   return app;
 }
