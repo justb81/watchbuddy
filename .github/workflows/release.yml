@@ -205,16 +205,25 @@ jobs:
             NOTES="${NOTES:0:497}..."
           fi
 
+          # Fail fast on an empty changelog — refuse to upload blank Play Store notes
+          if [ -z "${NOTES//[[:space:]]/}" ]; then
+            echo "::error::Release body is empty after markdown stripping — refusing to upload blank Play Store notes."
+            exit 1
+          fi
+
           # Write locale files — all locales get the same English text
-          # (matches supported languages: EN, DE, FR, ES)
+          # (matches supported languages: EN, DE, FR, ES). Filenames must use the
+          # `whatsnew-<locale>` convention expected by r0adkll/upload-google-play.
           mkdir -p whatsnew
           for LOCALE in en-US de-DE fr-FR es-ES; do
-            echo "$NOTES" > "whatsnew/${LOCALE}"
+            echo "$NOTES" > "whatsnew/whatsnew-${LOCALE}"
           done
 
           echo "--- Play Store changelog (en-US) ---"
-          cat whatsnew/en-US
+          cat whatsnew/whatsnew-en-US
           echo "--- ${#NOTES} characters ---"
+          echo "--- files in whatsnew/ ---"
+          ls -la whatsnew/
 
       # -- Determine Play Store release status ------------------------------
       - name: Determine Play Store release status
@@ -230,7 +239,7 @@ jobs:
       # -- Publish to Google Play Store ------------------------------------
       - name: Upload to Google Play Store
         if: steps.keystore.outputs.available == 'true' && steps.play-store.outputs.available == 'true'
-        uses: r0adkll/upload-google-play@v1
+        uses: r0adkll/upload-google-play@v1.1.3
         with:
           serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
           packageName: com.justb81.watchbuddy
