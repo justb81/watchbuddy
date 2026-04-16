@@ -1,5 +1,7 @@
 # Trakt Connection and Sync — Complete Flow Documentation
 
+> **Trakt API reference:** https://github.com/trakt/trakt-api — the official API repository with ts-rest contract definitions. Do not use the outdated Apiary docs (`trakt.docs.apiary.io`).
+
 This document describes the full user journey and technical flow for connecting to Trakt, syncing watch history, and scrobbling — covering both the phone and TV apps end to end.
 
 ---
