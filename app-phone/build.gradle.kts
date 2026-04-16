@@ -24,7 +24,7 @@ android {
 
         // versionName: release-please sets VERSION_NAME, fallback to hardcoded value
         versionName = providers.environmentVariable("VERSION_NAME")
-            .orElse("0.13.8").get() // x-release-please-version
+            .orElse("0.13.9").get() // x-release-please-version
 
         // ── Trakt configuration ───────────────────────────────────────────────
         // Leave empty → app does not use token proxy / does not show Trakt login.

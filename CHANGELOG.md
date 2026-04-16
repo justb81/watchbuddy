@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.9](https://github.com/justb81/watchbuddy/compare/v0.13.8...v0.13.9) (2026-04-16)
+
+
+### Bug Fixes
+
+* **phone:** prevent settings force-close via CoroutineExceptionHandler safety net (closes [#224](https://github.com/justb81/watchbuddy/issues/224)) ([#226](https://github.com/justb81/watchbuddy/issues/226)) ([4761887](https://github.com/justb81/watchbuddy/commit/4761887dbaae368a1d3c59d5fc0d809192e18568))
+
 ## [0.13.8](https://github.com/justb81/watchbuddy/compare/v0.13.7...v0.13.8) (2026-04-16)
 
 
