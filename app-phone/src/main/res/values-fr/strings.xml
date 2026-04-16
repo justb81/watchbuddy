@@ -73,11 +73,15 @@
     <string name="settings_advanced">Paramètres avancés</string>
     <string name="settings_auth_mode">Authentification Trakt</string>
     <string name="settings_auth_managed">Backend géré (par défaut)</string>
+    <string name="settings_auth_managed_unavailable">Non configuré dans cette version</string>
     <string name="settings_auth_self_hosted">Serveur auto-hébergé</string>
     <string name="settings_auth_direct">Identifiants personnels</string>
     <string name="settings_auth_backend_url">URL du backend</string>
     <string name="settings_auth_client_id">Client ID</string>
     <string name="settings_auth_client_secret">Client Secret</string>
+    <string name="settings_tmdb_key_section">Clé API TMDB</string>
+    <string name="settings_tmdb_key_bundled">Clé intégrée (incluse)</string>
+    <string name="settings_tmdb_key_own">Clé personnelle</string>
     <string name="settings_model_url_section">Téléchargement du modèle</string>
     <string name="settings_model_url">URL de téléchargement personnalisée</string>
     <string name="settings_llm_validation_failed">Échec du téléchargement : le fichier semble invalide</string>

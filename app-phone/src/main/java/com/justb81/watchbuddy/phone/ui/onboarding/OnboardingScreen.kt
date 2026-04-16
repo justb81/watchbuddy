@@ -1,6 +1,8 @@
 package com.justb81.watchbuddy.phone.ui.onboarding
 
+import android.content.ClipData
 import android.widget.Toast
+import kotlinx.coroutines.launch
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -11,14 +13,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -192,7 +195,8 @@ private fun NotConfiguredCard(
 @Composable
 private fun PinCard(userCode: String, verificationUrl: String, expiresIn: Int) {
     val uriHandler = LocalUriHandler.current
-    val clipboardManager = LocalClipboardManager.current
+    val clipboard = LocalClipboard.current
+    val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val copiedMessage = stringResource(R.string.onboarding_code_copied)
 
@@ -236,7 +240,11 @@ private fun PinCard(userCode: String, verificationUrl: String, expiresIn: Int) {
                 )
                 .padding(horizontal = 32.dp, vertical = 16.dp)
                 .clickable {
-                    clipboardManager.setText(AnnotatedString(userCode))
+                    scope.launch {
+                        clipboard.setClipEntry(
+                            ClipEntry(ClipData.newPlainText("code", userCode))
+                        )
+                    }
                     Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
                 },
             contentAlignment = Alignment.Center

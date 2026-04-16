@@ -45,6 +45,18 @@ object AppModule {
     @Named("defaultTmdbApiKey")
     fun provideDefaultTmdbApiKey(): String = BuildConfig.DEFAULT_TMDB_API_KEY
 
+    /**
+     * True when the managed Trakt backend is fully configured in this build
+     * (both TOKEN_BACKEND_URL and TRAKT_CLIENT_ID are non-blank).
+     * Used by SettingsViewModel to disable the MANAGED auth mode option and
+     * auto-expand advanced settings when bundled options are unavailable.
+     */
+    @Provides
+    @Singleton
+    @Named("managedBackendAvailable")
+    fun provideManagedBackendAvailable(): Boolean =
+        BuildConfig.TOKEN_BACKEND_URL.isNotBlank() && BuildConfig.TRAKT_CLIENT_ID.isNotBlank()
+
     /** Debug flag for NetworkModule (controls HTTP logging level). */
     @Provides
     @Singleton
