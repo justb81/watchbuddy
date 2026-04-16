@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.4](https://github.com/justb81/watchbuddy/compare/v0.13.3...v0.13.4) (2026-04-16)
+
+
+### Bug Fixes
+
+* **backend:** fix token refresh, credential verification, and device flow handling ([#204](https://github.com/justb81/watchbuddy/issues/204)) ([0b147bf](https://github.com/justb81/watchbuddy/commit/0b147bf3e6639ba8988bd8df6b6a6be23e8d4d9c))
+
 ## [0.13.3](https://github.com/justb81/watchbuddy/compare/v0.13.2...v0.13.3) (2026-04-16)
 
 
