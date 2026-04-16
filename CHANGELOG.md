@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.6](https://github.com/justb81/watchbuddy/compare/v0.13.5...v0.13.6) (2026-04-16)
+
+
+### Bug Fixes
+
+* **backend:** read User-Agent version from package.json ([#208](https://github.com/justb81/watchbuddy/issues/208)) ([e9dca19](https://github.com/justb81/watchbuddy/commit/e9dca190bd788b16cdb8ca4d42ffd81fffd4a43b))
+
 ## [0.13.5](https://github.com/justb81/watchbuddy/compare/v0.13.4...v0.13.5) (2026-04-16)
 
 
