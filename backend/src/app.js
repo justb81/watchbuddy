@@ -115,8 +115,19 @@ export function createApp(config) {
   let traktStatus = 'pending';
   let traktError = null;
   let credentialsVerified = false;
+  let retryTimer = null;
 
-  async function verifyCredentials() {
+  // Retry delays: 5s, 15s, 30s, 60s, then stay at 60s
+  const RETRY_DELAYS = [5_000, 15_000, 30_000, 60_000];
+
+  function scheduleRetry(attempt) {
+    const delay = RETRY_DELAYS[Math.min(attempt, RETRY_DELAYS.length - 1)];
+    console.log(`Scheduling credential re-verification in ${delay / 1000}s (attempt ${attempt + 1})…`);
+    retryTimer = setTimeout(() => verifyCredentials(attempt + 1), delay);
+  }
+
+  async function verifyCredentials(attempt = 0) {
+    if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
     const url = `${traktApi}/certifications/shows`;
     const options = { method: 'GET', headers: traktHeaders };
     try {
@@ -145,6 +156,7 @@ export function createApp(config) {
           console.error(`Credential check: Trakt response body: ${bodySnippet}`);
         }
         console.error(`Trakt credential verification failed: HTTP ${res.status} — TRAKT_CLIENT_ID may be invalid.`);
+        // Do not retry on 401/403 — credentials are definitively wrong
       } else {
         traktStatus = `trakt_http_${res.status}`;
         traktError = `Trakt returned HTTP ${res.status} during credential check`;
@@ -154,6 +166,7 @@ export function createApp(config) {
           console.error(`Credential check: Trakt response body: ${bodySnippet}`);
         }
         console.error(`Trakt credential verification failed: HTTP ${res.status}`);
+        scheduleRetry(attempt);
       }
     } catch (err) {
       if (err.name === 'AbortError') {
@@ -167,6 +180,7 @@ export function createApp(config) {
         credentialsVerified = false;
         console.error('Trakt credential verification failed: network error:', err.message);
       }
+      scheduleRetry(attempt);
     }
   }
 
@@ -310,6 +324,8 @@ export function createApp(config) {
         access_token: data.access_token,
         refresh_token: data.refresh_token,
         expires_in: data.expires_in,
+        token_type: data.token_type,
+        scope: data.scope,
       });
     } catch (err) {
       if (err.name === 'AbortError') {
@@ -340,6 +356,7 @@ export function createApp(config) {
   });
 
   app.verifyCredentials = verifyCredentials;
+  app.clearRetryTimer = () => { if (retryTimer) clearTimeout(retryTimer); };
 
   return app;
 }

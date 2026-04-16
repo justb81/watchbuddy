@@ -254,6 +254,8 @@ describe('POST /trakt/token/refresh', () => {
       access_token: 'new-acc-789',
       refresh_token: 'new-ref-012',
       expires_in: 7776000,
+      token_type: 'Bearer',
+      scope: 'public',
     });
     app = buildApp(fetchFn);
   });
@@ -276,6 +278,8 @@ describe('POST /trakt/token/refresh', () => {
       access_token: 'new-acc-789',
       refresh_token: 'new-ref-012',
       expires_in: 7776000,
+      token_type: 'Bearer',
+      scope: 'public',
     });
   });
 
@@ -487,6 +491,7 @@ describe('Credential verification', () => {
   it('health returns 503 with trakt_http_500 on server error', async () => {
     const app = buildApp(mockFetch(500, {}));
     await app.verifyCredentials();
+    app.clearRetryTimer();
     const res = await request(app).get('/health');
     expect(res.status).toBe(503);
     expect(res.body.status).toBe('unhealthy');
@@ -507,6 +512,7 @@ describe('Credential verification', () => {
     });
     const app = buildApp(hangingFetch, { fetchTimeoutMs: 50 });
     await app.verifyCredentials();
+    app.clearRetryTimer();
     const res = await request(app).get('/health');
     expect(res.status).toBe(503);
     expect(res.body.status).toBe('unhealthy');
@@ -517,6 +523,7 @@ describe('Credential verification', () => {
     const failFetch = vi.fn().mockRejectedValue(new Error('ECONNREFUSED'));
     const app = buildApp(failFetch);
     await app.verifyCredentials();
+    app.clearRetryTimer();
     const res = await request(app).get('/health');
     expect(res.status).toBe(503);
     expect(res.body.status).toBe('unhealthy');
@@ -562,6 +569,159 @@ describe('Credential verification', () => {
     const res = await request(app).get('/health');
     expect(res.status).toBe(200);
     expect(res.body.trakt).toBe('connected');
+  });
+});
+
+// ── Credential verification retry ─────────────────────────────────────────
+
+describe('Credential verification retry', () => {
+  let logSpy;
+  let errorSpy;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    logSpy.mockRestore();
+    errorSpy.mockRestore();
+  });
+
+  it('schedules retry after transient HTTP error (e.g. 503)', async () => {
+    const fetchFn = mockFetch(503, {});
+    const app = buildApp(fetchFn);
+
+    await app.verifyCredentials();
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+
+    // Advance past first retry delay (5s)
+    fetchFn.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve([]),
+      headers: { forEach: (cb) => new Map().forEach((v, k) => cb(v, k)) },
+    });
+    await vi.advanceTimersByTimeAsync(5_000);
+
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+    app.clearRetryTimer();
+  });
+
+  it('does not retry on 401/403 (invalid credentials)', async () => {
+    const fetchFn = mockFetch(403, { error: 'invalid_api_key' });
+    const app = buildApp(fetchFn);
+
+    await app.verifyCredentials();
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+
+    // Advance well past any retry delay
+    await vi.advanceTimersByTimeAsync(120_000);
+
+    // No retry should have been scheduled
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+    app.clearRetryTimer();
+  });
+
+  it('schedules retry after network error', async () => {
+    const fetchFn = vi.fn().mockRejectedValue(new Error('ECONNREFUSED'));
+    const app = buildApp(fetchFn);
+
+    await app.verifyCredentials();
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+
+    // Advance past first retry delay (5s)
+    fetchFn.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve([]),
+      headers: { forEach: (cb) => new Map().forEach((v, k) => cb(v, k)) },
+    });
+    await vi.advanceTimersByTimeAsync(5_000);
+
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+    app.clearRetryTimer();
+  });
+
+  it('schedules retry after timeout', async () => {
+    const abortErr = new Error('The operation was aborted');
+    abortErr.name = 'AbortError';
+    const fetchFn = vi.fn().mockRejectedValue(abortErr);
+    const app = buildApp(fetchFn);
+
+    await app.verifyCredentials();
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+
+    // For the retry, return success
+    fetchFn.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve([]),
+      headers: { forEach: (cb) => new Map().forEach((v, k) => cb(v, k)) },
+    });
+    await vi.advanceTimersByTimeAsync(5_000);
+
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+    app.clearRetryTimer();
+  });
+
+  it('recovers to healthy after retry succeeds', async () => {
+    const fetchFn = vi.fn()
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 503,
+        json: () => Promise.resolve({}),
+        headers: { forEach: (cb) => new Map().forEach((v, k) => cb(v, k)) },
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve([]),
+        headers: { forEach: (cb) => new Map().forEach((v, k) => cb(v, k)) },
+      });
+    const app = buildApp(fetchFn);
+
+    await app.verifyCredentials();
+    let res = await request(app).get('/health');
+    expect(res.status).toBe(503);
+    expect(res.body.trakt).toBe('trakt_http_503');
+
+    // Advance past first retry delay
+    await vi.advanceTimersByTimeAsync(5_000);
+
+    res = await request(app).get('/health');
+    expect(res.status).toBe(200);
+    expect(res.body.trakt).toBe('connected');
+    app.clearRetryTimer();
+  });
+
+  it('uses increasing retry delays', async () => {
+    // Always return 503 to keep retrying
+    const fetchFn = mockFetch(503, {});
+    const app = buildApp(fetchFn);
+
+    await app.verifyCredentials();
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+
+    // First retry at 5s
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+
+    // Second retry at 15s
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(fetchFn).toHaveBeenCalledTimes(3);
+
+    // Third retry at 30s
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(fetchFn).toHaveBeenCalledTimes(4);
+
+    // Fourth retry at 60s
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(fetchFn).toHaveBeenCalledTimes(5);
+
+    app.clearRetryTimer();
   });
 });
 
