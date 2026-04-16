@@ -19,6 +19,8 @@ navigation = "2.8.5"
 datastore = "1.1.1"
 work = "2.10.0"
 security-crypto = "1.1.0-alpha06"
+junit = "4.13.2"
+mockk = "1.13.12"
 
 [libraries]
 # AndroidX Core
@@ -83,6 +85,9 @@ mediapipe-tasks-genai = { group = "com.google.mediapipe", name = "tasks-genai", 
 
 # Image loading
 coil = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
+junit = { group = "junit", name = "junit", version.ref = "junit" }
+mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
+kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

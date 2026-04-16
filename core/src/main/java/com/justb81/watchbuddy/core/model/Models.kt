@@ -97,6 +97,16 @@ data class ScrobbleCandidate(
     val matchedEpisode: TraktEpisode? = null
 )
 
+// ── Scrobble Display ─────────────────────────────────────────────────────────
+
+@Serializable
+data class ScrobbleDisplayEvent(
+    val show: TraktShow,
+    val episode: TraktEpisode,
+    val action: String,
+    val timestamp: Long
+)
+
 // ── Streaming Deep Links ──────────────────────────────────────────────────────
 
 @Serializable

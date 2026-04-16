@@ -36,6 +36,7 @@ class SettingsRepository @Inject constructor(
         val DIRECT_CLIENT_ID = stringPreferencesKey("direct_client_id")
         val COMPANION_ENABLED = booleanPreferencesKey("companion_enabled")
         val MODEL_READY = booleanPreferencesKey("model_ready")
+        val TMDB_API_KEY = stringPreferencesKey("tmdb_api_key")
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -75,6 +76,22 @@ class SettingsRepository @Inject constructor(
 
     fun saveClientSecret(secret: String) {
         tokenRepository.saveClientSecret(secret)
+    }
+
+    fun getTmdbApiKey(): Flow<String> = context.dataStore.data.map { prefs ->
+        prefs[Keys.TMDB_API_KEY] ?: ""
+    }
+
+    suspend fun setTmdbApiKey(key: String) {
+        context.dataStore.edit { prefs ->
+            prefs[Keys.TMDB_API_KEY] = key
+        }
+    }
+
+    suspend fun setCompanionEnabled(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[Keys.COMPANION_ENABLED] = enabled
+        }
     }
 
     fun setModelReady(ready: Boolean) {

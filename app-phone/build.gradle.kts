@@ -133,4 +133,9 @@ dependencies {
 
     // Image loading
     implementation(libs.coil)
+
+    // Unit tests
+    testImplementation(libs.junit)
+    testImplementation(libs.mockk)
+    testImplementation(libs.kotlinx.coroutines.test)
 }

@@ -16,6 +16,9 @@
     <string name="onboarding_code_expires">Code expires in %1$d seconds</string>
     <string name="onboarding_error_loading_code">Error loading code: %1$s</string>
     <string name="onboarding_code_expired">Code expired. Please try again.</string>
+    <string name="onboarding_error_denied">Authorization was denied. Please try again.</string>
+    <string name="onboarding_error_polling_network">Lost connection while waiting for authorization. Please check your internet connection and try again.</string>
+    <string name="onboarding_error_auth_failed">Authorization failed. Please check your Trakt credentials and try again.</string>
 
     <!-- Home -->
     <string name="home_title">My Shows</string>
@@ -28,6 +31,7 @@
     <string name="home_next_episode">Next: S%1$02dE%2$02d</string>
     <string name="home_just_now">Just now</string>
     <string name="home_sync_failed">Sync failed: %1$s</string>
+    <string name="home_sync_failed_auth">Your Trakt session has expired. Please re-authenticate in Settings.</string>
     <string name="home_cd_sync">Sync</string>
     <string name="home_cd_settings">Settings</string>
 
@@ -71,7 +75,7 @@
     <string name="companion_channel_name">Companion Service</string>
     <string name="companion_channel_description">Shows when the companion server is active for TV connections</string>
     <string name="companion_notification_title">WatchBuddy Companion</string>
-    <string name="companion_notification_text">Bereit für TV-Verbindung</string>
+    <string name="companion_notification_text">Ready for TV connection</string>
 
     <!-- Common -->
     <string name="no_description">No description available.</string>

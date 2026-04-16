@@ -16,6 +16,9 @@
     <string name="onboarding_code_expires">Le code expire dans %1$d secondes</string>
     <string name="onboarding_error_loading_code">Erreur lors du chargement du code : %1$s</string>
     <string name="onboarding_code_expired">Code expiré. Veuillez réessayer.</string>
+    <string name="onboarding_error_denied">L\'autorisation a été refusée. Veuillez réessayer.</string>
+    <string name="onboarding_error_polling_network">Connexion perdue pendant l\'autorisation. Vérifiez votre connexion internet et réessayez.</string>
+    <string name="onboarding_error_auth_failed">Autorisation échouée. Veuillez vérifier vos identifiants Trakt et réessayer.</string>
 
     <!-- Home -->
     <string name="home_title">Mes séries</string>
@@ -28,6 +31,7 @@
     <string name="home_next_episode">Suivant : S%1$02dE%2$02d</string>
     <string name="home_just_now">À l\'instant</string>
     <string name="home_sync_failed">Échec de la synchronisation : %1$s</string>
+    <string name="home_sync_failed_auth">Votre session Trakt a expiré. Veuillez vous réauthentifier dans les paramètres.</string>
     <string name="home_cd_sync">Synchroniser</string>
     <string name="home_cd_settings">Paramètres</string>
 

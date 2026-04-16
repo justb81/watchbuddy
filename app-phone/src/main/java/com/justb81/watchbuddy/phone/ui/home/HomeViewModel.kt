@@ -9,12 +9,13 @@ import com.justb81.watchbuddy.core.trakt.TraktApiService
 import com.justb81.watchbuddy.phone.auth.TokenRepository
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import com.justb81.watchbuddy.service.CompanionService
-import kotlinx.coroutines.flow.first
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import retrofit2.HttpException
 import javax.inject.Inject
 
 data class HomeUiState(
@@ -63,10 +64,13 @@ class HomeViewModel @Inject constructor(
                     lastSyncTime = getApplication<Application>().getString(R.string.home_just_now)
                 )
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    error     = getApplication<Application>().getString(R.string.home_sync_failed, e.message)
-                )
+                val httpCode = (e as? HttpException)?.code()
+                val errorMessage = if (httpCode == 401 || httpCode == 403) {
+                    getApplication<Application>().getString(R.string.home_sync_failed_auth)
+                } else {
+                    getApplication<Application>().getString(R.string.home_sync_failed, e.message)
+                }
+                _uiState.value = _uiState.value.copy(isLoading = false, error = errorMessage)
             }
         }
     }

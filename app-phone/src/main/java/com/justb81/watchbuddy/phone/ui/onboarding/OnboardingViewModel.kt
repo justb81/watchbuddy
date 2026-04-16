@@ -16,7 +16,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import retrofit2.HttpException
 import javax.inject.Inject
 import javax.inject.Named
 
@@ -33,7 +35,7 @@ sealed class OnboardingState {
     data class Success(val username: String) : OnboardingState()
     data class Error(val message: String) : OnboardingState()
 
-    /** Trakt nicht konfiguriert — CLIENT_ID oder TOKEN_BACKEND_URL fehlt. */
+    /** Trakt not configured — CLIENT_ID or TOKEN_BACKEND_URL is missing. */
     object NotConfigured : OnboardingState()
 }
 
@@ -41,7 +43,7 @@ sealed class OnboardingState {
 class OnboardingViewModel @Inject constructor(
     application: Application,
     private val traktApi: TraktApiService,
-    /** Null, wenn TOKEN_BACKEND_URL in BuildConfig leer ist. */
+    /** Null when TOKEN_BACKEND_URL in BuildConfig is empty. */
     private val tokenProxy: TokenProxyService?,
     @Named("traktClientId") private val clientId: String,
     private val tokenRepository: TokenRepository
@@ -50,10 +52,6 @@ class OnboardingViewModel @Inject constructor(
     private val _state = MutableStateFlow<OnboardingState>(OnboardingState.Idle)
     val state: StateFlow<OnboardingState> = _state.asStateFlow()
 
-    /**
-     * True, wenn sowohl CLIENT_ID als auch Token-Proxy konfiguriert sind.
-     * Wird vom UI genutzt, um den Trakt-Login-Button ein-/auszublenden.
-     */
     val isTraktConfigured: Boolean
         get() = clientId.isNotBlank() && tokenProxy != null
 
@@ -110,11 +108,12 @@ class OnboardingViewModel @Inject constructor(
     private fun startPolling(response: DeviceCodeResponse) {
         pollingJob?.cancel()
         pollingJob = viewModelScope.launch {
-            repeat(response.expires_in / response.interval) {
+            var consecutiveNetworkFailures = 0
+            val maxAttempts = response.expires_in / response.interval
+            var attempts = 0
+            while (isActive && attempts < maxAttempts) {
                 delay(response.interval * 1_000L)
                 try {
-                    // Token-Austausch läuft ausschließlich über den Proxy —
-                    // der client_secret verlässt niemals die APK.
                     val token = tokenProxy!!.exchangeDeviceCode(
                         ProxyTokenRequest(code = response.device_code)
                     )
@@ -123,13 +122,80 @@ class OnboardingViewModel @Inject constructor(
                         refreshToken = token.refresh_token,
                         expiresIn    = token.expires_in
                     )
-                    val profile = traktApi.getProfile("Bearer ${token.access_token}")
-                    countdownJob?.cancel()
-                    pollingJob?.cancel()
-                    _state.value = OnboardingState.Success(profile.username)
-                } catch (_: Exception) {
-                    // HTTP 400 = PIN noch nicht bestätigt, 410 = abgelaufen — weiter pollen
+
+                    // Verify the token with a profile fetch — keep this error path
+                    // isolated so auth failures are never counted as network failures.
+                    try {
+                        val profile = traktApi.getProfile("Bearer ${token.access_token}")
+                        countdownJob?.cancel()
+                        _state.value = OnboardingState.Success(profile.username)
+                        return@launch
+                    } catch (profileEx: Exception) {
+                        val code = (profileEx as? HttpException)?.code()
+                        if (code == 401 || code == 403) {
+                            countdownJob?.cancel()
+                            _state.value = OnboardingState.Error(
+                                getApplication<Application>().getString(
+                                    R.string.onboarding_error_auth_failed
+                                )
+                            )
+                            return@launch
+                        }
+                        // Transient profile fetch failure — treat as network error
+                        consecutiveNetworkFailures++
+                    }
+                } catch (e: Exception) {
+                    val httpCode = (e as? HttpException)?.code()
+                    when (httpCode) {
+                        400 -> {
+                            // Pending — user hasn't authorized yet, keep polling
+                            consecutiveNetworkFailures = 0
+                        }
+                        401, 403 -> {
+                            // Auth failure — credentials are invalid, stop immediately
+                            countdownJob?.cancel()
+                            _state.value = OnboardingState.Error(
+                                getApplication<Application>().getString(
+                                    R.string.onboarding_error_auth_failed
+                                )
+                            )
+                            return@launch
+                        }
+                        409, 410 -> {
+                            // Code expired or already used
+                            countdownJob?.cancel()
+                            _state.value = OnboardingState.Error(
+                                getApplication<Application>().getString(R.string.onboarding_code_expired)
+                            )
+                            return@launch
+                        }
+                        418 -> {
+                            // User denied access
+                            countdownJob?.cancel()
+                            _state.value = OnboardingState.Error(
+                                getApplication<Application>().getString(R.string.onboarding_error_denied)
+                            )
+                            return@launch
+                        }
+                        429 -> {
+                            // Slow down — back off without counting as failure
+                            delay(response.interval * 1_000L)
+                        }
+                        else -> {
+                            consecutiveNetworkFailures++
+                        }
+                    }
                 }
+                if (consecutiveNetworkFailures >= 3) {
+                    countdownJob?.cancel()
+                    _state.value = OnboardingState.Error(
+                        getApplication<Application>().getString(
+                            R.string.onboarding_error_polling_network
+                        )
+                    )
+                    return@launch
+                }
+                attempts++
             }
         }
     }

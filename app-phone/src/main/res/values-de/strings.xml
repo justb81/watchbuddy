@@ -16,6 +16,9 @@
     <string name="onboarding_code_expires">Code läuft ab in %1$d Sekunden</string>
     <string name="onboarding_error_loading_code">Fehler beim Laden des Codes: %1$s</string>
     <string name="onboarding_code_expired">Code abgelaufen. Bitte erneut versuchen.</string>
+    <string name="onboarding_error_denied">Die Autorisierung wurde abgelehnt. Bitte versuche es erneut.</string>
+    <string name="onboarding_error_polling_network">Verbindung während der Autorisierung verloren. Bitte überprüfe deine Internetverbindung und versuche es erneut.</string>
+    <string name="onboarding_error_auth_failed">Autorisierung fehlgeschlagen. Bitte überprüfe deine Trakt-Zugangsdaten und versuche es erneut.</string>
 
     <!-- Home -->
     <string name="home_title">Meine Serien</string>
@@ -28,6 +31,7 @@
     <string name="home_next_episode">Nächste: S%1$02dE%2$02d</string>
     <string name="home_just_now">Gerade eben</string>
     <string name="home_sync_failed">Synchronisierung fehlgeschlagen: %1$s</string>
+    <string name="home_sync_failed_auth">Deine Trakt-Sitzung ist abgelaufen. Bitte melde dich in den Einstellungen erneut an.</string>
     <string name="home_cd_sync">Synchronisieren</string>
     <string name="home_cd_settings">Einstellungen</string>
 
