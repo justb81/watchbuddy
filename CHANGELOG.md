@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.8](https://github.com/justb81/watchbuddy/compare/v0.13.7...v0.13.8) (2026-04-16)
+
+
+### Bug Fixes
+
+* **build:** use whatsnew- filename prefix for Play Store release notes ([#221](https://github.com/justb81/watchbuddy/issues/221)) ([49a3c61](https://github.com/justb81/watchbuddy/commit/49a3c61317b10a422187ecd57264502ec160b1a1)), closes [#219](https://github.com/justb81/watchbuddy/issues/219)
+
 ## [0.13.7](https://github.com/justb81/watchbuddy/compare/v0.13.6...v0.13.7) (2026-04-16)
 
 
