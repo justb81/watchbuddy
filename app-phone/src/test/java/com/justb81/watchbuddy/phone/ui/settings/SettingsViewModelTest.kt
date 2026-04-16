@@ -22,6 +22,7 @@ import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -31,6 +32,7 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
+import java.io.IOException
 import java.security.GeneralSecurityException
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -828,6 +830,194 @@ class SettingsViewModelTest {
             advanceUntilIdle()
 
             assertFalse(vm.uiState.value.useBundledTmdbKey)
+        }
+    }
+
+    /**
+     * Issue #224 — settings screen must not force-close even if the WorkManager-backed
+     * download-progress flow or the model-ready state flow throws.  Regression coverage
+     * for the two init-time collectors that `2962ca0` left unguarded.
+     */
+    @Nested
+    @DisplayName("Flow observer resilience (issue #224)")
+    inner class FlowObserverResilience {
+
+        @Test
+        fun `ViewModel creation does not throw when workManager flow throws at subscription`() = runTest {
+            // Simulates WorkManager not being fully initialized on a cold start —
+            // the Flow throws the moment it's collected.
+            every { workManager.getWorkInfosForUniqueWorkFlow(any()) } returns flow {
+                throw IllegalStateException("WorkManager not initialized")
+            }
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            // Screen still opens; download-progress UI stays at initial state.
+            assertNull(vm.uiState.value.llmDownloadProgress)
+        }
+
+        @Test
+        fun `ViewModel creation does not throw when workManager flow emits error mid-stream`() = runTest {
+            every { workManager.getWorkInfosForUniqueWorkFlow(any()) } returns flow {
+                emit(emptyList())
+                throw IOException("SQLite read failed")
+            }
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            assertNull(vm.uiState.value.llmDownloadProgress)
+        }
+
+        @Test
+        fun `ViewModel creation does not throw with no Trakt token and managedBackendAvailable false`() = runTest {
+            // Exactly the scenario reported in issue #224: user has skipped Trakt login
+            // and is on a build where the managed backend is not configured.
+            every { tokenRepository.getAccessToken() } returns null
+            every { settingsRepository.hasDefaultTmdbApiKey() } returns false
+            every { settingsRepository.settings } returns flowOf(
+                AppSettings(authMode = AuthMode.MANAGED, tmdbApiKey = "", defaultTmdbApiKeyAvailable = false)
+            )
+
+            val vm = createViewModel(managedBackendAvailable = false)
+            advanceUntilIdle()
+
+            assertNull(vm.uiState.value.traktUsername)
+            assertTrue(vm.uiState.value.forceShowAdvanced)
+            // Auto-correction of auth mode when MANAGED was stored but backend unavailable.
+            assertEquals(AuthMode.DIRECT, vm.uiState.value.authMode)
+        }
+    }
+
+    /**
+     * Issue #224 — every user-action site that does blocking work (`.first()`, `saveSettings`,
+     * Keystore writes, service start/stop) must not crash the app on failure.
+     */
+    @Nested
+    @DisplayName("User-action resilience (issue #224)")
+    inner class UserActionResilience {
+
+        @Test
+        fun `saveAdvancedSettings does not crash when settings flow throws`() = runTest {
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            // After successful init, swap in a settings flow that throws on subsequent .first()
+            every { settingsRepository.settings } returns flow { throw IOException("DataStore corrupted") }
+
+            vm.saveAdvancedSettings()
+            advanceUntilIdle()
+
+            assertFalse(vm.uiState.value.saveSuccess)
+        }
+
+        @Test
+        fun `saveAdvancedSettings does not crash when saveClientSecret throws SecurityException`() = runTest {
+            coEvery { settingsRepository.saveSettings(any()) } returns Unit
+            every { settingsRepository.saveClientSecret(any()) } throws
+                SecurityException("Keystore operation failed")
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            vm.saveAdvancedSettings()
+            advanceUntilIdle()
+            // No crash — that alone is the contract.
+            assertFalse(vm.uiState.value.saveSuccess)
+        }
+
+        @Test
+        fun `saveTmdbApiKey does not crash when saveSettings throws`() = runTest {
+            coEvery { settingsRepository.saveSettings(any()) } throws
+                RuntimeException("DataStore write failed")
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            vm.setTmdbApiKey("new-key")
+            vm.saveTmdbApiKey()
+            advanceUntilIdle()
+
+            assertFalse(vm.uiState.value.saveSuccess)
+        }
+
+        @Test
+        fun `disconnectTmdb does not crash when settings flow throws`() = runTest {
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            every { settingsRepository.settings } returns flow { throw IOException("DataStore corrupted") }
+
+            vm.disconnectTmdb()
+            advanceUntilIdle()
+            // No crash — UI remains usable.
+        }
+
+        @Test
+        fun `toggleCompanionService reverts optimistic state when settings flow throws`() = runTest {
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            // ViewModel was created with companionRunning = false (default).
+            val beforeToggle = vm.uiState.value.companionRunning
+            assertFalse(beforeToggle)
+
+            // Swap in a throwing flow so the save path fails.
+            every { settingsRepository.settings } returns flow { throw IOException("DataStore corrupted") }
+
+            vm.toggleCompanionService()
+            advanceUntilIdle()
+
+            // After failure, the optimistic flip must be reverted so the UI matches reality.
+            assertEquals(beforeToggle, vm.uiState.value.companionRunning)
+        }
+
+        @Test
+        fun `toggleCompanionService reverts optimistic state when saveSettings throws`() = runTest {
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            val beforeToggle = vm.uiState.value.companionRunning
+            coEvery { settingsRepository.saveSettings(any()) } throws
+                RuntimeException("DataStore write failed")
+
+            vm.toggleCompanionService()
+            advanceUntilIdle()
+
+            assertEquals(beforeToggle, vm.uiState.value.companionRunning)
+        }
+    }
+
+    /**
+     * Safety net: even if a future refactor accidentally bypasses every try/catch, the
+     * CoroutineExceptionHandler installed on viewModelScope must swallow the crash so the
+     * Settings screen still opens.  This test class guards against a fourth "settings
+     * force-close" regression.
+     */
+    @Nested
+    @DisplayName("Coroutine exception handler safety net (issue #224)")
+    inner class CoroutineHandlerSafetyNet {
+
+        @Test
+        fun `ViewModel creation does not propagate exceptions from multiple broken init paths`() = runTest {
+            // Simulate a catastrophic device state: Keystore broken, DataStore broken, WorkManager
+            // broken, LLM detection broken — but the app must still show the Settings screen.
+            every { settingsRepository.getClientSecret() } throws SecurityException("Keystore")
+            every { settingsRepository.settings } returns flow { throw IOException("DataStore") }
+            every { workManager.getWorkInfosForUniqueWorkFlow(any()) } returns flow {
+                throw IllegalStateException("WorkManager")
+            }
+            every { llmOrchestrator.selectConfig() } throws RuntimeException("LLM")
+            every { tokenRepository.getAccessToken() } throws SecurityException("Token")
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            // All recovered to safe defaults — and crucially, no crash.
+            assertNull(vm.uiState.value.traktUsername)
+            assertNull(vm.uiState.value.llmDownloadProgress)
+            assertFalse(vm.uiState.value.tmdbConnected)
         }
     }
 }
