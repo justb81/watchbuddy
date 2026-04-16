@@ -73,11 +73,15 @@
     <string name="settings_advanced">Erweiterte Einstellungen</string>
     <string name="settings_auth_mode">Trakt-Authentifizierung</string>
     <string name="settings_auth_managed">Verwaltetes Backend (Standard)</string>
+    <string name="settings_auth_managed_unavailable">In diesem Build nicht konfiguriert</string>
     <string name="settings_auth_self_hosted">Eigener Server</string>
     <string name="settings_auth_direct">Eigene Zugangsdaten</string>
     <string name="settings_auth_backend_url">Backend-URL</string>
     <string name="settings_auth_client_id">Client ID</string>
     <string name="settings_auth_client_secret">Client Secret</string>
+    <string name="settings_tmdb_key_section">TMDB-API-Schlüssel</string>
+    <string name="settings_tmdb_key_bundled">Integrierter Schlüssel (eingebaut)</string>
+    <string name="settings_tmdb_key_own">Eigener Schlüssel</string>
     <string name="settings_model_url_section">Modell-Download</string>
     <string name="settings_model_url">Eigene Download-URL</string>
     <string name="settings_llm_validation_failed">Download fehlgeschlagen: Datei scheint ungültig zu sein</string>

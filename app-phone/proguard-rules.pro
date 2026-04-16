@@ -55,6 +55,12 @@
 -keep class com.google.ai.edge.aicore.** { *; }
 -dontwarn com.google.ai.edge.aicore.**
 
+# ── Reactor / BlockHound (transitive via Ktor Netty) ─────────────────────────
+# Ktor's Netty engine bundles a META-INF/services descriptor that references
+# reactor.blockhound.integration.BlockHoundIntegration, but BlockHound itself
+# is not on the classpath.  Suppress the R8 missing-service-class warning.
+-dontwarn reactor.blockhound.integration.BlockHoundIntegration
+
 # ── Coil ─────────────────────────────────────────────────────────────────────
 -dontwarn coil.**
 

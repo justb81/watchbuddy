@@ -59,6 +59,7 @@ class SettingsViewModelTest {
         every { settingsRepository.settings } returns flowOf(AppSettings())
         every { settingsRepository.getClientSecret() } returns ""
         every { settingsRepository.modelReady } returns MutableStateFlow(false)
+        every { settingsRepository.hasDefaultTmdbApiKey() } returns false
         every { tokenRepository.getAccessToken() } returns null
         every { llmOrchestrator.selectConfig() } returns LlmOrchestrator.LlmConfig(
             backend = LlmBackend.NONE,
@@ -67,15 +68,17 @@ class SettingsViewModelTest {
         )
     }
 
-    private fun createViewModel(): SettingsViewModel = SettingsViewModel(
-        application = application,
-        workManager = workManager,
-        llmOrchestrator = llmOrchestrator,
-        traktApi = traktApi,
-        tokenRepository = tokenRepository,
-        deviceCapabilityProvider = deviceCapabilityProvider,
-        settingsRepository = settingsRepository
-    )
+    private fun createViewModel(managedBackendAvailable: Boolean = true): SettingsViewModel =
+        SettingsViewModel(
+            application = application,
+            workManager = workManager,
+            llmOrchestrator = llmOrchestrator,
+            traktApi = traktApi,
+            tokenRepository = tokenRepository,
+            deviceCapabilityProvider = deviceCapabilityProvider,
+            settingsRepository = settingsRepository,
+            managedBackendAvailable = managedBackendAvailable
+        )
 
     @Nested
     @DisplayName("Download progress observation")
@@ -569,6 +572,262 @@ class SettingsViewModelTest {
             advanceUntilIdle()
 
             assertTrue(vm.uiState.value.saveSuccess)
+        }
+
+        @Test
+        fun `saveAdvancedSettings saves empty TMDB key when bundled is selected`() = runTest {
+            // Build has a bundled key; user has not set their own.
+            every { settingsRepository.hasDefaultTmdbApiKey() } returns true
+            every { settingsRepository.settings } returns flowOf(
+                AppSettings(tmdbApiKey = "", defaultTmdbApiKeyAvailable = true)
+            )
+            coEvery { settingsRepository.saveSettings(any()) } returns Unit
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            // useBundledTmdbKey is true (no custom key, bundled available)
+            assertTrue(vm.uiState.value.useBundledTmdbKey)
+
+            vm.saveAdvancedSettings()
+            advanceUntilIdle()
+
+            coVerify {
+                settingsRepository.saveSettings(withArg { saved ->
+                    assertEquals("", saved.tmdbApiKey)
+                })
+            }
+        }
+
+        @Test
+        fun `saveAdvancedSettings saves own key when own is selected`() = runTest {
+            every { settingsRepository.hasDefaultTmdbApiKey() } returns true
+            every { settingsRepository.settings } returns flowOf(
+                AppSettings(tmdbApiKey = "", defaultTmdbApiKeyAvailable = true)
+            )
+            coEvery { settingsRepository.saveSettings(any()) } returns Unit
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            vm.setUseBundledTmdbKey(false)
+            vm.setTmdbApiKey("my-custom-key")
+            vm.saveAdvancedSettings()
+            advanceUntilIdle()
+
+            coVerify {
+                settingsRepository.saveSettings(withArg { saved ->
+                    assertEquals("my-custom-key", saved.tmdbApiKey)
+                })
+            }
+        }
+
+        @Test
+        fun `saveAdvancedSettings updates tmdbConnected after saving own key`() = runTest {
+            every { settingsRepository.hasDefaultTmdbApiKey() } returns true
+            every { settingsRepository.settings } returns flowOf(
+                AppSettings(tmdbApiKey = "", defaultTmdbApiKeyAvailable = true)
+            )
+            coEvery { settingsRepository.saveSettings(any()) } returns Unit
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            vm.setUseBundledTmdbKey(false)
+            vm.setTmdbApiKey("my-key")
+            vm.saveAdvancedSettings()
+            advanceUntilIdle()
+
+            assertTrue(vm.uiState.value.tmdbConnected)
+        }
+
+        @Test
+        fun `saveAdvancedSettings clears tmdbConnected when switching back to bundled`() = runTest {
+            every { settingsRepository.hasDefaultTmdbApiKey() } returns true
+            every { settingsRepository.settings } returns flowOf(
+                AppSettings(tmdbApiKey = "old-key", defaultTmdbApiKeyAvailable = true)
+            )
+            coEvery { settingsRepository.saveSettings(any()) } returns Unit
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            // Switch from own key to bundled
+            vm.setUseBundledTmdbKey(true)
+            vm.saveAdvancedSettings()
+            advanceUntilIdle()
+
+            assertFalse(vm.uiState.value.tmdbConnected)
+        }
+    }
+
+    @Nested
+    @DisplayName("Managed backend availability")
+    inner class ManagedBackendAvailability {
+
+        @Test
+        fun `managedTraktAvailable is true when managedBackendAvailable is true`() = runTest {
+            val vm = createViewModel(managedBackendAvailable = true)
+            advanceUntilIdle()
+
+            assertTrue(vm.uiState.value.managedTraktAvailable)
+        }
+
+        @Test
+        fun `managedTraktAvailable is false when managedBackendAvailable is false`() = runTest {
+            val vm = createViewModel(managedBackendAvailable = false)
+            advanceUntilIdle()
+
+            assertFalse(vm.uiState.value.managedTraktAvailable)
+        }
+
+        @Test
+        fun `forceShowAdvanced is true when managed backend is unavailable`() = runTest {
+            val vm = createViewModel(managedBackendAvailable = false)
+            advanceUntilIdle()
+
+            assertTrue(vm.uiState.value.forceShowAdvanced)
+        }
+
+        @Test
+        fun `forceShowAdvanced is false when managed is available and bundled TMDB key exists`() = runTest {
+            every { settingsRepository.hasDefaultTmdbApiKey() } returns true
+            every { settingsRepository.settings } returns flowOf(
+                AppSettings(defaultTmdbApiKeyAvailable = true)
+            )
+
+            val vm = createViewModel(managedBackendAvailable = true)
+            advanceUntilIdle()
+
+            assertFalse(vm.uiState.value.forceShowAdvanced)
+        }
+
+        @Test
+        fun `forceShowAdvanced is true when no bundled TMDB key is available`() = runTest {
+            every { settingsRepository.hasDefaultTmdbApiKey() } returns false
+            every { settingsRepository.settings } returns flowOf(
+                AppSettings(defaultTmdbApiKeyAvailable = false)
+            )
+
+            val vm = createViewModel(managedBackendAvailable = true)
+            advanceUntilIdle()
+
+            assertTrue(vm.uiState.value.forceShowAdvanced)
+        }
+
+        @Test
+        fun `authMode is auto-corrected to DIRECT when managed is unavailable and stored MANAGED`() = runTest {
+            every { settingsRepository.settings } returns flowOf(
+                AppSettings(authMode = AuthMode.MANAGED)
+            )
+
+            val vm = createViewModel(managedBackendAvailable = false)
+            advanceUntilIdle()
+
+            assertEquals(AuthMode.DIRECT, vm.uiState.value.authMode)
+        }
+
+        @Test
+        fun `authMode is not changed when managed is available and stored MANAGED`() = runTest {
+            every { settingsRepository.settings } returns flowOf(
+                AppSettings(authMode = AuthMode.MANAGED)
+            )
+
+            val vm = createViewModel(managedBackendAvailable = true)
+            advanceUntilIdle()
+
+            assertEquals(AuthMode.MANAGED, vm.uiState.value.authMode)
+        }
+
+        @Test
+        fun `authMode is not changed to DIRECT when stored SELF_HOSTED even if managed unavailable`() = runTest {
+            every { settingsRepository.settings } returns flowOf(
+                AppSettings(authMode = AuthMode.SELF_HOSTED)
+            )
+
+            val vm = createViewModel(managedBackendAvailable = false)
+            advanceUntilIdle()
+
+            assertEquals(AuthMode.SELF_HOSTED, vm.uiState.value.authMode)
+        }
+    }
+
+    @Nested
+    @DisplayName("setUseBundledTmdbKey")
+    inner class SetUseBundledTmdbKey {
+
+        @Test
+        fun `switching to bundled sets useBundledTmdbKey true and clears tmdbApiKey`() = runTest {
+            every { settingsRepository.hasDefaultTmdbApiKey() } returns true
+            every { settingsRepository.settings } returns flowOf(
+                AppSettings(tmdbApiKey = "existing-key", defaultTmdbApiKeyAvailable = true)
+            )
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            vm.setUseBundledTmdbKey(true)
+
+            assertTrue(vm.uiState.value.useBundledTmdbKey)
+            assertEquals("", vm.uiState.value.tmdbApiKey)
+        }
+
+        @Test
+        fun `switching to own key sets useBundledTmdbKey false and preserves tmdbApiKey`() = runTest {
+            every { settingsRepository.hasDefaultTmdbApiKey() } returns true
+            every { settingsRepository.settings } returns flowOf(
+                AppSettings(tmdbApiKey = "", defaultTmdbApiKeyAvailable = true)
+            )
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            vm.setTmdbApiKey("new-key")
+            vm.setUseBundledTmdbKey(false)
+
+            assertFalse(vm.uiState.value.useBundledTmdbKey)
+            assertEquals("new-key", vm.uiState.value.tmdbApiKey)
+        }
+    }
+
+    @Nested
+    @DisplayName("buildHasBundledTmdbKey")
+    inner class BuildHasBundledTmdbKey {
+
+        @Test
+        fun `buildHasBundledTmdbKey is false when hasDefaultTmdbApiKey returns false`() = runTest {
+            every { settingsRepository.hasDefaultTmdbApiKey() } returns false
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            assertFalse(vm.uiState.value.buildHasBundledTmdbKey)
+        }
+
+        @Test
+        fun `buildHasBundledTmdbKey is true when build has default key even with custom key set`() = runTest {
+            every { settingsRepository.hasDefaultTmdbApiKey() } returns true
+            every { settingsRepository.settings } returns flowOf(
+                AppSettings(tmdbApiKey = "custom-key", defaultTmdbApiKeyAvailable = true)
+            )
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            assertTrue(vm.uiState.value.buildHasBundledTmdbKey)
+        }
+
+        @Test
+        fun `useBundledTmdbKey is false when user has custom key even if build has bundled`() = runTest {
+            every { settingsRepository.hasDefaultTmdbApiKey() } returns true
+            every { settingsRepository.settings } returns flowOf(
+                AppSettings(tmdbApiKey = "user-key", defaultTmdbApiKeyAvailable = true)
+            )
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            assertFalse(vm.uiState.value.useBundledTmdbKey)
         }
     }
 }

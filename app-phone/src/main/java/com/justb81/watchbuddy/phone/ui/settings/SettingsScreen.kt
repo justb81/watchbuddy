@@ -28,7 +28,9 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    var showAdvanced by remember { mutableStateOf(false) }
+    // forceShowAdvanced is true when a bundled option is unavailable and the user must
+    // configure it manually.  In that case advanced settings are always expanded.
+    var showAdvanced by remember(uiState.forceShowAdvanced) { mutableStateOf(uiState.forceShowAdvanced) }
     var showDisconnectDialog by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val savedMessage = stringResource(R.string.settings_saved)
@@ -98,96 +100,19 @@ fun SettingsScreen(
             SettingsSectionHeader(stringResource(R.string.settings_tmdb))
 
             SettingsCard {
-                when {
-                    uiState.tmdbConnected -> {
-                        // User has saved their own API key
-                        SettingsRow(
-                            label    = stringResource(R.string.settings_tmdb_account),
-                            value    = stringResource(R.string.settings_tmdb_connected),
-                            showDivider = true
-                        )
-                        TextButton(
-                            onClick  = { viewModel.disconnectTmdb() },
-                            modifier = Modifier.padding(horizontal = 8.dp)
-                        ) {
-                            Text(
-                                stringResource(R.string.settings_disconnect),
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        }
-                    }
-                    uiState.defaultTmdbApiKeyAvailable -> {
-                        // No user key, but a built-in key is available
-                        SettingsRow(
-                            label    = stringResource(R.string.settings_tmdb_account),
-                            value    = stringResource(R.string.settings_tmdb_default_key_active),
-                            showDivider = true
-                        )
-                        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                            Text(
-                                text  = stringResource(R.string.settings_tmdb_default_key_hint),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                            )
-                            Spacer(Modifier.height(8.dp))
-                            OutlinedTextField(
-                                value         = uiState.tmdbApiKey,
-                                onValueChange = viewModel::setTmdbApiKey,
-                                label         = { Text(stringResource(R.string.settings_tmdb_api_key)) },
-                                modifier      = Modifier.fillMaxWidth(),
-                                singleLine    = true,
-                                visualTransformation = PasswordVisualTransformation()
-                            )
-                            Spacer(Modifier.height(4.dp))
-                            TmdbHelperLink()
-                            Spacer(Modifier.height(8.dp))
-                            Button(
-                                onClick  = { viewModel.saveTmdbApiKey() },
-                                modifier = Modifier.fillMaxWidth(),
-                                enabled  = uiState.tmdbApiKey.isNotBlank()
-                            ) {
-                                Text(stringResource(R.string.settings_save))
-                            }
-                            Spacer(Modifier.height(4.dp))
-                        }
-                    }
-                    else -> {
-                        // No key at all — user must enter one
-                        SettingsRow(
-                            label    = stringResource(R.string.settings_tmdb_account),
-                            value    = stringResource(R.string.settings_not_connected),
-                            showDivider = true
-                        )
-                        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                            OutlinedTextField(
-                                value         = uiState.tmdbApiKey,
-                                onValueChange = viewModel::setTmdbApiKey,
-                                label         = { Text(stringResource(R.string.settings_tmdb_api_key)) },
-                                modifier      = Modifier.fillMaxWidth(),
-                                singleLine    = true,
-                                visualTransformation = PasswordVisualTransformation()
-                            )
-                            Spacer(Modifier.height(4.dp))
-                            TmdbHelperLink()
-                            Spacer(Modifier.height(8.dp))
-                            Button(
-                                onClick  = { viewModel.saveTmdbApiKey() },
-                                modifier = Modifier.fillMaxWidth(),
-                                enabled  = uiState.tmdbApiKey.isNotBlank()
-                            ) {
-                                Text(stringResource(R.string.settings_save))
-                            }
-                            Spacer(Modifier.height(4.dp))
-                        }
-                    }
+                // Status row only — key management lives in Advanced settings.
+                val tmdbStatusValue = when {
+                    uiState.tmdbConnected -> stringResource(R.string.settings_tmdb_connected)
+                    uiState.defaultTmdbApiKeyAvailable -> stringResource(R.string.settings_tmdb_default_key_active)
+                    else -> stringResource(R.string.settings_not_connected)
                 }
+                SettingsRow(
+                    label       = stringResource(R.string.settings_tmdb_account),
+                    value       = tmdbStatusValue,
+                    showDivider = true
+                )
 
                 // TMDB attribution (always visible)
-                HorizontalDivider(
-                    color     = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
-                    thickness = 0.5.dp,
-                    modifier  = Modifier.padding(horizontal = 16.dp)
-                )
                 Text(
                     text     = stringResource(R.string.settings_tmdb_attribution),
                     style    = MaterialTheme.typography.labelSmall,
@@ -323,8 +248,15 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurface
                     )
-                    TextButton(onClick = { showAdvanced = !showAdvanced }) {
-                        Text(if (showAdvanced) stringResource(R.string.settings_advanced_hide) else stringResource(R.string.settings_advanced_show))
+                    // Hide the toggle when advanced settings must always be shown
+                    // because a bundled option is not configured in this build.
+                    if (!uiState.forceShowAdvanced) {
+                        TextButton(onClick = { showAdvanced = !showAdvanced }) {
+                            Text(
+                                if (showAdvanced) stringResource(R.string.settings_advanced_hide)
+                                else stringResource(R.string.settings_advanced_show)
+                            )
+                        }
                     }
                 }
 
@@ -375,25 +307,39 @@ private fun AdvancedAuthSettings(uiState: SettingsUiState, viewModel: SettingsVi
         )
         Spacer(Modifier.height(4.dp))
 
-        // Auth mode selector
+        // Auth mode selector — MANAGED is disabled when the backend is not configured in the build.
         AuthMode.entries.forEach { mode ->
+            val isManagedUnavailable = mode == AuthMode.MANAGED && !uiState.managedTraktAvailable
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 RadioButton(
                     selected = uiState.authMode == mode,
-                    onClick  = { viewModel.setAuthMode(mode) }
+                    onClick  = { if (!isManagedUnavailable) viewModel.setAuthMode(mode) },
+                    enabled  = !isManagedUnavailable
                 )
-                Text(
-                    text  = when (mode) {
-                        AuthMode.MANAGED     -> stringResource(R.string.settings_auth_managed)
-                        AuthMode.SELF_HOSTED -> stringResource(R.string.settings_auth_self_hosted)
-                        AuthMode.DIRECT      -> stringResource(R.string.settings_auth_direct)
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+                Column {
+                    Text(
+                        text  = when (mode) {
+                            AuthMode.MANAGED     -> stringResource(R.string.settings_auth_managed)
+                            AuthMode.SELF_HOSTED -> stringResource(R.string.settings_auth_self_hosted)
+                            AuthMode.DIRECT      -> stringResource(R.string.settings_auth_direct)
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (isManagedUnavailable)
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                        else
+                            MaterialTheme.colorScheme.onSurface
+                    )
+                    if (isManagedUnavailable) {
+                        Text(
+                            text  = stringResource(R.string.settings_auth_managed_unavailable),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                        )
+                    }
+                }
             }
         }
 
@@ -437,6 +383,73 @@ private fun AdvancedAuthSettings(uiState: SettingsUiState, viewModel: SettingsVi
                 )
             }
             else -> {}
+        }
+
+        Spacer(Modifier.height(12.dp))
+        HorizontalDivider(
+            color     = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+            thickness = 0.5.dp
+        )
+        Spacer(Modifier.height(12.dp))
+
+        // ── TMDB API key group ────────────────────────────────────────────────
+        Text(
+            text  = stringResource(R.string.settings_tmdb_key_section),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Spacer(Modifier.height(4.dp))
+
+        // "Bundled key" option — disabled when no built-in key was baked into this build.
+        val bundledAvailable = uiState.buildHasBundledTmdbKey
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            RadioButton(
+                selected = uiState.useBundledTmdbKey,
+                onClick  = { viewModel.setUseBundledTmdbKey(true) },
+                enabled  = bundledAvailable
+            )
+            Text(
+                text  = stringResource(R.string.settings_tmdb_key_bundled),
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (bundledAvailable)
+                    MaterialTheme.colorScheme.onSurface
+                else
+                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+            )
+        }
+
+        // "Own key" option — always enabled.
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            RadioButton(
+                selected = !uiState.useBundledTmdbKey,
+                onClick  = { viewModel.setUseBundledTmdbKey(false) }
+            )
+            Text(
+                text  = stringResource(R.string.settings_tmdb_key_own),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+
+        // Text field + helper shown only when "Own key" is selected.
+        if (!uiState.useBundledTmdbKey) {
+            Spacer(Modifier.height(4.dp))
+            OutlinedTextField(
+                value         = uiState.tmdbApiKey,
+                onValueChange = viewModel::setTmdbApiKey,
+                label         = { Text(stringResource(R.string.settings_tmdb_api_key)) },
+                modifier      = Modifier.fillMaxWidth(),
+                singleLine    = true,
+                visualTransformation = PasswordVisualTransformation()
+            )
+            Spacer(Modifier.height(4.dp))
+            TmdbHelperLink()
         }
 
         Spacer(Modifier.height(12.dp))
