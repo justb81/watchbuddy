@@ -17,6 +17,7 @@
     <string name="onboarding_code_expires">Code expires in %1$d seconds</string>
     <string name="onboarding_error_loading_code">Error loading code: %1$s</string>
     <string name="onboarding_code_expired">Code expired. Please try again.</string>
+    <string name="onboarding_error_denied">Authorization was denied. Please try again.</string>
     <string name="onboarding_not_configured">Trakt is not configured yet. You can set up your credentials in Settings.</string>
     <string name="onboarding_not_configured_managed_no_client_id">This build has no Trakt Client ID. Open Settings → Advanced and switch to \"Own credentials\".</string>
     <string name="onboarding_not_configured_managed_no_backend">Token backend is not configured. Open Settings → Advanced to switch authentication mode.</string>

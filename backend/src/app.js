@@ -128,8 +128,12 @@ export function createApp(config) {
 
   async function verifyCredentials(attempt = 0) {
     if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
-    const url = `${traktApi}/certifications/shows`;
-    const options = { method: 'GET', headers: traktHeaders };
+    const url = `${traktApi}/oauth/device/code`;
+    const options = {
+      method: 'POST',
+      headers: traktHeaders,
+      body: JSON.stringify({ client_id: clientId }),
+    };
     try {
       const res = await fetchWithTimeout(url, options);
 
@@ -247,9 +251,15 @@ export function createApp(config) {
 
       if (!traktRes.ok) {
         const bodySnippet = JSON.stringify(data).slice(0, 200);
-        console.error(`Token exchange: Trakt returned HTTP ${traktRes.status}: ${bodySnippet}`);
-        if (traktRes.status === 403) {
-          console.error('Hint: HTTP 403 from Trakt usually means TRAKT_CLIENT_ID is invalid or revoked.');
+        if (traktRes.status === 400) {
+          // Expected during device flow polling — user hasn't authorized yet
+        } else if ([409, 410, 418, 429].includes(traktRes.status)) {
+          console.warn(`Token exchange: Trakt returned HTTP ${traktRes.status}: ${bodySnippet}`);
+        } else {
+          console.error(`Token exchange: Trakt returned HTTP ${traktRes.status}: ${bodySnippet}`);
+          if (traktRes.status === 403) {
+            console.error('Hint: HTTP 403 from Trakt usually means TRAKT_CLIENT_ID is invalid or revoked.');
+          }
         }
         return res.status(traktRes.status).json(data);
       }
@@ -346,7 +356,7 @@ export function createApp(config) {
       return res.status(503).json({ status: 'starting', trakt: 'pending' });
     }
     if (credentialsVerified) {
-      return res.json({ status: 'ok', trakt: 'connected', validated: 'client_id_only' });
+      return res.json({ status: 'ok', trakt: 'connected', validated: 'client_id_via_oauth' });
     }
     return res.status(503).json({
       status: 'unhealthy',

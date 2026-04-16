@@ -48,7 +48,7 @@ describe('GET /health', () => {
     await app.verifyCredentials();
     const res = await request(app).get('/health');
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ status: 'ok', trakt: 'connected', validated: 'client_id_only' });
+    expect(res.body).toEqual({ status: 'ok', trakt: 'connected', validated: 'client_id_via_oauth' });
   });
 });
 
@@ -454,18 +454,26 @@ describe('Credential verification', () => {
     expect(typeof app.verifyCredentials).toBe('function');
   });
 
-  it('sends correct headers to Trakt /certifications/shows', async () => {
-    const fetchFn = mockFetch(200, []);
+  it('sends correct POST to Trakt /oauth/device/code', async () => {
+    const fetchFn = mockFetch(200, {
+      device_code: 'mock-device-code',
+      user_code: 'ABCD1234',
+      verification_url: 'https://trakt.tv/activate',
+      expires_in: 600,
+      interval: 5,
+    });
     const app = buildApp(fetchFn);
     await app.verifyCredentials();
     expect(fetchFn).toHaveBeenCalledWith(
-      'https://api.trakt.tv/certifications/shows',
+      'https://api.trakt.tv/oauth/device/code',
       expect.objectContaining({
-        method: 'GET',
+        method: 'POST',
         headers: expect.objectContaining({
+          'Content-Type': 'application/json',
           'trakt-api-key': 'test-client-id',
           'trakt-api-version': '2',
         }),
+        body: JSON.stringify({ client_id: 'test-client-id' }),
       }),
     );
   });
@@ -475,7 +483,7 @@ describe('Credential verification', () => {
     await app.verifyCredentials();
     const res = await request(app).get('/health');
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ status: 'ok', trakt: 'connected', validated: 'client_id_only' });
+    expect(res.body).toEqual({ status: 'ok', trakt: 'connected', validated: 'client_id_via_oauth' });
   });
 
   it('health returns 503 invalid_client_id when Trakt returns 403', async () => {
@@ -765,6 +773,43 @@ describe('Error logging improvements', () => {
     );
   });
 
+  it('does not log error or warn for HTTP 400 on token exchange (pending during polling)', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const app = buildApp(mockFetch(400, { error: 'pending' }));
+    await request(app).post('/trakt/token').send({ code: 'test-code' });
+    expect(errorSpy).not.toHaveBeenCalled();
+    expect(warnSpy).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it('logs warn (not error) for device flow status codes 410 and 418', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const app410 = buildApp(mockFetch(410, { error: 'expired' }));
+    await request(app410).post('/trakt/token').send({ code: 'test-code' });
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('HTTP 410'));
+    expect(errorSpy).not.toHaveBeenCalled();
+
+    warnSpy.mockClear();
+    errorSpy.mockClear();
+
+    const app418 = buildApp(mockFetch(418, { error: 'denied' }));
+    await request(app418).post('/trakt/token').send({ code: 'test-code' });
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('HTTP 418'));
+    expect(errorSpy).not.toHaveBeenCalled();
+
+    warnSpy.mockRestore();
+  });
+
+  it('logs warn (not error) for HTTP 429 slow down', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const app = buildApp(mockFetch(429, { error: 'slow_down' }));
+    await request(app).post('/trakt/token').send({ code: 'test-code' });
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('HTTP 429'));
+    expect(errorSpy).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
   it('logs network error code on ECONNREFUSED for token exchange', async () => {
     const err = new Error('connect ECONNREFUSED');
     err.code = 'ECONNREFUSED';
@@ -972,7 +1017,13 @@ describe('Debug logging — Trakt API call details (debug: true)', () => {
 
   it('logs response body for credential check when debug is enabled', async () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    const app = buildApp(mockFetch(200, [{ slug: 'tv-pg', name: 'TV-PG' }]), { debug: true });
+    const app = buildApp(mockFetch(200, {
+      device_code: 'mock-device-code',
+      user_code: 'ABCD1234',
+      verification_url: 'https://trakt.tv/activate',
+      expires_in: 600,
+      interval: 5,
+    }), { debug: true });
     await app.verifyCredentials();
     logSpy.mockRestore();
 

@@ -255,22 +255,55 @@ class OnboardingViewModel @Inject constructor(
                     _state.value = OnboardingState.Success(profile.username)
                     return@launch
                 } catch (e: Exception) {
-                    // HTTP 400 = PIN not yet confirmed — this is expected, keep polling.
-                    // Any other exception (network error, HTTP 410/418/429, etc.) counts as a failure.
-                    val isPinPending = e is HttpException && e.code() == 400
-                    if (isPinPending) {
-                        consecutiveNetworkFailures = 0
-                    } else {
-                        consecutiveNetworkFailures++
-                        if (consecutiveNetworkFailures >= 3) {
+                    val httpCode = (e as? HttpException)?.code()
+                    when (httpCode) {
+                        400 -> {
+                            // Pending — user hasn't authorized yet, keep polling
+                            consecutiveNetworkFailures = 0
+                        }
+                        410 -> {
+                            // Expired — stop immediately
                             countdownJob?.cancel()
                             clearSavedDeviceCode()
                             _state.value = OnboardingState.Error(
-                                getApplication<Application>().getString(
-                                    R.string.onboarding_error_polling_network
-                                )
+                                getApplication<Application>().getString(R.string.onboarding_code_expired)
                             )
                             return@launch
+                        }
+                        418 -> {
+                            // Denied — user explicitly refused
+                            countdownJob?.cancel()
+                            clearSavedDeviceCode()
+                            _state.value = OnboardingState.Error(
+                                getApplication<Application>().getString(R.string.onboarding_error_denied)
+                            )
+                            return@launch
+                        }
+                        409 -> {
+                            // Already used — code was consumed elsewhere
+                            countdownJob?.cancel()
+                            clearSavedDeviceCode()
+                            _state.value = OnboardingState.Error(
+                                getApplication<Application>().getString(R.string.onboarding_code_expired)
+                            )
+                            return@launch
+                        }
+                        429 -> {
+                            // Slow down — increase delay, don't count as failure
+                            delay(response.interval * 1_000L)
+                        }
+                        else -> {
+                            consecutiveNetworkFailures++
+                            if (consecutiveNetworkFailures >= 3) {
+                                countdownJob?.cancel()
+                                clearSavedDeviceCode()
+                                _state.value = OnboardingState.Error(
+                                    getApplication<Application>().getString(
+                                        R.string.onboarding_error_polling_network
+                                    )
+                                )
+                                return@launch
+                            }
                         }
                     }
                 }
