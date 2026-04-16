@@ -81,6 +81,12 @@ watchbuddy/
 - **CI/CD:** GitHub Actions, release-please (Conventional Commits)
 - **Backend:** Node.js, Docker
 
+## External API References
+
+- **Trakt API:** https://github.com/trakt/trakt-api (official, contracts in `projects/api/src/contracts/`)
+  - Do NOT use the outdated Apiary docs (`trakt.docs.apiary.io`) — they reference deprecated endpoints.
+- **TMDB API:** https://developer.themoviedb.org/docs
+
 ## Key Conventions
 
 ### Language — MANDATORY

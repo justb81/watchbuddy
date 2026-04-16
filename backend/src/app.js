@@ -117,27 +117,42 @@ export function createApp(config) {
   let credentialsVerified = false;
 
   async function verifyCredentials() {
-    const url = `${traktApi}/languages/shows`;
+    const url = `${traktApi}/certifications/shows`;
     const options = { method: 'GET', headers: traktHeaders };
     try {
       const res = await fetchWithTimeout(url, options);
 
-      logTraktCall('Credential check', url, options, res);
+      let data;
+      try {
+        data = await res.json();
+      } catch (_parseErr) {
+        data = undefined;
+      }
+
+      logTraktCall('Credential check', url, options, res, data);
 
       if (res.ok) {
         traktStatus = 'connected';
         traktError = null;
         credentialsVerified = true;
         console.log('Trakt credential verification: OK');
-      } else if (res.status === 403) {
+      } else if (res.status === 401 || res.status === 403) {
         traktStatus = 'invalid_client_id';
-        traktError = 'Trakt returned 403 Forbidden — check that TRAKT_CLIENT_ID is correct.';
+        traktError = `Trakt returned ${res.status} — check that TRAKT_CLIENT_ID is correct.`;
         credentialsVerified = false;
-        console.error('Trakt credential verification failed: HTTP 403 — TRAKT_CLIENT_ID may be invalid.');
+        if (data !== undefined) {
+          const bodySnippet = JSON.stringify(data).slice(0, 200);
+          console.error(`Credential check: Trakt response body: ${bodySnippet}`);
+        }
+        console.error(`Trakt credential verification failed: HTTP ${res.status} — TRAKT_CLIENT_ID may be invalid.`);
       } else {
         traktStatus = `trakt_http_${res.status}`;
         traktError = `Trakt returned HTTP ${res.status} during credential check`;
         credentialsVerified = false;
+        if (data !== undefined) {
+          const bodySnippet = JSON.stringify(data).slice(0, 200);
+          console.error(`Credential check: Trakt response body: ${bodySnippet}`);
+        }
         console.error(`Trakt credential verification failed: HTTP ${res.status}`);
       }
     } catch (err) {
@@ -315,7 +330,7 @@ export function createApp(config) {
       return res.status(503).json({ status: 'starting', trakt: 'pending' });
     }
     if (credentialsVerified) {
-      return res.json({ status: 'ok', trakt: 'connected' });
+      return res.json({ status: 'ok', trakt: 'connected', validated: 'client_id_only' });
     }
     return res.status(503).json({
       status: 'unhealthy',

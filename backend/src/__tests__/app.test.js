@@ -48,7 +48,7 @@ describe('GET /health', () => {
     await app.verifyCredentials();
     const res = await request(app).get('/health');
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ status: 'ok', trakt: 'connected' });
+    expect(res.body).toEqual({ status: 'ok', trakt: 'connected', validated: 'client_id_only' });
   });
 });
 
@@ -450,12 +450,12 @@ describe('Credential verification', () => {
     expect(typeof app.verifyCredentials).toBe('function');
   });
 
-  it('sends correct headers to Trakt /languages/shows', async () => {
+  it('sends correct headers to Trakt /certifications/shows', async () => {
     const fetchFn = mockFetch(200, []);
     const app = buildApp(fetchFn);
     await app.verifyCredentials();
     expect(fetchFn).toHaveBeenCalledWith(
-      'https://api.trakt.tv/languages/shows',
+      'https://api.trakt.tv/certifications/shows',
       expect.objectContaining({
         method: 'GET',
         headers: expect.objectContaining({
@@ -471,7 +471,7 @@ describe('Credential verification', () => {
     await app.verifyCredentials();
     const res = await request(app).get('/health');
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ status: 'ok', trakt: 'connected' });
+    expect(res.body).toEqual({ status: 'ok', trakt: 'connected', validated: 'client_id_only' });
   });
 
   it('health returns 503 invalid_client_id when Trakt returns 403', async () => {
@@ -536,6 +536,32 @@ describe('Credential verification', () => {
     expect(errorSpy).toHaveBeenCalledWith(
       expect.stringContaining('TRAKT_CLIENT_ID'),
     );
+  });
+
+  it('health returns 503 invalid_client_id when Trakt returns 401', async () => {
+    const app = buildApp(mockFetch(401, { error: 'unauthorized' }));
+    await app.verifyCredentials();
+    const res = await request(app).get('/health');
+    expect(res.status).toBe(503);
+    expect(res.body.status).toBe('unhealthy');
+    expect(res.body.trakt).toBe('invalid_client_id');
+    expect(res.body.error).toMatch(/TRAKT_CLIENT_ID/);
+  });
+
+  it('logs response body snippet when credential check fails', async () => {
+    const app = buildApp(mockFetch(403, { error: 'invalid_api_key' }));
+    await app.verifyCredentials();
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('invalid_api_key'),
+    );
+  });
+
+  it('handles non-JSON response gracefully during credential check', async () => {
+    const app = buildApp(mockFetchHtml(200));
+    await app.verifyCredentials();
+    const res = await request(app).get('/health');
+    expect(res.status).toBe(200);
+    expect(res.body.trakt).toBe('connected');
   });
 });
 
@@ -782,6 +808,16 @@ describe('Debug logging — Trakt API call details (debug: true)', () => {
     expect(headerLog).toBeDefined();
     expect(headerLog).toContain('x-ratelimit-limit');
     expect(headerLog).toContain('1000');
+  });
+
+  it('logs response body for credential check when debug is enabled', async () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const app = buildApp(mockFetch(200, [{ slug: 'tv-pg', name: 'TV-PG' }]), { debug: true });
+    await app.verifyCredentials();
+    logSpy.mockRestore();
+
+    const allLogs = debugSpy.mock.calls.map(c => c.join(' '));
+    expect(allLogs.some(l => l.includes('Credential check') && l.includes('response body'))).toBe(true);
   });
 
   it('does not log Trakt API call details when debug is false', async () => {
