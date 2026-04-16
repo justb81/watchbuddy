@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.13.2](https://github.com/justb81/watchbuddy/compare/v0.13.1...v0.13.2) (2026-04-16)
+
+
+### Bug Fixes
+
+* **backend:** use /certifications/shows for Trakt credential check ([#200](https://github.com/justb81/watchbuddy/issues/200)) ([1dd660f](https://github.com/justb81/watchbuddy/commit/1dd660ff2d7d047235b4d191bc3171738c36f9f4))
+* **phone:** guard all TokenRepository calls against Keystore unavailability (closes [#196](https://github.com/justb81/watchbuddy/issues/196)) ([#199](https://github.com/justb81/watchbuddy/issues/199)) ([eed0d72](https://github.com/justb81/watchbuddy/commit/eed0d72d194c9a941a5cabce815631bdab727f88))
+
 ## [0.13.1](https://github.com/justb81/watchbuddy/compare/v0.13.0...v0.13.1) (2026-04-15)
 
 
