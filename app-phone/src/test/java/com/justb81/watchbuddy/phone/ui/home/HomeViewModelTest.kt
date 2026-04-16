@@ -12,6 +12,8 @@ import com.justb81.watchbuddy.service.CompanionStateManager
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
+import okhttp3.ResponseBody
+import retrofit2.HttpException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -111,6 +113,34 @@ class HomeViewModelTest {
             assertFalse(vm.uiState.value.isLoading)
             assertTrue(vm.uiState.value.shows.isEmpty())
             assertNotNull(vm.uiState.value.error)
+        }
+
+        @Test
+        fun `shows auth error message on HTTP 401`() = runTest {
+            every { tokenRepository.getAccessToken() } returns "valid-token"
+            val httpEx = HttpException(retrofit2.Response.error<Any>(401, ResponseBody.create(null, "")))
+            coEvery { traktApi.getWatchedShows(any()) } throws httpEx
+            every { application.getString(com.justb81.watchbuddy.R.string.home_sync_failed_auth) } returns "Session expired"
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            assertFalse(vm.uiState.value.isLoading)
+            assertEquals("Session expired", vm.uiState.value.error)
+        }
+
+        @Test
+        fun `shows auth error message on HTTP 403`() = runTest {
+            every { tokenRepository.getAccessToken() } returns "valid-token"
+            val httpEx = HttpException(retrofit2.Response.error<Any>(403, ResponseBody.create(null, "")))
+            coEvery { traktApi.getWatchedShows(any()) } throws httpEx
+            every { application.getString(com.justb81.watchbuddy.R.string.home_sync_failed_auth) } returns "Session expired"
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            assertFalse(vm.uiState.value.isLoading)
+            assertEquals("Session expired", vm.uiState.value.error)
         }
 
         @Test

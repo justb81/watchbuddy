@@ -191,6 +191,9 @@ export function createApp(config) {
   }
 
   const app = express();
+  // Trust the first proxy hop so express-rate-limit reads the real client IP
+  // from X-Forwarded-For instead of treating all traffic as one bucket.
+  app.set('trust proxy', 1);
   app.use(helmet());
   app.use(express.json());
 

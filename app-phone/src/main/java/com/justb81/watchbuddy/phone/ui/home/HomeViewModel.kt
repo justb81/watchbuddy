@@ -15,6 +15,7 @@ import com.justb81.watchbuddy.service.CompanionService
 import com.justb81.watchbuddy.service.CompanionStateManager
 import kotlinx.coroutines.flow.first
 import dagger.hilt.android.lifecycle.HiltViewModel
+import retrofit2.HttpException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -120,10 +121,13 @@ class HomeViewModel @Inject constructor(
                 )
                 loadPosters(shows)
             } catch (e: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    error     = getApplication<Application>().getString(R.string.home_sync_failed, e.message)
-                )
+                val httpCode = (e as? HttpException)?.code()
+                val errorMsg = if (httpCode == 401 || httpCode == 403) {
+                    getApplication<Application>().getString(R.string.home_sync_failed_auth)
+                } else {
+                    getApplication<Application>().getString(R.string.home_sync_failed, e.message)
+                }
+                _uiState.value = _uiState.value.copy(isLoading = false, error = errorMsg)
             }
         }
     }

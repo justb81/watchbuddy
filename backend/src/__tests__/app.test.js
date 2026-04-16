@@ -1049,3 +1049,35 @@ describe('Debug logging — Trakt API call details (debug: true)', () => {
     expect(allLogs.some(l => l.includes('Token exchange'))).toBe(false);
   });
 });
+
+// ── Trust proxy ────────────────────────────────────────────────────────────
+
+describe('Trust proxy', () => {
+  it('does not return 500 when X-Forwarded-For header is present', async () => {
+    const app = buildApp(mockFetch(200, {}));
+    // Without `app.set('trust proxy', 1)`, express-rate-limit throws
+    // ERR_ERL_UNEXPECTED_X_FORWARDED_FOR and all requests fail with 500.
+    const res = await request(app)
+      .post('/trakt/token')
+      .set('X-Forwarded-For', '1.2.3.4')
+      .send({ code: 'device-code-abc' });
+    expect(res.status).not.toBe(500);
+  });
+
+  it('responds normally with multiple X-Forwarded-For hops', async () => {
+    const tokenBody = {
+      access_token: 'acc',
+      refresh_token: 'ref',
+      expires_in: 7776000,
+      token_type: 'Bearer',
+      scope: 'public',
+    };
+    const app = buildApp(mockFetch(200, tokenBody));
+    const res = await request(app)
+      .post('/trakt/token')
+      .set('X-Forwarded-For', '10.0.0.1, 172.16.0.1')
+      .send({ code: 'valid-code' });
+    expect(res.status).toBe(200);
+    expect(res.body.access_token).toBe('acc');
+  });
+});

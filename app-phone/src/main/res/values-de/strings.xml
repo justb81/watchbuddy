@@ -26,6 +26,7 @@
     <string name="onboarding_not_configured_direct_no_credentials">Gib deine Trakt-Client-ID und dein Client-Secret in Einstellungen → Erweitert ein.</string>
     <string name="onboarding_open_settings">Einstellungen öffnen</string>
     <string name="onboarding_error_polling_network">Verbindung während der Autorisierung verloren. Bitte überprüfe deine Internetverbindung und versuche es erneut.</string>
+    <string name="onboarding_error_auth_failed">Autorisierung fehlgeschlagen. Bitte überprüfe deine Trakt-Zugangsdaten und versuche es erneut.</string>
     <string name="onboarding_skip">Jetzt überspringen</string>
     <string name="onboarding_reconnect_title">Mit Trakt verbinden</string>
 
@@ -41,6 +42,7 @@
     <string name="home_next_episode">Nächste: S%1$02dE%2$02d</string>
     <string name="home_just_now">Gerade eben</string>
     <string name="home_sync_failed">Synchronisierung fehlgeschlagen: %1$s</string>
+    <string name="home_sync_failed_auth">Deine Trakt-Sitzung ist abgelaufen. Bitte authentifiziere dich erneut in den Einstellungen.</string>
     <string name="home_cd_sync">Synchronisieren</string>
     <string name="home_cd_settings">Einstellungen</string>
     <string name="home_watching_tv_toggle">Ich schaue fern</string>

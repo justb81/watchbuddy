@@ -261,6 +261,15 @@ class OnboardingViewModel @Inject constructor(
                             // Pending — user hasn't authorized yet, keep polling
                             consecutiveNetworkFailures = 0
                         }
+                        401, 403 -> {
+                            // Auth failure — invalid client ID / revoked credentials
+                            countdownJob?.cancel()
+                            clearSavedDeviceCode()
+                            _state.value = OnboardingState.Error(
+                                getApplication<Application>().getString(R.string.onboarding_error_auth_failed)
+                            )
+                            return@launch
+                        }
                         410 -> {
                             // Expired — stop immediately
                             countdownJob?.cancel()
