@@ -17,6 +17,7 @@ import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import com.justb81.watchbuddy.phone.ui.settings.AuthMode
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.coroutines.delay
@@ -26,6 +27,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import com.justb81.watchbuddy.core.trakt.isServerMisconfigured
 import retrofit2.HttpException
 import javax.inject.Inject
 import javax.inject.Named
@@ -139,6 +141,10 @@ class OnboardingViewModel @Inject constructor(
     }
 
     fun requestDeviceCode() {
+        // Cancel stale jobs before starting fresh, so the old polling
+        // coroutine cannot race and overwrite the new state.
+        pollingJob?.cancel()
+        countdownJob?.cancel()
         viewModelScope.launch {
             _state.value = OnboardingState.LoadingCode
             try {
@@ -193,13 +199,13 @@ class OnboardingViewModel @Inject constructor(
         }
     }
 
-    private fun startPolling(
+    private suspend fun startPolling(
         response: DeviceCodeResponse,
         authMode: AuthMode,
         backendUrl: String,
         clientId: String
     ) {
-        pollingJob?.cancel()
+        pollingJob?.cancelAndJoin()
         pollingJob = viewModelScope.launch {
             var attempts = 0
             var consecutiveNetworkFailures = 0
@@ -268,6 +274,21 @@ class OnboardingViewModel @Inject constructor(
                             _state.value = OnboardingState.Error(
                                 getApplication<Application>().getString(R.string.onboarding_error_auth_failed)
                             )
+                            return@launch
+                        }
+                        503 -> {
+                            countdownJob?.cancel()
+                            clearSavedDeviceCode()
+                            val msg = if ((e as? HttpException)?.isServerMisconfigured() == true) {
+                                getApplication<Application>().getString(
+                                    R.string.onboarding_error_server_misconfigured
+                                )
+                            } else {
+                                getApplication<Application>().getString(
+                                    R.string.onboarding_error_polling_network
+                                )
+                            }
+                            _state.value = OnboardingState.Error(msg)
                             return@launch
                         }
                         410 -> {

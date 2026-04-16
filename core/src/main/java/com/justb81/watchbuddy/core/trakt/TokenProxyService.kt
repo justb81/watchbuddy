@@ -1,6 +1,10 @@
 package com.justb81.watchbuddy.core.trakt
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import retrofit2.HttpException
 import retrofit2.http.Body
 import retrofit2.http.POST
 
@@ -22,6 +26,29 @@ interface TokenProxyService {
 
     @POST("trakt/token/refresh")
     suspend fun refreshToken(@Body body: ProxyRefreshRequest): ProxyTokenResponse
+}
+
+// ── Error types ───────────────────────────────────────────────────────────────
+
+sealed class TokenExchangeError : Exception() {
+    data object ServerMisconfigured : TokenExchangeError()
+}
+
+/**
+ * Returns true when the HTTP 503 response body contains
+ * `{ "error": "server_misconfigured" }`, signalling that the backend
+ * proxy is missing its Trakt credentials — not a user error.
+ */
+fun HttpException.isServerMisconfigured(): Boolean {
+    if (code() != 503) return false
+    val body = try {
+        response()?.errorBody()?.string()
+    } catch (_: Exception) { null } ?: return false
+    return try {
+        Json.parseToJsonElement(body)
+            .jsonObject["error"]
+            ?.jsonPrimitive?.content == "server_misconfigured"
+    } catch (_: Exception) { false }
 }
 
 // ── DTOs ──────────────────────────────────────────────────────────────────────

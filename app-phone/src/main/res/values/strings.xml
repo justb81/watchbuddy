@@ -27,6 +27,7 @@
     <string name="onboarding_open_settings">Open Settings</string>
     <string name="onboarding_error_polling_network">Lost connection while waiting for authorization. Please check your internet connection and try again.</string>
     <string name="onboarding_error_auth_failed">Authorization failed. Please check your Trakt credentials and try again.</string>
+    <string name="onboarding_error_server_misconfigured">The authentication server is misconfigured. Please try again later or contact the maintainer.</string>
     <string name="onboarding_skip">Skip for now</string>
     <string name="onboarding_reconnect_title">Connect to Trakt</string>
 
