@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.5](https://github.com/justb81/watchbuddy/compare/v0.13.4...v0.13.5) (2026-04-16)
+
+
+### Bug Fixes
+
+* **backend:** add User-Agent header to Trakt API requests ([#206](https://github.com/justb81/watchbuddy/issues/206)) ([3bfbbe8](https://github.com/justb81/watchbuddy/commit/3bfbbe8154971c1dbfefcb85ddcbd6548a344cdb))
+
 ## [0.13.4](https://github.com/justb81/watchbuddy/compare/v0.13.3...v0.13.4) (2026-04-16)
 
 
