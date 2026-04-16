@@ -1,6 +1,7 @@
 package com.justb81.watchbuddy.phone.ui.settings
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.Constraints
@@ -20,9 +21,13 @@ import com.justb81.watchbuddy.phone.server.DeviceCapabilityProvider
 import com.justb81.watchbuddy.phone.settings.AppSettings
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -87,6 +92,24 @@ class SettingsViewModel @Inject constructor(
     ))
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
+    /**
+     * Safety-net exception handler for every coroutine launched from this ViewModel.
+     *
+     * Three previous force-close bugs (#168, #177, #196) were all caused by a single
+     * unguarded [viewModelScope.launch] in the Settings flow.  Each fix added a try/catch
+     * to the specific offender, which works until the next coroutine is added and someone
+     * forgets the pattern.  This handler ensures that *any* uncaught exception in a
+     * coroutine launched via [launchSafe] is logged and swallowed instead of propagating
+     * to the JVM's default uncaught exception handler (which force-closes the app).
+     */
+    private val coroutineExceptionHandler = CoroutineExceptionHandler { _, throwable ->
+        Log.e(TAG, "Uncaught exception in SettingsViewModel coroutine", throwable)
+    }
+
+    /** Launch a coroutine under [viewModelScope] guarded by [coroutineExceptionHandler]. */
+    private fun launchSafe(block: suspend CoroutineScope.() -> Unit): Job =
+        viewModelScope.launch(coroutineExceptionHandler, block = block)
+
     init {
         loadPersistedSettings()
         loadTraktUsername()
@@ -96,9 +119,9 @@ class SettingsViewModel @Inject constructor(
     }
 
     private fun loadTraktUsername() {
-        viewModelScope.launch {
+        launchSafe {
             try {
-                val accessToken = tokenRepository.getAccessToken() ?: return@launch
+                val accessToken = tokenRepository.getAccessToken() ?: return@launchSafe
                 val profile = traktApi.getProfile("Bearer $accessToken")
                 _uiState.value = _uiState.value.copy(traktUsername = profile.username)
             } catch (_: Exception) {
@@ -108,7 +131,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     private fun loadPersistedSettings() {
-        viewModelScope.launch {
+        launchSafe {
             try {
                 val saved = settingsRepository.settings.first()
                 val clientSecret = settingsRepository.getClientSecret()
@@ -142,7 +165,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     private fun detectLlm() {
-        viewModelScope.launch {
+        launchSafe {
             try {
                 val config = llmOrchestrator.selectConfig()
                 _uiState.value = _uiState.value.copy(
@@ -157,16 +180,22 @@ class SettingsViewModel @Inject constructor(
     }
 
     private fun observeModelReadyState() {
-        viewModelScope.launch {
-            settingsRepository.modelReady.collect { ready ->
-                _uiState.value = _uiState.value.copy(llmReady = ready)
-            }
+        launchSafe {
+            settingsRepository.modelReady
+                .catch { /* DataStore IO error — keep existing llmReady value */ }
+                .collect { ready ->
+                    _uiState.value = _uiState.value.copy(llmReady = ready)
+                }
         }
     }
 
     private fun observeDownloadProgress() {
-        viewModelScope.launch {
+        launchSafe {
+            // WorkManager's flow can throw at subscription (WM not yet initialized,
+            // SQLite IO error) or mid-stream.  .catch {} contains the failure so the
+            // Settings screen still opens even when the WorkManager backend is broken.
             workManager.getWorkInfosForUniqueWorkFlow(ModelDownloadWorker.UNIQUE_WORK_NAME)
+                .catch { /* WorkManager unavailable — no download progress UI */ }
                 .collect { workInfoList ->
                     val workInfo = workInfoList.firstOrNull() ?: return@collect
                     when (workInfo.state) {
@@ -230,53 +259,65 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun saveTmdbApiKey() {
-        viewModelScope.launch {
-            val current = settingsRepository.settings.first()
-            val key = _uiState.value.tmdbApiKey
-            settingsRepository.saveSettings(current.copy(tmdbApiKey = key))
-            _uiState.value = _uiState.value.copy(
-                tmdbConnected = key.isNotBlank(),
-                defaultTmdbApiKeyAvailable = key.isBlank() && current.defaultTmdbApiKeyAvailable,
-                saveSuccess = true
-            )
+        launchSafe {
+            try {
+                val current = settingsRepository.settings.first()
+                val key = _uiState.value.tmdbApiKey
+                settingsRepository.saveSettings(current.copy(tmdbApiKey = key))
+                _uiState.value = _uiState.value.copy(
+                    tmdbConnected = key.isNotBlank(),
+                    defaultTmdbApiKeyAvailable = key.isBlank() && current.defaultTmdbApiKeyAvailable,
+                    saveSuccess = true
+                )
+            } catch (_: Exception) {
+                // Persistence failed (DataStore IO, Keystore) — user can retry; no crash.
+            }
         }
     }
 
     fun disconnectTmdb() {
-        viewModelScope.launch {
-            val current = settingsRepository.settings.first()
-            settingsRepository.saveSettings(current.copy(tmdbApiKey = ""))
-            _uiState.value = _uiState.value.copy(
-                tmdbApiKey = "",
-                tmdbConnected = false,
-                defaultTmdbApiKeyAvailable = current.defaultTmdbApiKeyAvailable
-            )
+        launchSafe {
+            try {
+                val current = settingsRepository.settings.first()
+                settingsRepository.saveSettings(current.copy(tmdbApiKey = ""))
+                _uiState.value = _uiState.value.copy(
+                    tmdbApiKey = "",
+                    tmdbConnected = false,
+                    defaultTmdbApiKeyAvailable = current.defaultTmdbApiKeyAvailable
+                )
+            } catch (_: Exception) {
+                // Persistence failed — user can retry; no crash.
+            }
         }
     }
 
     fun saveAdvancedSettings() {
-        viewModelScope.launch {
-            val state = _uiState.value
-            val current = settingsRepository.settings.first()
-            // When "bundled" is selected the key is stored as empty (repository falls back to
-            // the build-time default); when "own" is selected we persist whatever the user typed.
-            val tmdbKeyToSave = if (state.useBundledTmdbKey) "" else state.tmdbApiKey
-            settingsRepository.saveSettings(
-                current.copy(
-                    authMode = state.authMode,
-                    backendUrl = state.customBackendUrl,
-                    directClientId = state.directClientId,
-                    companionEnabled = state.companionRunning,
-                    modelDownloadUrl = state.modelDownloadUrl,
-                    tmdbApiKey = tmdbKeyToSave
+        launchSafe {
+            try {
+                val state = _uiState.value
+                val current = settingsRepository.settings.first()
+                // When "bundled" is selected the key is stored as empty (repository falls back to
+                // the build-time default); when "own" is selected we persist whatever the user typed.
+                val tmdbKeyToSave = if (state.useBundledTmdbKey) "" else state.tmdbApiKey
+                settingsRepository.saveSettings(
+                    current.copy(
+                        authMode = state.authMode,
+                        backendUrl = state.customBackendUrl,
+                        directClientId = state.directClientId,
+                        companionEnabled = state.companionRunning,
+                        modelDownloadUrl = state.modelDownloadUrl,
+                        tmdbApiKey = tmdbKeyToSave
+                    )
                 )
-            )
-            settingsRepository.saveClientSecret(state.directClientSecret)
-            _uiState.value = _uiState.value.copy(
-                tmdbConnected = tmdbKeyToSave.isNotBlank(),
-                defaultTmdbApiKeyAvailable = tmdbKeyToSave.isBlank() && current.defaultTmdbApiKeyAvailable,
-                saveSuccess = true
-            )
+                settingsRepository.saveClientSecret(state.directClientSecret)
+                _uiState.value = _uiState.value.copy(
+                    tmdbConnected = tmdbKeyToSave.isNotBlank(),
+                    defaultTmdbApiKeyAvailable = tmdbKeyToSave.isBlank() && current.defaultTmdbApiKeyAvailable,
+                    saveSuccess = true
+                )
+            } catch (_: Exception) {
+                // Persistence or Keystore failure — leave state unchanged; user can retry.
+            }
         }
     }
 
@@ -294,17 +335,24 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun toggleCompanionService() {
-        val newState = !_uiState.value.companionRunning
+        val previousState = _uiState.value.companionRunning
+        val newState = !previousState
         _uiState.value = _uiState.value.copy(companionRunning = newState)
-        viewModelScope.launch {
-            val current = settingsRepository.settings.first()
-            settingsRepository.saveSettings(current.copy(companionEnabled = newState))
-        }
-        val context = getApplication<Application>()
-        if (newState) {
-            CompanionService.start(context)
-        } else {
-            CompanionService.stop(context)
+        launchSafe {
+            try {
+                val current = settingsRepository.settings.first()
+                settingsRepository.saveSettings(current.copy(companionEnabled = newState))
+                val context = getApplication<Application>()
+                if (newState) {
+                    CompanionService.start(context)
+                } else {
+                    CompanionService.stop(context)
+                }
+            } catch (_: Exception) {
+                // Persistence or service start failed — revert optimistic toggle so
+                // the UI reflects reality and the user can retry.
+                _uiState.value = _uiState.value.copy(companionRunning = previousState)
+            }
         }
     }
 
@@ -350,4 +398,7 @@ class SettingsViewModel @Inject constructor(
         // Progress is tracked by observeDownloadProgress() running since init
     }
 
+    private companion object {
+        const val TAG = "SettingsViewModel"
+    }
 }
