@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.3](https://github.com/justb81/watchbuddy/compare/v0.13.2...v0.13.3) (2026-04-16)
+
+
+### Bug Fixes
+
+* resolve issues [#187](https://github.com/justb81/watchbuddy/issues/187), [#192](https://github.com/justb81/watchbuddy/issues/192), [#193](https://github.com/justb81/watchbuddy/issues/193) — settings UX and build warnings ([#202](https://github.com/justb81/watchbuddy/issues/202)) ([2962ca0](https://github.com/justb81/watchbuddy/commit/2962ca0a692100a3c1b8664388c8756ff97646c4))
+
 ## [0.13.2](https://github.com/justb81/watchbuddy/compare/v0.13.1...v0.13.2) (2026-04-16)
 
 
