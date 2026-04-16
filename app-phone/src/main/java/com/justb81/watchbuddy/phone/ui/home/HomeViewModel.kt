@@ -61,9 +61,13 @@ class HomeViewModel @Inject constructor(
 
     private fun checkServiceConnections() {
         viewModelScope.launch {
-            val traktOk = tokenRepository.isTokenValid()
-            val tmdbOk = settingsRepository.getTmdbApiKey().first().isNotBlank()
-            _uiState.update { it.copy(canWatch = traktOk && tmdbOk) }
+            try {
+                val traktOk = tokenRepository.isTokenValid()
+                val tmdbOk = settingsRepository.getTmdbApiKey().first().isNotBlank()
+                _uiState.update { it.copy(canWatch = traktOk && tmdbOk) }
+            } catch (_: Exception) {
+                // Keystore unavailable — default to not ready
+            }
         }
     }
 

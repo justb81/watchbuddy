@@ -20,9 +20,14 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        val startDestination = if (tokenRepository.isTokenValid()) {
-            PhoneRoute.Home.route
-        } else {
+        val startDestination = try {
+            if (tokenRepository.isTokenValid()) {
+                PhoneRoute.Home.route
+            } else {
+                PhoneRoute.Onboarding.route
+            }
+        } catch (_: Exception) {
+            // Keystore unavailable — default to onboarding
             PhoneRoute.Onboarding.route
         }
 

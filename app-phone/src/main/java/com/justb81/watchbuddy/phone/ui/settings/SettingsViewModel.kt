@@ -262,7 +262,11 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun disconnectTrakt() {
-        tokenRepository.clearTokens()
+        try {
+            tokenRepository.clearTokens()
+        } catch (_: Exception) {
+            // Keystore unavailable — tokens are effectively gone anyway
+        }
         deviceCapabilityProvider.invalidateCache()
         _uiState.value = _uiState.value.copy(traktUsername = null)
     }
