@@ -68,6 +68,7 @@ export function createApp(config) {
     'Content-Type': 'application/json',
     'trakt-api-key': clientId,
     'trakt-api-version': '2',
+    'User-Agent': 'WatchBuddy/1.0.0',
   };
 
   async function fetchWithTimeout(url, options) {

@@ -115,6 +115,7 @@ describe('POST /trakt/token', () => {
           'Content-Type': 'application/json',
           'trakt-api-key': 'test-client-id',
           'trakt-api-version': '2',
+          'User-Agent': 'WatchBuddy/1.0.0',
         },
         body: JSON.stringify({
           code: 'device-code-abc',
@@ -296,6 +297,7 @@ describe('POST /trakt/token/refresh', () => {
           'Content-Type': 'application/json',
           'trakt-api-key': 'test-client-id',
           'trakt-api-version': '2',
+          'User-Agent': 'WatchBuddy/1.0.0',
         },
         body: JSON.stringify({
           refresh_token: 'old-ref-token',
@@ -472,6 +474,7 @@ describe('Credential verification', () => {
           'Content-Type': 'application/json',
           'trakt-api-key': 'test-client-id',
           'trakt-api-version': '2',
+          'User-Agent': 'WatchBuddy/1.0.0',
         }),
         body: JSON.stringify({ client_id: 'test-client-id' }),
       }),
