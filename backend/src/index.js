@@ -14,7 +14,12 @@
  * that injects the server-side client_secret.
  */
 
+import { readFileSync } from 'fs';
 import { createApp } from './app.js';
+
+const { version } = JSON.parse(
+  readFileSync(new URL('../package.json', import.meta.url), 'utf-8'),
+);
 
 const { TRAKT_CLIENT_ID, TRAKT_CLIENT_SECRET, PORT = 3000, DEBUG_MODE } = process.env;
 
@@ -28,6 +33,7 @@ const debug = DEBUG_MODE === 'true';
 const app = createApp({
   clientId: TRAKT_CLIENT_ID,
   clientSecret: TRAKT_CLIENT_SECRET,
+  version,
   debug,
 });
 
