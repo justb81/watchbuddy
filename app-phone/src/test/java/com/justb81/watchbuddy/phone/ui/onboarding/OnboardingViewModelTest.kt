@@ -327,6 +327,40 @@ class OnboardingViewModelTest {
         )
 
         @Test
+        fun `shows Error immediately on HTTP 401 during polling`() = runTest {
+            every { settingsRepository.settings } returns flowOf(
+                AppSettings(authMode = AuthMode.MANAGED)
+            )
+            coEvery { traktApi.requestDeviceCode(any()) } returns deviceCodeResponse
+            coEvery { tokenProxy.exchangeDeviceCode(any()) } throws
+                HttpException(Response.error<Any>(401, "".toResponseBody()))
+            every { application.getString(any<Int>()) } returns "Auth failed"
+
+            val vm = createViewModel()
+            vm.requestDeviceCode()
+            advanceUntilIdle()
+
+            assertTrue(vm.state.value is OnboardingState.Error)
+        }
+
+        @Test
+        fun `shows Error immediately on HTTP 403 during polling`() = runTest {
+            every { settingsRepository.settings } returns flowOf(
+                AppSettings(authMode = AuthMode.MANAGED)
+            )
+            coEvery { traktApi.requestDeviceCode(any()) } returns deviceCodeResponse
+            coEvery { tokenProxy.exchangeDeviceCode(any()) } throws
+                HttpException(Response.error<Any>(403, "".toResponseBody()))
+            every { application.getString(any<Int>()) } returns "Auth failed"
+
+            val vm = createViewModel()
+            vm.requestDeviceCode()
+            advanceUntilIdle()
+
+            assertTrue(vm.state.value is OnboardingState.Error)
+        }
+
+        @Test
         fun `shows Error after 3 consecutive network failures during polling`() = runTest {
             every { settingsRepository.settings } returns flowOf(
                 AppSettings(authMode = AuthMode.MANAGED)

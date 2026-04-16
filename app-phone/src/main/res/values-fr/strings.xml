@@ -26,6 +26,7 @@
     <string name="onboarding_not_configured_direct_no_credentials">Entrez votre Client ID et Client Secret Trakt dans Paramètres → Avancé.</string>
     <string name="onboarding_open_settings">Ouvrir les paramètres</string>
     <string name="onboarding_error_polling_network">Connexion perdue pendant l\'autorisation. Vérifiez votre connexion internet et réessayez.</string>
+    <string name="onboarding_error_auth_failed">Autorisation échouée. Veuillez vérifier vos identifiants Trakt et réessayer.</string>
     <string name="onboarding_skip">Ignorer pour le moment</string>
     <string name="onboarding_reconnect_title">Se connecter à Trakt</string>
 
@@ -41,6 +42,7 @@
     <string name="home_next_episode">Suivant : S%1$02dE%2$02d</string>
     <string name="home_just_now">À l\'instant</string>
     <string name="home_sync_failed">Échec de la synchronisation : %1$s</string>
+    <string name="home_sync_failed_auth">Votre session Trakt a expiré. Veuillez vous ré-authentifier dans les paramètres.</string>
     <string name="home_cd_sync">Synchroniser</string>
     <string name="home_cd_settings">Paramètres</string>
     <string name="home_watching_tv_toggle">Je regarde la TV</string>
