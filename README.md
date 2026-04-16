@@ -101,6 +101,17 @@ Please make sure your PR:
 - Builds successfully (`./gradlew assembleDebug`)
 - Includes a clear description of the changes
 
+## Privacy / Datenschutz
+
+WatchBuddy is designed with privacy in mind: no tracking SDKs, no analytics, no WatchBuddy-side user accounts. Trakt tokens stay in the Android Keystore on the phone, LLM recaps are generated entirely on-device, and the only server component (the optional token proxy at `watchbuddy.server.rang.it`) runs on an EU host and does not persist tokens.
+
+The full privacy policy is available in two language versions:
+
+- 🇩🇪 **Deutsch (rechtlich maßgeblich):** [`docs/privacy-policy.de.md`](docs/privacy-policy.de.md)
+- 🇬🇧 **English (translation):** [`docs/privacy-policy.en.md`](docs/privacy-policy.en.md)
+
+> Note: The policy is a carefully researched draft and not legal advice. Before linking it from a public Play Store listing, a qualified IT / data-protection lawyer should review the German version — in particular the third-country transfer clauses for Trakt, TMDB and Hugging Face.
+
 ## Attribution
 
 - This product uses the Trakt API but is not endorsed or certified by Trakt.
