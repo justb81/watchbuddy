@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.15.0](https://github.com/justb81/watchbuddy/compare/v0.14.5...v0.15.0) (2026-04-17)
+
+
+### Features
+
+* **home:** show episode progress vs aired episodes with collapsible all-shows section (closes [#239](https://github.com/justb81/watchbuddy/issues/239)) ([#248](https://github.com/justb81/watchbuddy/issues/248)) ([cab074b](https://github.com/justb81/watchbuddy/commit/cab074b4fe25340b645a22bdc3b68fb188de67b3))
+* **tv:** send real playback progress to Trakt instead of hardcoded 0/50/100 ([#249](https://github.com/justb81/watchbuddy/issues/249)) ([11a0f86](https://github.com/justb81/watchbuddy/commit/11a0f863d2e11fd72a44c66ba0c84634efec2ba2))
+
+
+### Bug Fixes
+
+* **tv:** pin Retrofit service interfaces to stop R8 CCE on app launch ([#251](https://github.com/justb81/watchbuddy/issues/251)) ([912c57a](https://github.com/justb81/watchbuddy/commit/912c57a37972aaa08a7db8cec56a3f63f0b09ed1)), closes [#247](https://github.com/justb81/watchbuddy/issues/247) [#238](https://github.com/justb81/watchbuddy/issues/238)
+
 ## [0.14.5](https://github.com/justb81/watchbuddy/compare/v0.14.4...v0.14.5) (2026-04-17)
 
 
