@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Exposes /files/diagnostics/ so crash reports can be shared via
+         an ACTION_SEND intent. See CrashReporter / DiagnosticShare. -->
+    <files-path name="diagnostics" path="diagnostics/" />
+</paths>

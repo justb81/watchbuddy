@@ -45,6 +45,13 @@
     <string name="tv_error_phone_unreachable">Companion app unreachable. Showing cached data.</string>
     <string name="tv_error_phone_unreachable_no_cache">Companion app unreachable. Make sure WatchBuddy is running on your phone.</string>
 
+    <!-- Diagnostics -->
+    <string name="diagnostics_banner_title">Diagnostic report available</string>
+    <string name="diagnostics_banner_message">The app captured %1$d crash report(s). Share them with the maintainer so the problem can be analysed.</string>
+    <string name="diagnostics_banner_share">Share</string>
+    <string name="diagnostics_banner_dismiss">Dismiss</string>
+    <string name="diagnostics_export">Export diagnostics</string>
+
     <!-- Streaming settings -->
     <string name="tv_streaming_settings_button">Services</string>
     <string name="tv_streaming_settings_title">Streaming Services</string>

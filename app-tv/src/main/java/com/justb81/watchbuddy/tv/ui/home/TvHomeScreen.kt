@@ -20,10 +20,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.ui.graphics.Color
 import androidx.tv.material3.*
 import com.justb81.watchbuddy.R
+import com.justb81.watchbuddy.core.logging.CrashReporter
+import com.justb81.watchbuddy.core.logging.DiagnosticShare
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
 import com.justb81.watchbuddy.tv.ui.theme.extendedColors
 
@@ -36,6 +39,8 @@ fun TvHomeScreen(
     viewModel: TvHomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+    var pendingReports by remember { mutableStateOf(CrashReporter.listReports(context).size) }
 
     Box(
         modifier = Modifier
@@ -77,6 +82,18 @@ fun TvHomeScreen(
                         )
                     }
 
+                    // Diagnostics export button — always focusable on TV so we can
+                    // collect logs even when nothing has crashed yet.
+                    OutlinedButton(
+                        onClick = {
+                            DiagnosticShare.launchShare(context)
+                            pendingReports = CrashReporter.listReports(context).size
+                        },
+                        scale   = ButtonDefaults.scale(scale = 1f)
+                    ) {
+                        Text(stringResource(R.string.diagnostics_export))
+                    }
+
                     // Streaming settings button
                     OutlinedButton(
                         onClick = onStreamingSettingsClick,
@@ -93,6 +110,17 @@ fun TvHomeScreen(
                         Text(stringResource(R.string.tv_select_user))
                     }
                 }
+            }
+
+            if (pendingReports > 0) {
+                TvDiagnosticsBanner(
+                    reportCount = pendingReports,
+                    onShare = { DiagnosticShare.launchShare(context) },
+                    onDismiss = {
+                        CrashReporter.clearReports(context)
+                        pendingReports = 0
+                    }
+                )
             }
 
             // ── Content ───────────────────────────────────────────────────────
@@ -305,6 +333,49 @@ private fun ShowCard(entry: TraktWatchedEntry, onClick: () -> Unit) {
                     )
                 }
             }
+        }
+    }
+}
+
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+private fun TvDiagnosticsBanner(
+    reportCount: Int,
+    onShare: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.errorContainer)
+            .padding(horizontal = 48.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = stringResource(R.string.diagnostics_banner_title),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onErrorContainer
+            )
+            Text(
+                text = stringResource(R.string.diagnostics_banner_message, reportCount),
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.85f)
+            )
+        }
+        OutlinedButton(
+            onClick = onDismiss,
+            scale = ButtonDefaults.scale(scale = 1f)
+        ) {
+            Text(stringResource(R.string.diagnostics_banner_dismiss))
+        }
+        Button(
+            onClick = onShare,
+            scale = ButtonDefaults.scale(scale = 1f)
+        ) {
+            Text(stringResource(R.string.diagnostics_banner_share))
         }
     }
 }

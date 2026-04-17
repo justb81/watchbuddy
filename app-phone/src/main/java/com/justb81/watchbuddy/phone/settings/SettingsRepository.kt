@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.phone.auth.TokenRepository
 import com.justb81.watchbuddy.phone.ui.settings.AuthMode
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -17,6 +18,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import java.io.File
@@ -48,10 +50,16 @@ class SettingsRepository @Inject constructor(
     val modelReady: StateFlow<Boolean> = _modelReady.asStateFlow()
 
     init {
+        DiagnosticLog.event(TAG, "init: subscribing to MODEL_READY")
         scope.launch {
-            context.dataStore.data.map { it[Keys.MODEL_READY] ?: false }.collect {
-                _modelReady.value = it
-            }
+            context.dataStore.data
+                .catch { e ->
+                    DiagnosticLog.error(TAG, "modelReady flow errored at subscription", e)
+                }
+                .map { it[Keys.MODEL_READY] ?: false }
+                .collect {
+                    _modelReady.value = it
+                }
         }
     }
 
@@ -80,10 +88,19 @@ class SettingsRepository @Inject constructor(
         }
     }
 
-    fun getClientSecret(): String = tokenRepository.getClientSecret()
+    fun getClientSecret(): String = try {
+        tokenRepository.getClientSecret()
+    } catch (e: Exception) {
+        DiagnosticLog.error(TAG, "getClientSecret failed (Keystore?)", e)
+        ""
+    }
 
     fun saveClientSecret(secret: String) {
-        tokenRepository.saveClientSecret(secret)
+        try {
+            tokenRepository.saveClientSecret(secret)
+        } catch (e: Exception) {
+            DiagnosticLog.error(TAG, "saveClientSecret failed (Keystore?)", e)
+        }
     }
 
     /**
@@ -115,4 +132,8 @@ class SettingsRepository @Inject constructor(
 
     /** Absolute path where downloaded model files are stored. */
     fun modelDir(): File = File(context.filesDir, "llm_models").also { it.mkdirs() }
+
+    private companion object {
+        const val TAG = "SettingsRepository"
+    }
 }

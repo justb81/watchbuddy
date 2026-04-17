@@ -74,6 +74,13 @@
     volatile <fields>;
 }
 
+# ── Diagnostic Logging ───────────────────────────────────────────────────────
+# Keep class and method names so the breadcrumb tags and crash-report stack
+# frames in shared reports remain readable in release builds.  The entire
+# purpose of this module is to make crashes investigable after the fact.
+-keep class com.justb81.watchbuddy.core.logging.** { *; }
+-keepnames class com.justb81.watchbuddy.core.logging.**
+
 # ── General ──────────────────────────────────────────────────────────────────
 -keep class * extends android.app.Application
 -keep class * extends android.app.Service

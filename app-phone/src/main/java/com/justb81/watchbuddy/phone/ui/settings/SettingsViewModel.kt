@@ -12,6 +12,7 @@ import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.workDataOf
 import com.justb81.watchbuddy.R
+import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.trakt.TraktApiService
 import com.justb81.watchbuddy.phone.auth.TokenRepository
 import com.justb81.watchbuddy.service.CompanionService
@@ -80,11 +81,21 @@ class SettingsViewModel @Inject constructor(
     @Named("managedBackendAvailable") private val managedBackendAvailable: Boolean
 ) : AndroidViewModel(application) {
 
-    private val hasBundledTmdb = settingsRepository.hasDefaultTmdbApiKey()
+    init {
+        DiagnosticLog.event(TAG, "constructor:enter")
+    }
+
+    private val hasBundledTmdb = runCatching { settingsRepository.hasDefaultTmdbApiKey() }
+        .onFailure { DiagnosticLog.error(TAG, "hasDefaultTmdbApiKey threw", it) }
+        .getOrDefault(false)
+
+    private val initialModelReady = runCatching { settingsRepository.modelReady.value }
+        .onFailure { DiagnosticLog.error(TAG, "modelReady.value threw", it) }
+        .getOrDefault(false)
 
     private val _uiState = MutableStateFlow(SettingsUiState(
         llmBackend = application.getString(R.string.settings_llm_detecting),
-        llmReady = settingsRepository.modelReady.value,
+        llmReady = initialModelReady,
         managedTraktAvailable = managedBackendAvailable,
         buildHasBundledTmdbKey = hasBundledTmdb,
         useBundledTmdbKey = hasBundledTmdb,  // start with bundled if available, corrected after load
@@ -101,9 +112,16 @@ class SettingsViewModel @Inject constructor(
      * forgets the pattern.  This handler ensures that *any* uncaught exception in a
      * coroutine launched via [launchSafe] is logged and swallowed instead of propagating
      * to the JVM's default uncaught exception handler (which force-closes the app).
+     *
+     * Exceptions are *also* written to [DiagnosticLog] so they show up in shared crash
+     * reports even though they don't force-close the process.  The silent swallow in
+     * earlier versions made it impossible to tell the difference between "nothing
+     * happened" and "something broke invisibly" — now every swallowed failure is
+     * visible in the exported diagnostic report.
      */
     private val coroutineExceptionHandler = CoroutineExceptionHandler { _, throwable ->
         Log.e(TAG, "Uncaught exception in SettingsViewModel coroutine", throwable)
+        DiagnosticLog.error(TAG, "swallowed coroutine exception", throwable)
     }
 
     /** Launch a coroutine under [viewModelScope] guarded by [coroutineExceptionHandler]. */
@@ -111,30 +129,45 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch(coroutineExceptionHandler, block = block)
 
     init {
+        DiagnosticLog.event(
+            TAG,
+            "init: managedBackend=$managedBackendAvailable hasBundledTmdb=$hasBundledTmdb " +
+                "initialModelReady=$initialModelReady"
+        )
         loadPersistedSettings()
         loadTraktUsername()
         detectLlm()
         observeModelReadyState()
         observeDownloadProgress()
+        DiagnosticLog.event(TAG, "constructor:exit (init blocks launched)")
     }
 
     private fun loadTraktUsername() {
         launchSafe {
+            DiagnosticLog.event(TAG, "loadTraktUsername:start")
             try {
-                val accessToken = tokenRepository.getAccessToken() ?: return@launchSafe
+                val accessToken = tokenRepository.getAccessToken() ?: run {
+                    DiagnosticLog.event(TAG, "loadTraktUsername: no token, skipping")
+                    return@launchSafe
+                }
                 val profile = traktApi.getProfile("Bearer $accessToken")
                 _uiState.value = _uiState.value.copy(traktUsername = profile.username)
-            } catch (_: Exception) {
+                DiagnosticLog.event(TAG, "loadTraktUsername:ok user=${profile.username}")
+            } catch (e: Exception) {
                 // Keystore unavailable, token expired, or network error — keep "Not connected"
+                DiagnosticLog.warn(TAG, "loadTraktUsername:failed", e)
             }
         }
     }
 
     private fun loadPersistedSettings() {
         launchSafe {
+            DiagnosticLog.event(TAG, "loadPersistedSettings:start")
             try {
                 val saved = settingsRepository.settings.first()
+                DiagnosticLog.event(TAG, "loadPersistedSettings: settings.first() returned")
                 val clientSecret = settingsRepository.getClientSecret()
+                DiagnosticLog.event(TAG, "loadPersistedSettings: getClientSecret() returned")
                 // If managed backend is unavailable in this build but was previously stored,
                 // fall back to DIRECT so the user is not stuck on a non-functional mode.
                 val resolvedAuthMode = if (!managedBackendAvailable && saved.authMode == AuthMode.MANAGED) {
@@ -157,15 +190,18 @@ class SettingsViewModel @Inject constructor(
                     useBundledTmdbKey = saved.tmdbApiKey.isBlank() && buildHasBundled,
                     forceShowAdvanced = !managedBackendAvailable || !buildHasBundled
                 )
-            } catch (_: Exception) {
+                DiagnosticLog.event(TAG, "loadPersistedSettings:ok authMode=$resolvedAuthMode tmdbConnected=${saved.tmdbApiKey.isNotBlank()}")
+            } catch (e: Exception) {
                 // Settings failed to load (e.g. Keystore unavailable) — keep defaults.
                 // App remains usable; user can still configure settings manually.
+                DiagnosticLog.error(TAG, "loadPersistedSettings:failed", e)
             }
         }
     }
 
     private fun detectLlm() {
         launchSafe {
+            DiagnosticLog.event(TAG, "detectLlm:start")
             try {
                 val config = llmOrchestrator.selectConfig()
                 _uiState.value = _uiState.value.copy(
@@ -173,16 +209,21 @@ class SettingsViewModel @Inject constructor(
                     llmModelName = config.modelVariant?.fileName,
                     llmReady    = settingsRepository.modelReady.value
                 )
-            } catch (_: Exception) {
+                DiagnosticLog.event(TAG, "detectLlm:ok backend=${config.backend.name} model=${config.modelVariant?.fileName}")
+            } catch (e: Exception) {
                 // LLM detection failed (e.g. system service unavailable) — keep default state.
+                DiagnosticLog.error(TAG, "detectLlm:failed", e)
             }
         }
     }
 
     private fun observeModelReadyState() {
         launchSafe {
+            DiagnosticLog.event(TAG, "observeModelReadyState:subscribe")
             settingsRepository.modelReady
-                .catch { /* DataStore IO error — keep existing llmReady value */ }
+                .catch { e ->
+                    DiagnosticLog.error(TAG, "observeModelReadyState:flow-error", e)
+                }
                 .collect { ready ->
                     _uiState.value = _uiState.value.copy(llmReady = ready)
                 }
@@ -191,11 +232,14 @@ class SettingsViewModel @Inject constructor(
 
     private fun observeDownloadProgress() {
         launchSafe {
+            DiagnosticLog.event(TAG, "observeDownloadProgress:subscribe")
             // WorkManager's flow can throw at subscription (WM not yet initialized,
             // SQLite IO error) or mid-stream.  .catch {} contains the failure so the
             // Settings screen still opens even when the WorkManager backend is broken.
             workManager.getWorkInfosForUniqueWorkFlow(ModelDownloadWorker.UNIQUE_WORK_NAME)
-                .catch { /* WorkManager unavailable — no download progress UI */ }
+                .catch { e ->
+                    DiagnosticLog.error(TAG, "observeDownloadProgress:flow-error", e)
+                }
                 .collect { workInfoList ->
                     val workInfo = workInfoList.firstOrNull() ?: return@collect
                     when (workInfo.state) {
@@ -269,8 +313,9 @@ class SettingsViewModel @Inject constructor(
                     defaultTmdbApiKeyAvailable = key.isBlank() && current.defaultTmdbApiKeyAvailable,
                     saveSuccess = true
                 )
-            } catch (_: Exception) {
+            } catch (e: Exception) {
                 // Persistence failed (DataStore IO, Keystore) — user can retry; no crash.
+                DiagnosticLog.error(TAG, "saveTmdbApiKey:failed", e)
             }
         }
     }
@@ -285,8 +330,9 @@ class SettingsViewModel @Inject constructor(
                     tmdbConnected = false,
                     defaultTmdbApiKeyAvailable = current.defaultTmdbApiKeyAvailable
                 )
-            } catch (_: Exception) {
+            } catch (e: Exception) {
                 // Persistence failed — user can retry; no crash.
+                DiagnosticLog.error(TAG, "disconnectTmdb:failed", e)
             }
         }
     }
@@ -315,8 +361,9 @@ class SettingsViewModel @Inject constructor(
                     defaultTmdbApiKeyAvailable = tmdbKeyToSave.isBlank() && current.defaultTmdbApiKeyAvailable,
                     saveSuccess = true
                 )
-            } catch (_: Exception) {
+            } catch (e: Exception) {
                 // Persistence or Keystore failure — leave state unchanged; user can retry.
+                DiagnosticLog.error(TAG, "saveAdvancedSettings:failed", e)
             }
         }
     }
@@ -348,22 +395,30 @@ class SettingsViewModel @Inject constructor(
                 } else {
                     CompanionService.stop(context)
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
                 // Persistence or service start failed — revert optimistic toggle so
                 // the UI reflects reality and the user can retry.
+                DiagnosticLog.error(TAG, "toggleCompanionService:failed (reverting)", e)
                 _uiState.value = _uiState.value.copy(companionRunning = previousState)
             }
         }
     }
 
     fun disconnectTrakt() {
+        DiagnosticLog.event(TAG, "disconnectTrakt:start")
         try {
             tokenRepository.clearTokens()
-        } catch (_: Exception) {
+        } catch (e: Exception) {
             // Keystore unavailable — tokens are effectively gone anyway
+            DiagnosticLog.warn(TAG, "disconnectTrakt: clearTokens failed", e)
         }
-        deviceCapabilityProvider.invalidateCache()
+        try {
+            deviceCapabilityProvider.invalidateCache()
+        } catch (e: Exception) {
+            DiagnosticLog.warn(TAG, "disconnectTrakt: invalidateCache failed", e)
+        }
         _uiState.value = _uiState.value.copy(traktUsername = null)
+        DiagnosticLog.event(TAG, "disconnectTrakt:done")
     }
 
     fun downloadModel() {

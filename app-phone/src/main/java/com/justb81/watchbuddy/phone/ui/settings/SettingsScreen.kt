@@ -18,6 +18,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.justb81.watchbuddy.R
+import com.justb81.watchbuddy.core.logging.DiagnosticLog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -27,6 +28,9 @@ fun SettingsScreen(
     onConnectClick: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
+    LaunchedEffect(Unit) {
+        DiagnosticLog.event("SettingsScreen", "composable:entered")
+    }
     val uiState by viewModel.uiState.collectAsState()
     // forceShowAdvanced is true when a bundled option is unavailable and the user must
     // configure it manually.  In that case advanced settings are always expanded.
@@ -174,18 +178,21 @@ fun SettingsScreen(
 
                 when {
                     uiState.llmDownloadProgress != null -> {
+                        // Snapshot to a local so a racing recomposition that nulls the
+                        // value out between the guard and the render can't throw NPE.
+                        val progress = uiState.llmDownloadProgress ?: 0
                         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                             Text(
                                 stringResource(
                                     R.string.settings_llm_downloading,
-                                    uiState.llmDownloadProgress!!
+                                    progress
                                 ),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.primary
                             )
                             Spacer(Modifier.height(4.dp))
                             LinearProgressIndicator(
-                                progress = { uiState.llmDownloadProgress!! / 100f },
+                                progress = { progress / 100f },
                                 modifier = Modifier.fillMaxWidth(),
                                 color    = MaterialTheme.colorScheme.primary
                             )

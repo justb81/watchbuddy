@@ -73,4 +73,11 @@
     <string name="cd_scrobble_countdown">Confirmación automática en %1$d segundos</string>
     <string name="cd_service_move_up">Subir %1$s en la prioridad</string>
     <string name="cd_service_move_down">Bajar %1$s en la prioridad</string>
+
+    <!-- Diagnostics -->
+    <string name="diagnostics_banner_title">Informe de diagnóstico disponible</string>
+    <string name="diagnostics_banner_message">La aplicación ha registrado %1$d informe(s) de error. Compártelos con el mantenedor para que pueda analizar el problema.</string>
+    <string name="diagnostics_banner_share">Compartir</string>
+    <string name="diagnostics_banner_dismiss">Descartar</string>
+    <string name="diagnostics_export">Exportar diagnóstico</string>
 </resources>

@@ -134,4 +134,12 @@
     <string name="error_generic">Une erreur est survenue.</string>
     <string name="retry">Réessayer</string>
     <string name="ok">OK</string>
+
+    <!-- Diagnostics -->
+    <string name="home_cd_overflow">Plus d\'options</string>
+    <string name="diagnostics_banner_title">Rapport de diagnostic disponible</string>
+    <string name="diagnostics_banner_message">L\'application a enregistré %1$d rapport(s) de plantage. Partagez-les avec le mainteneur pour qu\'il puisse analyser le problème.</string>
+    <string name="diagnostics_banner_share">Partager</string>
+    <string name="diagnostics_banner_dismiss">Ignorer</string>
+    <string name="diagnostics_export">Exporter le diagnostic</string>
 </resources>

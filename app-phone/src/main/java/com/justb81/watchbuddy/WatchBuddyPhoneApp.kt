@@ -3,8 +3,11 @@ package com.justb81.watchbuddy
 import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.os.Build
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
+import com.justb81.watchbuddy.core.logging.CrashReporter
+import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.service.CompanionService
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
@@ -22,6 +25,12 @@ class WatchBuddyPhoneApp : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
+        CrashReporter.install(this)
+        DiagnosticLog.event(
+            "App",
+            "Phone onCreate ${BuildConfig.VERSION_NAME} (vc=${BuildConfig.VERSION_CODE}) " +
+                "device=${Build.MANUFACTURER} ${Build.MODEL} sdk=${Build.VERSION.SDK_INT}"
+        )
         createNotificationChannels()
     }
 

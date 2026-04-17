@@ -73,4 +73,11 @@
     <string name="cd_scrobble_countdown">Automatisch bestätigen in %1$d Sekunden</string>
     <string name="cd_service_move_up">%1$s in der Priorität nach oben verschieben</string>
     <string name="cd_service_move_down">%1$s in der Priorität nach unten verschieben</string>
+
+    <!-- Diagnostics -->
+    <string name="diagnostics_banner_title">Diagnoseprotokoll verfügbar</string>
+    <string name="diagnostics_banner_message">Die App hat %1$d Absturzprotokoll(e) erfasst. Teile sie mit dem Entwickler, damit das Problem analysiert werden kann.</string>
+    <string name="diagnostics_banner_share">Teilen</string>
+    <string name="diagnostics_banner_dismiss">Verwerfen</string>
+    <string name="diagnostics_export">Diagnose exportieren</string>
 </resources>

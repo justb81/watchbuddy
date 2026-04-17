@@ -30,6 +30,9 @@ kotlin {
 }
 
 dependencies {
+    // AndroidX Core (FileProvider for diagnostic share intent)
+    api(libs.androidx.core.ktx)
+
     // Network
     api(libs.retrofit)
     api(libs.retrofit.serialization)

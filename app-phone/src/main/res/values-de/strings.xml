@@ -134,4 +134,12 @@
     <string name="error_generic">Ein Fehler ist aufgetreten.</string>
     <string name="retry">Erneut versuchen</string>
     <string name="ok">OK</string>
+
+    <!-- Diagnostics -->
+    <string name="home_cd_overflow">Weitere Optionen</string>
+    <string name="diagnostics_banner_title">Diagnoseprotokoll verfügbar</string>
+    <string name="diagnostics_banner_message">Die App hat %1$d Absturzprotokoll(e) erfasst. Teile sie mit dem Entwickler, damit das Problem analysiert werden kann.</string>
+    <string name="diagnostics_banner_share">Teilen</string>
+    <string name="diagnostics_banner_dismiss">Verwerfen</string>
+    <string name="diagnostics_export">Diagnose exportieren</string>
 </resources>
