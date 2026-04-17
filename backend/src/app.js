@@ -257,11 +257,20 @@ export function createApp(config) {
 
     try {
       const traktRes = await fetchWithTimeout(url, options);
+      const rawText = await traktRes.text();
 
       let data;
       try {
-        data = await traktRes.json();
+        data = JSON.parse(rawText);
       } catch (_parseErr) {
+        // Trakt uses empty / non-JSON 400 responses during device-flow polling
+        // to mean "user hasn't authorized yet — keep polling". Pass it through
+        // as 400 so the client's polling loop treats it as pending, not a
+        // 5xx error that burns its consecutive-failure budget.
+        if (traktRes.status === 400) {
+          logTraktCall('Token exchange (pending)', url, options, traktRes);
+          return res.status(400).json({ error: 'authorization_pending' });
+        }
         console.error(`Token exchange: Trakt returned non-JSON response (HTTP ${traktRes.status})`);
         logTraktCall('Token exchange (non-JSON)', url, options, traktRes);
         return res.status(502).json({
@@ -329,10 +338,11 @@ export function createApp(config) {
 
     try {
       const traktRes = await fetchWithTimeout(url, options);
+      const rawText = await traktRes.text();
 
       let data;
       try {
-        data = await traktRes.json();
+        data = JSON.parse(rawText);
       } catch (_parseErr) {
         console.error(`Token refresh: Trakt returned non-JSON response (HTTP ${traktRes.status})`);
         logTraktCall('Token refresh (non-JSON)', url, options, traktRes);

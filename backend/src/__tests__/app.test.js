@@ -4,10 +4,12 @@ import { createApp } from '../app.js';
 
 /** Helper: build a mock fetch that resolves with the given status and body. */
 function mockFetch(status, body, headers = new Map()) {
+  const text = JSON.stringify(body);
   return vi.fn().mockResolvedValue({
     ok: status >= 200 && status < 300,
     status,
     json: () => Promise.resolve(body),
+    text: () => Promise.resolve(text),
     headers: { forEach: (cb) => headers.forEach((v, k) => cb(v, k)) },
   });
 }
@@ -18,6 +20,18 @@ function mockFetchHtml(status) {
     ok: status >= 200 && status < 300,
     status,
     json: () => Promise.reject(new SyntaxError("Unexpected token '<', \"<html>...\" is not valid JSON")),
+    text: () => Promise.resolve('<html><body>Oops</body></html>'),
+    headers: { forEach: (cb) => new Map().forEach((v, k) => cb(v, k)) },
+  });
+}
+
+/** Helper: build a mock fetch that resolves with the given status and an empty body. */
+function mockFetchEmpty(status) {
+  return vi.fn().mockResolvedValue({
+    ok: status >= 200 && status < 300,
+    status,
+    json: () => Promise.reject(new SyntaxError('Unexpected end of JSON input')),
+    text: () => Promise.resolve(''),
     headers: { forEach: (cb) => new Map().forEach((v, k) => cb(v, k)) },
   });
 }
@@ -241,6 +255,35 @@ describe('POST /trakt/token', () => {
     expect(res.status).toBe(502);
     expect(res.body.error).toMatch(/non-JSON/i);
     expect(res.body.error).toContain('503');
+  });
+
+  it('returns 400 authorization_pending when Trakt responds 400 with an empty body', async () => {
+    // Trakt's device-flow /oauth/device/token returns HTTP 400 with an empty body
+    // while the user hasn't yet authorized on trakt.tv/activate. The proxy must
+    // pass this through as 400 (not 502) so the client's polling loop keeps
+    // polling instead of treating it as a network failure.
+    const emptyFetch = mockFetchEmpty(400);
+    const emptyApp = buildApp(emptyFetch);
+
+    const res = await request(emptyApp)
+      .post('/trakt/token')
+      .send({ code: 'device-code-abc' });
+
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ error: 'authorization_pending' });
+  });
+
+  it('returns 502 when Trakt responds with empty body on a 5xx status', async () => {
+    const emptyFetch = mockFetchEmpty(500);
+    const emptyApp = buildApp(emptyFetch);
+
+    const res = await request(emptyApp)
+      .post('/trakt/token')
+      .send({ code: 'device-code-abc' });
+
+    expect(res.status).toBe(502);
+    expect(res.body.error).toMatch(/non-JSON/i);
+    expect(res.body.error).toContain('500');
   });
 });
 
