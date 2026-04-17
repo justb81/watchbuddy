@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.2](https://github.com/justb81/watchbuddy/compare/v0.14.1...v0.14.2) (2026-04-17)
+
+
+### Bug Fixes
+
+* **auth:** stop breaking Trakt device-flow polling on pending 400 responses ([#236](https://github.com/justb81/watchbuddy/issues/236)) ([eb677fe](https://github.com/justb81/watchbuddy/commit/eb677fef06a34761b03a26085d4f649e4a5e1fbd)), closes [#235](https://github.com/justb81/watchbuddy/issues/235)
+
 ## [0.14.1](https://github.com/justb81/watchbuddy/compare/v0.14.0...v0.14.1) (2026-04-17)
 
 
