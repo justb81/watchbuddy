@@ -34,8 +34,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.tv.material3.*
 import coil.compose.AsyncImage
 import com.justb81.watchbuddy.R
-import com.justb81.watchbuddy.core.logging.CrashReporter
-import com.justb81.watchbuddy.core.logging.DiagnosticShare
 import com.justb81.watchbuddy.core.model.EnrichedShowEntry
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
 import com.justb81.watchbuddy.core.progress.ShowProgress
@@ -54,8 +52,6 @@ fun TvHomeScreen(
     viewModel: TvHomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val context = LocalContext.current
-    var pendingReports by remember { mutableStateOf(CrashReporter.listReports(context).size) }
 
     Box(
         modifier = Modifier
@@ -93,14 +89,6 @@ fun TvHomeScreen(
                     }
 
                     OutlinedButton(
-                        onClick = {
-                            DiagnosticShare.launchShare(context)
-                            pendingReports = CrashReporter.listReports(context).size
-                        },
-                        scale = ButtonDefaults.scale(scale = 1f)
-                    ) { Text(stringResource(R.string.diagnostics_export)) }
-
-                    OutlinedButton(
                         onClick = onStreamingSettingsClick,
                         scale = ButtonDefaults.scale(scale = 1f)
                     ) { Text(stringResource(R.string.tv_streaming_settings_button)) }
@@ -110,17 +98,6 @@ fun TvHomeScreen(
                         scale = ButtonDefaults.scale(scale = 1f)
                     ) { Text(stringResource(R.string.tv_select_user)) }
                 }
-            }
-
-            if (pendingReports > 0) {
-                TvDiagnosticsBanner(
-                    reportCount = pendingReports,
-                    onShare = { DiagnosticShare.launchShare(context) },
-                    onDismiss = {
-                        CrashReporter.clearReports(context)
-                        pendingReports = 0
-                    }
-                )
             }
 
             when {
@@ -565,43 +542,6 @@ private fun relativeDate(context: android.content.Context, moment: Instant, now:
         else -> DateUtils.getRelativeTimeSpanString(
             moment.toEpochMilli(), now, DateUtils.DAY_IN_MILLIS, DateUtils.FORMAT_ABBREV_RELATIVE
         ).toString()
-    }
-}
-
-@OptIn(ExperimentalTvMaterial3Api::class)
-@Composable
-private fun TvDiagnosticsBanner(
-    reportCount: Int,
-    onShare: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.errorContainer)
-            .padding(horizontal = 48.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = stringResource(R.string.diagnostics_banner_title),
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onErrorContainer
-            )
-            Text(
-                text = stringResource(R.string.diagnostics_banner_message, reportCount),
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.85f)
-            )
-        }
-        OutlinedButton(onClick = onDismiss, scale = ButtonDefaults.scale(scale = 1f)) {
-            Text(stringResource(R.string.diagnostics_banner_dismiss))
-        }
-        Button(onClick = onShare, scale = ButtonDefaults.scale(scale = 1f)) {
-            Text(stringResource(R.string.diagnostics_banner_share))
-        }
     }
 }
 

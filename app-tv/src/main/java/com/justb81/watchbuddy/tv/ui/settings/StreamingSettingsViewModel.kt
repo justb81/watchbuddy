@@ -2,7 +2,6 @@ package com.justb81.watchbuddy.tv.ui.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.model.KNOWN_STREAMING_SERVICES
 import com.justb81.watchbuddy.core.model.StreamingService
 import com.justb81.watchbuddy.tv.data.StreamingPreferencesRepository
@@ -30,24 +29,18 @@ class StreamingSettingsViewModel @Inject constructor(
 
     /**
      * Safety-net handler so a DataStore-IO failure inside the subscribed-services
-     * flow doesn't force-close the TV Settings screen.  The same pattern that was
-     * retrofitted onto the phone SettingsViewModel in #224 — every exception also
-     * lands in the [DiagnosticLog] so shared reports capture silent failures.
+     * flow doesn't force-close the TV Settings screen. Same pattern as the phone
+     * SettingsViewModel in #224.
      */
-    private val coroutineExceptionHandler = CoroutineExceptionHandler { _, throwable ->
-        DiagnosticLog.error(TAG, "swallowed coroutine exception", throwable)
-    }
+    private val coroutineExceptionHandler = CoroutineExceptionHandler { _, _ -> }
 
     private fun launchSafe(block: suspend CoroutineScope.() -> Unit): Job =
         viewModelScope.launch(coroutineExceptionHandler, block = block)
 
     init {
-        DiagnosticLog.event(TAG, "init: subscribing to subscribedServiceIds")
         launchSafe {
             repository.subscribedServiceIds
-                .catch { e ->
-                    DiagnosticLog.error(TAG, "subscribedServiceIds flow errored", e)
-                }
+                .catch { }
                 .collect { ids ->
                     _uiState.update {
                         it.copy(subscribedIds = ids.toSet(), orderedIds = ids)
@@ -95,7 +88,4 @@ class StreamingSettingsViewModel @Inject constructor(
         }
     }
 
-    private companion object {
-        const val TAG = "StreamingSettingsVM"
-    }
 }

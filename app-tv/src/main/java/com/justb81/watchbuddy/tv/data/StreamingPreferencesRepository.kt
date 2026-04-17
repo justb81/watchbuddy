@@ -7,7 +7,6 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
@@ -31,10 +30,7 @@ class StreamingPreferencesRepository @Inject constructor(
      * Empty list means no preference has been set (show all as fallback).
      */
     val subscribedServiceIds: Flow<List<String>> = context.streamingDataStore.data
-        .catch { e ->
-            DiagnosticLog.error(TAG, "streamingDataStore.data flow errored", e)
-            emit(androidx.datastore.preferences.core.emptyPreferences())
-        }
+        .catch { emit(androidx.datastore.preferences.core.emptyPreferences()) }
         .map { prefs ->
             val ids = prefs[subscribedKey] ?: emptySet()
             val order = prefs[orderKey]?.split(",") ?: emptyList()
@@ -47,18 +43,9 @@ class StreamingPreferencesRepository @Inject constructor(
         }
 
     suspend fun setSubscribedServices(orderedIds: List<String>) {
-        try {
-            context.streamingDataStore.edit { prefs ->
-                prefs[subscribedKey] = orderedIds.toSet()
-                prefs[orderKey] = orderedIds.joinToString(",")
-            }
-        } catch (e: Exception) {
-            DiagnosticLog.error(TAG, "setSubscribedServices failed", e)
-            throw e
+        context.streamingDataStore.edit { prefs ->
+            prefs[subscribedKey] = orderedIds.toSet()
+            prefs[orderKey] = orderedIds.joinToString(",")
         }
-    }
-
-    private companion object {
-        const val TAG = "StreamingPrefsRepo"
     }
 }
