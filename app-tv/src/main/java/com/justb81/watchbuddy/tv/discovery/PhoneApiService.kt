@@ -1,8 +1,8 @@
 package com.justb81.watchbuddy.tv.discovery
 
+import com.justb81.watchbuddy.core.model.EnrichedShowEntry
 import com.justb81.watchbuddy.core.model.TraktEpisode
 import com.justb81.watchbuddy.core.model.TraktShow
-import com.justb81.watchbuddy.core.model.TraktWatchedEntry
 import kotlinx.serialization.Serializable
 import retrofit2.http.Body
 import retrofit2.http.GET
@@ -16,7 +16,7 @@ interface PhoneApiService {
     suspend fun getShows(
         @Query("offset") offset: Int = 0,
         @Query("limit") limit: Int = PAGE_SIZE
-    ): List<TraktWatchedEntry>
+    ): List<EnrichedShowEntry>
 
     companion object {
         const val PAGE_SIZE = 30

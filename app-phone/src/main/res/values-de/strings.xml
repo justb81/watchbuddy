@@ -39,9 +39,19 @@
     <string name="home_connect_to_trakt">Mit Trakt verbinden</string>
     <string name="home_syncing">Synchronisiere mit Trakt…</string>
     <string name="home_last_sync">Zuletzt synchronisiert: %1$s</string>
-    <string name="home_episode_progress">S%1$02dE%2$02d — %3$d/%4$d Folgen gesehen</string>
     <string name="home_next_episode">Nächste: S%1$02dE%2$02d</string>
     <string name="home_just_now">Gerade eben</string>
+    <string name="home_last_watched">Zuletzt gesehen: %1$s, %2$s</string>
+    <string name="home_last_aired_episode">Zuletzt ausgestrahlt: %1$s, %2$s</string>
+    <string name="home_time_today">heute</string>
+    <string name="home_time_tomorrow">morgen</string>
+    <string name="home_time_yesterday">gestern</string>
+    <string name="home_caught_up">Auf dem neuesten Stand</string>
+    <string name="home_show_completed">Abgeschlossen</string>
+    <string name="home_not_started">Noch nicht gestartet</string>
+    <string name="home_show_ended_caught_up">Abgeschlossen %1$s</string>
+    <string name="home_section_expand">Abschnitt ausklappen</string>
+    <string name="home_section_collapse">Abschnitt einklappen</string>
     <string name="home_sync_failed">Synchronisierung fehlgeschlagen: %1$s</string>
     <string name="home_sync_failed_auth">Deine Trakt-Sitzung ist abgelaufen. Bitte authentifiziere dich erneut in den Einstellungen.</string>
     <string name="home_cd_sync">Synchronisieren</string>
@@ -142,4 +152,14 @@
     <string name="diagnostics_banner_share">Teilen</string>
     <string name="diagnostics_banner_dismiss">Verwerfen</string>
     <string name="diagnostics_export">Diagnose exportieren</string>
+
+    <!-- Home plurals -->
+    <plurals name="home_episodes_behind">
+        <item quantity="one">%d Folge hinterher</item>
+        <item quantity="other">%d Folgen hinterher</item>
+    </plurals>
+    <plurals name="home_section_all_shows_count">
+        <item quantity="one">%d Serie</item>
+        <item quantity="other">%d Serien</item>
+    </plurals>
 </resources>

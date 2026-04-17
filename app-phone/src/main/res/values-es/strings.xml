@@ -39,9 +39,19 @@
     <string name="home_connect_to_trakt">Conectar con Trakt</string>
     <string name="home_syncing">Sincronizando con Trakt…</string>
     <string name="home_last_sync">Última sincronización: %1$s</string>
-    <string name="home_episode_progress">S%1$02dE%2$02d — %3$d/%4$d episodios vistos</string>
     <string name="home_next_episode">Siguiente: S%1$02dE%2$02d</string>
     <string name="home_just_now">Ahora mismo</string>
+    <string name="home_last_watched">Último visto: %1$s, %2$s</string>
+    <string name="home_last_aired_episode">Último emitido: %1$s, %2$s</string>
+    <string name="home_time_today">hoy</string>
+    <string name="home_time_tomorrow">mañana</string>
+    <string name="home_time_yesterday">ayer</string>
+    <string name="home_caught_up">Al día</string>
+    <string name="home_show_completed">Terminada</string>
+    <string name="home_not_started">No iniciada</string>
+    <string name="home_show_ended_caught_up">Terminada %1$s</string>
+    <string name="home_section_expand">Expandir sección</string>
+    <string name="home_section_collapse">Contraer sección</string>
     <string name="home_sync_failed">Error de sincronización: %1$s</string>
     <string name="home_sync_failed_auth">Tu sesión de Trakt ha expirado. Por favor, vuelve a autenticarte en los ajustes.</string>
     <string name="home_cd_sync">Sincronizar</string>
@@ -142,4 +152,14 @@
     <string name="diagnostics_banner_share">Compartir</string>
     <string name="diagnostics_banner_dismiss">Descartar</string>
     <string name="diagnostics_export">Exportar diagnóstico</string>
+
+    <!-- Home plurals -->
+    <plurals name="home_episodes_behind">
+        <item quantity="one">%d episodio pendiente</item>
+        <item quantity="other">%d episodios pendientes</item>
+    </plurals>
+    <plurals name="home_section_all_shows_count">
+        <item quantity="one">%d serie</item>
+        <item quantity="other">%d series</item>
+    </plurals>
 </resources>

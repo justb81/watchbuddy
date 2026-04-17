@@ -1,5 +1,6 @@
 package com.justb81.watchbuddy.tv.ui.home
 
+import com.justb81.watchbuddy.core.model.EnrichedShowEntry
 import com.justb81.watchbuddy.core.model.TraktIds
 import com.justb81.watchbuddy.core.model.TraktShow
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
@@ -39,10 +40,11 @@ class TvHomeViewModelTest {
     private val phonesFlow = MutableStateFlow<List<PhoneDiscoveryManager.DiscoveredPhone>>(emptyList())
     private val phoneApiService: PhoneApiService = mockk()
 
-    private val testShows = listOf(
+    private val testTraktShows = listOf(
         TraktWatchedEntry(TraktShow("Show 1", 2024, TraktIds())),
         TraktWatchedEntry(TraktShow("Show 2", 2023, TraktIds()))
     )
+    private val testShows = testTraktShows.map { EnrichedShowEntry(entry = it) }
 
     @BeforeEach
     fun setUp() {
@@ -125,7 +127,7 @@ class TvHomeViewModelTest {
 
         val state = viewModel.uiState.value
         assertEquals(2, state.shows.size)
-        assertEquals("Show 1", state.shows[0].show.title)
+        assertEquals("Show 1", state.shows[0].entry.show.title)
         assertFalse(state.isLoading)
         assertFalse(state.phoneApiError)
         assertFalse(state.noPhoneConnected)
@@ -142,7 +144,7 @@ class TvHomeViewModelTest {
         createViewModel()
         advanceUntilIdle()
 
-        verify { tvShowCache.updateShows(testShows) }
+        verify { tvShowCache.updateShows(testTraktShows) }
     }
 
     @Test
@@ -184,7 +186,7 @@ class TvHomeViewModelTest {
 
         private fun makeShows(count: Int, startId: Int = 1) =
             (startId until startId + count).map { i ->
-                TraktWatchedEntry(TraktShow("Show $i", 2020, TraktIds(trakt = i)))
+                EnrichedShowEntry(entry = TraktWatchedEntry(TraktShow("Show $i", 2020, TraktIds(trakt = i))))
             }
 
         private fun setupPhone(): PhoneDiscoveryManager.DiscoveredPhone {
@@ -346,7 +348,7 @@ class TvHomeViewModelTest {
             advanceUntilIdle()
 
             val allShows = page1 + page2
-            verify { tvShowCache.updateShows(allShows) }
+            verify { tvShowCache.updateShows(allShows.map { it.entry }) }
         }
     }
 }

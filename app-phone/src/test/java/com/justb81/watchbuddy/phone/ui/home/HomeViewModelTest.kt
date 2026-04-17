@@ -1,11 +1,11 @@
 package com.justb81.watchbuddy.phone.ui.home
 
 import android.app.Application
-import com.justb81.watchbuddy.core.tmdb.TmdbApiService
-import com.justb81.watchbuddy.core.trakt.TraktApiService
+import com.justb81.watchbuddy.core.model.EnrichedShowEntry
 import com.justb81.watchbuddy.phone.MainDispatcherRule
 import com.justb81.watchbuddy.phone.TestFixtures
 import com.justb81.watchbuddy.phone.auth.TokenRepository
+import com.justb81.watchbuddy.phone.server.ShowRepository
 import com.justb81.watchbuddy.phone.settings.AppSettings
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import com.justb81.watchbuddy.service.CompanionStateManager
@@ -36,10 +36,9 @@ class HomeViewModelTest {
     }
 
     private val application: Application = mockk(relaxed = true)
-    private val traktApi: TraktApiService = mockk(relaxed = true)
+    private val showRepository: ShowRepository = mockk(relaxed = true)
     private val tokenRepository: TokenRepository = mockk(relaxed = true)
     private val settingsRepository: SettingsRepository = mockk(relaxed = true)
-    private val tmdbApiService: TmdbApiService = mockk(relaxed = true)
     private val companionStateManager = CompanionStateManager()
 
     @BeforeEach
@@ -47,16 +46,19 @@ class HomeViewModelTest {
         every { settingsRepository.settings } returns flowOf(AppSettings())
         every { settingsRepository.getTmdbApiKey() } returns flowOf("")
         every { tokenRepository.getAccessToken() } returns null
+        coEvery { showRepository.getShows() } returns emptyList()
     }
 
     private fun createViewModel(): HomeViewModel = HomeViewModel(
         application = application,
-        traktApi = traktApi,
+        showRepository = showRepository,
         tokenRepository = tokenRepository,
         settingsRepository = settingsRepository,
-        tmdbApiService = tmdbApiService,
         companionStateManager = companionStateManager
     )
+
+    private fun enriched(title: String) =
+        EnrichedShowEntry(entry = TestFixtures.traktWatchedEntry(show = TestFixtures.traktShow(title)))
 
     @Nested
     @DisplayName("loadShows")
@@ -76,12 +78,9 @@ class HomeViewModelTest {
 
         @Test
         fun `loads shows successfully when token is available`() = runTest {
-            val shows = listOf(
-                TestFixtures.traktWatchedEntry(show = TestFixtures.traktShow("Breaking Bad")),
-                TestFixtures.traktWatchedEntry(show = TestFixtures.traktShow("The Wire"))
-            )
+            val shows = listOf(enriched("Breaking Bad"), enriched("The Wire"))
             every { tokenRepository.getAccessToken() } returns "valid-token"
-            coEvery { traktApi.getWatchedShows("Bearer valid-token") } returns shows
+            coEvery { showRepository.getShows() } returns shows
 
             val vm = createViewModel()
             advanceUntilIdle()
@@ -94,7 +93,7 @@ class HomeViewModelTest {
         @Test
         fun `sets lastSyncTime after successful load`() = runTest {
             every { tokenRepository.getAccessToken() } returns "valid-token"
-            coEvery { traktApi.getWatchedShows(any()) } returns emptyList()
+            coEvery { showRepository.getShows() } returns emptyList()
 
             val vm = createViewModel()
             advanceUntilIdle()
@@ -103,9 +102,9 @@ class HomeViewModelTest {
         }
 
         @Test
-        fun `sets error and clears loading when API throws`() = runTest {
+        fun `sets error and clears loading when repository throws`() = runTest {
             every { tokenRepository.getAccessToken() } returns "valid-token"
-            coEvery { traktApi.getWatchedShows(any()) } throws RuntimeException("Network error")
+            coEvery { showRepository.getShows() } throws RuntimeException("Network error")
 
             val vm = createViewModel()
             advanceUntilIdle()
@@ -119,7 +118,7 @@ class HomeViewModelTest {
         fun `shows auth error message on HTTP 401`() = runTest {
             every { tokenRepository.getAccessToken() } returns "valid-token"
             val httpEx = HttpException(retrofit2.Response.error<Any>(401, ResponseBody.create(null, "")))
-            coEvery { traktApi.getWatchedShows(any()) } throws httpEx
+            coEvery { showRepository.getShows() } throws httpEx
             every { application.getString(com.justb81.watchbuddy.R.string.home_sync_failed_auth) } returns "Session expired"
 
             val vm = createViewModel()
@@ -133,7 +132,7 @@ class HomeViewModelTest {
         fun `shows auth error message on HTTP 403`() = runTest {
             every { tokenRepository.getAccessToken() } returns "valid-token"
             val httpEx = HttpException(retrofit2.Response.error<Any>(403, ResponseBody.create(null, "")))
-            coEvery { traktApi.getWatchedShows(any()) } throws httpEx
+            coEvery { showRepository.getShows() } throws httpEx
             every { application.getString(com.justb81.watchbuddy.R.string.home_sync_failed_auth) } returns "Session expired"
 
             val vm = createViewModel()
@@ -146,14 +145,14 @@ class HomeViewModelTest {
         @Test
         fun `clears error on successful reload after failure`() = runTest {
             every { tokenRepository.getAccessToken() } returns "valid-token"
-            coEvery { traktApi.getWatchedShows(any()) } throws RuntimeException("fail")
+            coEvery { showRepository.getShows() } throws RuntimeException("fail")
 
             val vm = createViewModel()
             advanceUntilIdle()
             assertNotNull(vm.uiState.value.error)
 
-            val shows = listOf(TestFixtures.traktWatchedEntry())
-            coEvery { traktApi.getWatchedShows(any()) } returns shows
+            val shows = listOf(enriched("Test"))
+            coEvery { showRepository.getShows() } returns shows
 
             vm.loadShows()
             advanceUntilIdle()
@@ -165,7 +164,7 @@ class HomeViewModelTest {
         @Test
         fun `empty show list is a valid success result`() = runTest {
             every { tokenRepository.getAccessToken() } returns "valid-token"
-            coEvery { traktApi.getWatchedShows(any()) } returns emptyList()
+            coEvery { showRepository.getShows() } returns emptyList()
 
             val vm = createViewModel()
             advanceUntilIdle()
@@ -182,19 +181,16 @@ class HomeViewModelTest {
 
         @Test
         fun `sync reloads and reflects updated show list`() = runTest {
-            val initialShows = listOf(TestFixtures.traktWatchedEntry(show = TestFixtures.traktShow("Show A")))
-            val updatedShows = listOf(
-                TestFixtures.traktWatchedEntry(show = TestFixtures.traktShow("Show A")),
-                TestFixtures.traktWatchedEntry(show = TestFixtures.traktShow("Show B"))
-            )
+            val initialShows = listOf(enriched("Show A"))
+            val updatedShows = listOf(enriched("Show A"), enriched("Show B"))
             every { tokenRepository.getAccessToken() } returns "valid-token"
-            coEvery { traktApi.getWatchedShows(any()) } returns initialShows
+            coEvery { showRepository.getShows() } returns initialShows
 
             val vm = createViewModel()
             advanceUntilIdle()
             assertEquals(initialShows, vm.uiState.value.shows)
 
-            coEvery { traktApi.getWatchedShows(any()) } returns updatedShows
+            coEvery { showRepository.getShows() } returns updatedShows
             vm.sync()
             advanceUntilIdle()
 
@@ -204,13 +200,13 @@ class HomeViewModelTest {
         @Test
         fun `sync clears error from previous failed load`() = runTest {
             every { tokenRepository.getAccessToken() } returns "valid-token"
-            coEvery { traktApi.getWatchedShows(any()) } throws RuntimeException("fail")
+            coEvery { showRepository.getShows() } throws RuntimeException("fail")
 
             val vm = createViewModel()
             advanceUntilIdle()
             assertNotNull(vm.uiState.value.error)
 
-            coEvery { traktApi.getWatchedShows(any()) } returns emptyList()
+            coEvery { showRepository.getShows() } returns emptyList()
             vm.sync()
             advanceUntilIdle()
 
@@ -241,7 +237,6 @@ class HomeViewModelTest {
             val vm = createViewModel()
             advanceUntilIdle()
 
-            // loadShows() catches via existing broad catch; checkServiceConnections() catches via new try-catch
             assertFalse(vm.uiState.value.canWatch)
             assertNotNull(vm.uiState.value.error)
         }
@@ -258,8 +253,6 @@ class HomeViewModelTest {
             val vm = createViewModel()
             advanceUntilIdle()
 
-            // Application is a relaxed mock — startForegroundService() is a no-op.
-            // Reaching here without an exception confirms the code path executes safely.
             assertNotNull(vm)
         }
 

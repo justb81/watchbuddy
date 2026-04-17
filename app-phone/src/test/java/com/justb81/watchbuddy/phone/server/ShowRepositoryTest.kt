@@ -1,11 +1,15 @@
 package com.justb81.watchbuddy.phone.server
 
+import com.justb81.watchbuddy.core.model.TmdbShow
 import com.justb81.watchbuddy.core.model.TraktIds
 import com.justb81.watchbuddy.core.model.TraktShow
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
+import com.justb81.watchbuddy.core.tmdb.TmdbApiService
 import com.justb81.watchbuddy.core.trakt.TraktApiService
 import com.justb81.watchbuddy.phone.auth.TokenRefreshManager
+import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import io.mockk.*
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
@@ -17,16 +21,19 @@ class ShowRepositoryTest {
 
     private val traktApi: TraktApiService = mockk()
     private val tokenRefreshManager: TokenRefreshManager = mockk()
+    private val tmdbApiService: TmdbApiService = mockk()
+    private val settingsRepository: SettingsRepository = mockk()
     private lateinit var repository: ShowRepository
 
     private val testShows = listOf(
-        TraktWatchedEntry(TraktShow("Show 1", 2024, TraktIds())),
-        TraktWatchedEntry(TraktShow("Show 2", 2023, TraktIds()))
+        TraktWatchedEntry(TraktShow("Show 1", 2024, TraktIds(trakt = 1, tmdb = 100))),
+        TraktWatchedEntry(TraktShow("Show 2", 2023, TraktIds(trakt = 2, tmdb = 200)))
     )
 
     @BeforeEach
     fun setUp() {
-        repository = ShowRepository(traktApi, tokenRefreshManager)
+        every { settingsRepository.getTmdbApiKey() } returns flowOf("")
+        repository = ShowRepository(traktApi, tokenRefreshManager, tmdbApiService, settingsRepository)
     }
 
     @Test
@@ -36,7 +43,7 @@ class ShowRepositoryTest {
 
         val result = repository.getShows()
         assertEquals(2, result.size)
-        assertEquals("Show 1", result[0].show.title)
+        assertEquals("Show 1", result[0].entry.show.title)
         coVerify(exactly = 1) { traktApi.getWatchedShows(any()) }
     }
 
@@ -47,7 +54,6 @@ class ShowRepositoryTest {
 
         repository.getShows()
         repository.getShows()
-        // API should only be called once due to caching
         coVerify(exactly = 1) { traktApi.getWatchedShows(any()) }
     }
 
@@ -75,7 +81,6 @@ class ShowRepositoryTest {
         coEvery { traktApi.getWatchedShows(any()) } throws RuntimeException("Network error")
 
         val result = repository.getShows()
-
         assertTrue(result.isEmpty())
     }
 
@@ -84,39 +89,61 @@ class ShowRepositoryTest {
         coEvery { tokenRefreshManager.getValidAccessToken() } returns "test-token"
         coEvery { traktApi.getWatchedShows(any()) } returns testShows
 
-        // Prime the cache with a successful fetch
         repository.getShows()
 
-        // Simulate cache TTL expiry by resetting lastFetch to 0 via reflection
         ShowRepository::class.java.getDeclaredField("lastFetch").apply {
             isAccessible = true
             setLong(repository, 0L)
         }
 
-        // API now throws on the refresh attempt
         coEvery { traktApi.getWatchedShows(any()) } throws RuntimeException("Trakt unavailable")
 
-        // Stale cached data should be returned instead of propagating the exception
         val result = repository.getShows()
 
         assertEquals(2, result.size)
-        // API was retried (two total calls: initial fetch + failed refresh attempt)
         coVerify(exactly = 2) { traktApi.getWatchedShows(any()) }
     }
 
     @Test
     fun `getShows retries API on next call after a failure`() = runTest {
         coEvery { tokenRefreshManager.getValidAccessToken() } returns "test-token"
-        // First call: API throws
         coEvery { traktApi.getWatchedShows(any()) } throws RuntimeException("Network error")
         repository.getShows()
 
-        // Second call: API succeeds
         coEvery { traktApi.getWatchedShows(any()) } returns testShows
         val result = repository.getShows()
 
-        // Both calls should have hit the API because lastFetch was not updated on failure
         coVerify(exactly = 2) { traktApi.getWatchedShows(any()) }
         assertEquals(2, result.size)
+    }
+
+    @Test
+    fun `getShows enriches entries with TMDB poster path when API key is set`() = runTest {
+        every { settingsRepository.getTmdbApiKey() } returns flowOf("api-key")
+        coEvery { tokenRefreshManager.getValidAccessToken() } returns "test-token"
+        coEvery { traktApi.getWatchedShows(any()) } returns testShows
+        coEvery { tmdbApiService.getShow(100, "api-key", any()) } returns TmdbShow(100, "Show 1", poster_path = "/one.jpg")
+        coEvery { tmdbApiService.getShow(200, "api-key", any()) } returns TmdbShow(200, "Show 2", poster_path = "/two.jpg")
+
+        val result = repository.getShows()
+
+        assertEquals("/one.jpg", result[0].posterPath)
+        assertEquals("/two.jpg", result[1].posterPath)
+    }
+
+    @Test
+    fun `getShows tolerates per-show TMDB failures`() = runTest {
+        every { settingsRepository.getTmdbApiKey() } returns flowOf("api-key")
+        coEvery { tokenRefreshManager.getValidAccessToken() } returns "test-token"
+        coEvery { traktApi.getWatchedShows(any()) } returns testShows
+        coEvery { tmdbApiService.getShow(100, "api-key", any()) } returns TmdbShow(100, "Show 1", poster_path = "/one.jpg")
+        coEvery { tmdbApiService.getShow(200, "api-key", any()) } throws RuntimeException("TMDB down for Show 2")
+
+        val result = repository.getShows()
+
+        assertEquals(2, result.size)
+        assertEquals("/one.jpg", result[0].posterPath)
+        assertNull(result[1].posterPath)
+        assertNull(result[1].tmdb)
     }
 }

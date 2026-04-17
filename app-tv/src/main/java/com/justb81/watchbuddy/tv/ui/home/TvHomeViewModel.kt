@@ -3,7 +3,9 @@ package com.justb81.watchbuddy.tv.ui.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
-import com.justb81.watchbuddy.core.model.TraktWatchedEntry
+import com.justb81.watchbuddy.core.model.EnrichedShowEntry
+import com.justb81.watchbuddy.core.progress.ShowProgress
+import com.justb81.watchbuddy.core.progress.ShowProgressCalculator
 import com.justb81.watchbuddy.tv.data.TvShowCache
 import com.justb81.watchbuddy.tv.data.UserSessionRepository
 import com.justb81.watchbuddy.tv.discovery.PhoneApiClientFactory
@@ -17,7 +19,9 @@ import javax.inject.Inject
 data class TvHomeUiState(
     val isLoading: Boolean = true,
     val isLoadingMore: Boolean = false,
-    val shows: List<TraktWatchedEntry> = emptyList(),
+    val shows: List<EnrichedShowEntry> = emptyList(),
+    /** Progress keyed by Trakt id. */
+    val progress: Map<Int, ShowProgress> = emptyMap(),
     val selectedUserIds: Set<String> = emptySet(),
     val connectedPhones: Int = 0,
     val bestPhoneName: String? = null,
@@ -46,7 +50,7 @@ class TvHomeViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(TvHomeUiState())
     val uiState: StateFlow<TvHomeUiState> = _uiState.asStateFlow()
 
-    private var cachedShows: List<TraktWatchedEntry>? = null
+    private var cachedShows: List<EnrichedShowEntry>? = null
     private var cacheTimestamp: Long = 0L
     private var loadedOffset: Int = 0
 
@@ -108,7 +112,6 @@ class TvHomeViewModel @Inject constructor(
             }
         }
 
-        // Determine best phone before entering the try block so it is accessible in the catch.
         val bestPhone = phoneDiscovery.getBestPhone()
         val currentOffset = if (append) loadedOffset else 0
 
@@ -124,13 +127,14 @@ class TvHomeViewModel @Inject constructor(
 
                 cachedShows = allShows
                 cacheTimestamp = System.currentTimeMillis()
-                tvShowCache.updateShows(allShows)
+                tvShowCache.updateShows(allShows.map { it.entry })
 
                 _uiState.update {
                     it.copy(
                         isLoading = false,
                         isLoadingMore = false,
                         shows = allShows,
+                        progress = computeProgress(allShows),
                         canLoadMore = hasMore
                     )
                 }
@@ -142,6 +146,7 @@ class TvHomeViewModel @Inject constructor(
                             isLoading = false,
                             isLoadingMore = false,
                             shows = cached,
+                            progress = computeProgress(cached),
                             noPhoneConnected = true,
                             canLoadMore = false
                         )
@@ -158,8 +163,6 @@ class TvHomeViewModel @Inject constructor(
                 }
             }
         } catch (e: Exception) {
-            // A phone was found (bestPhone != null) but its API call failed — this is different from
-            // "no phone connected". Show phoneApiError so the UI can display the correct message.
             val phoneFound = bestPhone != null
             val cached = getCachedShows()
             if (cached != null) {
@@ -168,6 +171,7 @@ class TvHomeViewModel @Inject constructor(
                         isLoading = false,
                         isLoadingMore = false,
                         shows = cached,
+                        progress = computeProgress(cached),
                         phoneApiError = phoneFound,
                         error = e.message,
                         canLoadMore = false
@@ -188,7 +192,14 @@ class TvHomeViewModel @Inject constructor(
         }
     }
 
-    private fun getCachedShows(): List<TraktWatchedEntry>? {
+    private fun computeProgress(shows: List<EnrichedShowEntry>): Map<Int, ShowProgress> =
+        shows.mapNotNull { enriched ->
+            enriched.entry.show.ids.trakt?.let { id ->
+                id to ShowProgressCalculator.compute(enriched.entry, enriched.tmdb)
+            }
+        }.toMap()
+
+    private fun getCachedShows(): List<EnrichedShowEntry>? {
         val ttl = 5 * 60 * 1000L // 5 minutes
         val cached = cachedShows
         return if (cached != null && System.currentTimeMillis() - cacheTimestamp < ttl) cached else null

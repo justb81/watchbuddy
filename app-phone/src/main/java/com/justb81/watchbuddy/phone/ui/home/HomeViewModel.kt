@@ -4,21 +4,21 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.justb81.watchbuddy.R
+import com.justb81.watchbuddy.core.model.EnrichedShowEntry
 import com.justb81.watchbuddy.core.model.ScrobbleDisplayEvent
-import com.justb81.watchbuddy.core.model.TraktWatchedEntry
-import com.justb81.watchbuddy.core.tmdb.TmdbApiService
-import com.justb81.watchbuddy.core.tmdb.TmdbImageHelper
-import com.justb81.watchbuddy.core.trakt.TraktApiService
+import com.justb81.watchbuddy.core.progress.ShowProgress
+import com.justb81.watchbuddy.core.progress.ShowProgressCalculator
 import com.justb81.watchbuddy.phone.auth.TokenRepository
+import com.justb81.watchbuddy.phone.server.ShowRepository
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import com.justb81.watchbuddy.service.CompanionService
 import com.justb81.watchbuddy.service.CompanionStateManager
-import kotlinx.coroutines.flow.first
 import dagger.hilt.android.lifecycle.HiltViewModel
-import retrofit2.HttpException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -26,8 +26,9 @@ import javax.inject.Inject
 data class HomeUiState(
     val isLoading: Boolean = false,
     val isSyncing: Boolean = false,
-    val shows: List<TraktWatchedEntry> = emptyList(),
-    val posterUrls: Map<Int, String?> = emptyMap(),  // key: TMDB ID
+    val shows: List<EnrichedShowEntry> = emptyList(),
+    /** Progress keyed by Trakt id so the UI can look up per-card state in O(1). */
+    val progress: Map<Int, ShowProgress> = emptyMap(),
     val lastSyncTime: String? = null,
     val error: String? = null,
     val canWatch: Boolean = false,
@@ -38,10 +39,9 @@ data class HomeUiState(
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     application: Application,
-    private val traktApi: TraktApiService,
+    private val showRepository: ShowRepository,
     private val tokenRepository: TokenRepository,
     private val settingsRepository: SettingsRepository,
-    private val tmdbApiService: TmdbApiService,
     private val companionStateManager: CompanionStateManager
 ) : AndroidViewModel(application) {
 
@@ -74,7 +74,12 @@ class HomeViewModel @Inject constructor(
 
     private fun observeCompanionState() {
         viewModelScope.launch {
-            settingsRepository.settings.collect { settings ->
+            val settingsFlow = try {
+                settingsRepository.settings
+            } catch (_: Exception) {
+                flowOf()
+            }
+            settingsFlow.collect { settings ->
                 val wasWatching = _uiState.value.isWatchingTv
                 _uiState.update { it.copy(isWatchingTv = settings.companionEnabled) }
                 if (settings.companionEnabled && !wasWatching) {
@@ -110,45 +115,30 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             try {
-                val accessToken = tokenRepository.getAccessToken()
+                val token = tokenRepository.getAccessToken()
                     ?: throw IllegalStateException("No access token available")
-                val shows = traktApi.getWatchedShows("Bearer $accessToken")
+                // Touch token to surface keystore exceptions here so catch translates them into UI error.
+                @Suppress("UNUSED_VARIABLE") val _t = token
+                val shows = showRepository.getShows()
+                val progressMap = shows.mapNotNull { enriched ->
+                    enriched.entry.show.ids.trakt?.let { traktId ->
+                        traktId to ShowProgressCalculator.compute(enriched.entry, enriched.tmdb)
+                    }
+                }.toMap()
                 _uiState.value = _uiState.value.copy(
                     isLoading    = false,
                     shows        = shows,
-                    posterUrls   = emptyMap(),
+                    progress     = progressMap,
                     lastSyncTime = getApplication<Application>().getString(R.string.home_just_now)
                 )
-                loadPosters(shows)
             } catch (e: Exception) {
-                val httpCode = (e as? HttpException)?.code()
+                val httpCode = (e as? retrofit2.HttpException)?.code()
                 val errorMsg = if (httpCode == 401 || httpCode == 403) {
                     getApplication<Application>().getString(R.string.home_sync_failed_auth)
                 } else {
                     getApplication<Application>().getString(R.string.home_sync_failed, e.message)
                 }
                 _uiState.value = _uiState.value.copy(isLoading = false, error = errorMsg)
-            }
-        }
-    }
-
-    private fun loadPosters(shows: List<TraktWatchedEntry>) {
-        viewModelScope.launch {
-            val tmdbKey = settingsRepository.getTmdbApiKey().first()
-            if (tmdbKey.isBlank()) return@launch
-            shows.forEach { entry ->
-                val tmdbId = entry.show.ids.tmdb ?: return@forEach
-                launch {
-                    try {
-                        val tmdbShow = tmdbApiService.getShow(tmdbId, tmdbKey)
-                        val posterUrl = TmdbImageHelper.poster(tmdbShow.poster_path, 300)
-                        _uiState.update { state ->
-                            state.copy(posterUrls = state.posterUrls + (tmdbId to posterUrl))
-                        }
-                    } catch (_: Exception) {
-                        // Poster loading failure is silent; show renders without image
-                    }
-                }
             }
         }
     }

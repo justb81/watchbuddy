@@ -10,6 +10,25 @@
     <string name="tv_no_phone">Kein Handy verbunden.\nStarte die WatchBuddy-App auf deinem Smartphone.</string>
     <string name="tv_retry">Erneut versuchen</string>
     <string name="tv_devices_count">%1$d Gerät(e)</string>
+    <string name="tv_last_watched">Zuletzt: %1$s, %2$s</string>
+    <string name="tv_last_aired_episode">Ausgestrahlt: %1$s, %2$s</string>
+    <string name="tv_next_aired">Nächste: %1$s, %2$s</string>
+    <string name="tv_time_today">heute</string>
+    <string name="tv_time_tomorrow">morgen</string>
+    <string name="tv_time_yesterday">gestern</string>
+    <string name="tv_caught_up">Aktuell</string>
+    <string name="tv_show_completed">Abgeschlossen</string>
+    <string name="tv_not_started">Nicht gestartet</string>
+    <string name="tv_section_expand">Abschnitt ausklappen</string>
+    <string name="tv_section_collapse">Abschnitt einklappen</string>
+    <plurals name="tv_episodes_behind">
+        <item quantity="one">%d hinterher</item>
+        <item quantity="other">%d hinterher</item>
+    </plurals>
+    <plurals name="tv_section_all_shows_count">
+        <item quantity="one">%d Serie</item>
+        <item quantity="other">%d Serien</item>
+    </plurals>
 
     <!-- User select -->
     <string name="tv_select_user">Wer schaut?</string>

@@ -152,7 +152,7 @@ internal fun Application.configureCompanionRoutes(
                 val tmdbLanguage = LocaleHelper.getTmdbLanguage()
 
                 val shows = showRepository.getShows()
-                val watchedEntry = shows.find { it.show.ids.trakt == showId }
+                val watchedEntry = shows.find { it.entry.show.ids.trakt == showId }?.entry
                     ?: return@post call.respond(HttpStatusCode.NotFound, ErrorResponse("Show not found"))
 
                 val tmdbId = watchedEntry.show.ids.tmdb
