@@ -32,6 +32,21 @@
 -keep,allowobfuscation interface <1>
 -keep,allowobfuscation,allowshrinking class kotlin.coroutines.Continuation
 
+# Explicit non-obfuscated keep rules for every Retrofit service interface in
+# the project.  Under AGP 9 / R8 full mode, the generic
+# `-keep,allowobfuscation interface <1>` rule above permits renaming and
+# horizontal class merging, which breaks the `Proxy.newProxyInstance` →
+# Kotlin-inserted checkcast invariant that `retrofit.create(Foo::class.java)`
+# relies on.  Symptom: ClassCastException thrown from the @Provides method
+# the moment the Hilt graph constructs the Retrofit service (issue #247).
+# The phone has more live call sites into TmdbApiService / TraktApiService
+# than the TV, so R8 has been less aggressive there in practice — but the
+# guarantee is fragile.  Keep the rules aligned across modules.
+# NOTE: Every new Retrofit interface MUST be added here as well.
+-keep interface com.justb81.watchbuddy.core.tmdb.TmdbApiService { *; }
+-keep interface com.justb81.watchbuddy.core.trakt.TraktApiService { *; }
+-keep interface com.justb81.watchbuddy.core.trakt.TokenProxyService { *; }
+
 # ── OkHttp ───────────────────────────────────────────────────────────────────
 -dontwarn okhttp3.internal.platform.**
 -dontwarn org.conscrypt.**
