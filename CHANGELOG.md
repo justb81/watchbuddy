@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.0](https://github.com/justb81/watchbuddy/compare/v0.13.10...v0.14.0) (2026-04-17)
+
+
+### Features
+
+* **diagnostics:** capture crashes and breadcrumbs so the Settings bug becomes observable ([#230](https://github.com/justb81/watchbuddy/issues/230)) ([cbf0620](https://github.com/justb81/watchbuddy/commit/cbf062097005cc363c15e36eb7dbafa5fea6d6a6))
+
 ## [0.13.10](https://github.com/justb81/watchbuddy/compare/v0.13.9...v0.13.10) (2026-04-17)
 
 
