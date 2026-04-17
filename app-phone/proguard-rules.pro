@@ -68,17 +68,23 @@
 -keep class androidx.security.crypto.** { *; }
 
 # ── Room / WorkManager ──────────────────────────────────────────────────────
-# Room 2.7+ instantiates generated _Impl classes via reflection
-# (Class.getDeclaredConstructor().newInstance()), so the no-arg constructor
-# must survive R8 shrinking.  Without this rule, the first call to
-# WorkManager.getInstance() in a release build throws
-# "NoSuchMethodException: androidx.work.impl.WorkDatabase_Impl.<init>[]".
-# Reported in issue #232 — the crash that opening Settings produced because
-# SettingsViewModel has an @Inject WorkManager dependency.
--keepclassmembers class * extends androidx.room.RoomDatabase {
-    public <init>();
+# Room 2.7+ reflectively invokes a no-arg constructor on generated _Impl
+# classes (see androidx.room.Room.getGeneratedImplementation).  R8 full mode
+# in AGP 9 strips constructors that have no static callers even under
+# `-keep class X { *; }` — issue #232 traced to this pathway on the phone
+# (SettingsViewModel has an @Inject WorkManager dependency).  Kept the
+# constructor explicitly; matches the TV module for consistency.
+-keep,includedescriptorclasses class * extends androidx.room.RoomDatabase {
+    <init>();
+    *;
 }
--keep class androidx.work.impl.WorkDatabase_Impl { *; }
+-keepclassmembers class * extends androidx.room.RoomDatabase {
+    <init>();
+}
+-keep class androidx.work.impl.WorkDatabase_Impl {
+    <init>();
+    *;
+}
 
 # ── Coroutines ───────────────────────────────────────────────────────────────
 -keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}

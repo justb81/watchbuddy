@@ -148,3 +148,14 @@ kotlin {
 tasks.withType<Test> {
     useJUnitPlatform()
 }
+
+// The TV app does not use WorkManager. If a transitive dep brings in
+// androidx.work:work-runtime, its InitializationProvider auto-init crashes
+// pre-Application.onCreate on release builds (Room reflectively invokes the
+// no-arg constructor on WorkDatabase_Impl, which R8 full mode strips — see
+// issue #232 and the 0.12.0 trace on #244). Dropping the group removes both
+// the DEX classes and the merged-manifest contribution, so WorkManager cannot
+// be registered as an androidx.startup initializer in the first place.
+configurations.all {
+    exclude(group = "androidx.work")
+}

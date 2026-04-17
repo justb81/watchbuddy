@@ -48,18 +48,30 @@
 -keep class androidx.security.crypto.** { *; }
 -dontwarn com.google.errorprone.annotations.**
 
-# ── Room / WorkManager ──────────────────────────────────────────────────────
-# Room 2.7+ instantiates generated _Impl classes via reflection
-# (Class.getDeclaredConstructor().newInstance()), so the no-arg constructor
-# must survive R8 shrinking.  Without this rule, the first call to
-# WorkManager.getInstance() in a release build throws
-# "NoSuchMethodException: androidx.work.impl.WorkDatabase_Impl.<init>[]".
-# Reported in issue #232 — the crash that opening Settings produced because
-# SettingsViewModel has an @Inject WorkManager dependency.
--keepclassmembers class * extends androidx.room.RoomDatabase {
-    public <init>();
+# ── Room ────────────────────────────────────────────────────────────────────
+# Room 2.7+ reflectively invokes a no-arg constructor on generated _Impl
+# classes (see androidx.room.Room.getGeneratedImplementation).  R8 full mode
+# in AGP 9 strips constructors that have no static callers even under
+# `-keep class X { *; }` — issues #232 and the 0.12.0 trace attached to #244
+# both trace to this pathway.  Kept the constructor explicitly.
+-keep,includedescriptorclasses class * extends androidx.room.RoomDatabase {
+    <init>();
+    *;
 }
--keep class androidx.work.impl.WorkDatabase_Impl { *; }
+-keepclassmembers class * extends androidx.room.RoomDatabase {
+    <init>();
+}
+
+# ── WorkManager (safety net) ────────────────────────────────────────────────
+# androidx.work is excluded from this module's classpath (see
+# app-tv/build.gradle.kts `configurations.all`), so these rules are a safety
+# net in case a future transitive dep re-introduces work-runtime.  `-dontwarn`
+# keeps R8 from failing the build while the classes are absent.
+-keep class androidx.work.impl.WorkDatabase_Impl {
+    <init>();
+    *;
+}
+-dontwarn androidx.work.**
 
 # ── Coroutines ───────────────────────────────────────────────────────────────
 -keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
