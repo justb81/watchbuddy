@@ -1,6 +1,10 @@
 package com.justb81.watchbuddy.tv.discovery
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import android.net.wifi.WifiManager
@@ -46,6 +50,8 @@ class PhoneDiscoveryManager @Inject constructor(
         private const val TAG = "PhoneDiscoveryManager"
         private const val HEARTBEAT_INTERVAL_MS = 60_000L
         private const val MAX_FAIL_COUNT = 3
+        /** Back-off before retrying a stop+start cycle after FAILURE_ALREADY_ACTIVE. */
+        private const val RESTART_BACKOFF_MS = 500L
     }
 
     private val _discoveredPhones = MutableStateFlow<List<DiscoveredPhone>>(emptyList())
@@ -64,6 +70,8 @@ class PhoneDiscoveryManager @Inject constructor(
     private var multicastLock: WifiManager.MulticastLock? = null
     private val heartbeatScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var heartbeatJob: Job? = null
+    private var networkCallback: ConnectivityManager.NetworkCallback? = null
+    @Volatile private var isDiscovering: Boolean = false
 
     /**
      * Lightweight device info extracted from NSD TXT records.
@@ -96,6 +104,16 @@ class PhoneDiscoveryManager @Inject constructor(
 
         override fun onStartDiscoveryFailed(serviceType: String, errorCode: Int) {
             Log.e(TAG, "start discovery failed: $serviceType, error=${nsdErrorName(errorCode)}")
+            // A prior listener (possibly leaked across a process restart) is
+            // still registered in the system NSD service. Schedule a single
+            // stop+start cycle so we self-heal without an app relaunch.
+            if (errorCode == NsdManager.FAILURE_ALREADY_ACTIVE && isDiscovering) {
+                heartbeatScope.launch {
+                    delay(RESTART_BACKOFF_MS)
+                    Log.i(TAG, "retrying discovery after FAILURE_ALREADY_ACTIVE")
+                    restartDiscoveryInternal()
+                }
+            }
         }
 
         override fun onStopDiscoveryFailed(serviceType: String, errorCode: Int) {
@@ -136,21 +154,82 @@ class PhoneDiscoveryManager @Inject constructor(
     fun startDiscovery() {
         val mgr = nsdManager ?: return
         Log.i(TAG, "startDiscovery: type=$SERVICE_TYPE")
+        isDiscovering = true
         acquireMulticastLock()
         runCatching {
             mgr.discoverServices(SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, discoveryListener)
         }.onFailure { Log.e(TAG, "discoverServices failed", it) }
         startHeartbeat()
+        registerNetworkCallback()
     }
 
     fun stopDiscovery() {
         Log.i(TAG, "stopDiscovery")
+        isDiscovering = false
         heartbeatJob?.cancel()
+        unregisterNetworkCallback()
         val mgr = nsdManager
         if (mgr != null) {
             runCatching { mgr.stopServiceDiscovery(discoveryListener) }
         }
         releaseMulticastLock()
+    }
+
+    /**
+     * Tear down and restart NSD discovery. Safe to call while discovery is
+     * already running: the underlying stop/start is wrapped in runCatching so
+     * a stale listener registration cannot abort the cycle. Intended for
+     * external callers (UI retry, post-reconnect recovery).
+     */
+    fun restartDiscovery() {
+        if (!isDiscovering) {
+            Log.i(TAG, "restartDiscovery skipped: discovery not active")
+            return
+        }
+        heartbeatScope.launch { restartDiscoveryInternal() }
+    }
+
+    private suspend fun restartDiscoveryInternal() {
+        val mgr = nsdManager ?: return
+        runCatching { mgr.stopServiceDiscovery(discoveryListener) }
+        delay(RESTART_BACKOFF_MS)
+        runCatching {
+            mgr.discoverServices(SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, discoveryListener)
+        }.onFailure { Log.e(TAG, "re-discoverServices failed", it) }
+    }
+
+    // Mirrors the phone's CompanionService network callback: if the TV's Wi-Fi
+    // flickers, our NSD listener can silently go dead on the new network.
+    // Cycle discovery when Wi-Fi becomes available again.
+    private fun registerNetworkCallback() {
+        if (networkCallback != null) return
+        val cm = runCatching {
+            context.applicationContext.getSystemService(ConnectivityManager::class.java)
+        }.getOrNull() ?: return
+        val request = NetworkRequest.Builder()
+            .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+            .build()
+        val callback = object : ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: Network) {
+                Log.i(TAG, "Wi-Fi available — cycling NSD discovery")
+                if (isDiscovering) {
+                    heartbeatScope.launch { restartDiscoveryInternal() }
+                }
+            }
+        }
+        runCatching { cm.registerNetworkCallback(request, callback) }
+            .onSuccess { networkCallback = callback }
+            .onFailure { Log.w(TAG, "registerNetworkCallback failed", it) }
+    }
+
+    private fun unregisterNetworkCallback() {
+        val cb = networkCallback ?: return
+        runCatching {
+            context.applicationContext
+                .getSystemService(ConnectivityManager::class.java)
+                ?.unregisterNetworkCallback(cb)
+        }
+        networkCallback = null
     }
 
     // Many Android TV ROMs (Google TV, Chromecast with Google TV, Shield, several
@@ -198,9 +277,18 @@ class PhoneDiscoveryManager @Inject constructor(
         }
     }
 
-    private fun checkAllPhones() {
+    private suspend fun checkAllPhones() {
         val phones = _discoveredPhones.value
-        if (phones.isEmpty()) return
+        if (phones.isEmpty()) {
+            // If we have no phones after a full heartbeat interval, the system
+            // NSD service may have silently dropped our listener (seen on some
+            // Google TV ROMs). Cycle discovery so we recover without relaunch.
+            if (isDiscovering) {
+                Log.i(TAG, "no phones discovered; cycling NSD discovery")
+                restartDiscoveryInternal()
+            }
+            return
+        }
 
         val updated = phones.mapNotNull { phone ->
             val url = "${phone.baseUrl}${CAPABILITY_PATH}".replace("//capability", "/capability")
