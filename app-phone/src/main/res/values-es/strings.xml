@@ -134,4 +134,12 @@
     <string name="error_generic">Se ha producido un error.</string>
     <string name="retry">Reintentar</string>
     <string name="ok">OK</string>
+
+    <!-- Diagnostics -->
+    <string name="home_cd_overflow">Más opciones</string>
+    <string name="diagnostics_banner_title">Informe de diagnóstico disponible</string>
+    <string name="diagnostics_banner_message">La aplicación ha registrado %1$d informe(s) de error. Compártelos con el mantenedor para que pueda analizar el problema.</string>
+    <string name="diagnostics_banner_share">Compartir</string>
+    <string name="diagnostics_banner_dismiss">Descartar</string>
+    <string name="diagnostics_export">Exportar diagnóstico</string>
 </resources>

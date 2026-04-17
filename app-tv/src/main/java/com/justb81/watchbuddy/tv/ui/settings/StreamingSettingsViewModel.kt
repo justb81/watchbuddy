@@ -2,10 +2,14 @@ package com.justb81.watchbuddy.tv.ui.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.model.KNOWN_STREAMING_SERVICES
 import com.justb81.watchbuddy.core.model.StreamingService
 import com.justb81.watchbuddy.tv.data.StreamingPreferencesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -24,13 +28,31 @@ class StreamingSettingsViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(StreamingSettingsUiState())
     val uiState: StateFlow<StreamingSettingsUiState> = _uiState.asStateFlow()
 
+    /**
+     * Safety-net handler so a DataStore-IO failure inside the subscribed-services
+     * flow doesn't force-close the TV Settings screen.  The same pattern that was
+     * retrofitted onto the phone SettingsViewModel in #224 — every exception also
+     * lands in the [DiagnosticLog] so shared reports capture silent failures.
+     */
+    private val coroutineExceptionHandler = CoroutineExceptionHandler { _, throwable ->
+        DiagnosticLog.error(TAG, "swallowed coroutine exception", throwable)
+    }
+
+    private fun launchSafe(block: suspend CoroutineScope.() -> Unit): Job =
+        viewModelScope.launch(coroutineExceptionHandler, block = block)
+
     init {
-        viewModelScope.launch {
-            repository.subscribedServiceIds.collect { ids ->
-                _uiState.update {
-                    it.copy(subscribedIds = ids.toSet(), orderedIds = ids)
+        DiagnosticLog.event(TAG, "init: subscribing to subscribedServiceIds")
+        launchSafe {
+            repository.subscribedServiceIds
+                .catch { e ->
+                    DiagnosticLog.error(TAG, "subscribedServiceIds flow errored", e)
                 }
-            }
+                .collect { ids ->
+                    _uiState.update {
+                        it.copy(subscribedIds = ids.toSet(), orderedIds = ids)
+                    }
+                }
         }
     }
 
@@ -42,7 +64,7 @@ class StreamingSettingsViewModel @Inject constructor(
             current.add(serviceId)
         }
         _uiState.update { it.copy(subscribedIds = current.toSet(), orderedIds = current) }
-        viewModelScope.launch {
+        launchSafe {
             repository.setSubscribedServices(current)
         }
     }
@@ -54,7 +76,7 @@ class StreamingSettingsViewModel @Inject constructor(
             current.removeAt(index)
             current.add(index - 1, serviceId)
             _uiState.update { it.copy(orderedIds = current) }
-            viewModelScope.launch {
+            launchSafe {
                 repository.setSubscribedServices(current)
             }
         }
@@ -67,9 +89,13 @@ class StreamingSettingsViewModel @Inject constructor(
             current.removeAt(index)
             current.add(index + 1, serviceId)
             _uiState.update { it.copy(orderedIds = current) }
-            viewModelScope.launch {
+            launchSafe {
                 repository.setSubscribedServices(current)
             }
         }
+    }
+
+    private companion object {
+        const val TAG = "StreamingSettingsVM"
     }
 }

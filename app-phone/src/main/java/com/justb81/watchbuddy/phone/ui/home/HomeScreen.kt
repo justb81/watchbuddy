@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Check
@@ -17,12 +18,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.justb81.watchbuddy.R
+import com.justb81.watchbuddy.core.logging.CrashReporter
+import com.justb81.watchbuddy.core.logging.DiagnosticShare
 import com.justb81.watchbuddy.core.model.ScrobbleAction
 import com.justb81.watchbuddy.core.model.ScrobbleDisplayEvent
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
@@ -36,6 +40,11 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+    // Polled once per composition; the diagnostic banner doesn't need real-time updates
+    // and this avoids adding Flow plumbing to HomeViewModel just for a debug surface.
+    var pendingReports by remember { mutableStateOf(CrashReporter.listReports(context).size) }
+    var overflowExpanded by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -61,6 +70,27 @@ fun HomeScreen(
                     IconButton(onClick = onSettingsClick) {
                         Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.home_cd_settings))
                     }
+                    Box {
+                        IconButton(onClick = { overflowExpanded = true }) {
+                            Icon(
+                                Icons.Default.MoreVert,
+                                contentDescription = stringResource(R.string.home_cd_overflow)
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = overflowExpanded,
+                            onDismissRequest = { overflowExpanded = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.diagnostics_export)) },
+                                onClick = {
+                                    overflowExpanded = false
+                                    DiagnosticShare.launchShare(context)
+                                    pendingReports = CrashReporter.listReports(context).size
+                                }
+                            )
+                        }
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background
@@ -69,10 +99,27 @@ fun HomeScreen(
         },
         containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+        ) {
+            if (pendingReports > 0) {
+                DiagnosticsBanner(
+                    reportCount = pendingReports,
+                    onShare = {
+                        DiagnosticShare.launchShare(context)
+                    },
+                    onDismiss = {
+                        CrashReporter.clearReports(context)
+                        pendingReports = 0
+                    }
+                )
+            }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .weight(1f)
         ) {
             when {
                 uiState.isLoading -> {
@@ -181,6 +228,52 @@ fun HomeScreen(
                         }
                     }
                 }
+            }
+        }
+        }
+    }
+}
+
+@Composable
+private fun DiagnosticsBanner(
+    reportCount: Int,
+    onShare: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = stringResource(R.string.diagnostics_banner_title),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onErrorContainer
+                )
+                Text(
+                    text = stringResource(R.string.diagnostics_banner_message, reportCount),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.85f)
+                )
+            }
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.diagnostics_banner_dismiss))
+            }
+            Button(onClick = onShare) {
+                Text(stringResource(R.string.diagnostics_banner_share))
             }
         }
     }

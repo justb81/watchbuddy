@@ -4,20 +4,33 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKeys
+import com.justb81.watchbuddy.core.logging.DiagnosticLog
 class TokenRepository(context: Context) {
 
     private val prefs: SharedPreferences
 
     init {
-        val masterKeyAlias = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC)
-
-        prefs = EncryptedSharedPreferences.create(
-            "watchbuddy_tokens",
-            masterKeyAlias,
-            context,
-            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-        )
+        DiagnosticLog.event(TAG, "init: requesting Keystore master key")
+        val masterKeyAlias = try {
+            MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC)
+        } catch (e: Exception) {
+            DiagnosticLog.error(TAG, "MasterKeys.getOrCreate failed", e)
+            throw e
+        }
+        DiagnosticLog.event(TAG, "init: opening EncryptedSharedPreferences")
+        prefs = try {
+            EncryptedSharedPreferences.create(
+                "watchbuddy_tokens",
+                masterKeyAlias,
+                context,
+                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+            )
+        } catch (e: Exception) {
+            DiagnosticLog.error(TAG, "EncryptedSharedPreferences.create failed", e)
+            throw e
+        }
+        DiagnosticLog.event(TAG, "init: ready")
     }
 
     fun saveTokens(accessToken: String, refreshToken: String, expiresIn: Int) {
@@ -71,5 +84,6 @@ class TokenRepository(context: Context) {
         const val KEY_REFRESH_TOKEN = "refresh_token"
         const val KEY_EXPIRES_AT = "expires_at"
         const val KEY_CLIENT_SECRET = "trakt_client_secret"
+        const val TAG = "TokenRepository"
     }
 }

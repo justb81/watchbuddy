@@ -46,6 +46,14 @@
     <string name="home_sync_failed_auth">Your Trakt session has expired. Please re-authenticate in Settings.</string>
     <string name="home_cd_sync">Sync</string>
     <string name="home_cd_settings">Settings</string>
+    <string name="home_cd_overflow">More options</string>
+
+    <!-- Diagnostics -->
+    <string name="diagnostics_banner_title">Diagnostic report available</string>
+    <string name="diagnostics_banner_message">The app captured %1$d crash report(s). Share them with the maintainer so the problem can be analysed.</string>
+    <string name="diagnostics_banner_share">Share</string>
+    <string name="diagnostics_banner_dismiss">Dismiss</string>
+    <string name="diagnostics_export">Export diagnostics</string>
     <string name="home_watching_tv_toggle">I am watching TV</string>
     <string name="home_watching_tv_description">Connect with your TV for scrobbling</string>
     <string name="home_watching_tv_disabled_reason">Connect to Trakt and configure TMDB first</string>

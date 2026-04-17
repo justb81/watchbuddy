@@ -58,6 +58,19 @@
                 tools:node="remove" />
         </provider>
 
+        <!-- Diagnostic report sharing. Exposes filesDir/diagnostics/ so crash
+             reports can be attached to an ACTION_SEND intent from the Home
+             screen banner. See CrashReporter / DiagnosticShare. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.diagnostics.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/provider_paths" />
+        </provider>
+
         <!-- Companion HTTP server (NSD + Ktor) -->
         <service
             android:name=".service.CompanionService"
