@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.10](https://github.com/justb81/watchbuddy/compare/v0.13.9...v0.13.10) (2026-04-17)
+
+
+### Bug Fixes
+
+* **phone:** cancel stale coroutines on Retry and distinguish server misconfiguration ([#228](https://github.com/justb81/watchbuddy/issues/228)) ([f598d45](https://github.com/justb81/watchbuddy/commit/f598d459947723ac594888d266e35e833bced87c))
+
 ## [0.13.9](https://github.com/justb81/watchbuddy/compare/v0.13.8...v0.13.9) (2026-04-16)
 
 
