@@ -25,6 +25,14 @@ android {
         // versionName: release-please sets VERSION_NAME, fallback to hardcoded value
         versionName = providers.environmentVariable("VERSION_NAME")
             .orElse("0.14.0").get() // x-release-please-version
+
+        // Package native debug symbols into the AAB so Google Play Console can
+        // symbolicate native stack traces (Tink via security-crypto is the main
+        // contributor on TV).  SYMBOL_TABLE yields readable frames without the
+        // size overhead of FULL (which also includes line numbers).
+        ndk {
+            debugSymbolLevel = "SYMBOL_TABLE"
+        }
     }
 
     // CI signing: keystore path + credentials via environment variables.
