@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import android.util.Log
+import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.model.DeviceCapability
 import com.justb81.watchbuddy.core.model.LlmBackend
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -50,7 +51,15 @@ class PhoneDiscoveryManager @Inject constructor(
     private val _discoveredPhones = MutableStateFlow<List<DiscoveredPhone>>(emptyList())
     val discoveredPhones: StateFlow<List<DiscoveredPhone>> = _discoveredPhones
 
-    private val nsdManager = context.getSystemService(Context.NSD_SERVICE) as NsdManager
+    // Nullable + runCatching so that a missing NSD system service on unusual
+    // TV ROMs cannot throw during Hilt singleton construction, which would
+    // otherwise blow up the first hiltViewModel() call and prevent the app
+    // from ever drawing a frame.
+    private val nsdManager: NsdManager? = runCatching {
+        context.getSystemService(Context.NSD_SERVICE) as? NsdManager
+    }.onFailure {
+        DiagnosticLog.error(TAG, "NSD_SERVICE lookup failed", it)
+    }.getOrNull()
     private val heartbeatScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var heartbeatJob: Job? = null
 
@@ -81,8 +90,9 @@ class PhoneDiscoveryManager @Inject constructor(
         override fun onStopDiscoveryFailed(serviceType: String, errorCode: Int) {}
 
         override fun onServiceFound(service: NsdServiceInfo) {
+            val mgr = nsdManager ?: return
             @Suppress("DEPRECATION")
-            nsdManager.resolveService(service, object : NsdManager.ResolveListener {
+            mgr.resolveService(service, object : NsdManager.ResolveListener {
                 override fun onResolveFailed(serviceInfo: NsdServiceInfo, errorCode: Int) {}
                 override fun onServiceResolved(serviceInfo: NsdServiceInfo) {
                     fetchCapabilityAndAdd(serviceInfo)
@@ -97,13 +107,21 @@ class PhoneDiscoveryManager @Inject constructor(
     }
 
     fun startDiscovery() {
-        nsdManager.discoverServices(SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, discoveryListener)
+        val mgr = nsdManager
+        if (mgr == null) {
+            DiagnosticLog.warn(TAG, "NSD unavailable; discovery disabled")
+            return
+        }
+        runCatching {
+            mgr.discoverServices(SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, discoveryListener)
+        }.onFailure { DiagnosticLog.error(TAG, "discoverServices failed", it) }
         startHeartbeat()
     }
 
     fun stopDiscovery() {
         heartbeatJob?.cancel()
-        runCatching { nsdManager.stopServiceDiscovery(discoveryListener) }
+        val mgr = nsdManager ?: return
+        runCatching { mgr.stopServiceDiscovery(discoveryListener) }
     }
 
     private fun startHeartbeat() {

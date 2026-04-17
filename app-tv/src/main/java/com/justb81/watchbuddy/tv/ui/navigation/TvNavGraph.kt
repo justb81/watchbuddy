@@ -31,10 +31,6 @@ fun TvNavGraph() {
     // Shared state: currently selected show (passed between Home → Detail → Recap)
     var selectedEntry by remember { mutableStateOf<TraktWatchedEntry?>(null) }
 
-    // Scrobble overlay — driven by ScrobbleViewModel (Issue #18)
-    val scrobbleViewModel: ScrobbleViewModel = hiltViewModel()
-    val pendingCandidate by scrobbleViewModel.pendingCandidate.collectAsState()
-
     NavHost(
         navController    = navController,
         startDestination = TvRoute.Home.route
@@ -95,12 +91,24 @@ fun TvNavGraph() {
         }
     }
 
-    // Scrobble overlay — renders on top of everything
-    pendingCandidate?.let { candidate ->
+    // Scrobble overlay — isolated in its own host so ScrobbleViewModel (and its
+    // transitive singletons: MediaSessionScrobbler → PhoneDiscoveryManager) are
+    // only instantiated once the Nav tree is up and running. Previously this
+    // viewModel was requested at the top of TvNavGraph, which meant any
+    // exception inside those singletons' constructors would throw during the
+    // very first composition and prevent the app from ever drawing a frame.
+    ScrobbleOverlayHost()
+}
+
+@Composable
+private fun ScrobbleOverlayHost() {
+    val vm: ScrobbleViewModel = hiltViewModel()
+    val pending by vm.pendingCandidate.collectAsState()
+    pending?.let { candidate ->
         ScrobbleOverlay(
             candidate = candidate,
-            onConfirm = { scrobbleViewModel.confirmScrobble() },
-            onDismiss = { scrobbleViewModel.dismissScrobble() }
+            onConfirm = { vm.confirmScrobble() },
+            onDismiss = { vm.dismissScrobble() }
         )
     }
 }

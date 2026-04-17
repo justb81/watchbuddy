@@ -80,4 +80,6 @@
     <string name="diagnostics_banner_share">Teilen</string>
     <string name="diagnostics_banner_dismiss">Verwerfen</string>
     <string name="diagnostics_export">Diagnose exportieren</string>
+    <string name="tv_startup_failed_title">WatchBuddy konnte nicht gestartet werden</string>
+    <string name="tv_startup_failed_share">Diagnosebericht teilen</string>
 </resources>

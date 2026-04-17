@@ -121,9 +121,6 @@ dependencies {
     // Image loading
     implementation(libs.coil)
 
-    // WorkManager (background Trakt sync / scrobble history)
-    implementation(libs.work.runtime)
-
     // Error-prone annotations — compileOnly so R8 can resolve references from Tink
     // without bundling the annotation library in the APK.
     compileOnly(libs.errorprone.annotations)
