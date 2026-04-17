@@ -119,6 +119,17 @@ export function createApp(config) {
   let credentialsVerified = false;
   let retryTimer = null;
 
+  // True when we know for certain the proxy cannot exchange tokens —
+  // e.g. the client secret is missing or the client ID was rejected by Trakt.
+  // In this state /trakt/token returns 503 server_misconfigured so the Android
+  // client can show a "contact the maintainer" message instead of "wrong credentials".
+  let serverMisconfigured = !clientSecret;
+  if (serverMisconfigured) {
+    console.error(
+      'TRAKT_CLIENT_SECRET is missing — token exchange will be rejected with 503 server_misconfigured.',
+    );
+  }
+
   // Retry delays: 5s, 15s, 30s, 60s, then stay at 60s
   const RETRY_DELAYS = [5_000, 15_000, 30_000, 60_000];
 
@@ -162,6 +173,7 @@ export function createApp(config) {
           console.error(`Credential check: Trakt response body: ${bodySnippet}`);
         }
         console.error(`Trakt credential verification failed: HTTP ${res.status} — TRAKT_CLIENT_ID may be invalid.`);
+        serverMisconfigured = true;
         // Do not retry on 401/403 — credentials are definitively wrong
       } else {
         traktStatus = `trakt_http_${res.status}`;
@@ -223,6 +235,11 @@ export function createApp(config) {
   // Body: { "code": "<device_code>" }
   // Calls Trakt /oauth/device/token with server-side secret injected
   app.post('/trakt/token', async (req, res) => {
+    if (serverMisconfigured) {
+      console.error('Token exchange blocked: proxy is misconfigured (missing or rejected credentials).');
+      return res.status(503).json({ error: 'server_misconfigured' });
+    }
+
     const { code } = req.body;
     const codeError = validateField(code, 'code');
     if (codeError) return res.status(400).json({ error: codeError });
@@ -357,6 +374,13 @@ export function createApp(config) {
 
   // ── GET /health ─────────────────────────────────────────────────────────────
   app.get('/health', (_req, res) => {
+    if (serverMisconfigured && traktStatus === 'pending') {
+      return res.status(503).json({
+        status: 'misconfigured',
+        trakt: 'missing_client_secret',
+        error: 'TRAKT_CLIENT_SECRET is not set — token exchange is disabled.',
+      });
+    }
     if (traktStatus === 'pending') {
       return res.status(503).json({ status: 'starting', trakt: 'pending' });
     }

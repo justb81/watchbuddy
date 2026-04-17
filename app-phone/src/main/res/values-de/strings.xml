@@ -27,6 +27,7 @@
     <string name="onboarding_open_settings">Einstellungen öffnen</string>
     <string name="onboarding_error_polling_network">Verbindung während der Autorisierung verloren. Bitte überprüfe deine Internetverbindung und versuche es erneut.</string>
     <string name="onboarding_error_auth_failed">Autorisierung fehlgeschlagen. Bitte überprüfe deine Trakt-Zugangsdaten und versuche es erneut.</string>
+    <string name="onboarding_error_server_misconfigured">Der Authentifizierungsserver ist falsch konfiguriert. Bitte versuche es später erneut oder kontaktiere den Wartungsverantwortlichen.</string>
     <string name="onboarding_skip">Jetzt überspringen</string>
     <string name="onboarding_reconnect_title">Mit Trakt verbinden</string>
 

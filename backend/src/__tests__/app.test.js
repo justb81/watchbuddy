@@ -425,6 +425,89 @@ describe('POST /trakt/token/refresh', () => {
   });
 });
 
+// ── Server misconfiguration (missing/invalid credentials) ───────────────────
+
+describe('POST /trakt/token — server_misconfigured', () => {
+  let errorSpy;
+
+  beforeEach(() => {
+    errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    errorSpy.mockRestore();
+  });
+
+  it('returns 503 server_misconfigured when clientSecret is missing', async () => {
+    const app = buildApp(mockFetch(200, {}), { clientSecret: '' });
+    const res = await request(app)
+      .post('/trakt/token')
+      .send({ code: 'device-code-abc' });
+    expect(res.status).toBe(503);
+    expect(res.body).toEqual({ error: 'server_misconfigured' });
+  });
+
+  it('returns 503 server_misconfigured when clientSecret is undefined', async () => {
+    const app = buildApp(mockFetch(200, {}), { clientSecret: undefined });
+    const res = await request(app)
+      .post('/trakt/token')
+      .send({ code: 'device-code-abc' });
+    expect(res.status).toBe(503);
+    expect(res.body).toEqual({ error: 'server_misconfigured' });
+  });
+
+  it('returns 503 server_misconfigured after verifyCredentials receives 401', async () => {
+    const app = buildApp(mockFetch(401, { error: 'unauthorized' }));
+    await app.verifyCredentials();
+    const res = await request(app)
+      .post('/trakt/token')
+      .send({ code: 'device-code-abc' });
+    expect(res.status).toBe(503);
+    expect(res.body).toEqual({ error: 'server_misconfigured' });
+  });
+
+  it('returns 503 server_misconfigured after verifyCredentials receives 403', async () => {
+    const app = buildApp(mockFetch(403, { error: 'invalid_api_key' }));
+    await app.verifyCredentials();
+    const res = await request(app)
+      .post('/trakt/token')
+      .send({ code: 'device-code-abc' });
+    expect(res.status).toBe(503);
+    expect(res.body).toEqual({ error: 'server_misconfigured' });
+  });
+
+  it('logs an error when blocking token exchange due to misconfiguration', async () => {
+    const app = buildApp(mockFetch(200, {}), { clientSecret: '' });
+    await request(app).post('/trakt/token').send({ code: 'device-code-abc' });
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('misconfigured'),
+    );
+  });
+
+  it('health returns 503 misconfigured when clientSecret is missing', async () => {
+    const app = buildApp(mockFetch(200, {}), { clientSecret: '' });
+    const res = await request(app).get('/health');
+    expect(res.status).toBe(503);
+    expect(res.body.status).toBe('misconfigured');
+    expect(res.body.error).toMatch(/TRAKT_CLIENT_SECRET/);
+  });
+
+  it('does not block token exchange when credentials are valid', async () => {
+    const app = buildApp(mockFetch(200, {
+      access_token: 'acc-123',
+      refresh_token: 'ref-456',
+      expires_in: 7776000,
+      token_type: 'Bearer',
+      scope: 'public',
+    }));
+    const res = await request(app)
+      .post('/trakt/token')
+      .send({ code: 'device-code-abc' });
+    expect(res.status).toBe(200);
+    expect(res.body.access_token).toBe('acc-123');
+  });
+});
+
 // ── Unknown routes ──────────────────────────────────────────────────────────
 
 describe('Unknown routes', () => {
