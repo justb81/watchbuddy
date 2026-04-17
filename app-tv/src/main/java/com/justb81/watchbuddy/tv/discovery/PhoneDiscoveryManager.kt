@@ -3,6 +3,7 @@ package com.justb81.watchbuddy.tv.discovery
 import android.content.Context
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
+import android.net.wifi.WifiManager
 import android.util.Log
 import com.justb81.watchbuddy.core.model.DeviceCapability
 import com.justb81.watchbuddy.core.model.LlmBackend
@@ -57,6 +58,10 @@ class PhoneDiscoveryManager @Inject constructor(
     private val nsdManager: NsdManager? = runCatching {
         context.getSystemService(Context.NSD_SERVICE) as? NsdManager
     }.getOrNull()
+    private val wifiManager: WifiManager? = runCatching {
+        context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+    }.getOrNull()
+    private var multicastLock: WifiManager.MulticastLock? = null
     private val heartbeatScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var heartbeatJob: Job? = null
 
@@ -131,6 +136,7 @@ class PhoneDiscoveryManager @Inject constructor(
     fun startDiscovery() {
         val mgr = nsdManager ?: return
         Log.i(TAG, "startDiscovery: type=$SERVICE_TYPE")
+        acquireMulticastLock()
         runCatching {
             mgr.discoverServices(SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, discoveryListener)
         }.onFailure { Log.e(TAG, "discoverServices failed", it) }
@@ -140,8 +146,40 @@ class PhoneDiscoveryManager @Inject constructor(
     fun stopDiscovery() {
         Log.i(TAG, "stopDiscovery")
         heartbeatJob?.cancel()
-        val mgr = nsdManager ?: return
-        runCatching { mgr.stopServiceDiscovery(discoveryListener) }
+        val mgr = nsdManager
+        if (mgr != null) {
+            runCatching { mgr.stopServiceDiscovery(discoveryListener) }
+        }
+        releaseMulticastLock()
+    }
+
+    // Many Android TV ROMs (Google TV, Chromecast with Google TV, Shield, several
+    // Sony/TCL images) drop inbound multicast packets at the Wi-Fi driver unless
+    // an app holds a multicast lock, so NsdManager runs but never receives the
+    // phone's mDNS announcements. Hold the lock only while discovery is active.
+    private fun acquireMulticastLock() {
+        if (multicastLock?.isHeld == true) return
+        val wifi = wifiManager ?: run {
+            Log.w(TAG, "WifiManager unavailable; skipping multicast lock")
+            return
+        }
+        runCatching {
+            val lock = wifi.createMulticastLock("watchbuddy-nsd").apply {
+                setReferenceCounted(false)
+                acquire()
+            }
+            multicastLock = lock
+            Log.i(TAG, "multicast lock acquired")
+        }.onFailure { Log.e(TAG, "multicast lock acquire failed", it) }
+    }
+
+    private fun releaseMulticastLock() {
+        val lock = multicastLock ?: return
+        runCatching {
+            if (lock.isHeld) lock.release()
+            Log.i(TAG, "multicast lock released")
+        }.onFailure { Log.w(TAG, "multicast lock release failed", it) }
+        multicastLock = null
     }
 
     private fun nsdErrorName(errorCode: Int): String = when (errorCode) {
