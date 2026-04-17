@@ -51,6 +51,8 @@
     <string name="diagnostics_banner_share">Share</string>
     <string name="diagnostics_banner_dismiss">Dismiss</string>
     <string name="diagnostics_export">Export diagnostics</string>
+    <string name="tv_startup_failed_title">WatchBuddy could not start</string>
+    <string name="tv_startup_failed_share">Share diagnostic report</string>
 
     <!-- Streaming settings -->
     <string name="tv_streaming_settings_button">Services</string>
