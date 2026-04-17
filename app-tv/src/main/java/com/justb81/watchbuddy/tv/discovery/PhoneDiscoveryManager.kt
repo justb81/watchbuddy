@@ -4,7 +4,6 @@ import android.content.Context
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import android.util.Log
-import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.model.DeviceCapability
 import com.justb81.watchbuddy.core.model.LlmBackend
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -57,8 +56,6 @@ class PhoneDiscoveryManager @Inject constructor(
     // from ever drawing a frame.
     private val nsdManager: NsdManager? = runCatching {
         context.getSystemService(Context.NSD_SERVICE) as? NsdManager
-    }.onFailure {
-        DiagnosticLog.error(TAG, "NSD_SERVICE lookup failed", it)
     }.getOrNull()
     private val heartbeatScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var heartbeatJob: Job? = null
@@ -107,14 +104,10 @@ class PhoneDiscoveryManager @Inject constructor(
     }
 
     fun startDiscovery() {
-        val mgr = nsdManager
-        if (mgr == null) {
-            DiagnosticLog.warn(TAG, "NSD unavailable; discovery disabled")
-            return
-        }
+        val mgr = nsdManager ?: return
         runCatching {
             mgr.discoverServices(SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, discoveryListener)
-        }.onFailure { DiagnosticLog.error(TAG, "discoverServices failed", it) }
+        }
         startHeartbeat()
     }
 

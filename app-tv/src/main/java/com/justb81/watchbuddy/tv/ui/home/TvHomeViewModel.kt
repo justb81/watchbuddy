@@ -2,7 +2,6 @@ package com.justb81.watchbuddy.tv.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.model.EnrichedShowEntry
 import com.justb81.watchbuddy.core.progress.ShowProgress
 import com.justb81.watchbuddy.core.progress.ShowProgressCalculator
@@ -44,7 +43,6 @@ class TvHomeViewModel @Inject constructor(
 
     companion object {
         val PAGE_SIZE = PhoneApiService.PAGE_SIZE
-        private const val TAG = "TvHomeViewModel"
     }
 
     private val _uiState = MutableStateFlow(TvHomeUiState())
@@ -56,7 +54,6 @@ class TvHomeViewModel @Inject constructor(
 
     init {
         runCatching { phoneDiscovery.startDiscovery() }
-            .onFailure { DiagnosticLog.error(TAG, "startDiscovery failed", it) }
         observePhones()
         observeSelectedUsers()
     }
