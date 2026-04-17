@@ -26,4 +26,15 @@ object AppModule {
     @Provides
     @Singleton
     fun provideTokenBackendUrl(): String = ""
+
+    /**
+     * Trakt Client ID — the TV app never calls the Trakt API directly
+     * (all Trakt operations go through the phone proxy), so this is blank.
+     * Required by NetworkModule.provideOkHttpClient(); when blank, no
+     * `trakt-api-key` header is attached.
+     */
+    @Provides
+    @Singleton
+    @Named("traktClientId")
+    fun provideTraktClientId(): String = ""
 }

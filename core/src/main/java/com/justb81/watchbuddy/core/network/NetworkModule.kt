@@ -30,16 +30,17 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideOkHttpClient(
-        @Named("isDebugBuild") isDebug: Boolean
+        @Named("isDebugBuild") isDebug: Boolean,
+        @Named("traktClientId") traktClientId: String,
     ): OkHttpClient = OkHttpClient.Builder()
         .addInterceptor { chain ->
-            // Trakt required headers
-            val request = chain.request().newBuilder()
+            val builder = chain.request().newBuilder()
                 .addHeader("Content-Type", "application/json")
                 .addHeader("trakt-api-version", "2")
-                // client_id is added per-request from secure storage
-                .build()
-            chain.proceed(request)
+            if (traktClientId.isNotBlank()) {
+                builder.addHeader("trakt-api-key", traktClientId)
+            }
+            chain.proceed(builder.build())
         }
         .addInterceptor(HttpLoggingInterceptor().apply {
             level = if (isDebug) HttpLoggingInterceptor.Level.BODY

@@ -34,7 +34,7 @@ class NetworkModuleTest {
         @Test
         fun `adds Content-Type header`() {
             server.enqueue(MockResponse().setBody("{}"))
-            val client = NetworkModule.provideOkHttpClient(isDebug = false)
+            val client = NetworkModule.provideOkHttpClient(isDebug = false, traktClientId = "test-id")
             client.newCall(Request.Builder().url(server.url("/test")).build()).execute()
             val recorded = server.takeRequest()
             assertEquals("application/json", recorded.getHeader("Content-Type"))
@@ -43,15 +43,33 @@ class NetworkModuleTest {
         @Test
         fun `adds trakt-api-version header`() {
             server.enqueue(MockResponse().setBody("{}"))
-            val client = NetworkModule.provideOkHttpClient(isDebug = false)
+            val client = NetworkModule.provideOkHttpClient(isDebug = false, traktClientId = "test-id")
             client.newCall(Request.Builder().url(server.url("/test")).build()).execute()
             val recorded = server.takeRequest()
             assertEquals("2", recorded.getHeader("trakt-api-version"))
         }
 
         @Test
+        fun `adds trakt-api-key header when client id is provided`() {
+            server.enqueue(MockResponse().setBody("{}"))
+            val client = NetworkModule.provideOkHttpClient(isDebug = false, traktClientId = "abc-123")
+            client.newCall(Request.Builder().url(server.url("/test")).build()).execute()
+            val recorded = server.takeRequest()
+            assertEquals("abc-123", recorded.getHeader("trakt-api-key"))
+        }
+
+        @Test
+        fun `omits trakt-api-key header when client id is blank`() {
+            server.enqueue(MockResponse().setBody("{}"))
+            val client = NetworkModule.provideOkHttpClient(isDebug = false, traktClientId = "")
+            client.newCall(Request.Builder().url(server.url("/test")).build()).execute()
+            val recorded = server.takeRequest()
+            assertNull(recorded.getHeader("trakt-api-key"))
+        }
+
+        @Test
         fun `does not apply certificate pinning`() {
-            val client = NetworkModule.provideOkHttpClient(isDebug = false)
+            val client = NetworkModule.provideOkHttpClient(isDebug = false, traktClientId = "test-id")
             assertTrue(client.certificatePinner.pins.isEmpty())
         }
     }
