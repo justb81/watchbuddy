@@ -139,6 +139,17 @@ The `MediaSessionScrobbler` additionally checks each phone's `lastSuccessfulChec
 before sending scrobble requests. Phones with stale presence (> 2 minutes) are skipped to
 avoid network timeouts during playback.
 
+**mDNS reliability on TV hardware:** `PhoneDiscoveryManager` holds a
+`WifiManager.MulticastLock` for the entire lifetime of active discovery. Many Android TV
+ROMs (Google TV, Chromecast with Google TV, Shield, several Sony/TCL images) silently
+drop inbound multicast packets at the Wi-Fi driver unless an app holds this lock, which
+would otherwise make the phone undiscoverable even though the `CHANGE_WIFI_MULTICAST_STATE`
+permission is granted. Discovery is also self-healing: `onStartDiscoveryFailed` with
+`FAILURE_ALREADY_ACTIVE` triggers a delayed stop+start cycle, a `ConnectivityManager`
+network callback restarts discovery when Wi-Fi returns, and an empty phone list at the
+60 s heartbeat tick cycles discovery so the TV recovers from silent NSD failures without
+requiring an app relaunch.
+
 ## Scrobble Event Display (Phone)
 
 When the phone's HTTP server receives a scrobble event (`/scrobble/start|pause|stop`), it
