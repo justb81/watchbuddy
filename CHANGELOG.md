@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.4](https://github.com/justb81/watchbuddy/compare/v0.14.3...v0.14.4) (2026-04-17)
+
+
+### Bug Fixes
+
+* **tv:** harden startup path and add early crash capture (refs [#238](https://github.com/justb81/watchbuddy/issues/238)) ([#242](https://github.com/justb81/watchbuddy/issues/242)) ([bb7c379](https://github.com/justb81/watchbuddy/commit/bb7c3797ba81dfa5ae172df1a7861f24fd15de48))
+
 ## [0.14.3](https://github.com/justb81/watchbuddy/compare/v0.14.2...v0.14.3) (2026-04-17)
 
 
