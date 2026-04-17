@@ -220,9 +220,11 @@ flowchart TD
 
 | State | Phone endpoint | Progress | Effect |
 |-------|---------------|----------|--------|
-| PLAYING | `POST /scrobble/start` | 0.0 | Start watching |
-| PAUSED | `POST /scrobble/pause` | 50.0 | Pause |
-| STOPPED | `POST /scrobble/stop` | 100.0 | Marks episode as watched |
+| PLAYING | `POST /scrobble/start` | Real playback progress (0–100), else 0.0 | Start watching |
+| PAUSED | `POST /scrobble/pause` | Real playback progress (0–100), else 50.0 | Pause |
+| STOPPED | `POST /scrobble/stop` | Real playback progress (0–100) — event **skipped** if unavailable | Marks episode as watched only if `progress >= 80` (Trakt rule) |
+
+Progress is derived from `PlaybackState.position` and `MediaMetadata.METADATA_KEY_DURATION`. When the media session does not expose either value (e.g. live TV), `start` and `pause` fall back to their historical fixed values so tracking is not lost, but `stop` is skipped entirely to avoid Trakt accidentally marking an unfinished episode as watched.
 
 ### Key Classes
 

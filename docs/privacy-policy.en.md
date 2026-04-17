@@ -136,7 +136,7 @@ The TV app automatically detects what is being played on the television and repo
 - Package name of the playing app (e.g. `com.netflix.ninja`)
 - Media title from `MediaMetadata.METADATA_KEY_TITLE`
 - Playback state (`PLAYING`, `PAUSED`, `STOPPED`, `NONE`)
-- Progress as a percentage (0 %, 50 %, 100 %) for forwarding to Trakt
+- Current playback progress as a percentage (0–100 %), derived from `PlaybackState.position` and `MediaMetadata.METADATA_KEY_DURATION`, forwarded to Trakt
 
 ### 6.2 Confidence thresholds
 

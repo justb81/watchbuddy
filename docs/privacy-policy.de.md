@@ -136,7 +136,7 @@ Die TV App erkennt automatisch, welche Inhalte auf dem Fernseher abgespielt werd
 - Paketname der abspielenden App (z. B. `com.netflix.ninja`)
 - Medientitel aus `MediaMetadata.METADATA_KEY_TITLE`
 - Wiedergabestatus (`PLAYING`, `PAUSED`, `STOPPED`, `NONE`)
-- Fortschritt in Prozent (0 %, 50 %, 100 %) zur Übermittlung an Trakt
+- Aktueller Wiedergabefortschritt in Prozent (0–100 %), ermittelt aus `PlaybackState.position` und `MediaMetadata.METADATA_KEY_DURATION`, zur Übermittlung an Trakt
 
 ### 6.2 Confidence-Schwellen
 
