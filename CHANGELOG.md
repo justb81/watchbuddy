@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.1](https://github.com/justb81/watchbuddy/compare/v0.14.0...v0.14.1) (2026-04-17)
+
+
+### Bug Fixes
+
+* **build:** preserve Room no-arg constructors in R8 + native debug symbols (closes [#232](https://github.com/justb81/watchbuddy/issues/232)) ([#233](https://github.com/justb81/watchbuddy/issues/233)) ([2219f25](https://github.com/justb81/watchbuddy/commit/2219f25e684c282a0c4d6d8633b5e4c52a99cfbc))
+
 ## [0.14.0](https://github.com/justb81/watchbuddy/compare/v0.13.10...v0.14.0) (2026-04-17)
 
 
