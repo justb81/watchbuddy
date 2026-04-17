@@ -11,7 +11,13 @@ interface TmdbApiService {
     suspend fun getShow(
         @Path("series_id") id: Int,
         @Query("api_key") apiKey: String,
-        @Query("language") language: String = "en-US"
+        @Query("language") language: String = "en-US",
+        /**
+         * TMDB returns `status`, `last_episode_to_air`, `next_episode_to_air`, and `seasons`
+         * on the base tv-show resource without an explicit `append_to_response` — the parameter
+         * is still accepted here in case callers want to request extra bundles in the future.
+         */
+        @Query("append_to_response") appendToResponse: String? = null
     ): TmdbShow
 
     @GET("tv/{series_id}/season/{season_number}/episode/{episode_number}")

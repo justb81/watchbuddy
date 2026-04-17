@@ -1,5 +1,6 @@
 package com.justb81.watchbuddy.phone.server
 
+import com.justb81.watchbuddy.core.model.EnrichedShowEntry
 import com.justb81.watchbuddy.core.model.LlmBackend
 import com.justb81.watchbuddy.core.model.DeviceCapability
 import com.justb81.watchbuddy.core.model.TmdbEpisode
@@ -70,6 +71,7 @@ class CompanionHttpServerTest {
             TraktWatchedSeason(2, listOf(TraktWatchedEpisode(1)))
         )
     )
+    private val enrichedEntry = EnrichedShowEntry(entry = watchedEntry)
 
     private val ep1 = TmdbEpisode(1, "Pilot", "First episode.", "/s1e1.jpg", 1, 1)
     private val ep2 = TmdbEpisode(2, "Cat's in the Bag", null, null, 1, 2)
@@ -131,7 +133,7 @@ class CompanionHttpServerTest {
         @Test
         fun `returns 200 with shows list when authenticated`() = testApp {
             every { tokenRepository.getAccessToken() } returns "test-token"
-            coEvery { showRepository.getShows() } returns listOf(watchedEntry)
+            coEvery { showRepository.getShows() } returns listOf(enrichedEntry)
 
             val response = client.get("/shows")
 
@@ -151,7 +153,7 @@ class CompanionHttpServerTest {
         }
 
         @Test
-        fun `returns 500 when show repository throws — no exception detail leaked`() = testApp {
+        fun `returns 500 when show repository throws - no exception detail leaked`() = testApp {
             every { tokenRepository.getAccessToken() } returns "test-token"
             coEvery { showRepository.getShows() } throws RuntimeException("Trakt API down")
 
@@ -168,7 +170,7 @@ class CompanionHttpServerTest {
             val shows = (1..5).map { i ->
                 TraktWatchedEntry(TraktShow("Show $i", 2020 + i, TraktIds(trakt = i)))
             }
-            coEvery { showRepository.getShows() } returns shows
+            coEvery { showRepository.getShows() } returns shows.map { EnrichedShowEntry(entry = it) }
 
             val response = client.get("/shows?limit=2")
 
@@ -185,7 +187,7 @@ class CompanionHttpServerTest {
             val shows = (1..5).map { i ->
                 TraktWatchedEntry(TraktShow("Show $i", 2020 + i, TraktIds(trakt = i)))
             }
-            coEvery { showRepository.getShows() } returns shows
+            coEvery { showRepository.getShows() } returns shows.map { EnrichedShowEntry(entry = it) }
 
             val response = client.get("/shows?offset=2&limit=2")
 
@@ -204,7 +206,7 @@ class CompanionHttpServerTest {
             val shows = (1..3).map { i ->
                 TraktWatchedEntry(TraktShow("Show $i", 2020 + i, TraktIds(trakt = i)))
             }
-            coEvery { showRepository.getShows() } returns shows
+            coEvery { showRepository.getShows() } returns shows.map { EnrichedShowEntry(entry = it) }
 
             val response = client.get("/shows?offset=10&limit=5")
 
@@ -215,11 +217,11 @@ class CompanionHttpServerTest {
         @Test
         fun `defaults to first 30 shows when no params provided`() = testApp {
             every { tokenRepository.getAccessToken() } returns "test-token"
-            // Create 35 shows — only first 30 should be returned
+            // Create 35 shows - only first 30 should be returned
             val shows = (1..35).map { i ->
                 TraktWatchedEntry(TraktShow("Show $i", 2020, TraktIds(trakt = i)))
             }
-            coEvery { showRepository.getShows() } returns shows
+            coEvery { showRepository.getShows() } returns shows.map { EnrichedShowEntry(entry = it) }
 
             val response = client.get("/shows")
 
@@ -236,7 +238,7 @@ class CompanionHttpServerTest {
             val shows = (1..3).map { i ->
                 TraktWatchedEntry(TraktShow("Show $i", 2020 + i, TraktIds(trakt = i)))
             }
-            coEvery { showRepository.getShows() } returns shows
+            coEvery { showRepository.getShows() } returns shows.map { EnrichedShowEntry(entry = it) }
 
             val response = client.get("/shows?offset=-5&limit=2")
 
@@ -249,7 +251,7 @@ class CompanionHttpServerTest {
         @Test
         fun `ignores invalid non-numeric offset and limit`() = testApp {
             every { tokenRepository.getAccessToken() } returns "test-token"
-            coEvery { showRepository.getShows() } returns listOf(watchedEntry)
+            coEvery { showRepository.getShows() } returns listOf(enrichedEntry)
 
             val response = client.get("/shows?offset=abc&limit=xyz")
 
@@ -329,7 +331,7 @@ class CompanionHttpServerTest {
                 show = TraktShow("No TMDB Show", 2020, TraktIds(trakt = 1, tmdb = null)),
                 seasons = listOf(TraktWatchedSeason(1, listOf(TraktWatchedEpisode(1))))
             )
-            coEvery { showRepository.getShows() } returns listOf(noTmdbEntry)
+            coEvery { showRepository.getShows() } returns listOf(EnrichedShowEntry(entry = noTmdbEntry))
 
             val response = client.post("/recap/1") {
                 contentType(ContentType.Application.Json)
@@ -342,7 +344,7 @@ class CompanionHttpServerTest {
         @Test
         fun `returns 200 on successful recap generation`() = testApp {
             every { tokenRepository.getAccessToken() } returns "token"
-            coEvery { showRepository.getShows() } returns listOf(watchedEntry)
+            coEvery { showRepository.getShows() } returns listOf(enrichedEntry)
             coEvery { tmdbApiService.getShow(100, "api-key", any()) } returns tmdbShow
             stubSuccessfulEpisodes()
             coEvery { recapGenerator.generateRecap(any(), any(), any(), any()) } returns "<div>Recap HTML</div>"
@@ -357,9 +359,9 @@ class CompanionHttpServerTest {
         }
 
         @Test
-        fun `uses show from cache — does not call TMDB getShow`() = testApp {
+        fun `uses show from cache - does not call TMDB getShow`() = testApp {
             every { tokenRepository.getAccessToken() } returns "token"
-            coEvery { showRepository.getShows() } returns listOf(watchedEntry)
+            coEvery { showRepository.getShows() } returns listOf(enrichedEntry)
             tmdbCache.putShow(100, tmdbShow)
             stubSuccessfulEpisodes()
             coEvery { recapGenerator.generateRecap(any(), any(), any(), any()) } returns "<div>ok</div>"
@@ -376,7 +378,7 @@ class CompanionHttpServerTest {
         @Test
         fun `fetches show from TMDB on cache miss and stores it in cache`() = testApp {
             every { tokenRepository.getAccessToken() } returns "token"
-            coEvery { showRepository.getShows() } returns listOf(watchedEntry)
+            coEvery { showRepository.getShows() } returns listOf(enrichedEntry)
             coEvery { tmdbApiService.getShow(100, "api-key", any()) } returns tmdbShow
             stubSuccessfulEpisodes()
             coEvery { recapGenerator.generateRecap(any(), any(), any(), any()) } returns "<div>ok</div>"
@@ -392,9 +394,9 @@ class CompanionHttpServerTest {
         }
 
         @Test
-        fun `uses episode cache on hit — does not call TMDB getEpisode`() = testApp {
+        fun `uses episode cache on hit - does not call TMDB getEpisode`() = testApp {
             every { tokenRepository.getAccessToken() } returns "token"
-            coEvery { showRepository.getShows() } returns listOf(watchedEntry)
+            coEvery { showRepository.getShows() } returns listOf(enrichedEntry)
             coEvery { tmdbApiService.getShow(100, "api-key", any()) } returns tmdbShow
             // Pre-populate episode cache
             tmdbCache.putEpisode(100, 1, 1, ep1)
@@ -414,7 +416,7 @@ class CompanionHttpServerTest {
         @Test
         fun `fetches episodes from TMDB on cache miss and stores them in cache`() = testApp {
             every { tokenRepository.getAccessToken() } returns "token"
-            coEvery { showRepository.getShows() } returns listOf(watchedEntry)
+            coEvery { showRepository.getShows() } returns listOf(enrichedEntry)
             coEvery { tmdbApiService.getShow(100, "api-key", any()) } returns tmdbShow
             stubSuccessfulEpisodes()
             coEvery { recapGenerator.generateRecap(any(), any(), any(), any()) } returns "<div>ok</div>"
@@ -437,7 +439,7 @@ class CompanionHttpServerTest {
         @Test
         fun `returns 200 when one episode fails but others succeed`() = testApp {
             every { tokenRepository.getAccessToken() } returns "token"
-            coEvery { showRepository.getShows() } returns listOf(watchedEntry)
+            coEvery { showRepository.getShows() } returns listOf(enrichedEntry)
             coEvery { tmdbApiService.getShow(100, "api-key", any()) } returns tmdbShow
             coEvery { tmdbApiService.getEpisode(100, 1, 1, "api-key", any()) } returns ep1
             coEvery { tmdbApiService.getEpisode(100, 1, 2, "api-key", any()) } throws RuntimeException("Network error")
@@ -455,7 +457,7 @@ class CompanionHttpServerTest {
         @Test
         fun `returns 404 when all episodes fail to load`() = testApp {
             every { tokenRepository.getAccessToken() } returns "token"
-            coEvery { showRepository.getShows() } returns listOf(watchedEntry)
+            coEvery { showRepository.getShows() } returns listOf(enrichedEntry)
             coEvery { tmdbApiService.getShow(100, "api-key", any()) } returns tmdbShow
             coEvery { tmdbApiService.getEpisode(any(), any(), any(), any(), any()) } throws RuntimeException("All fail")
 
@@ -468,9 +470,9 @@ class CompanionHttpServerTest {
         }
 
         @Test
-        fun `returns 503 when recap generation throws — no exception detail leaked`() = testApp {
+        fun `returns 503 when recap generation throws - no exception detail leaked`() = testApp {
             every { tokenRepository.getAccessToken() } returns "token"
-            coEvery { showRepository.getShows() } returns listOf(watchedEntry)
+            coEvery { showRepository.getShows() } returns listOf(enrichedEntry)
             coEvery { tmdbApiService.getShow(100, "api-key", any()) } returns tmdbShow
             stubSuccessfulEpisodes()
             coEvery { recapGenerator.generateRecap(any(), any(), any(), any()) } throws RuntimeException("LLM crashed")
@@ -488,7 +490,7 @@ class CompanionHttpServerTest {
         @Test
         fun `uses TMDB key from settings when body key is blank`() = testApp {
             every { tokenRepository.getAccessToken() } returns "token"
-            coEvery { showRepository.getShows() } returns listOf(watchedEntry)
+            coEvery { showRepository.getShows() } returns listOf(enrichedEntry)
             every { settingsRepository.getTmdbApiKey() } returns flowOf("settings-key")
             coEvery { tmdbApiService.getShow(100, "settings-key", any()) } returns tmdbShow
             coEvery { tmdbApiService.getEpisode(100, 1, 1, "settings-key", any()) } returns ep1
@@ -514,7 +516,7 @@ class CompanionHttpServerTest {
                 )
             )
             every { tokenRepository.getAccessToken() } returns "token"
-            coEvery { showRepository.getShows() } returns listOf(manyEpisodeEntry)
+            coEvery { showRepository.getShows() } returns listOf(EnrichedShowEntry(entry = manyEpisodeEntry))
             coEvery { tmdbApiService.getShow(100, "api-key", any()) } returns tmdbShow
             // Only stub the last 8 episodes (S1E3..S1E5, S2E1..S2E5)
             coEvery { tmdbApiService.getEpisode(100, 1, 3, "api-key", any()) } returns TmdbEpisode(3, "S1E3", null, null, 1, 3)
@@ -715,7 +717,7 @@ class CompanionHttpServerTest {
         }
 
         @Test
-        fun `scrobble stop returns 503 when Trakt API throws — no exception detail leaked`() = testApp {
+        fun `scrobble stop returns 503 when Trakt API throws - no exception detail leaked`() = testApp {
             coEvery { tokenRefreshManager.getValidAccessToken() } returns "token"
             coEvery { traktApiService.scrobbleStop(any(), any()) } throws RuntimeException("Network error")
 

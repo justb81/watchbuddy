@@ -39,9 +39,19 @@
     <string name="home_connect_to_trakt">Connect to Trakt</string>
     <string name="home_syncing">Syncing with Trakt…</string>
     <string name="home_last_sync">Last synced: %1$s</string>
-    <string name="home_episode_progress">S%1$02dE%2$02d — %3$d/%4$d episodes watched</string>
     <string name="home_next_episode">Next: S%1$02dE%2$02d</string>
     <string name="home_just_now">Just now</string>
+    <string name="home_last_watched">Last watched: %1$s, %2$s</string>
+    <string name="home_last_aired_episode">Last aired: %1$s, %2$s</string>
+    <string name="home_time_today">today</string>
+    <string name="home_time_tomorrow">tomorrow</string>
+    <string name="home_time_yesterday">yesterday</string>
+    <string name="home_caught_up">Caught up</string>
+    <string name="home_show_completed">Completed</string>
+    <string name="home_not_started">Not started</string>
+    <string name="home_show_ended_caught_up">Completed %1$s</string>
+    <string name="home_section_expand">Expand section</string>
+    <string name="home_section_collapse">Collapse section</string>
     <string name="home_sync_failed">Sync failed: %1$s</string>
     <string name="home_sync_failed_auth">Your Trakt session has expired. Please re-authenticate in Settings.</string>
     <string name="home_cd_sync">Sync</string>
@@ -150,4 +160,14 @@
     <string name="error_generic">An error occurred.</string>
     <string name="retry">Try again</string>
     <string name="ok">OK</string>
+
+    <!-- Home plurals -->
+    <plurals name="home_episodes_behind">
+        <item quantity="one">%d episode behind</item>
+        <item quantity="other">%d episodes behind</item>
+    </plurals>
+    <plurals name="home_section_all_shows_count">
+        <item quantity="one">%d show</item>
+        <item quantity="other">%d shows</item>
+    </plurals>
 </resources>

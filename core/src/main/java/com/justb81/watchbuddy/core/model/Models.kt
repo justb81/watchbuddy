@@ -56,7 +56,12 @@ data class TmdbShow(
     val overview: String? = null,
     val poster_path: String? = null,
     val backdrop_path: String? = null,
-    val first_air_date: String? = null
+    val first_air_date: String? = null,
+    val status: String? = null,
+    val number_of_episodes: Int? = null,
+    val last_episode_to_air: TmdbEpisodeSummary? = null,
+    val next_episode_to_air: TmdbEpisodeSummary? = null,
+    val seasons: List<TmdbSeasonSummary> = emptyList()
 )
 
 @Serializable
@@ -73,6 +78,40 @@ data class TmdbEpisode(
     val season_number: Int,
     val episode_number: Int,
     val air_date: String? = null
+)
+
+@Serializable
+data class TmdbEpisodeSummary(
+    val season_number: Int,
+    val episode_number: Int,
+    val name: String? = null,
+    val air_date: String? = null
+)
+
+@Serializable
+data class TmdbSeasonSummary(
+    val season_number: Int,
+    val episode_count: Int
+)
+
+/**
+ * Wire-slim subset of TMDB per-show progress information shipped over the companion
+ * HTTP API as part of [EnrichedShowEntry]. Keeps /shows payload small while giving the
+ * TV all it needs to render the same progress visualisation as the phone.
+ */
+@Serializable
+data class TmdbProgressHint(
+    val status: String? = null,
+    val lastAired: TmdbEpisodeSummary? = null,
+    val nextAired: TmdbEpisodeSummary? = null,
+    val seasons: List<TmdbSeasonSummary> = emptyList()
+)
+
+@Serializable
+data class EnrichedShowEntry(
+    val entry: TraktWatchedEntry,
+    val tmdb: TmdbProgressHint? = null,
+    val posterPath: String? = null
 )
 
 // ── Companion / Device Models ─────────────────────────────────────────────────

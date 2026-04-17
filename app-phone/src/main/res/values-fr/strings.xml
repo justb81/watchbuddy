@@ -39,9 +39,19 @@
     <string name="home_connect_to_trakt">Se connecter à Trakt</string>
     <string name="home_syncing">Synchronisation avec Trakt…</string>
     <string name="home_last_sync">Dernière synchronisation : %1$s</string>
-    <string name="home_episode_progress">S%1$02dE%2$02d — %3$d/%4$d épisodes vus</string>
     <string name="home_next_episode">Suivant : S%1$02dE%2$02d</string>
     <string name="home_just_now">À l\'instant</string>
+    <string name="home_last_watched">Dernier vu : %1$s, %2$s</string>
+    <string name="home_last_aired_episode">Dernier diffusé : %1$s, %2$s</string>
+    <string name="home_time_today">aujourd\'hui</string>
+    <string name="home_time_tomorrow">demain</string>
+    <string name="home_time_yesterday">hier</string>
+    <string name="home_caught_up">À jour</string>
+    <string name="home_show_completed">Terminée</string>
+    <string name="home_not_started">Non commencée</string>
+    <string name="home_show_ended_caught_up">Terminée %1$s</string>
+    <string name="home_section_expand">Développer la section</string>
+    <string name="home_section_collapse">Réduire la section</string>
     <string name="home_sync_failed">Échec de la synchronisation : %1$s</string>
     <string name="home_sync_failed_auth">Votre session Trakt a expiré. Veuillez vous ré-authentifier dans les paramètres.</string>
     <string name="home_cd_sync">Synchroniser</string>
@@ -142,4 +152,14 @@
     <string name="diagnostics_banner_share">Partager</string>
     <string name="diagnostics_banner_dismiss">Ignorer</string>
     <string name="diagnostics_export">Exporter le diagnostic</string>
+
+    <!-- Home plurals -->
+    <plurals name="home_episodes_behind">
+        <item quantity="one">%d épisode de retard</item>
+        <item quantity="other">%d épisodes de retard</item>
+    </plurals>
+    <plurals name="home_section_all_shows_count">
+        <item quantity="one">%d série</item>
+        <item quantity="other">%d séries</item>
+    </plurals>
 </resources>
