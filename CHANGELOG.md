@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.5](https://github.com/justb81/watchbuddy/compare/v0.14.4...v0.14.5) (2026-04-17)
+
+
+### Bug Fixes
+
+* **tv:** exclude androidx.work from classpath and harden Room R8 keeps (refs [#244](https://github.com/justb81/watchbuddy/issues/244) [#238](https://github.com/justb81/watchbuddy/issues/238)) ([#245](https://github.com/justb81/watchbuddy/issues/245)) ([8e845b2](https://github.com/justb81/watchbuddy/commit/8e845b22acd88f89aab6e62602195c216daaee1c))
+
 ## [0.14.4](https://github.com/justb81/watchbuddy/compare/v0.14.3...v0.14.4) (2026-04-17)
 
 
