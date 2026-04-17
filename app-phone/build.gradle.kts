@@ -48,6 +48,14 @@ android {
             "String", "DEFAULT_TMDB_API_KEY",
             "\"${providers.environmentVariable("TMDB_API_KEY").orElse("").get()}\""
         )
+
+        // Package native debug symbols into the AAB so Google Play Console can
+        // symbolicate native stack traces.  LiteRT-LM, AICore and Tink all ship
+        // .so libraries; SYMBOL_TABLE yields readable frames without inflating
+        // the bundle the way FULL (with line numbers) would.
+        ndk {
+            debugSymbolLevel = "SYMBOL_TABLE"
+        }
     }
 
     // CI signing: keystore path + credentials via environment variables.

@@ -67,6 +67,19 @@
 # ── Security Crypto ──────────────────────────────────────────────────────────
 -keep class androidx.security.crypto.** { *; }
 
+# ── Room / WorkManager ──────────────────────────────────────────────────────
+# Room 2.7+ instantiates generated _Impl classes via reflection
+# (Class.getDeclaredConstructor().newInstance()), so the no-arg constructor
+# must survive R8 shrinking.  Without this rule, the first call to
+# WorkManager.getInstance() in a release build throws
+# "NoSuchMethodException: androidx.work.impl.WorkDatabase_Impl.<init>[]".
+# Reported in issue #232 — the crash that opening Settings produced because
+# SettingsViewModel has an @Inject WorkManager dependency.
+-keepclassmembers class * extends androidx.room.RoomDatabase {
+    public <init>();
+}
+-keep class androidx.work.impl.WorkDatabase_Impl { *; }
+
 # ── Coroutines ───────────────────────────────────────────────────────────────
 -keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
 -keepnames class kotlinx.coroutines.CoroutineExceptionHandler {}
