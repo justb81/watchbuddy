@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.3](https://github.com/justb81/watchbuddy/compare/v0.14.2...v0.14.3) (2026-04-17)
+
+
+### Bug Fixes
+
+* **tv:** remove broken service declarations that block app launch ([#238](https://github.com/justb81/watchbuddy/issues/238)) ([#240](https://github.com/justb81/watchbuddy/issues/240)) ([81bafa7](https://github.com/justb81/watchbuddy/commit/81bafa738746ee1cdc8cb838aa71bed6136f2ce5))
+
 ## [0.14.2](https://github.com/justb81/watchbuddy/compare/v0.14.1...v0.14.2) (2026-04-17)
 
 
