@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.15.1](https://github.com/justb81/watchbuddy/compare/v0.15.0...v0.15.1) (2026-04-17)
+
+
+### Bug Fixes
+
+* **tv:** make phone discovery reliable on Google TV via multicast lock + retry ([#256](https://github.com/justb81/watchbuddy/issues/256)) ([3673252](https://github.com/justb81/watchbuddy/commit/367325251eeb4e13203f771559b0e484382ab181))
+* **tv:** remove diagnostic surface and unsafe setContent guard (closes [#252](https://github.com/justb81/watchbuddy/issues/252)) ([#254](https://github.com/justb81/watchbuddy/issues/254)) ([eebdc2c](https://github.com/justb81/watchbuddy/commit/eebdc2c88776d4abdcebd144908183241169d30e))
+
 ## [0.15.0](https://github.com/justb81/watchbuddy/compare/v0.14.5...v0.15.0) (2026-04-17)
 
 
