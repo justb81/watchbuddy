@@ -81,23 +81,48 @@ class PhoneDiscoveryManager @Inject constructor(
     )
 
     private val discoveryListener = object : NsdManager.DiscoveryListener {
-        override fun onDiscoveryStarted(serviceType: String) {}
-        override fun onDiscoveryStopped(serviceType: String) {}
-        override fun onStartDiscoveryFailed(serviceType: String, errorCode: Int) {}
-        override fun onStopDiscoveryFailed(serviceType: String, errorCode: Int) {}
+        override fun onDiscoveryStarted(serviceType: String) {
+            Log.i(TAG, "discovery started: $serviceType")
+        }
+
+        override fun onDiscoveryStopped(serviceType: String) {
+            Log.i(TAG, "discovery stopped: $serviceType")
+        }
+
+        override fun onStartDiscoveryFailed(serviceType: String, errorCode: Int) {
+            Log.e(TAG, "start discovery failed: $serviceType, error=${nsdErrorName(errorCode)}")
+        }
+
+        override fun onStopDiscoveryFailed(serviceType: String, errorCode: Int) {
+            Log.w(TAG, "stop discovery failed: $serviceType, error=${nsdErrorName(errorCode)}")
+        }
 
         override fun onServiceFound(service: NsdServiceInfo) {
+            Log.i(TAG, "service found: ${service.serviceName} type=${service.serviceType}")
             val mgr = nsdManager ?: return
             @Suppress("DEPRECATION")
             mgr.resolveService(service, object : NsdManager.ResolveListener {
-                override fun onResolveFailed(serviceInfo: NsdServiceInfo, errorCode: Int) {}
+                override fun onResolveFailed(serviceInfo: NsdServiceInfo, errorCode: Int) {
+                    Log.w(
+                        TAG,
+                        "resolve failed: ${serviceInfo.serviceName}, error=${nsdErrorName(errorCode)}"
+                    )
+                }
+
                 override fun onServiceResolved(serviceInfo: NsdServiceInfo) {
+                    @Suppress("DEPRECATION")
+                    val host = serviceInfo.host?.hostAddress
+                    Log.i(
+                        TAG,
+                        "service resolved: ${serviceInfo.serviceName} → $host:${serviceInfo.port}"
+                    )
                     fetchCapabilityAndAdd(serviceInfo)
                 }
             })
         }
 
         override fun onServiceLost(service: NsdServiceInfo) {
+            Log.i(TAG, "service lost: ${service.serviceName}")
             _discoveredPhones.value = _discoveredPhones.value
                 .filter { it.serviceInfo.serviceName != service.serviceName }
         }
@@ -105,16 +130,25 @@ class PhoneDiscoveryManager @Inject constructor(
 
     fun startDiscovery() {
         val mgr = nsdManager ?: return
+        Log.i(TAG, "startDiscovery: type=$SERVICE_TYPE")
         runCatching {
             mgr.discoverServices(SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, discoveryListener)
-        }
+        }.onFailure { Log.e(TAG, "discoverServices failed", it) }
         startHeartbeat()
     }
 
     fun stopDiscovery() {
+        Log.i(TAG, "stopDiscovery")
         heartbeatJob?.cancel()
         val mgr = nsdManager ?: return
         runCatching { mgr.stopServiceDiscovery(discoveryListener) }
+    }
+
+    private fun nsdErrorName(errorCode: Int): String = when (errorCode) {
+        NsdManager.FAILURE_INTERNAL_ERROR -> "FAILURE_INTERNAL_ERROR($errorCode)"
+        NsdManager.FAILURE_ALREADY_ACTIVE -> "FAILURE_ALREADY_ACTIVE($errorCode)"
+        NsdManager.FAILURE_MAX_LIMIT -> "FAILURE_MAX_LIMIT($errorCode)"
+        else -> "UNKNOWN($errorCode)"
     }
 
     private fun startHeartbeat() {
