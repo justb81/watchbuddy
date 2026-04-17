@@ -77,11 +77,13 @@ class MediaSessionScrobbler @Inject constructor(
                         val title = metadata.getString(android.media.MediaMetadata.METADATA_KEY_TITLE)
                             ?: return@forEach
 
+                        val progress = computeProgress(playbackState, metadata)
+
                         when (playbackState.state) {
-                            PlaybackState.STATE_PLAYING -> processPlayingMedia(packageName, title)
-                            PlaybackState.STATE_PAUSED -> handleScrobblePause(title)
+                            PlaybackState.STATE_PLAYING -> processPlayingMedia(packageName, title, progress)
+                            PlaybackState.STATE_PAUSED -> handleScrobblePause(title, progress)
                             PlaybackState.STATE_STOPPED,
-                            PlaybackState.STATE_NONE -> handleScrobbleStop(title)
+                            PlaybackState.STATE_NONE -> handleScrobbleStop(title, progress)
                             else -> { /* no-op */ }
                         }
                     }
@@ -98,17 +100,35 @@ class MediaSessionScrobbler @Inject constructor(
         scope.cancel()
     }
 
-    private suspend fun processPlayingMedia(packageName: String, rawTitle: String) {
+    private suspend fun processPlayingMedia(packageName: String, rawTitle: String, progress: Float?) {
         if (rawTitle == currentlyScrobbling) return // already handling this title
 
         val candidate = matchTitle(packageName, rawTitle) ?: return
 
         if (candidate.confidence >= AUTO_SCROBBLE_THRESHOLD) {
-            autoScrobble(candidate)
+            autoScrobble(candidate, progress)
         } else if (candidate.confidence >= OVERLAY_THRESHOLD) {
             _pendingConfirmation.emit(candidate)
         }
         // confidence < 0.70 → too uncertain, don't scrobble
+    }
+
+    /**
+     * Computes playback progress as a percentage (0.0–100.0) from the current
+     * MediaSession state, or null if duration/position are unavailable.
+     *
+     * Trakt treats progress >= 80 on /scrobble/stop as "watched", so sending a
+     * real progress value prevents accidentally marking partially-watched
+     * episodes as fully watched.
+     */
+    internal fun computeProgress(
+        playbackState: PlaybackState,
+        metadata: android.media.MediaMetadata
+    ): Float? {
+        val durationMs = metadata.getLong(android.media.MediaMetadata.METADATA_KEY_DURATION)
+        val positionMs = playbackState.position
+        if (durationMs <= 0L || positionMs < 0L) return null
+        return (positionMs * 100f / durationMs).coerceIn(0f, 100f)
     }
 
     // ── Fuzzy Matching ───────────────────────────────────────────────────────
@@ -227,7 +247,7 @@ class MediaSessionScrobbler @Inject constructor(
      * Called automatically for high-confidence matches or via [ScrobbleViewModel] after
      * user confirmation.
      */
-    suspend fun autoScrobble(candidate: ScrobbleCandidate) {
+    suspend fun autoScrobble(candidate: ScrobbleCandidate, progress: Float? = null) {
         val now = System.currentTimeMillis()
         val phones = phoneDiscovery.discoveredPhones.value
             .filter { it.capability?.isAvailable == true }
@@ -239,7 +259,7 @@ class MediaSessionScrobbler @Inject constructor(
 
         val show = candidate.matchedShow ?: return
         val episode = candidate.matchedEpisode ?: return
-        val request = PhoneScrobbleRequest(show = show, episode = episode, progress = 0f)
+        val request = PhoneScrobbleRequest(show = show, episode = episode, progress = progress ?: 0f)
 
         coroutineScope {
             phones.forEach { phone ->
@@ -256,7 +276,7 @@ class MediaSessionScrobbler @Inject constructor(
         currentlyScrobbling = candidate.mediaTitle
     }
 
-    private suspend fun handleScrobblePause(rawTitle: String) {
+    internal suspend fun handleScrobblePause(rawTitle: String, progress: Float? = null) {
         if (rawTitle != currentlyScrobbling) return
 
         val now = System.currentTimeMillis()
@@ -267,7 +287,7 @@ class MediaSessionScrobbler @Inject constructor(
         val candidate = matchTitle("", rawTitle) ?: return
         val show = candidate.matchedShow ?: return
         val episode = candidate.matchedEpisode ?: return
-        val request = PhoneScrobbleRequest(show = show, episode = episode, progress = 50f)
+        val request = PhoneScrobbleRequest(show = show, episode = episode, progress = progress ?: 50f)
 
         coroutineScope {
             phones.forEach { phone ->
@@ -283,8 +303,14 @@ class MediaSessionScrobbler @Inject constructor(
         }
     }
 
-    private suspend fun handleScrobbleStop(rawTitle: String) {
+    internal suspend fun handleScrobbleStop(rawTitle: String, progress: Float? = null) {
         if (rawTitle != currentlyScrobbling) return
+
+        if (progress == null) {
+            Log.w(TAG, "Scrobble stop skipped — playback position/duration unavailable for '$rawTitle'")
+            currentlyScrobbling = null
+            return
+        }
 
         val now = System.currentTimeMillis()
         val phones = phoneDiscovery.discoveredPhones.value
@@ -294,7 +320,7 @@ class MediaSessionScrobbler @Inject constructor(
         val candidate = matchTitle("", rawTitle) ?: return
         val show = candidate.matchedShow ?: return
         val episode = candidate.matchedEpisode ?: return
-        val request = PhoneScrobbleRequest(show = show, episode = episode, progress = 100f)
+        val request = PhoneScrobbleRequest(show = show, episode = episode, progress = progress)
 
         coroutineScope {
             phones.forEach { phone ->
