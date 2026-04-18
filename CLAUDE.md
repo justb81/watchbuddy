@@ -30,7 +30,7 @@ watchbuddy/
 │       ├── data/       StreamingPreferencesRepository, UserSessionRepository, TvShowCache
 │       ├── di/         AppModule (Hilt dependency injection)
 │       ├── discovery/  PhoneDiscoveryManager, PhoneApiService, PhoneApiClientFactory
-│       ├── scrobbler/  MediaSessionScrobbler
+│       ├── scrobbler/  TvScrobbleDispatcher, TvWatchedShowSource
 │       ├── ui/         TvMainActivity, TvNavGraph
 │       │   ├── home/       TvHomeScreen, TvHomeViewModel
 │       │   ├── navigation/ TvNavGraph
@@ -43,8 +43,11 @@ watchbuddy/
 ├── core/               Shared library module
 │   └── src/main/java/com/justb81/watchbuddy/core/
 │       ├── locale/     LocaleHelper (LLM language resolution)
+│       ├── logging/    CrashReporter, DiagnosticLog, DiagnosticShare
 │       ├── model/      Data models (Kotlin Serialization)
 │       ├── network/    NetworkModule (Hilt, OkHttp, Retrofit), SharedJson (WatchBuddyJson shared instance)
+│       ├── progress/   ShowProgressCalculator
+│       ├── scrobbler/  MediaSessionScrobbler, ScrobbleContracts
 │       ├── tmdb/       TmdbApiService
 │       └── trakt/      TraktApiService, TokenProxyService
 ├── backend/            Node.js token proxy (Docker)
@@ -204,7 +207,7 @@ The TV ranks connected phones by LLM quality and uses the best one. Failover cha
 - **Auto-reconnect:** `CompanionService` registers a `ConnectivityManager.NetworkCallback` for Wi-Fi. On network loss, NSD is unregistered; on network available, `onAvailable` is debounced (2 s) and NSD is torn down then re-registered 300 ms later — `NsdManager.unregisterService` is async and calling `registerService` before its callback runs leaves ghost advertisements on the network (#264). All register/unregister transitions run through an `IDLE → REGISTERING → REGISTERED → UNREGISTERING` state machine under a single lock so concurrent callers (`onStartCommand` + network callback) can't race past the guard while a prior registration is still in flight. `onStartCommand` is also idempotent against duplicate starts.
 - **NSD advertising (phone):** `CompanionService` holds a `WifiManager.MulticastLock` for its whole lifetime (OEM skins filter outgoing multicast packets without it), pins `NsdServiceInfo.host` to the Wi-Fi IPv4 address for multi-homed devices, and `CompanionHttpServer` binds Netty explicitly to `0.0.0.0` (#265). Cross-device discovery additionally requires the Wi-Fi AP to allow peer-to-peer traffic (client isolation off) — no code-level fix helps there.
 - **Scrobble display:** When a scrobble event is received on the phone, `CompanionStateManager.lastScrobbleEvent` is updated. The phone HomeScreen shows a "Now Watching" card with show/episode details, auto-hidden after 30 minutes.
-- **Scrobbling:** `MediaSessionScrobbler` listens to active media sessions on the TV, extracts package name + title, fuzzy-matches against the local show cache first, then falls back to TMDB title search (using the API key from the best phone's capability). Auto-scrobbles if confidence ≥ 95%, shows overlay confirmation between 70–95%, ignores below 70%. When a scrobble event occurs, `MediaSessionScrobbler` calls `POST /scrobble/{start|pause|stop}` on **every** connected phone in parallel via `PhoneDiscoveryManager` + `PhoneApiClientFactory` — each phone records the episode on its own user's Trakt account using its own stored credentials. A failure for one phone does not block the others. The TV never calls the Trakt API directly for any operation. Progress is derived from `PlaybackState.position` and `MediaMetadata.METADATA_KEY_DURATION`; if unavailable, start/pause fall back to 0/50 and stop is skipped to avoid Trakt marking partially-watched episodes as watched (Trakt treats `progress >= 80` on `/scrobble/stop` as watched).
+- **Scrobbling:** `MediaSessionScrobbler` (core, consumed by `TvScrobbleDispatcher`) listens to active media sessions on the TV, extracts package name + title, fuzzy-matches against the local show cache first, then falls back to TMDB title search (using the API key from the best phone's capability). Auto-scrobbles if confidence ≥ 95%, shows overlay confirmation between 70–95%, ignores below 70%. When a scrobble event occurs, `TvScrobbleDispatcher` calls `POST /scrobble/{start|pause|stop}` on **every** connected phone in parallel via `PhoneDiscoveryManager` + `PhoneApiClientFactory` — each phone records the episode on its own user's Trakt account using its own stored credentials. A failure for one phone does not block the others. The TV never calls the Trakt API directly for any operation. Progress is derived from `PlaybackState.position` and `MediaMetadata.METADATA_KEY_DURATION`; if unavailable, start/pause fall back to 0/50 and stop is skipped to avoid Trakt marking partially-watched episodes as watched (Trakt treats `progress >= 80` on `/scrobble/stop` as watched).
 - **LLM selection:** `LlmOrchestrator` checks AICore first, then falls back to LiteRT-LM with a Gemma 4 model (E4B or E2B) sized to available RAM.
 - **Auth modes:** Managed backend (default), self-hosted proxy, or direct Trakt credentials.
 - **Multi-user:** Multiple phones can connect to one TV simultaneously; scrobbling records the episode for each connected user independently; shared watch mode avoids recap spoilers.
