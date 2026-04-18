@@ -127,10 +127,10 @@ The only exceptions are **localization string resources** (`values-de/`, `values
 2. Make changes and commit using Conventional Commits (see below)
 3. Push the branch and open a PR against `main`
 4. **Wait for a green CI build** (`build-android.yml`) — do not continue if the build is red; fix the issue first
-5. **Stop here.** The PR is the deliverable. Do NOT merge into `main` automatically.
-6. Merging into `main` is the owner's decision and happens only on explicit instruction.
+5. **Auto-merge when green.** Once every required build step on the PR has completed successfully, the agent may merge the PR into `main` automatically (e.g. via `enable_pr_auto_merge` or by merging directly after CI passes). Use a squash merge and delete the branch after merge.
+6. If CI fails or a required check is still pending, do NOT merge — fix the failure or wait.
 
-> Agents that open multiple PRs without waiting for CI or without owner approval create unreviewed, potentially broken state on `main`. One PR per task, green build, then hand off.
+> One PR per task. Never merge with red or missing required checks. If a reviewer has requested changes, wait for their approval before merging even if CI is green.
 
 **Branch naming:**
 
