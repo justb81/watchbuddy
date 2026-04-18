@@ -9,6 +9,10 @@ android {
     namespace = "com.justb81.watchbuddy.core"
     compileSdk = 35
 
+    buildFeatures {
+        buildConfig = true
+    }
+
     defaultConfig {
         minSdk = 31
     }

@@ -57,12 +57,6 @@ object AppModule {
     fun provideManagedBackendAvailable(): Boolean =
         BuildConfig.TOKEN_BACKEND_URL.isNotBlank() && BuildConfig.TRAKT_CLIENT_ID.isNotBlank()
 
-    /** Debug flag for NetworkModule (controls HTTP logging level). */
-    @Provides
-    @Singleton
-    @Named("isDebugBuild")
-    fun provideIsDebugBuild(): Boolean = BuildConfig.DEBUG
-
     /**
      * WorkManager singleton for injection into ViewModels.
      * Injecting rather than calling getInstance() directly keeps ViewModels testable.

@@ -1,6 +1,5 @@
 package com.justb81.watchbuddy.tv.di
 
-import com.justb81.watchbuddy.BuildConfig
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -12,16 +11,9 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object AppModule {
 
-    /** Debug-Flag für NetworkModule (steuert HTTP-Logging-Level). */
-    @Provides
-    @Singleton
-    @Named("isDebugBuild")
-    fun provideIsDebugBuild(): Boolean = BuildConfig.DEBUG
-
     /**
-     * URL des Token-Proxy-Backends — die TV-App nutzt keinen Token-Proxy,
-     * daher Leerstring. Wird von NetworkModule.provideTokenProxyRetrofit()
-     * benötigt; bei leerem String wird null zurückgegeben.
+     * Token proxy backend URL — the TV app uses no token proxy, so this is blank.
+     * NetworkModule.provideTokenProxyRetrofit() returns null when blank.
      */
     @Provides
     @Singleton
