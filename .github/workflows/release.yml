@@ -230,11 +230,13 @@ jobs:
         id: play-status
         run: |
           MAJOR=$(echo "$VERSION" | cut -d. -f1)
+          MINOR=$(echo "$VERSION" | cut -d. -f2)
           if [ "$MAJOR" -ge 1 ]; then
             echo "status=completed" >> "$GITHUB_OUTPUT"
           else
             echo "status=draft" >> "$GITHUB_OUTPUT"
           fi
+          echo "release-name=${MAJOR}.${MINOR}" >> "$GITHUB_OUTPUT"
 
       # -- Publish to Google Play Store ------------------------------------
       - name: Upload to Google Play Store
@@ -246,6 +248,7 @@ jobs:
           releaseFiles: release-assets/*-release.aab
           track: internal
           status: ${{ steps.play-status.outputs.status }}
+          releaseName: ${{ steps.play-status.outputs.release-name }}
           whatsNewDirectory: whatsnew
 
       - name: Upload release artifacts
