@@ -42,7 +42,9 @@ import com.justb81.watchbuddy.core.model.ScrobbleAction
 import com.justb81.watchbuddy.core.model.ScrobbleDisplayEvent
 import com.justb81.watchbuddy.core.progress.ShowProgress
 import com.justb81.watchbuddy.core.tmdb.TmdbImageHelper
+import com.justb81.watchbuddy.phone.permissions.BluetoothAdvertisePermission
 import com.justb81.watchbuddy.phone.permissions.NotificationPermission
+import com.justb81.watchbuddy.phone.permissions.rememberBluetoothAdvertisePermissionRequest
 import com.justb81.watchbuddy.phone.permissions.rememberNotificationPermissionRequest
 import java.time.Instant
 import java.time.LocalDate
@@ -64,9 +66,21 @@ fun HomeScreen(
     var overflowExpanded by remember { mutableStateOf(false) }
     var showNotificationRationale by remember { mutableStateOf(false) }
 
+    // BLE advertising is a best-effort fallback discovery channel for networks
+    // where mDNS doesn't work (AP isolation, mesh VLANs, multicast filtering).
+    // If the user denies the permission, we still start the service — NSD
+    // continues to work on most networks — so the callback always proceeds.
+    val requestBluetoothAdvertisePermission = rememberBluetoothAdvertisePermissionRequest { _ ->
+        viewModel.toggleWatchingTv(true)
+    }
+
     val requestNotificationPermission = rememberNotificationPermissionRequest { granted ->
         if (granted) {
-            viewModel.toggleWatchingTv(true)
+            if (BluetoothAdvertisePermission.isGranted(context)) {
+                viewModel.toggleWatchingTv(true)
+            } else {
+                requestBluetoothAdvertisePermission()
+            }
         } else {
             showNotificationRationale = true
         }
@@ -75,10 +89,12 @@ fun HomeScreen(
     val handleToggleWatchingTv: (Boolean) -> Unit = { enabled ->
         if (!enabled) {
             viewModel.toggleWatchingTv(false)
-        } else if (NotificationPermission.isGranted(context)) {
-            viewModel.toggleWatchingTv(true)
-        } else {
+        } else if (!NotificationPermission.isGranted(context)) {
             requestNotificationPermission()
+        } else if (!BluetoothAdvertisePermission.isGranted(context)) {
+            requestBluetoothAdvertisePermission()
+        } else {
+            viewModel.toggleWatchingTv(true)
         }
     }
 

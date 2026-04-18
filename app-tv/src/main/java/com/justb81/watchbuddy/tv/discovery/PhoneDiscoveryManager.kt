@@ -23,6 +23,7 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.net.Inet4Address
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -42,7 +43,8 @@ import javax.inject.Singleton
 @Singleton
 class PhoneDiscoveryManager @Inject constructor(
     @param:ApplicationContext private val context: Context,
-    private val httpClient: OkHttpClient
+    private val httpClient: OkHttpClient,
+    private val bleScanner: PhoneBleScanner,
 ) {
     companion object {
         const val SERVICE_TYPE = "_watchbuddy._tcp."
@@ -158,13 +160,18 @@ class PhoneDiscoveryManager @Inject constructor(
     }
 
     fun startDiscovery() {
-        val mgr = nsdManager ?: return
         Log.i(TAG, "startDiscovery: type=$SERVICE_TYPE")
         isDiscovering = true
         acquireMulticastLock()
-        runCatching {
-            mgr.discoverServices(SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, discoveryListener)
-        }.onFailure { Log.e(TAG, "discoverServices failed", it) }
+        val mgr = nsdManager
+        if (mgr != null) {
+            runCatching {
+                mgr.discoverServices(SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, discoveryListener)
+            }.onFailure { Log.e(TAG, "discoverServices failed", it) }
+        } else {
+            Log.w(TAG, "NSD unavailable on this device; relying on BLE channel only")
+        }
+        startBleScan()
         startHeartbeat()
         registerNetworkCallback()
     }
@@ -178,6 +185,7 @@ class PhoneDiscoveryManager @Inject constructor(
         if (mgr != null) {
             runCatching { mgr.stopServiceDiscovery(discoveryListener) }
         }
+        bleScanner.stop()
         releaseMulticastLock()
     }
 
@@ -217,9 +225,14 @@ class PhoneDiscoveryManager @Inject constructor(
             .build()
         val callback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
-                Log.i(TAG, "Wi-Fi available — cycling NSD discovery")
+                Log.i(TAG, "Wi-Fi available — cycling discovery (NSD + BLE)")
                 if (isDiscovering) {
                     heartbeatScope.launch { restartDiscoveryInternal() }
+                    // Wi-Fi reconnects often coincide with the phone's IP
+                    // flipping; restart the BLE scanner so a fresh advert
+                    // (with the new IP) is captured promptly rather than
+                    // waiting for the next LOW_POWER scan window.
+                    startBleScan()
                 }
             }
         }
@@ -356,8 +369,22 @@ class PhoneDiscoveryManager @Inject constructor(
         val hostAddress = serviceInfo.host?.hostAddress ?: return
         val baseUrl = "http://${hostAddress}:${serviceInfo.port}/"
         val txtRecord = parseTxtRecord(serviceInfo)
+        fetchCapabilityAndAdd(serviceInfo, txtRecord, baseUrl)
+    }
 
-        val url = "http://${hostAddress}:${serviceInfo.port}${CAPABILITY_PATH}"
+    /**
+     * Shared implementation for both NSD and BLE discovery channels. Callers
+     * are responsible for constructing a [NsdServiceInfo] (real or synthetic
+     * for BLE) and a [PhoneTxtRecord] (parsed from NSD TXT attributes or
+     * reconstructed from BLE payload); this method fetches `/capability`,
+     * ranks the phone, and adds it to the shared list via [addOrUpdatePhone].
+     */
+    private fun fetchCapabilityAndAdd(
+        serviceInfo: NsdServiceInfo,
+        txtRecord: PhoneTxtRecord?,
+        baseUrl: String,
+    ) {
+        val url = "${baseUrl.trimEnd('/')}${CAPABILITY_PATH}"
         try {
             val response = httpClient.newCall(Request.Builder().url(url).build()).execute()
             val capability = response.body?.string()?.let {
@@ -435,9 +462,62 @@ class PhoneDiscoveryManager @Inject constructor(
     }
 
     private fun addOrUpdatePhone(phone: DiscoveredPhone) {
+        // Dedup by baseUrl so NSD and BLE — the two independent discovery
+        // channels — converge into a single entry when they surface the same
+        // phone. baseUrl embeds host:port, which is the authoritative address
+        // of the HTTP server; the NSD serviceName is per-channel and would
+        // allow duplicates.
         _discoveredPhones.value = (_discoveredPhones.value
-            .filter { it.serviceInfo.serviceName != phone.serviceInfo.serviceName } + phone)
+            .filter { it.baseUrl != phone.baseUrl } + phone)
             .sortedByDescending { it.score }
+    }
+
+    /**
+     * Entry point for advertisements surfaced by [PhoneBleScanner]. Dedups
+     * against phones already discovered via NSD (same host:port) and,
+     * otherwise, feeds the endpoint into the existing capability-fetch
+     * pipeline so heartbeating and ranking are identical across channels.
+     *
+     * BLE adverts fire every ~250 ms, so this method must not kick off an
+     * HTTP request on every tick — we short-circuit when the same baseUrl is
+     * already in the list.
+     */
+    internal fun onBleAdvertisement(
+        ipv4: Inet4Address,
+        port: Int,
+        modelQuality: Int,
+        llmBackendOrdinal: Int,
+    ) {
+        val hostAddress = ipv4.hostAddress ?: return
+        val baseUrl = "http://$hostAddress:$port/"
+        if (_discoveredPhones.value.any { it.baseUrl == baseUrl }) {
+            // Already known via NSD or a prior BLE tick — heartbeat handles
+            // aliveness from here.
+            return
+        }
+
+        val synthInfo = NsdServiceInfo().apply {
+            serviceName = "watchbuddy-ble-$hostAddress-$port"
+            serviceType = SERVICE_TYPE
+            this.port = port
+            host = ipv4
+        }
+        val txtRecord = PhoneTxtRecord(
+            version = "", // unknown until /capability is fetched
+            modelQuality = modelQuality,
+            llmBackend = runCatching { LlmBackend.entries[llmBackendOrdinal] }
+                .getOrDefault(LlmBackend.NONE),
+        )
+        Log.i(TAG, "BLE advertisement → resolving phone at $baseUrl")
+        heartbeatScope.launch {
+            fetchCapabilityAndAdd(synthInfo, txtRecord, baseUrl)
+        }
+    }
+
+    private fun startBleScan() {
+        bleScanner.start { ipv4, port, quality, backend ->
+            onBleAdvertisement(ipv4, port, quality, backend)
+        }
     }
 
     /**

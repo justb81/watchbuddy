@@ -19,12 +19,13 @@ class PhoneDiscoveryManagerTest {
     private val context: Context = mockk(relaxed = true)
     private val httpClient: OkHttpClient = mockk(relaxed = true)
     private val nsdManager: NsdManager = mockk(relaxed = true)
+    private val bleScanner: PhoneBleScanner = mockk(relaxed = true)
     private lateinit var manager: PhoneDiscoveryManager
 
     @BeforeEach
     fun setUp() {
         every { context.getSystemService(Context.NSD_SERVICE) } returns nsdManager
-        manager = PhoneDiscoveryManager(context, httpClient)
+        manager = PhoneDiscoveryManager(context, httpClient, bleScanner)
     }
 
     // ── DiscoveredPhone construction helpers ───────────────────────────────────

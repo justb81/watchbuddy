@@ -16,6 +16,15 @@
     <!-- NSD (mDNS) — phone registers itself as trakt-companion-{username}._tcp.local -->
     <!-- No special permission needed for NsdManager, INTERNET covers it -->
 
+    <!-- BLE advertising — secondary discovery channel used when mDNS is
+         blocked by the router (AP/client isolation, VLAN-segmented mesh
+         Wi-Fi, aggressive multicast filtering). The phone advertises its
+         LAN endpoint; the TV scans for it and falls through to plain HTTP
+         on whatever LAN path exists. Degrades gracefully when Bluetooth is
+         off or the permission is denied — NSD keeps working. -->
+    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
+
     <!-- Background work (model updates, token refresh) -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />

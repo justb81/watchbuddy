@@ -8,6 +8,17 @@
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
 
+    <!-- BLE scanning — secondary discovery channel used when mDNS is blocked
+         by the router (AP/client isolation, VLAN-segmented mesh Wi-Fi,
+         aggressive multicast filtering). The TV scans for phones that
+         advertise their LAN endpoint over BLE and falls through to plain
+         HTTP. `neverForLocation` opts out of the location runtime prompt
+         since we never derive physical location from scan results.
+         Degrades gracefully when Bluetooth is off or the permission is
+         denied — NSD keeps working. -->
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation" />
+
     <!-- Play Store: TV app — no touchscreen, leanback required for correct
          multi-APK device targeting (prevents phone devices from receiving the
          TV AAB which has a higher versionCode). -->
@@ -31,6 +42,10 @@
     <uses-feature android:name="android.hardware.usb.host" android:required="false" />
     <uses-feature android:name="android.hardware.wifi.direct" android:required="false" />
     <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
+    <!-- BLE receiver role — required for PhoneBleScanner fallback discovery,
+         but declared optional so TVs without BLE still get the APK and fall
+         back to NSD alone. -->
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
 
     <application
         android:name=".WatchBuddyTvApp"

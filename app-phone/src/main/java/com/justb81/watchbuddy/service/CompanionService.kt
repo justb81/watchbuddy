@@ -103,6 +103,7 @@ class CompanionService : Service() {
     @Inject lateinit var llmOrchestrator: LlmOrchestrator
     @Inject lateinit var stateManager: CompanionStateManager
     @Inject lateinit var settingsRepository: SettingsRepository
+    @Inject lateinit var bleAdvertiser: CompanionBleAdvertiser
 
     private enum class NsdState { IDLE, REGISTERING, REGISTERED, UNREGISTERING }
 
@@ -141,6 +142,7 @@ class CompanionService : Service() {
         acquireMulticastLock()
         companionHttpServer.start()
         registerNsd()
+        startBleAdvertising()
         stateManager.setServiceRunning(true)
         registerNetworkCallback()
         startPresenceMonitor()
@@ -151,6 +153,7 @@ class CompanionService : Service() {
         presenceJob?.cancel()
         unregisterNetworkCallback()
         unregisterNsd()
+        bleAdvertiser.stop()
         releaseMulticastLock()
         companionHttpServer.stop()
         stateManager.setServiceRunning(false)
@@ -201,6 +204,7 @@ class CompanionService : Service() {
             override fun onLost(network: Network) {
                 Log.i(TAG, "Wi-Fi lost — unregistering NSD, awaiting grace period")
                 unregisterNsd()
+                bleAdvertiser.stop()
                 // Grace period for SSID handoffs: if a fresh Wi-Fi network
                 // arrives before the timer expires, `onAvailable` restarts
                 // NSD and we stay alive. If not, the phone is truly off Wi-Fi
@@ -229,9 +233,11 @@ class CompanionService : Service() {
                 // registerService before unregisterService finishes is what
                 // leaves ghost entries on the network (#264).
                 unregisterNsd()
+                bleAdvertiser.stop()
                 serviceScope.launch {
                     delay(NSD_REREGISTER_DELAY_MS)
                     registerNsd()
+                    startBleAdvertising()
                 }
             }
         }
@@ -413,6 +419,29 @@ class CompanionService : Service() {
                 nsdState = NsdState.IDLE
             }
         }
+    }
+
+    // ── BLE advertising (mDNS fallback channel) ──────────────────────────────
+
+    /**
+     * Starts BLE advertising of our LAN endpoint for TVs that can't receive
+     * our NSD packets (AP/client isolation, VLAN-segmented mesh Wi-Fi,
+     * aggressive multicast filtering). This is additive to NSD — if BLE is
+     * off, permission-denied, or unsupported, the advertiser no-ops and we
+     * continue with NSD only.
+     */
+    private fun startBleAdvertising() {
+        val ipv4 = wifiIpv4Address() as? Inet4Address ?: run {
+            Log.d(TAG, "startBleAdvertising skipped: no IPv4 address")
+            return
+        }
+        val llmConfig = llmOrchestrator.selectConfig()
+        bleAdvertiser.start(
+            ipv4 = ipv4,
+            port = CompanionHttpServer.PORT,
+            modelQuality = llmConfig.qualityScore,
+            llmBackendOrdinal = llmConfig.backend.ordinal,
+        )
     }
 
     /**

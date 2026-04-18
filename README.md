@@ -37,6 +37,7 @@ watchbuddy/
 - **Deep links** — launches directly into Netflix, Prime Video, Disney+, WaipuTV, ARD, ZDF, etc.
 - **Multi-user** — multiple phones/users sync to one TV; shared watch mode avoids spoilers
 - **RAM-adaptive LLM** — AICore (Gemini Nano) if available, otherwise LiteRT-LM with auto-selected Gemma model based on free RAM
+- **Resilient pairing** — NSD/mDNS with a parallel BLE fallback so phone ↔ TV discovery keeps working on guest Wi-Fi, mesh routers, and other networks where multicast is blocked
 
 ## Module Structure
 
