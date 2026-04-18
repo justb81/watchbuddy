@@ -59,6 +59,7 @@
     <string name="home_watching_tv_toggle">Estoy viendo la tele</string>
     <string name="home_watching_tv_description">Conectar con tu TV para scrobbling</string>
     <string name="home_watching_tv_disabled_reason">Conéctate primero a Trakt y configura TMDB</string>
+    <string name="home_watching_tv_disabled_reason_no_wifi">Conéctate a una red Wi-Fi para ver con tu TV</string>
 
     <!-- Settings -->
     <string name="settings_title">Ajustes</string>

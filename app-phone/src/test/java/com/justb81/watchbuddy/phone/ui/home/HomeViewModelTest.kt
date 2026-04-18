@@ -5,16 +5,19 @@ import com.justb81.watchbuddy.core.model.EnrichedShowEntry
 import com.justb81.watchbuddy.phone.MainDispatcherRule
 import com.justb81.watchbuddy.phone.TestFixtures
 import com.justb81.watchbuddy.phone.auth.TokenRepository
+import com.justb81.watchbuddy.phone.network.WifiStateProvider
 import com.justb81.watchbuddy.phone.server.ShowRepository
 import com.justb81.watchbuddy.phone.settings.AppSettings
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import com.justb81.watchbuddy.service.CompanionStateManager
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import okhttp3.ResponseBody
 import retrofit2.HttpException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -40,6 +43,8 @@ class HomeViewModelTest {
     private val tokenRepository: TokenRepository = mockk(relaxed = true)
     private val settingsRepository: SettingsRepository = mockk(relaxed = true)
     private val companionStateManager = CompanionStateManager()
+    private val wifiStateProvider: WifiStateProvider = mockk(relaxed = true)
+    private val wifiFlow = MutableStateFlow(true)
 
     @BeforeEach
     fun setUp() {
@@ -47,6 +52,8 @@ class HomeViewModelTest {
         every { settingsRepository.getTmdbApiKey() } returns flowOf("")
         every { tokenRepository.getAccessToken() } returns null
         coEvery { showRepository.getShows() } returns emptyList()
+        wifiFlow.value = true
+        every { wifiStateProvider.isOnWifi } returns wifiFlow
     }
 
     private fun createViewModel(): HomeViewModel = HomeViewModel(
@@ -54,7 +61,8 @@ class HomeViewModelTest {
         showRepository = showRepository,
         tokenRepository = tokenRepository,
         settingsRepository = settingsRepository,
-        companionStateManager = companionStateManager
+        companionStateManager = companionStateManager,
+        wifiStateProvider = wifiStateProvider
     )
 
     private fun enriched(title: String) =
@@ -264,6 +272,92 @@ class HomeViewModelTest {
             advanceUntilIdle()
 
             assertNotNull(vm)
+        }
+    }
+
+    @Nested
+    @DisplayName("Wi-Fi gate for companion toggle (#278)")
+    inner class WifiGate {
+
+        @Test
+        fun `canStartCompanion is false when off Wi-Fi even with Trakt and TMDB ready`() = runTest {
+            every { tokenRepository.isTokenValid() } returns true
+            every { settingsRepository.getTmdbApiKey() } returns flowOf("tmdb-key")
+            wifiFlow.value = false
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            assertTrue(vm.uiState.value.canWatch)
+            assertFalse(vm.uiState.value.isOnWifi)
+            assertFalse(vm.uiState.value.canStartCompanion)
+        }
+
+        @Test
+        fun `canStartCompanion is true when Trakt, TMDB, and Wi-Fi are all ready`() = runTest {
+            every { tokenRepository.isTokenValid() } returns true
+            every { settingsRepository.getTmdbApiKey() } returns flowOf("tmdb-key")
+            wifiFlow.value = true
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            assertTrue(vm.uiState.value.canStartCompanion)
+        }
+
+        @Test
+        fun `toggleWatchingTv(true) is a no-op when off Wi-Fi`() = runTest {
+            wifiFlow.value = false
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            vm.toggleWatchingTv(true)
+            advanceUntilIdle()
+
+            coVerify(exactly = 0) { settingsRepository.setCompanionEnabled(true) }
+        }
+
+        @Test
+        fun `toggleWatchingTv(true) is allowed on Wi-Fi`() = runTest {
+            wifiFlow.value = true
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            vm.toggleWatchingTv(true)
+            advanceUntilIdle()
+
+            coVerify(exactly = 1) { settingsRepository.setCompanionEnabled(true) }
+        }
+
+        @Test
+        fun `running companion auto-stops when Wi-Fi is lost`() = runTest {
+            every { settingsRepository.settings } returns flowOf(AppSettings(companionEnabled = true))
+            wifiFlow.value = true
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+            assertTrue(vm.uiState.value.isWatchingTv)
+
+            wifiFlow.value = false
+            advanceUntilIdle()
+
+            coVerify { settingsRepository.setCompanionEnabled(false) }
+        }
+
+        @Test
+        fun `canStartCompanion recovers when Wi-Fi returns`() = runTest {
+            every { tokenRepository.isTokenValid() } returns true
+            every { settingsRepository.getTmdbApiKey() } returns flowOf("tmdb-key")
+            wifiFlow.value = false
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+            assertFalse(vm.uiState.value.canStartCompanion)
+
+            wifiFlow.value = true
+            advanceUntilIdle()
+
+            assertTrue(vm.uiState.value.canStartCompanion)
         }
     }
 }

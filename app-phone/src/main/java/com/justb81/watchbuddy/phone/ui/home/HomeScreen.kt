@@ -253,13 +253,20 @@ private fun HomeContent(
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        if (state.canWatch) {
-            item {
-                WatchingTvToggle(
-                    isWatching = state.isWatchingTv,
-                    onToggle = onToggleWatchingTv
-                )
+        item {
+            // Render the toggle even when disabled so the user can see *why* —
+            // credential-missing and Wi-Fi-missing deserve different messages.
+            val disabledReason = when {
+                !state.canWatch -> stringResource(R.string.home_watching_tv_disabled_reason)
+                !state.isOnWifi -> stringResource(R.string.home_watching_tv_disabled_reason_no_wifi)
+                else -> null
             }
+            WatchingTvToggle(
+                isWatching = state.isWatchingTv,
+                enabled = state.canStartCompanion,
+                disabledReason = disabledReason,
+                onToggle = onToggleWatchingTv
+            )
         }
         state.latestScrobbleEvent?.let { event ->
             item { NowWatchingCard(event = event) }
@@ -421,6 +428,8 @@ private fun SectionHeader(title: String) {
 @Composable
 private fun WatchingTvToggle(
     isWatching: Boolean,
+    enabled: Boolean,
+    disabledReason: String?,
     onToggle: (Boolean) -> Unit
 ) {
     Card(
@@ -459,7 +468,8 @@ private fun WatchingTvToggle(
                         MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = stringResource(R.string.home_watching_tv_description),
+                    text = disabledReason
+                        ?: stringResource(R.string.home_watching_tv_description),
                     style = MaterialTheme.typography.bodySmall,
                     color = if (isWatching)
                         MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
@@ -467,7 +477,11 @@ private fun WatchingTvToggle(
                         MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
             }
-            Switch(checked = isWatching, onCheckedChange = onToggle)
+            Switch(
+                checked = isWatching,
+                onCheckedChange = onToggle,
+                enabled = enabled
+            )
         }
     }
 }

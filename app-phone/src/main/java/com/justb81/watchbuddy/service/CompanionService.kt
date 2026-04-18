@@ -66,6 +66,14 @@ class CompanionService : Service() {
          */
         private const val NSD_REREGISTER_DELAY_MS = 300L
 
+        /**
+         * Grace period after a Wi-Fi network is lost before the service
+         * self-stops. Covers SSID handoffs where `onLost(oldNet)` fires a beat
+         * before `onAvailable(newNet)`. If Wi-Fi is genuinely gone after this
+         * delay we stop; otherwise the service keeps running (#278).
+         */
+        private const val WIFI_LOSS_GRACE_MS = 3_000L
+
         fun start(context: Context) {
             val intent = Intent(context, CompanionService::class.java)
             context.startForegroundService(intent)
@@ -114,6 +122,15 @@ class CompanionService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Wi-Fi gate: without TRANSPORT_WIFI, wifiIpv4Address() returns null,
+        // NSD advertises on no useful interface, and the TV can never discover
+        // us — refuse to start and clear the persisted toggle (#278).
+        if (wifiIpv4Address() == null) {
+            Log.w(TAG, "onStartCommand refused; phone is not on Wi-Fi")
+            serviceScope.launch { settingsRepository.setCompanionEnabled(false) }
+            stopSelf(startId)
+            return START_NOT_STICKY
+        }
         // Idempotent: onStartCommand can fire multiple times (ViewModel re-starts,
         // system re-delivery of START_STICKY) and each repeat would otherwise
         // race the NSD registration.
@@ -182,8 +199,21 @@ class CompanionService : Service() {
             private var lastAvailable = 0L
 
             override fun onLost(network: Network) {
-                Log.i(TAG, "Wi-Fi lost — unregistering NSD")
+                Log.i(TAG, "Wi-Fi lost — unregistering NSD, awaiting grace period")
                 unregisterNsd()
+                // Grace period for SSID handoffs: if a fresh Wi-Fi network
+                // arrives before the timer expires, `onAvailable` restarts
+                // NSD and we stay alive. If not, the phone is truly off Wi-Fi
+                // and we self-stop so the FG notification doesn't linger on
+                // a dead state (#278).
+                serviceScope.launch {
+                    delay(WIFI_LOSS_GRACE_MS)
+                    if (wifiIpv4Address() == null) {
+                        Log.i(TAG, "Still no Wi-Fi after grace — self-stopping")
+                        settingsRepository.setCompanionEnabled(false)
+                        stopSelf()
+                    }
+                }
             }
 
             override fun onAvailable(network: Network) {
