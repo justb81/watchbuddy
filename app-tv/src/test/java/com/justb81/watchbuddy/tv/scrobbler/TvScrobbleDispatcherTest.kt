@@ -15,6 +15,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import java.io.IOException
 
 @DisplayName("TvScrobbleDispatcher")
 class TvScrobbleDispatcherTest {
@@ -161,7 +162,7 @@ class TvScrobbleDispatcherTest {
         }
 
         @Test
-        fun `failure on one phone does not prevent dispatch to others`() = runTest {
+        fun `IOException on one phone does not prevent dispatch to others`() = runTest {
             val apiService1: PhoneApiService = mockk()
             val apiService2: PhoneApiService = mockk()
             val phone1 = makePhone(baseUrl = "http://phone1:8765/", name = "phone1")
@@ -169,10 +170,10 @@ class TvScrobbleDispatcherTest {
             phonesFlow.value = listOf(phone1, phone2)
             coEvery { phoneApiClientFactory.createClient("http://phone1:8765/") } returns apiService1
             coEvery { phoneApiClientFactory.createClient("http://phone2:8765/") } returns apiService2
-            coEvery { apiService1.scrobbleStart(any()) } throws RuntimeException("network error")
+            coEvery { apiService1.scrobbleStart(any()) } throws IOException("connection refused")
             coEvery { apiService2.scrobbleStart(any()) } returns mockk()
 
-            // Should not throw even when one phone fails.
+            // Should not throw even when one phone fails with IOException.
             dispatcher.dispatchStart(
                 TestFixtures.traktShow(),
                 TestFixtures.traktEpisode(),
@@ -180,6 +181,93 @@ class TvScrobbleDispatcherTest {
             )
 
             coVerify { apiService2.scrobbleStart(any()) }
+        }
+    }
+
+    // ── action routing ─────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("action routing")
+    inner class ActionRoutingTest {
+
+        @Test
+        fun `dispatchPause calls scrobblePause on available phones`() = runTest {
+            val phone = makePhone()
+            phonesFlow.value = listOf(phone)
+            coEvery { phoneApiClientFactory.createClient(any()) } returns phoneApiService
+            coEvery { phoneApiService.scrobblePause(any()) } returns mockk()
+
+            dispatcher.dispatchPause(
+                TestFixtures.traktShow(),
+                TestFixtures.traktEpisode(),
+                50f
+            )
+
+            coVerify { phoneApiService.scrobblePause(any()) }
+            coVerify(exactly = 0) { phoneApiService.scrobbleStart(any()) }
+            coVerify(exactly = 0) { phoneApiService.scrobbleStop(any()) }
+        }
+
+        @Test
+        fun `dispatchStop calls scrobbleStop on available phones`() = runTest {
+            val phone = makePhone()
+            phonesFlow.value = listOf(phone)
+            coEvery { phoneApiClientFactory.createClient(any()) } returns phoneApiService
+            coEvery { phoneApiService.scrobbleStop(any()) } returns mockk()
+
+            dispatcher.dispatchStop(
+                TestFixtures.traktShow(),
+                TestFixtures.traktEpisode(),
+                90f
+            )
+
+            coVerify { phoneApiService.scrobbleStop(any()) }
+            coVerify(exactly = 0) { phoneApiService.scrobbleStart(any()) }
+            coVerify(exactly = 0) { phoneApiService.scrobblePause(any()) }
+        }
+
+        @Test
+        fun `dispatchPause skips dispatch when phone list is empty`() = runTest {
+            phonesFlow.value = emptyList()
+
+            dispatcher.dispatchPause(
+                TestFixtures.traktShow(),
+                TestFixtures.traktEpisode(),
+                50f
+            )
+
+            coVerify(exactly = 0) { phoneApiClientFactory.createClient(any()) }
+        }
+
+        @Test
+        fun `dispatchStop skips dispatch when phone list is empty`() = runTest {
+            phonesFlow.value = emptyList()
+
+            dispatcher.dispatchStop(
+                TestFixtures.traktShow(),
+                TestFixtures.traktEpisode(),
+                90f
+            )
+
+            coVerify(exactly = 0) { phoneApiClientFactory.createClient(any()) }
+        }
+
+        @Test
+        fun `dispatchStart calls scrobbleStart not pause or stop`() = runTest {
+            val phone = makePhone()
+            phonesFlow.value = listOf(phone)
+            coEvery { phoneApiClientFactory.createClient(any()) } returns phoneApiService
+            coEvery { phoneApiService.scrobbleStart(any()) } returns mockk()
+
+            dispatcher.dispatchStart(
+                TestFixtures.traktShow(),
+                TestFixtures.traktEpisode(),
+                10f
+            )
+
+            coVerify { phoneApiService.scrobbleStart(any()) }
+            coVerify(exactly = 0) { phoneApiService.scrobblePause(any()) }
+            coVerify(exactly = 0) { phoneApiService.scrobbleStop(any()) }
         }
     }
 }
