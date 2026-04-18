@@ -142,6 +142,9 @@
     <string name="companion_channel_description">Shows when the companion server is active for TV connections</string>
     <string name="companion_notification_title">WatchBuddy Companion</string>
     <string name="companion_notification_text">Ready for TV connection</string>
+    <string name="companion_notification_permission_rationale_title">Allow notifications</string>
+    <string name="companion_notification_permission_rationale_body">WatchBuddy shows a persistent notification while the companion service is running so Android doesn\'t silently stop it. Enable notifications in the app settings to start watching.</string>
+    <string name="companion_notification_permission_open_settings">Open settings</string>
 
     <!-- Model Download -->
     <string name="model_download_channel_name">Model Download</string>

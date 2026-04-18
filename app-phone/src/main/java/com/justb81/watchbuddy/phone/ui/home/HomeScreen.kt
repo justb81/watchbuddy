@@ -42,6 +42,8 @@ import com.justb81.watchbuddy.core.model.ScrobbleAction
 import com.justb81.watchbuddy.core.model.ScrobbleDisplayEvent
 import com.justb81.watchbuddy.core.progress.ShowProgress
 import com.justb81.watchbuddy.core.tmdb.TmdbImageHelper
+import com.justb81.watchbuddy.phone.permissions.NotificationPermission
+import com.justb81.watchbuddy.phone.permissions.rememberNotificationPermissionRequest
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -60,6 +62,50 @@ fun HomeScreen(
     // and this avoids adding Flow plumbing to HomeViewModel just for a debug surface.
     var pendingReports by remember { mutableStateOf(CrashReporter.listReports(context).size) }
     var overflowExpanded by remember { mutableStateOf(false) }
+    var showNotificationRationale by remember { mutableStateOf(false) }
+
+    val requestNotificationPermission = rememberNotificationPermissionRequest { granted ->
+        if (granted) {
+            viewModel.toggleWatchingTv(true)
+        } else {
+            showNotificationRationale = true
+        }
+    }
+
+    val handleToggleWatchingTv: (Boolean) -> Unit = { enabled ->
+        if (!enabled) {
+            viewModel.toggleWatchingTv(false)
+        } else if (NotificationPermission.isGranted(context)) {
+            viewModel.toggleWatchingTv(true)
+        } else {
+            requestNotificationPermission()
+        }
+    }
+
+    if (showNotificationRationale) {
+        AlertDialog(
+            onDismissRequest = { showNotificationRationale = false },
+            title = {
+                Text(stringResource(R.string.companion_notification_permission_rationale_title))
+            },
+            text = {
+                Text(stringResource(R.string.companion_notification_permission_rationale_body))
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showNotificationRationale = false
+                    NotificationPermission.openAppNotificationSettings(context)
+                }) {
+                    Text(stringResource(R.string.companion_notification_permission_open_settings))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showNotificationRationale = false }) {
+                    Text(stringResource(R.string.settings_cancel))
+                }
+            }
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -176,7 +222,7 @@ fun HomeScreen(
                         HomeContent(
                             state = uiState,
                             onShowClick = onShowClick,
-                            onToggleWatchingTv = { viewModel.toggleWatchingTv(it) }
+                            onToggleWatchingTv = handleToggleWatchingTv
                         )
                     }
                 }
