@@ -44,7 +44,7 @@ watchbuddy/
 │   └── src/main/java/com/justb81/watchbuddy/core/
 │       ├── locale/     LocaleHelper (LLM language resolution)
 │       ├── model/      Data models (Kotlin Serialization)
-│       ├── network/    NetworkModule (Hilt, OkHttp, Retrofit)
+│       ├── network/    NetworkModule (Hilt, OkHttp, Retrofit), SharedJson (WatchBuddyJson shared instance)
 │       ├── tmdb/       TmdbApiService
 │       └── trakt/      TraktApiService, TokenProxyService
 ├── backend/            Node.js token proxy (Docker)

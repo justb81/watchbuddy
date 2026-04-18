@@ -27,9 +27,9 @@ import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import com.justb81.watchbuddy.core.network.WatchBuddyJson
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -107,7 +107,7 @@ internal fun Application.configureCompanionRoutes(
     stateManager: CompanionStateManager
 ) {
     install(ContentNegotiation) {
-        json(Json { ignoreUnknownKeys = true })
+        json(WatchBuddyJson)
     }
     routing {
         get("/capability") {

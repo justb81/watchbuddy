@@ -1,7 +1,6 @@
 package com.justb81.watchbuddy.core.network
 
 import com.justb81.watchbuddy.core.trakt.TokenProxyService
-import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
@@ -18,18 +17,12 @@ import javax.inject.Singleton
 @Singleton
 class TokenProxyServiceFactory @Inject constructor() {
 
-    private val json = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-        coerceInputValues = true
-    }
-
     fun create(baseUrl: String): TokenProxyService {
         val url = if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"
         return Retrofit.Builder()
             .baseUrl(url)
             .client(OkHttpClient())
-            .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
+            .addConverterFactory(WatchBuddyJson.asConverterFactory("application/json".toMediaType()))
             .build()
             .create(TokenProxyService::class.java)
     }

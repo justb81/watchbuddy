@@ -4,22 +4,17 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.justb81.watchbuddy.R
+import com.justb81.watchbuddy.core.network.WatchBuddyJson
 import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
+import com.justb81.watchbuddy.tv.discovery.RecapResponse
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import javax.inject.Inject
-
-@Serializable
-private data class RecapResponse(val html: String)
-
-private val lenientJson = Json { ignoreUnknownKeys = true }
 
 sealed class RecapUiState {
     object Idle : RecapUiState()
@@ -76,7 +71,7 @@ class RecapViewModel @Inject constructor(
 
                     if (response.isSuccessful) {
                         val body = response.body?.string() ?: ""
-                        val recap = lenientJson.decodeFromString<RecapResponse>(body)
+                        val recap = WatchBuddyJson.decodeFromString<RecapResponse>(body)
                         _state.value = RecapUiState.Ready(recap.html)
                         return@launch
                     }
