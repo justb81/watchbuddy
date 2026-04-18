@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.16.1](https://github.com/justb81/watchbuddy/compare/v0.16.0...v0.16.1) (2026-04-18)
+
+
+### Bug Fixes
+
+* **phone:** harden NSD registration lifecycle and cross-device discovery ([#268](https://github.com/justb81/watchbuddy/issues/268)) ([f14dd81](https://github.com/justb81/watchbuddy/commit/f14dd81c089754716753a0bb8bde4a2312c92c9b))
+* **phone:** show foreground notification while watching TV ([#263](https://github.com/justb81/watchbuddy/issues/263)) ([2f833ed](https://github.com/justb81/watchbuddy/commit/2f833ed94f7d071a26c299899dbdcf7b7e9d4e78))
+
 ## [0.16.0](https://github.com/justb81/watchbuddy/compare/v0.15.1...v0.16.0) (2026-04-18)
 
 
