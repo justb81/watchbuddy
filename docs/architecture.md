@@ -127,7 +127,35 @@ the `CompanionService`, `CompanionHttpServer`, and `HomeViewModel`. It tracks:
 
 **Auto-reconnect:** The service registers a `ConnectivityManager.NetworkCallback` for Wi-Fi.
 When Wi-Fi is lost, NSD is unregistered (HTTP server stays alive). When Wi-Fi returns,
-NSD is re-registered so the TV can rediscover the phone.
+`onAvailable` is debounced for 2 s, then the existing registration is torn down and a fresh
+one is registered 300 ms later. The unregister-then-register sequence is required because
+`NsdManager.unregisterService` is asynchronous — calling `registerService` before the
+teardown completes leaves duplicate advertisements on the network.
+
+**NSD registration state machine:** `registerNsd` / `unregisterNsd` transition an
+`IDLE → REGISTERING → REGISTERED → UNREGISTERING → IDLE` state under a single lock. The
+state is flipped before calling the async `NsdManager` API so concurrent callers
+(`onStartCommand` + Wi-Fi `onAvailable`) cannot race past the guard while a prior
+registration is still in flight.
+
+**Multicast lock (phone side):** The service acquires a `WifiManager.MulticastLock` for
+its entire lifetime. Many phone OEM skins (OxygenOS, OneUI, MIUI) filter outgoing
+multicast packets at the Wi-Fi driver unless an app holds this lock — without it, the
+phone's NSD registration succeeds locally but no mDNS packets leave the radio, so peers
+cannot discover it (TV-side discovery requires the same lock for the inbound path).
+
+**NSD host pin:** The `NsdServiceInfo.host` is pinned to the phone's Wi-Fi IPv4 address
+at registration time (resolved via `ConnectivityManager.getLinkProperties`). This prevents
+`NsdManager` from advertising a wrong interface's address on multi-homed devices
+(Wi-Fi + cellular, Wi-Fi + Ethernet dongle).
+
+**HTTP server bind:** `CompanionHttpServer` binds Netty explicitly to `0.0.0.0` so the
+listener accepts connections on the same Wi-Fi interface advertised via NSD.
+
+**Cross-device discoverability note:** None of the code-level fixes above can overcome a
+Wi-Fi access point that enforces client isolation (peer-to-peer traffic blocked at the
+AP). If the TV cannot reach the phone even with both on the same SSID, verify that client
+isolation / "AP isolation" / "Wi-Fi guest network" is disabled on the router.
 
 **Presence timeout:** A coroutine checks `lastCapabilityCheck` every 60 seconds. If no TV
 has polled `/capability` for 5 minutes, the service auto-deactivates and sets `companionEnabled = false`.
@@ -135,8 +163,9 @@ has polled `/capability` for 5 minutes, the service auto-deactivates and sets `c
 **App close:** `onTaskRemoved()` stops the service and clears `companionEnabled` when the user
 swipes the app from recents.
 
-**Service health sync:** `onStartCommand()` includes a guard to avoid double-starting the HTTP
-server (`if server != null return`).
+**Service health sync:** `onStartCommand()` is idempotent — if `CompanionStateManager.isServiceRunning`
+is already true the start is skipped, and `CompanionHttpServer.start()` additionally guards against
+double-binding Netty.
 
 ## Presence Heartbeat (TV)
 
