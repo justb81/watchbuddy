@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.16.0](https://github.com/justb81/watchbuddy/compare/v0.15.1...v0.16.0) (2026-04-18)
+
+
+### Features
+
+* **phone:** auto-scrobble MediaSessions on phone, share scrobbler from core ([#257](https://github.com/justb81/watchbuddy/issues/257)) ([23a74e0](https://github.com/justb81/watchbuddy/commit/23a74e0c070b0736d69cfc586ab9e1f28f291d1a))
+
+
+### Bug Fixes
+
+* diagnose + harden TV phone discovery (closes [#259](https://github.com/justb81/watchbuddy/issues/259)) ([#260](https://github.com/justb81/watchbuddy/issues/260)) ([cc0d8a0](https://github.com/justb81/watchbuddy/commit/cc0d8a0a25dbfdd2b5dbcffa713de84903257cf8))
+
 ## [0.15.1](https://github.com/justb81/watchbuddy/compare/v0.15.0...v0.15.1) (2026-04-17)
 
 
