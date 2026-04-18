@@ -118,15 +118,6 @@
     <string name="home_scrobble_stopped">Lecture terminée</string>
     <string name="companion_auto_deactivated">Companion désactivé — TV ne répond pas</string>
 
-    <!-- Paramètres de scrobble automatique -->
-    <string name="settings_scrobble">Scrobble auto</string>
-    <string name="settings_scrobble_toggle">Scrobble automatique sur le téléphone</string>
-    <string name="settings_scrobble_description">Suivre automatiquement les séries regardées sur ce téléphone</string>
-    <string name="settings_scrobble_grant_access">Autoriser l\'accès</string>
-    <string name="settings_scrobble_notification_access">Accès aux notifications</string>
-    <string name="settings_scrobble_access_granted">Accordé</string>
-    <string name="settings_scrobble_access_missing">Non accordé — requis pour le scrobble</string>
-
     <!-- Companion Service -->
     <string name="companion_channel_name">Service compagnon</string>
     <string name="companion_channel_description">Indique quand le serveur compagnon est actif pour les connexions TV</string>
