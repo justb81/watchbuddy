@@ -83,6 +83,63 @@ export function createApp(config) {
   }
 
   /**
+   * Calls a Trakt token endpoint, returning the parsed response.
+   *
+   * Returns one of:
+   *   { traktRes, data }         — JSON parsed successfully (any HTTP status)
+   *   { pending: true }          — 400 with empty/non-JSON body during device-flow polling
+   *                                (only when allowPending is true)
+   *   { nonJsonStatus: number }  — non-JSON body on any other status
+   *
+   * Throws on network / timeout errors so the caller's catch block handles them.
+   */
+  async function callTraktToken(url, options, label, { allowPending = false } = {}) {
+    const traktRes = await fetchWithTimeout(url, options);
+    const rawText = await traktRes.text();
+    let data;
+    try {
+      data = JSON.parse(rawText);
+    } catch (_parseErr) {
+      if (allowPending && traktRes.status === 400) {
+        logTraktCall(`${label} (pending)`, url, options, traktRes);
+        return { pending: true };
+      }
+      console.error(`${label}: Trakt returned non-JSON response (HTTP ${traktRes.status})`);
+      logTraktCall(`${label} (non-JSON)`, url, options, traktRes);
+      return { nonJsonStatus: traktRes.status };
+    }
+    logTraktCall(label, url, options, traktRes, data);
+    return { traktRes, data };
+  }
+
+  /** Returns only the token fields the Android client needs — never echoes secrets. */
+  function filterTokenResponse(data) {
+    return {
+      access_token: data.access_token,
+      refresh_token: data.refresh_token,
+      expires_in: data.expires_in,
+      token_type: data.token_type,
+      scope: data.scope,
+    };
+  }
+
+  /**
+   * Handles a caught fetch error (AbortError / network error) and writes the
+   * appropriate HTTP error response.  fetchTimeoutMs is read from the outer closure.
+   */
+  function handleUpstreamError(label, err, res) {
+    if (err.name === 'AbortError') {
+      console.error(`${label}: upstream timeout after`, fetchTimeoutMs, 'ms');
+      return res.status(504).json({ error: 'Upstream timeout' });
+    }
+    const category = err.code
+      ? `network error (${err.code})`
+      : `unexpected error (${err.name})`;
+    console.error(`${label}: ${category}:`, err.message);
+    return res.status(502).json({ error: 'Upstream error' });
+  }
+
+  /**
    * Logs full request/response details for a Trakt API call when debug mode is on.
    */
   function logTraktCall(label, url, options, traktRes, data) {
@@ -248,38 +305,25 @@ export function createApp(config) {
     const options = {
       method: 'POST',
       headers: traktHeaders,
-      body: JSON.stringify({
-        code,
-        client_id: clientId,
-        client_secret: clientSecret,
-      }),
+      body: JSON.stringify({ code, client_id: clientId, client_secret: clientSecret }),
     };
 
     try {
-      const traktRes = await fetchWithTimeout(url, options);
-      const rawText = await traktRes.text();
+      const result = await callTraktToken(url, options, 'Token exchange', { allowPending: true });
 
-      let data;
-      try {
-        data = JSON.parse(rawText);
-      } catch (_parseErr) {
-        // Trakt uses empty / non-JSON 400 responses during device-flow polling
-        // to mean "user hasn't authorized yet — keep polling". Pass it through
-        // as 400 so the client's polling loop treats it as pending, not a
-        // 5xx error that burns its consecutive-failure budget.
-        if (traktRes.status === 400) {
-          logTraktCall('Token exchange (pending)', url, options, traktRes);
-          return res.status(400).json({ error: 'authorization_pending' });
-        }
-        console.error(`Token exchange: Trakt returned non-JSON response (HTTP ${traktRes.status})`);
-        logTraktCall('Token exchange (non-JSON)', url, options, traktRes);
+      // Trakt uses empty / non-JSON 400 responses during device-flow polling
+      // to mean "user hasn't authorized yet — keep polling". Pass it through
+      // as 400 so the client's polling loop treats it as pending, not a
+      // 5xx error that burns its consecutive-failure budget.
+      if (result.pending) return res.status(400).json({ error: 'authorization_pending' });
+
+      if (result.nonJsonStatus !== undefined) {
         return res.status(502).json({
-          error: `Upstream returned non-JSON response (HTTP ${traktRes.status})`,
+          error: `Upstream returned non-JSON response (HTTP ${result.nonJsonStatus})`,
         });
       }
 
-      logTraktCall('Token exchange', url, options, traktRes, data);
-
+      const { traktRes, data } = result;
       if (!traktRes.ok) {
         const bodySnippet = JSON.stringify(data).slice(0, 200);
         if (traktRes.status === 400) {
@@ -295,24 +339,9 @@ export function createApp(config) {
         return res.status(traktRes.status).json(data);
       }
 
-      // Return only what the client needs — never echo back the secret
-      return res.json({
-        access_token: data.access_token,
-        refresh_token: data.refresh_token,
-        expires_in: data.expires_in,
-        token_type: data.token_type,
-        scope: data.scope,
-      });
+      return res.json(filterTokenResponse(data));
     } catch (err) {
-      if (err.name === 'AbortError') {
-        console.error('Token exchange: upstream timeout after', fetchTimeoutMs, 'ms');
-        return res.status(504).json({ error: 'Upstream timeout' });
-      }
-      const category = err.code
-        ? `network error (${err.code})`
-        : `unexpected error (${err.name})`;
-      console.error(`Token exchange: ${category}:`, err.message);
-      return res.status(502).json({ error: 'Upstream error' });
+      return handleUpstreamError('Token exchange', err, res);
     }
   });
 
@@ -337,22 +366,15 @@ export function createApp(config) {
     };
 
     try {
-      const traktRes = await fetchWithTimeout(url, options);
-      const rawText = await traktRes.text();
+      const result = await callTraktToken(url, options, 'Token refresh');
 
-      let data;
-      try {
-        data = JSON.parse(rawText);
-      } catch (_parseErr) {
-        console.error(`Token refresh: Trakt returned non-JSON response (HTTP ${traktRes.status})`);
-        logTraktCall('Token refresh (non-JSON)', url, options, traktRes);
+      if (result.nonJsonStatus !== undefined) {
         return res.status(502).json({
-          error: `Upstream returned non-JSON response (HTTP ${traktRes.status})`,
+          error: `Upstream returned non-JSON response (HTTP ${result.nonJsonStatus})`,
         });
       }
 
-      logTraktCall('Token refresh', url, options, traktRes, data);
-
+      const { traktRes, data } = result;
       if (!traktRes.ok) {
         const bodySnippet = JSON.stringify(data).slice(0, 200);
         console.error(`Token refresh: Trakt returned HTTP ${traktRes.status}: ${bodySnippet}`);
@@ -362,23 +384,9 @@ export function createApp(config) {
         return res.status(traktRes.status).json(data);
       }
 
-      return res.json({
-        access_token: data.access_token,
-        refresh_token: data.refresh_token,
-        expires_in: data.expires_in,
-        token_type: data.token_type,
-        scope: data.scope,
-      });
+      return res.json(filterTokenResponse(data));
     } catch (err) {
-      if (err.name === 'AbortError') {
-        console.error('Token refresh: upstream timeout after', fetchTimeoutMs, 'ms');
-        return res.status(504).json({ error: 'Upstream timeout' });
-      }
-      const category = err.code
-        ? `network error (${err.code})`
-        : `unexpected error (${err.name})`;
-      console.error(`Token refresh: ${category}:`, err.message);
-      return res.status(502).json({ error: 'Upstream error' });
+      return handleUpstreamError('Token refresh', err, res);
     }
   });
 

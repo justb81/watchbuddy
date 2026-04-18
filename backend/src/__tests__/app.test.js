@@ -1176,6 +1176,118 @@ describe('Debug logging — Trakt API call details (debug: true)', () => {
   });
 });
 
+// ── filterTokenResponse (shared helper) ────────────────────────────────────
+
+describe('filterTokenResponse — extra Trakt fields are stripped', () => {
+  it('strips unexpected fields from token exchange response', async () => {
+    const fetchFn = mockFetch(200, {
+      access_token: 'acc-123',
+      refresh_token: 'ref-456',
+      expires_in: 7776000,
+      token_type: 'Bearer',
+      scope: 'public',
+      user_id: 12345,
+      created_at: 1700000000,
+      username: 'alice',
+    });
+    const app = buildApp(fetchFn);
+
+    const res = await request(app)
+      .post('/trakt/token')
+      .send({ code: 'device-code-abc' });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      access_token: 'acc-123',
+      refresh_token: 'ref-456',
+      expires_in: 7776000,
+      token_type: 'Bearer',
+      scope: 'public',
+    });
+    expect(res.body).not.toHaveProperty('user_id');
+    expect(res.body).not.toHaveProperty('created_at');
+    expect(res.body).not.toHaveProperty('username');
+  });
+
+  it('strips unexpected fields from token refresh response', async () => {
+    const fetchFn = mockFetch(200, {
+      access_token: 'new-acc-789',
+      refresh_token: 'new-ref-012',
+      expires_in: 7776000,
+      token_type: 'Bearer',
+      scope: 'public',
+      user_id: 99,
+      created_at: 1700000001,
+    });
+    const app = buildApp(fetchFn);
+
+    const res = await request(app)
+      .post('/trakt/token/refresh')
+      .send({ refresh_token: 'old-ref-token' });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      access_token: 'new-acc-789',
+      refresh_token: 'new-ref-012',
+      expires_in: 7776000,
+      token_type: 'Bearer',
+      scope: 'public',
+    });
+    expect(res.body).not.toHaveProperty('user_id');
+    expect(res.body).not.toHaveProperty('created_at');
+  });
+});
+
+// ── handleUpstreamError (shared catch handler) ─────────────────────────────
+
+describe('handleUpstreamError — consistent error responses across both endpoints', () => {
+  it('returns 504 on timeout for token exchange', async () => {
+    const hangingFetch = vi.fn().mockImplementation((_url, options) =>
+      new Promise((_resolve, reject) => {
+        options?.signal?.addEventListener('abort', () => {
+          const err = new Error('aborted');
+          err.name = 'AbortError';
+          reject(err);
+        });
+      }),
+    );
+    const app = buildApp(hangingFetch, { fetchTimeoutMs: 50 });
+    const res = await request(app).post('/trakt/token').send({ code: 'x' });
+    expect(res.status).toBe(504);
+    expect(res.body).toEqual({ error: 'Upstream timeout' });
+  });
+
+  it('returns 504 on timeout for token refresh', async () => {
+    const hangingFetch = vi.fn().mockImplementation((_url, options) =>
+      new Promise((_resolve, reject) => {
+        options?.signal?.addEventListener('abort', () => {
+          const err = new Error('aborted');
+          err.name = 'AbortError';
+          reject(err);
+        });
+      }),
+    );
+    const app = buildApp(hangingFetch, { fetchTimeoutMs: 50 });
+    const res = await request(app).post('/trakt/token/refresh').send({ refresh_token: 'x' });
+    expect(res.status).toBe(504);
+    expect(res.body).toEqual({ error: 'Upstream timeout' });
+  });
+
+  it('returns 502 on network error for token exchange', async () => {
+    const app = buildApp(vi.fn().mockRejectedValue(new Error('ECONNREFUSED')));
+    const res = await request(app).post('/trakt/token').send({ code: 'x' });
+    expect(res.status).toBe(502);
+    expect(res.body).toEqual({ error: 'Upstream error' });
+  });
+
+  it('returns 502 on network error for token refresh', async () => {
+    const app = buildApp(vi.fn().mockRejectedValue(new Error('ECONNREFUSED')));
+    const res = await request(app).post('/trakt/token/refresh').send({ refresh_token: 'x' });
+    expect(res.status).toBe(502);
+    expect(res.body).toEqual({ error: 'Upstream error' });
+  });
+});
+
 // ── Trust proxy ────────────────────────────────────────────────────────────
 
 describe('Trust proxy', () => {
