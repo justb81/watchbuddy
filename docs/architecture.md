@@ -224,7 +224,9 @@ this flow and shows a "Now Watching" card with the show title, episode number, a
 | touchscreen required | true | false |
 | 64-bit (Aug 2026) | ✅ | ✅ |
 
-Release AABs are built with `debugSymbolLevel = "FULL"`. AGP emits a per-module `native-debug-symbols.zip` alongside each AAB; CI uploads it with the matching AAB to the Play Store (via `r0adkll/upload-google-play`'s `debugSymbols:` input) and attaches it to the GitHub Release so native crashes and ANRs can be symbolicated.
+Release AABs are built with `debugSymbolLevel = "FULL"`, so AGP embeds per-AAB native debug symbols under `BUNDLE-METADATA` and Play Console auto-associates them for native crash/ANR symbolication. A per-module `native-debug-symbols.zip` is also attached to the GitHub Release for manual triage.
+
+Release AABs likewise enable R8 (`isMinifyEnabled = true`), and AGP embeds the resulting `mapping.txt` inside each AAB so Play Console can de-obfuscate stack traces per versionCode. The Play upload is performed by [Gradle Play Publisher](https://github.com/Triple-T/gradle-play-publisher) (`./gradlew :app-phone:publishReleaseBundle`) in `artifactDir` mode, which uploads the phone + TV AABs as one atomic Play edit. Per-module `mapping.txt` files are also attached to the GitHub Release for manual symbolication.
 
 ## Deep Links
 

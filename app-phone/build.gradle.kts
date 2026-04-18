@@ -1,9 +1,13 @@
+import com.github.triplet.gradle.androidpublisher.ReleaseStatus
+import com.github.triplet.gradle.androidpublisher.ResolutionStrategy
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.gradle.play.publisher)
 }
 
 android {
@@ -202,4 +206,37 @@ kotlin {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+}
+
+// Gradle Play Publisher — uploads phone + TV AABs as one atomic Play edit.
+// The workflow stages both AABs into play-artifacts/; GPP's artifactDir mode
+// uploads every AAB found there under a single edit. Each AAB carries its own
+// R8 mapping.txt embedded by AGP at BUNDLE-METADATA/com.android.tools.build.
+// obfuscation/proguard.map, which Play reads per versionCode for stack-trace
+// de-obfuscation (#273). Keeping the plugin on app-phone only means there is
+// a single `publishReleaseBundle` task, not one per module — the shared
+// applicationId requires a single release on the track.
+play {
+    serviceAccountCredentials.set(
+        layout.file(
+            providers.environmentVariable("GOOGLE_PLAY_SERVICE_ACCOUNT_FILE")
+                .orElse("/dev/null")
+                .map { file(it) }
+        )
+    )
+
+    track.set(providers.gradleProperty("playTrack").orElse("internal"))
+
+    releaseStatus.set(
+        providers.gradleProperty("playStatus")
+            .orElse("COMPLETED")
+            .map { ReleaseStatus.valueOf(it) }
+    )
+
+    defaultToAppBundles.set(true)
+    resolutionStrategy.set(ResolutionStrategy.FAIL)
+
+    // Upload AABs from the workflow's staging dir rather than this module's
+    // own output, so both phone and TV AABs ship in the same Play edit.
+    artifactDir.set(rootProject.layout.projectDirectory.dir("play-artifacts"))
 }

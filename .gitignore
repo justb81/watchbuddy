@@ -26,6 +26,10 @@ secrets.properties
 google-services.json
 local.defaults.properties
 
+# Play Store publishing (populated by CI)
+play-artifacts/
+app-phone/src/main/play/release-notes/
+
 # Node.js (backend)
 node_modules/
 dist/

@@ -142,10 +142,10 @@ jobs:
 
           # Native debug symbols (AGP emits these when debugSymbolLevel is set).
           # Play Console uses them to symbolicate native crashes / ANRs (#262).
-          # Keep per-module zips as GitHub-Release artefacts for sideloaders /
-          # crash-triage, and build a merged zip for the single Play upload step
-          # (r0adkll/upload-google-play accepts only one debugSymbols: file and
-          # applies it to every uploaded AAB in the release).
+          # AGP embeds the per-AAB symbols under BUNDLE-METADATA when
+          # debugSymbolLevel = "FULL", so Play auto-associates them. The merged
+          # and per-module zips here are kept as GitHub-Release artefacts for
+          # sideloaders and manual crash triage.
           PHONE_SYMS="app-phone/build/outputs/native-debug-symbols/release/native-debug-symbols.zip"
           TV_SYMS="app-tv/build/outputs/native-debug-symbols/release/native-debug-symbols.zip"
           if [ -f "$PHONE_SYMS" ]; then
@@ -162,14 +162,58 @@ jobs:
             (cd /tmp/native-debug-symbols-merged && zip -qr "$GITHUB_WORKSPACE/release-assets/watchbuddy-${VERSION}-native-debug-symbols.zip" .)
           fi
 
+          # ProGuard/R8 mapping files — Play Console needs these to de-obfuscate
+          # stack traces (#273). Keep per-module copies as GitHub-Release
+          # artefacts; the Play upload consumes them from play-artifacts/.
+          PHONE_MAPPING="app-phone/build/outputs/mapping/release/mapping.txt"
+          TV_MAPPING="app-tv/build/outputs/mapping/release/mapping.txt"
+          if [ -f "$PHONE_MAPPING" ]; then
+            cp "$PHONE_MAPPING" "release-assets/watchbuddy-phone-${VERSION}-mapping.txt"
+          fi
+          if [ -f "$TV_MAPPING" ]; then
+            cp "$TV_MAPPING" "release-assets/watchbuddy-tv-${VERSION}-mapping.txt"
+          fi
+
           ls -lh release-assets/
+
+      # -- Stage artefacts for the Play upload ----------------------------
+      # Gradle Play Publisher's artifactDir mode uploads every AAB it finds
+      # in the given directory as part of one atomic Play edit.  For each
+      # AAB it pairs a sibling `<name>.mapping.txt` as the deobfuscation
+      # file uploaded per versionCode (#273), so phone and TV crashes are
+      # symbolicated with their respective R8 mappings.
+      - name: Stage Play artifacts
+        if: steps.keystore.outputs.available == 'true'
+        run: |
+          mkdir -p play-artifacts
+          PHONE_AAB="app-phone/build/outputs/bundle/release/app-phone-release.aab"
+          TV_AAB="app-tv/build/outputs/bundle/release/app-tv-release.aab"
+          # Be forgiving about AGP's bundle naming — fall back to glob.
+          [ -f "$PHONE_AAB" ] || PHONE_AAB=$(ls app-phone/build/outputs/bundle/release/*.aab 2>/dev/null | head -n1 || true)
+          [ -f "$TV_AAB" ]    || TV_AAB=$(ls    app-tv/build/outputs/bundle/release/*.aab    2>/dev/null | head -n1 || true)
+
+          if [ -n "$PHONE_AAB" ] && [ -f "$PHONE_AAB" ]; then
+            cp "$PHONE_AAB" "play-artifacts/phone.aab"
+            if [ -f "app-phone/build/outputs/mapping/release/mapping.txt" ]; then
+              cp "app-phone/build/outputs/mapping/release/mapping.txt" "play-artifacts/phone.mapping.txt"
+            fi
+          fi
+
+          if [ -n "$TV_AAB" ] && [ -f "$TV_AAB" ]; then
+            cp "$TV_AAB" "play-artifacts/tv.aab"
+            if [ -f "app-tv/build/outputs/mapping/release/mapping.txt" ]; then
+              cp "app-tv/build/outputs/mapping/release/mapping.txt" "play-artifacts/tv.mapping.txt"
+            fi
+          fi
+
+          ls -lh play-artifacts/
 
       # -- Upload to GitHub Release ----------------------------------------
       - name: Upload release assets to GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          for file in release-assets/*.apk release-assets/*.aab release-assets/*-native-debug-symbols.zip; do
+          for file in release-assets/*.apk release-assets/*.aab release-assets/*-native-debug-symbols.zip release-assets/*-mapping.txt; do
             [ -f "$file" ] && gh release upload "${TAG}" "$file" --clobber
           done
 
@@ -234,18 +278,19 @@ jobs:
           fi
 
           # Write locale files — all locales get the same English text
-          # (matches supported languages: EN, DE, FR, ES). Filenames must use the
-          # `whatsnew-<locale>` convention expected by r0adkll/upload-google-play.
-          mkdir -p whatsnew
+          # (matches supported languages: EN, DE, FR, ES). Gradle Play Publisher
+          # reads per-locale release notes from `src/main/play/release-notes/<locale>/default.txt`.
+          NOTES_DIR="app-phone/src/main/play/release-notes"
           for LOCALE in en-US de-DE fr-FR es-ES; do
-            echo "$NOTES" > "whatsnew/whatsnew-${LOCALE}"
+            mkdir -p "${NOTES_DIR}/${LOCALE}"
+            echo "$NOTES" > "${NOTES_DIR}/${LOCALE}/default.txt"
           done
 
           echo "--- Play Store changelog (en-US) ---"
-          cat whatsnew/whatsnew-en-US
+          cat "${NOTES_DIR}/en-US/default.txt"
           echo "--- ${#NOTES} characters ---"
-          echo "--- files in whatsnew/ ---"
-          ls -la whatsnew/
+          echo "--- files in ${NOTES_DIR}/ ---"
+          ls -la "${NOTES_DIR}"/*/
 
       # -- Determine Play Store release status ------------------------------
       - name: Determine Play Store release status
@@ -253,27 +298,33 @@ jobs:
         run: |
           MAJOR=$(echo "$VERSION" | cut -d. -f1)
           if [ "$MAJOR" -ge 1 ]; then
-            echo "status=completed" >> "$GITHUB_OUTPUT"
+            echo "status=COMPLETED" >> "$GITHUB_OUTPUT"
           else
-            echo "status=draft" >> "$GITHUB_OUTPUT"
+            echo "status=DRAFT" >> "$GITHUB_OUTPUT"
           fi
 
-      # -- Publish to Google Play Store ------------------------------------
-      # Phone + TV AABs ship as one release on the internal track so Play can
-      # serve the correct bundle per device type.  The merged native-debug-
-      # symbols.zip is attached to every uploaded AAB (r0adkll/upload-google-
-      # play accepts a single debugSymbols: file per invocation).
-      - name: Upload to Google Play Store
+      # -- Write Play service-account credentials to disk -------------------
+      # Gradle Play Publisher reads the service account JSON from a file
+      # pointed to by GOOGLE_PLAY_SERVICE_ACCOUNT_FILE (consumed by the
+      # `play { }` block in app-phone/build.gradle.kts).
+      - name: Write Play service account file
         if: steps.keystore.outputs.available == 'true' && steps.play-store.outputs.available == 'true'
-        uses: r0adkll/upload-google-play@v1.1.3
-        with:
-          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
-          packageName: com.justb81.watchbuddy
-          releaseFiles: release-assets/*-release.aab
-          debugSymbols: release-assets/watchbuddy-${{ env.VERSION }}-native-debug-symbols.zip
-          track: internal
-          status: ${{ steps.play-status.outputs.status }}
-          whatsNewDirectory: whatsnew
+        env:
+          GOOGLE_PLAY_KEY: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          printf '%s' "$GOOGLE_PLAY_KEY" > /tmp/gpp-sa.json
+          chmod 600 /tmp/gpp-sa.json
+          echo "GOOGLE_PLAY_SERVICE_ACCOUNT_FILE=/tmp/gpp-sa.json" >> "$GITHUB_ENV"
+
+      # -- Publish to Google Play Store ------------------------------------
+      # Gradle Play Publisher uploads every AAB it finds under `artifactDir`
+      # (play-artifacts/) as part of a single atomic Play edit, pairing each
+      # AAB with its sibling `<name>.mapping.txt` as the deobfuscation file
+      # per versionCode. This addresses #273: phone and TV crashes are now
+      # symbolicated with their respective R8 mappings.
+      - name: Publish to Google Play via GPP
+        if: steps.keystore.outputs.available == 'true' && steps.play-store.outputs.available == 'true'
+        run: ./gradlew :app-phone:publishReleaseBundle -PplayTrack=internal -PplayStatus=${{ steps.play-status.outputs.status }}
 
       - name: Upload release artifacts
         uses: actions/upload-artifact@v7
@@ -283,6 +334,7 @@ jobs:
             release-assets/*.apk
             release-assets/*.aab
             release-assets/*-native-debug-symbols.zip
+            release-assets/*-mapping.txt
 
   update-stable:
     name: Update stable branch
