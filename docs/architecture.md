@@ -195,6 +195,23 @@ Wi-Fi access point that enforces client isolation (peer-to-peer traffic blocked 
 AP). If the TV cannot reach the phone even with both on the same SSID, verify that client
 isolation / "AP isolation" / "Wi-Fi guest network" is disabled on the router.
 
+**BLE fallback discovery:** Because client isolation, VLAN-segmented mesh Wi-Fi, and
+aggressive multicast filtering block mDNS entirely at the network layer, a parallel BLE
+advertising channel ships alongside NSD. The phone's `CompanionBleAdvertiser`
+(see `service/CompanionBleAdvertiser.kt`) broadcasts a 9-byte service-data payload under
+the custom UUID `5e4b4d3a-9f7c-4b7e-8e6b-6c0e5f27e4a0` containing the phone's IPv4
+address, port, `modelQuality`, and `llmBackend` ordinal (schema defined in
+`core/discovery/BleDiscoveryContract.kt`). The TV's `PhoneBleScanner` listens for the
+same UUID; discovered endpoints flow into the same capability-fetch and heartbeat
+pipeline as NSD-discovered ones, deduped by `baseUrl`. BLE and NSD run **in parallel**
+from the moment the companion service starts. Graceful degradation is the default: on
+Bluetooth-off, permission-denied, or BLE-unsupported hardware the advertiser/scanner
+no-ops and NSD keeps working. Permissions: `BLUETOOTH_ADVERTISE` (phone, runtime prompt
+from HomeScreen when the "I am watching TV" toggle flips on) and `BLUETOOTH_SCAN` with
+`neverForLocation` (TV, requested on `TvMainActivity.onCreate`). BLE advertising starts
+and stops in lockstep with NSD under the same `NetworkCallback` so a Wi-Fi drop or IP
+change rebroadcasts with the new endpoint.
+
 **Presence timeout:** A coroutine checks `lastCapabilityCheck` every 60 seconds. If no TV
 has polled `/capability` for 5 minutes, the service auto-deactivates and sets `companionEnabled = false`.
 
