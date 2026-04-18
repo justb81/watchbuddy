@@ -48,8 +48,6 @@ class PhoneDiscoveryManager @Inject constructor(
         const val SERVICE_TYPE = "_watchbuddy._tcp."
         const val CAPABILITY_PATH = "/capability"
         private const val TAG = "PhoneDiscoveryManager"
-        private const val HEARTBEAT_INTERVAL_MS = 60_000L
-        private const val MAX_FAIL_COUNT = 3
         /** Back-off before retrying a stop+start cycle after FAILURE_ALREADY_ACTIVE. */
         private const val RESTART_BACKOFF_MS = 500L
     }
@@ -289,7 +287,7 @@ class PhoneDiscoveryManager @Inject constructor(
     private fun startHeartbeat() {
         heartbeatJob = heartbeatScope.launch {
             while (true) {
-                delay(HEARTBEAT_INTERVAL_MS)
+                delay(DiscoveryConstants.HEARTBEAT_INTERVAL_MS)
                 checkAllPhones()
             }
         }
@@ -330,8 +328,8 @@ class PhoneDiscoveryManager @Inject constructor(
                 )
             } catch (e: Exception) {
                 val newFailCount = phone.failCount + 1
-                if (newFailCount >= MAX_FAIL_COUNT) {
-                    Log.i(TAG, "Removing phone ${phone.baseUrl} after $MAX_FAIL_COUNT failed heartbeats")
+                if (newFailCount >= DiscoveryConstants.MAX_CONSECUTIVE_FAILURES) {
+                    Log.i(TAG, "Removing phone ${phone.baseUrl} after ${DiscoveryConstants.MAX_CONSECUTIVE_FAILURES} failed heartbeats")
                     null
                 } else {
                     phone.copy(failCount = newFailCount)
