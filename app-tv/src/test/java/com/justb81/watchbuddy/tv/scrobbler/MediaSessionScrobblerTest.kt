@@ -3,8 +3,6 @@ package com.justb81.watchbuddy.tv.scrobbler
 import android.content.Context
 import android.media.MediaMetadata
 import android.media.session.PlaybackState
-import com.justb81.watchbuddy.core.model.DeviceCapability
-import com.justb81.watchbuddy.core.model.LlmBackend
 import com.justb81.watchbuddy.core.model.ScrobbleCandidate
 import com.justb81.watchbuddy.core.model.TmdbShow
 import com.justb81.watchbuddy.core.model.TmdbTvSearchResponse
@@ -12,73 +10,39 @@ import com.justb81.watchbuddy.core.model.TraktEpisode
 import com.justb81.watchbuddy.core.model.TraktIds
 import com.justb81.watchbuddy.core.model.TraktShow
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
+import com.justb81.watchbuddy.core.scrobbler.MediaSessionScrobbler
+import com.justb81.watchbuddy.core.scrobbler.ScrobbleDispatcher
+import com.justb81.watchbuddy.core.scrobbler.WatchedShowSource
 import com.justb81.watchbuddy.core.tmdb.TmdbApiService
-import com.justb81.watchbuddy.tv.data.TvShowCache
-import com.justb81.watchbuddy.tv.discovery.PhoneApiClientFactory
-import com.justb81.watchbuddy.tv.discovery.PhoneApiService
-import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
-import com.justb81.watchbuddy.tv.discovery.PhoneScrobbleActionResponse
-import com.justb81.watchbuddy.tv.discovery.PhoneScrobbleRequest
 import io.mockk.*
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
-import android.net.nsd.NsdServiceInfo
 
 @DisplayName("MediaSessionScrobbler")
 class MediaSessionScrobblerTest {
 
     private val context: Context = mockk(relaxed = true)
     private val tmdbApiService: TmdbApiService = mockk()
-    private val tvShowCache: TvShowCache = mockk()
-    private val phoneDiscovery: PhoneDiscoveryManager = mockk()
-    private val phoneApiClientFactory: PhoneApiClientFactory = mockk()
+    private val watchedShowSource: WatchedShowSource = mockk()
+    private val scrobbleDispatcher: ScrobbleDispatcher = mockk()
     private lateinit var scrobbler: MediaSessionScrobbler
 
     @BeforeEach
     fun setUp() {
-        scrobbler = MediaSessionScrobbler(
-            context, tmdbApiService, tvShowCache, phoneDiscovery, phoneApiClientFactory
-        )
+        scrobbler = MediaSessionScrobbler(context, tmdbApiService, watchedShowSource, scrobbleDispatcher)
     }
 
-    /** Helper: creates a mock PlaybackState with a given position (in milliseconds). */
     private fun mockPlaybackState(positionMs: Long): PlaybackState =
         mockk<PlaybackState>().also { every { it.position } returns positionMs }
 
-    /** Helper: creates a mock MediaMetadata with a given duration (in milliseconds). */
     private fun mockMetadata(durationMs: Long): MediaMetadata =
         mockk<MediaMetadata>().also {
             every { it.getLong(MediaMetadata.METADATA_KEY_DURATION) } returns durationMs
         }
-
-    /** Helper: creates a mock DiscoveredPhone with a given base URL and optional TMDB API key. */
-    private fun mockPhone(
-        baseUrl: String,
-        tmdbApiKey: String? = "test-tmdb-key"
-    ): PhoneDiscoveryManager.DiscoveredPhone {
-        val capability = DeviceCapability(
-            deviceId = baseUrl,
-            userName = "user",
-            deviceName = "Phone",
-            llmBackend = LlmBackend.LITERT,
-            modelQuality = 75,
-            freeRamMb = 4096,
-            isAvailable = true,
-            tmdbApiKey = tmdbApiKey
-        )
-        return PhoneDiscoveryManager.DiscoveredPhone(
-            serviceInfo = mockk<NsdServiceInfo>(relaxed = true),
-            txtRecord = null,
-            capability = capability,
-            score = 75,
-            baseUrl = baseUrl
-        )
-    }
 
     // ── normalize() ──────────────────────────────────────────────────────────
 
@@ -239,7 +203,7 @@ class MediaSessionScrobblerTest {
         }
 
         @Test
-        fun `returns approximately 82 percent for 20 min of 24 min episode`() {
+        fun `returns approximately 83 percent for 20 min of 24 min episode`() {
             val result = scrobbler.computeProgress(
                 mockPlaybackState(20 * 60 * 1000L),
                 mockMetadata(24 * 60 * 1000L)
@@ -261,162 +225,52 @@ class MediaSessionScrobblerTest {
             "com.netflix", "Breaking Bad S01E01", 0.95f, testShow, testEpisode
         )
 
-        private fun mockPhoneApiService(): PhoneApiService = mockk<PhoneApiService>().also { svc ->
-            coEvery { svc.scrobbleStart(any()) } returns PhoneScrobbleActionResponse(true)
+        @BeforeEach
+        fun setUpDispatcher() {
+            coEvery { scrobbleDispatcher.dispatchStart(any(), any(), any()) } just runs
         }
 
         @Test
-        fun `calls scrobble start on single phone`() = runTest {
-            val phone = mockPhone("http://phone1:8765/")
-            every { phoneDiscovery.discoveredPhones } returns MutableStateFlow(listOf(phone))
-            val mockSvc = mockPhoneApiService()
-            every { phoneApiClientFactory.createClient("http://phone1:8765/") } returns mockSvc
-
+        fun `calls dispatchStart on scrobble dispatcher`() = runTest {
             scrobbler.autoScrobble(testCandidate)
 
             coVerify {
-                mockSvc.scrobbleStart(
-                    match<PhoneScrobbleRequest> {
-                        it.show == testShow && it.episode == testEpisode && it.progress == 0f
-                    }
-                )
+                scrobbleDispatcher.dispatchStart(testShow, testEpisode, 0f)
             }
         }
 
         @Test
-        fun `calls scrobble start on each connected phone independently`() = runTest {
-            val phone1 = mockPhone("http://phone1:8765/")
-            val phone2 = mockPhone("http://phone2:8765/")
-            every { phoneDiscovery.discoveredPhones } returns MutableStateFlow(listOf(phone1, phone2))
-            val mockSvc1 = mockPhoneApiService()
-            val mockSvc2 = mockPhoneApiService()
-            every { phoneApiClientFactory.createClient("http://phone1:8765/") } returns mockSvc1
-            every { phoneApiClientFactory.createClient("http://phone2:8765/") } returns mockSvc2
-
-            scrobbler.autoScrobble(testCandidate)
-
-            coVerify { mockSvc1.scrobbleStart(any()) }
-            coVerify { mockSvc2.scrobbleStart(any()) }
-        }
-
-        @Test
-        fun `skips when no phones available`() = runTest {
-            every { phoneDiscovery.discoveredPhones } returns MutableStateFlow(emptyList())
-
-            scrobbler.autoScrobble(testCandidate)
-
-            verify(exactly = 0) { phoneApiClientFactory.createClient(any()) }
-        }
-
-        @Test
-        fun `skips unavailable phones`() = runTest {
-            val unavailableCapability = DeviceCapability(
-                deviceId = "offline",
-                userName = "user",
-                deviceName = "Phone",
-                llmBackend = LlmBackend.NONE,
-                modelQuality = 0,
-                freeRamMb = 0,
-                isAvailable = false
-            )
-            val offlinePhone = PhoneDiscoveryManager.DiscoveredPhone(
-                serviceInfo = mockk(relaxed = true),
-                txtRecord = null,
-                capability = unavailableCapability,
-                score = 0,
-                baseUrl = "http://offline:8765/"
-            )
-            every { phoneDiscovery.discoveredPhones } returns MutableStateFlow(listOf(offlinePhone))
-
-            scrobbler.autoScrobble(testCandidate)
-
-            verify(exactly = 0) { phoneApiClientFactory.createClient(any()) }
-        }
-
-        @Test
-        fun `skips when no matched show`() = runTest {
-            val phone = mockPhone("http://phone1:8765/")
-            every { phoneDiscovery.discoveredPhones } returns MutableStateFlow(listOf(phone))
-            val mockSvc = mockPhoneApiService()
-            every { phoneApiClientFactory.createClient(any()) } returns mockSvc
-
-            val candidate = ScrobbleCandidate("pkg", "Title", 0.95f, null, testEpisode)
-            scrobbler.autoScrobble(candidate)
-
-            coVerify(exactly = 0) { mockSvc.scrobbleStart(any()) }
-        }
-
-        @Test
-        fun `skips when no matched episode`() = runTest {
-            val phone = mockPhone("http://phone1:8765/")
-            every { phoneDiscovery.discoveredPhones } returns MutableStateFlow(listOf(phone))
-            val mockSvc = mockPhoneApiService()
-            every { phoneApiClientFactory.createClient(any()) } returns mockSvc
-
-            val candidate = ScrobbleCandidate("pkg", "Title", 0.95f, testShow, null)
-            scrobbler.autoScrobble(candidate)
-
-            coVerify(exactly = 0) { mockSvc.scrobbleStart(any()) }
-        }
-
-        @Test
-        fun `phone API failure does not block scrobble for other phones`() = runTest {
-            val phone1 = mockPhone("http://phone1:8765/")
-            val phone2 = mockPhone("http://phone2:8765/")
-            every { phoneDiscovery.discoveredPhones } returns MutableStateFlow(listOf(phone1, phone2))
-            val failingSvc = mockk<PhoneApiService>()
-            val successSvc = mockk<PhoneApiService>()
-            coEvery { failingSvc.scrobbleStart(any()) } throws RuntimeException("Timeout")
-            coEvery { successSvc.scrobbleStart(any()) } returns PhoneScrobbleActionResponse(true)
-            every { phoneApiClientFactory.createClient("http://phone1:8765/") } returns failingSvc
-            every { phoneApiClientFactory.createClient("http://phone2:8765/") } returns successSvc
-
-            // Should not throw
-            scrobbler.autoScrobble(testCandidate)
-
-            coVerify { failingSvc.scrobbleStart(any()) }
-            coVerify { successSvc.scrobbleStart(any()) }
-        }
-
-        @Test
-        fun `does not call TMDB API for scrobbling`() = runTest {
-            val phone = mockPhone("http://phone1:8765/")
-            every { phoneDiscovery.discoveredPhones } returns MutableStateFlow(listOf(phone))
-            val mockSvc = mockPhoneApiService()
-            every { phoneApiClientFactory.createClient(any()) } returns mockSvc
-
-            scrobbler.autoScrobble(testCandidate)
-
-            coVerify(exactly = 0) { tmdbApiService.searchTv(any(), any()) }
-            coVerify(exactly = 0) { tmdbApiService.getShow(any(), any()) }
-        }
-
-        @Test
         fun `forwards explicit progress value`() = runTest {
-            val phone = mockPhone("http://phone1:8765/")
-            every { phoneDiscovery.discoveredPhones } returns MutableStateFlow(listOf(phone))
-            val mockSvc = mockPhoneApiService()
-            every { phoneApiClientFactory.createClient("http://phone1:8765/") } returns mockSvc
-
             scrobbler.autoScrobble(testCandidate, progress = 42.5f)
 
             coVerify {
-                mockSvc.scrobbleStart(match<PhoneScrobbleRequest> { it.progress == 42.5f })
+                scrobbleDispatcher.dispatchStart(testShow, testEpisode, 42.5f)
             }
         }
 
         @Test
         fun `falls back to 0 when progress is null`() = runTest {
-            val phone = mockPhone("http://phone1:8765/")
-            every { phoneDiscovery.discoveredPhones } returns MutableStateFlow(listOf(phone))
-            val mockSvc = mockPhoneApiService()
-            every { phoneApiClientFactory.createClient("http://phone1:8765/") } returns mockSvc
-
             scrobbler.autoScrobble(testCandidate, progress = null)
 
             coVerify {
-                mockSvc.scrobbleStart(match<PhoneScrobbleRequest> { it.progress == 0f })
+                scrobbleDispatcher.dispatchStart(testShow, testEpisode, 0f)
             }
+        }
+
+        @Test
+        fun `skips when no matched show`() = runTest {
+            val candidate = ScrobbleCandidate("pkg", "Title", 0.95f, null, testEpisode)
+            scrobbler.autoScrobble(candidate)
+
+            coVerify(exactly = 0) { scrobbleDispatcher.dispatchStart(any(), any(), any()) }
+        }
+
+        @Test
+        fun `skips when no matched episode`() = runTest {
+            val candidate = ScrobbleCandidate("pkg", "Title", 0.95f, testShow, null)
+            scrobbler.autoScrobble(candidate)
+
+            coVerify(exactly = 0) { scrobbleDispatcher.dispatchStart(any(), any(), any()) }
         }
     }
 
@@ -432,58 +286,38 @@ class MediaSessionScrobblerTest {
             "com.netflix", "Breaking Bad S01E01", 0.95f, testShow, testEpisode
         )
 
-        private fun mockPauseSvc(): PhoneApiService = mockk<PhoneApiService>().also { svc ->
-            coEvery { svc.scrobbleStart(any()) } returns PhoneScrobbleActionResponse(true)
-            coEvery { svc.scrobblePause(any()) } returns PhoneScrobbleActionResponse(true)
-        }
-
-        /** Primes `currentlyScrobbling` by running an autoScrobble first. */
-        private suspend fun primeCurrentlyScrobbling(
-            phone: PhoneDiscoveryManager.DiscoveredPhone,
-            svc: PhoneApiService
-        ) {
-            every { phoneDiscovery.discoveredPhones } returns MutableStateFlow(listOf(phone))
-            every { phoneApiClientFactory.createClient(phone.baseUrl) } returns svc
+        private suspend fun primeCurrentlyScrobbling() {
+            coEvery { scrobbleDispatcher.dispatchStart(any(), any(), any()) } just runs
+            coEvery { watchedShowSource.getCachedShows() } returns listOf(TraktWatchedEntry(show = testShow))
+            coEvery { watchedShowSource.getTmdbApiKey() } returns null
             scrobbler.autoScrobble(testCandidate)
-            every { tvShowCache.getCachedShows() } returns listOf(TraktWatchedEntry(show = testShow))
         }
 
         @Test
         fun `forwards explicit progress value on pause`() = runTest {
-            val phone = mockPhone("http://phone1:8765/")
-            val svc = mockPauseSvc()
-            primeCurrentlyScrobbling(phone, svc)
+            coEvery { scrobbleDispatcher.dispatchPause(any(), any(), any()) } just runs
+            primeCurrentlyScrobbling()
 
             scrobbler.handleScrobblePause("Breaking Bad S01E01", progress = 35f)
 
-            coVerify {
-                svc.scrobblePause(match<PhoneScrobbleRequest> { it.progress == 35f })
-            }
+            coVerify { scrobbleDispatcher.dispatchPause(any(), any(), 35f) }
         }
 
         @Test
         fun `falls back to 50 when progress is null on pause`() = runTest {
-            val phone = mockPhone("http://phone1:8765/")
-            val svc = mockPauseSvc()
-            primeCurrentlyScrobbling(phone, svc)
+            coEvery { scrobbleDispatcher.dispatchPause(any(), any(), any()) } just runs
+            primeCurrentlyScrobbling()
 
             scrobbler.handleScrobblePause("Breaking Bad S01E01", progress = null)
 
-            coVerify {
-                svc.scrobblePause(match<PhoneScrobbleRequest> { it.progress == 50f })
-            }
+            coVerify { scrobbleDispatcher.dispatchPause(any(), any(), 50f) }
         }
 
         @Test
         fun `skips pause when rawTitle does not match currentlyScrobbling`() = runTest {
-            val phone = mockPhone("http://phone1:8765/")
-            val svc = mockPauseSvc()
-            every { phoneDiscovery.discoveredPhones } returns MutableStateFlow(listOf(phone))
-            every { phoneApiClientFactory.createClient(any()) } returns svc
-
             scrobbler.handleScrobblePause("Some Other Title", progress = 50f)
 
-            coVerify(exactly = 0) { svc.scrobblePause(any()) }
+            coVerify(exactly = 0) { scrobbleDispatcher.dispatchPause(any(), any(), any()) }
         }
     }
 
@@ -499,68 +333,37 @@ class MediaSessionScrobblerTest {
             "com.netflix", "Breaking Bad S01E01", 0.95f, testShow, testEpisode
         )
 
-        private fun mockStopSvc(): PhoneApiService = mockk<PhoneApiService>().also { svc ->
-            coEvery { svc.scrobbleStart(any()) } returns PhoneScrobbleActionResponse(true)
-            coEvery { svc.scrobbleStop(any()) } returns PhoneScrobbleActionResponse(true)
-        }
-
-        private suspend fun primeCurrentlyScrobbling(
-            phone: PhoneDiscoveryManager.DiscoveredPhone,
-            svc: PhoneApiService
-        ) {
-            every { phoneDiscovery.discoveredPhones } returns MutableStateFlow(listOf(phone))
-            every { phoneApiClientFactory.createClient(phone.baseUrl) } returns svc
+        private suspend fun primeCurrentlyScrobbling() {
+            coEvery { scrobbleDispatcher.dispatchStart(any(), any(), any()) } just runs
+            coEvery { watchedShowSource.getCachedShows() } returns listOf(TraktWatchedEntry(show = testShow))
+            coEvery { watchedShowSource.getTmdbApiKey() } returns null
             scrobbler.autoScrobble(testCandidate)
-            every { tvShowCache.getCachedShows() } returns listOf(TraktWatchedEntry(show = testShow))
         }
 
         @Test
-        fun `forwards real progress value below watched threshold`() = runTest {
-            val phone = mockPhone("http://phone1:8765/")
-            val svc = mockStopSvc()
-            primeCurrentlyScrobbling(phone, svc)
-
-            scrobbler.handleScrobbleStop("Breaking Bad S01E01", progress = 25f)
-
-            coVerify {
-                svc.scrobbleStop(match<PhoneScrobbleRequest> { it.progress == 25f })
-            }
-        }
-
-        @Test
-        fun `forwards real progress value above watched threshold`() = runTest {
-            val phone = mockPhone("http://phone1:8765/")
-            val svc = mockStopSvc()
-            primeCurrentlyScrobbling(phone, svc)
+        fun `forwards real progress value`() = runTest {
+            coEvery { scrobbleDispatcher.dispatchStop(any(), any(), any()) } just runs
+            primeCurrentlyScrobbling()
 
             scrobbler.handleScrobbleStop("Breaking Bad S01E01", progress = 82f)
 
-            coVerify {
-                svc.scrobbleStop(match<PhoneScrobbleRequest> { it.progress == 82f })
-            }
+            coVerify { scrobbleDispatcher.dispatchStop(any(), any(), 82f) }
         }
 
         @Test
         fun `skips stop call when progress is null`() = runTest {
-            val phone = mockPhone("http://phone1:8765/")
-            val svc = mockStopSvc()
-            primeCurrentlyScrobbling(phone, svc)
+            primeCurrentlyScrobbling()
 
             scrobbler.handleScrobbleStop("Breaking Bad S01E01", progress = null)
 
-            coVerify(exactly = 0) { svc.scrobbleStop(any()) }
+            coVerify(exactly = 0) { scrobbleDispatcher.dispatchStop(any(), any(), any()) }
         }
 
         @Test
         fun `skips stop when rawTitle does not match currentlyScrobbling`() = runTest {
-            val phone = mockPhone("http://phone1:8765/")
-            val svc = mockStopSvc()
-            every { phoneDiscovery.discoveredPhones } returns MutableStateFlow(listOf(phone))
-            every { phoneApiClientFactory.createClient(any()) } returns svc
-
             scrobbler.handleScrobbleStop("Some Other Title", progress = 100f)
 
-            coVerify(exactly = 0) { svc.scrobbleStop(any()) }
+            coVerify(exactly = 0) { scrobbleDispatcher.dispatchStop(any(), any(), any()) }
         }
     }
 
@@ -603,13 +406,12 @@ class MediaSessionScrobblerTest {
 
         @BeforeEach
         fun setUpCache() {
-            every { tvShowCache.getCachedShows() } returns emptyList()
+            coEvery { watchedShowSource.getCachedShows() } returns emptyList()
         }
 
         @Test
         fun `uses TMDB search when cache is empty`() = runTest {
-            val phone = mockPhone("http://phone1:8765/")
-            every { phoneDiscovery.getBestPhone() } returns phone
+            coEvery { watchedShowSource.getTmdbApiKey() } returns "test-tmdb-key"
             coEvery {
                 tmdbApiService.searchTv("Breaking Bad", "test-tmdb-key")
             } returns TmdbTvSearchResponse(listOf(breakingBadTmdb))
@@ -625,19 +427,8 @@ class MediaSessionScrobblerTest {
         }
 
         @Test
-        fun `returns null when no phone has TMDB API key`() = runTest {
-            val phone = mockPhone("http://phone1:8765/", tmdbApiKey = null)
-            every { phoneDiscovery.getBestPhone() } returns phone
-
-            val candidate = scrobbler.matchTitle("com.netflix", "Breaking Bad S01E01")
-
-            assertNull(candidate)
-            coVerify(exactly = 0) { tmdbApiService.searchTv(any(), any()) }
-        }
-
-        @Test
-        fun `returns null when no phone connected`() = runTest {
-            every { phoneDiscovery.getBestPhone() } returns null
+        fun `returns null when no TMDB API key available`() = runTest {
+            coEvery { watchedShowSource.getTmdbApiKey() } returns null
 
             val candidate = scrobbler.matchTitle("com.netflix", "Breaking Bad S01E01")
 
@@ -647,8 +438,7 @@ class MediaSessionScrobblerTest {
 
         @Test
         fun `returns null when TMDB search score too low`() = runTest {
-            val phone = mockPhone("http://phone1:8765/")
-            every { phoneDiscovery.getBestPhone() } returns phone
+            coEvery { watchedShowSource.getTmdbApiKey() } returns "test-tmdb-key"
             val unrelatedShow = TmdbShow(id = 999, name = "Completely Different Show")
             coEvery {
                 tmdbApiService.searchTv(any(), any())
@@ -661,8 +451,7 @@ class MediaSessionScrobblerTest {
 
         @Test
         fun `returns null when TMDB search returns empty results`() = runTest {
-            val phone = mockPhone("http://phone1:8765/")
-            every { phoneDiscovery.getBestPhone() } returns phone
+            coEvery { watchedShowSource.getTmdbApiKey() } returns "test-tmdb-key"
             coEvery {
                 tmdbApiService.searchTv(any(), any())
             } returns TmdbTvSearchResponse(emptyList())
@@ -674,8 +463,7 @@ class MediaSessionScrobblerTest {
 
         @Test
         fun `returns null when TMDB search throws`() = runTest {
-            val phone = mockPhone("http://phone1:8765/")
-            every { phoneDiscovery.getBestPhone() } returns phone
+            coEvery { watchedShowSource.getTmdbApiKey() } returns "test-tmdb-key"
             coEvery {
                 tmdbApiService.searchTv(any(), any())
             } throws RuntimeException("Network error")
@@ -691,11 +479,10 @@ class MediaSessionScrobblerTest {
                 title = "Breaking Bad",
                 ids = TraktIds(trakt = 1, tmdb = 1396)
             )
-            every { tvShowCache.getCachedShows() } returns listOf(
+            coEvery { watchedShowSource.getCachedShows() } returns listOf(
                 TraktWatchedEntry(show = cachedShow)
             )
-            val phone = mockPhone("http://phone1:8765/")
-            every { phoneDiscovery.getBestPhone() } returns phone
+            coEvery { watchedShowSource.getTmdbApiKey() } returns "test-tmdb-key"
 
             val candidate = scrobbler.matchTitle("com.netflix", "Breaking Bad S01E01")
 
@@ -706,8 +493,7 @@ class MediaSessionScrobblerTest {
 
         @Test
         fun `TMDB result sets tmdb ID in TraktShow ids`() = runTest {
-            val phone = mockPhone("http://phone1:8765/")
-            every { phoneDiscovery.getBestPhone() } returns phone
+            coEvery { watchedShowSource.getTmdbApiKey() } returns "test-tmdb-key"
             coEvery {
                 tmdbApiService.searchTv(any(), any())
             } returns TmdbTvSearchResponse(listOf(breakingBadTmdb))

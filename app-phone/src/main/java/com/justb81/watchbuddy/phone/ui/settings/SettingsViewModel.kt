@@ -1,7 +1,12 @@
 package com.justb81.watchbuddy.phone.ui.settings
 
 import android.app.Application
+import android.content.ComponentName
+import android.content.Context
+import android.provider.Settings
+import android.service.notification.NotificationListenerService
 import android.util.Log
+import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.Constraints
@@ -13,6 +18,7 @@ import androidx.work.WorkManager
 import androidx.work.workDataOf
 import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
+import com.justb81.watchbuddy.phone.service.PhoneScrobblerListenerService
 import com.justb81.watchbuddy.core.trakt.TraktApiService
 import com.justb81.watchbuddy.phone.auth.TokenRepository
 import com.justb81.watchbuddy.service.CompanionService
@@ -66,7 +72,9 @@ data class SettingsUiState(
      * True when advanced settings must always be visible (i.e. at least one bundled option
      * is not configured in this build so the user must configure it manually).
      */
-    val forceShowAdvanced: Boolean = false
+    val forceShowAdvanced: Boolean = false,
+    val autoScrobbleEnabled: Boolean = false,
+    val notificationAccessGranted: Boolean = false
 )
 
 @HiltViewModel
@@ -188,7 +196,8 @@ class SettingsViewModel @Inject constructor(
                     defaultTmdbApiKeyAvailable = buildHasBundled && saved.tmdbApiKey.isBlank(),
                     buildHasBundledTmdbKey = buildHasBundled,
                     useBundledTmdbKey = saved.tmdbApiKey.isBlank() && buildHasBundled,
-                    forceShowAdvanced = !managedBackendAvailable || !buildHasBundled
+                    forceShowAdvanced = !managedBackendAvailable || !buildHasBundled,
+                    autoScrobbleEnabled = saved.autoScrobbleEnabled
                 )
                 DiagnosticLog.event(TAG, "loadPersistedSettings:ok authMode=$resolvedAuthMode tmdbConnected=${saved.tmdbApiKey.isNotBlank()}")
             } catch (e: Exception) {
@@ -419,6 +428,32 @@ class SettingsViewModel @Inject constructor(
         }
         _uiState.value = _uiState.value.copy(traktUsername = null)
         DiagnosticLog.event(TAG, "disconnectTrakt:done")
+    }
+
+    fun refreshNotificationAccess(context: Context) {
+        val granted = NotificationManagerCompat
+            .getEnabledListenerPackages(context)
+            .contains(context.packageName)
+        _uiState.value = _uiState.value.copy(notificationAccessGranted = granted)
+    }
+
+    fun toggleAutoScrobble(context: Context) {
+        val newEnabled = !_uiState.value.autoScrobbleEnabled
+        _uiState.value = _uiState.value.copy(autoScrobbleEnabled = newEnabled)
+        launchSafe {
+            try {
+                settingsRepository.setAutoScrobbleEnabled(newEnabled)
+                val component = ComponentName(context, PhoneScrobblerListenerService::class.java)
+                if (newEnabled && _uiState.value.notificationAccessGranted) {
+                    NotificationListenerService.requestRebind(component)
+                } else if (!newEnabled) {
+                    NotificationListenerService.requestUnbind(component)
+                }
+            } catch (e: Exception) {
+                DiagnosticLog.error(TAG, "toggleAutoScrobble:failed (reverting)", e)
+                _uiState.value = _uiState.value.copy(autoScrobbleEnabled = !newEnabled)
+            }
+        }
     }
 
     fun downloadModel() {

@@ -78,6 +78,19 @@
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
+        <!-- Auto-scrobble: MediaSession listener for phone-side scrobbling.
+             Requires the user to grant notification access via system settings;
+             no runtime dialog exists — the app deep-links to ACTION_NOTIFICATION_LISTENER_SETTINGS. -->
+        <service
+            android:name=".phone.service.PhoneScrobblerListenerService"
+            android:exported="true"
+            android:label="@string/settings_scrobble"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
         <!-- WorkManager foreground service — required for long-running downloads on Android 10+.
              Merges with WorkManager's own SystemForegroundService manifest entry to declare
              the dataSync foreground service type used by ModelDownloadWorker. -->

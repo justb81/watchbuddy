@@ -5,7 +5,7 @@ import com.justb81.watchbuddy.core.model.TraktEpisode
 import com.justb81.watchbuddy.core.model.TraktIds
 import com.justb81.watchbuddy.core.model.TraktShow
 import com.justb81.watchbuddy.tv.MainDispatcherRule
-import com.justb81.watchbuddy.tv.scrobbler.MediaSessionScrobbler
+import com.justb81.watchbuddy.core.scrobbler.MediaSessionScrobbler
 import io.mockk.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow

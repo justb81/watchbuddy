@@ -1,4 +1,4 @@
-package com.justb81.watchbuddy.tv.scrobbler
+package com.justb81.watchbuddy.core.scrobbler
 
 import android.content.ComponentName
 import android.content.Context
@@ -10,10 +10,6 @@ import com.justb81.watchbuddy.core.model.TraktEpisode
 import com.justb81.watchbuddy.core.model.TraktIds
 import com.justb81.watchbuddy.core.model.TraktShow
 import com.justb81.watchbuddy.core.tmdb.TmdbApiService
-import com.justb81.watchbuddy.tv.data.TvShowCache
-import com.justb81.watchbuddy.tv.discovery.PhoneApiClientFactory
-import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
-import com.justb81.watchbuddy.tv.discovery.PhoneScrobbleRequest
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -22,33 +18,27 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Listens to active MediaSessions on the TV and automatically scrobbles to Trakt.
+ * Listens to active MediaSessions and automatically scrobbles to Trakt.
  *
- * How it works:
- *   1. MediaSessionManager.getActiveSessions() returns all active sessions
- *   2. Extract package name + media title from session metadata
- *   3. Fuzzy-match title against user's watchlist (local cache first, then TMDB search)
- *   4. Confidence ≥ 0.95 → auto-scrobble; 0.70–0.95 → emit for UI confirmation; < 0.70 → ignore
- *   5. On playback stop/pause → call phone's /scrobble/stop or /scrobble/pause endpoint
+ * Shared between the phone and TV apps:
+ *   - TV: [WatchedShowSource] reads from in-memory TvShowCache populated by connected phones;
+ *     [ScrobbleDispatcher] fans scrobbles to each connected phone's HTTP API.
+ *   - Phone: [WatchedShowSource] reads from ShowRepository (Trakt cache);
+ *     [ScrobbleDispatcher] calls the Trakt scrobble API directly with the phone's own token.
  *
- * Scrobble operations are always forwarded to each connected phone's HTTP API.
- * The phone then calls Trakt with its own credentials — the TV never calls Trakt directly.
- * Show search uses the TMDB API with the API key provided by the connected phone.
+ * Confidence thresholds: ≥ 0.95 auto-scrobble; 0.70–0.95 emit for UI confirmation; < 0.70 ignore.
  */
 @Singleton
 class MediaSessionScrobbler @Inject constructor(
     @param:ApplicationContext private val context: Context,
     private val tmdbApiService: TmdbApiService,
-    private val tvShowCache: TvShowCache,
-    private val phoneDiscovery: PhoneDiscoveryManager,
-    private val phoneApiClientFactory: PhoneApiClientFactory
+    private val watchedShowSource: WatchedShowSource,
+    private val scrobbleDispatcher: ScrobbleDispatcher
 ) {
     companion object {
         private const val TAG = "MediaSessionScrobbler"
-        private const val AUTO_SCROBBLE_THRESHOLD = 0.95f
-        private const val OVERLAY_THRESHOLD = 0.70f
-        /** Skip phones whose last successful heartbeat is older than this. */
-        private const val PRESENCE_STALENESS_MS = 2 * 60_000L
+        internal const val AUTO_SCROBBLE_THRESHOLD = 0.95f
+        internal const val OVERLAY_THRESHOLD = 0.70f
     }
 
     private val _pendingConfirmation = MutableSharedFlow<ScrobbleCandidate>()
@@ -57,7 +47,6 @@ class MediaSessionScrobbler @Inject constructor(
     private var scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var pollingJob: Job? = null
 
-    /** Track which media title is currently being scrobbled to avoid duplicate starts. */
     private var currentlyScrobbling: String? = null
 
     fun startListening(notificationListenerComponent: ComponentName) {
@@ -73,24 +62,21 @@ class MediaSessionScrobbler @Inject constructor(
                         val packageName = controller.packageName
                         val metadata = controller.metadata ?: return@forEach
                         val playbackState = controller.playbackState ?: return@forEach
-
                         val title = metadata.getString(android.media.MediaMetadata.METADATA_KEY_TITLE)
                             ?: return@forEach
-
                         val progress = computeProgress(playbackState, metadata)
-
                         when (playbackState.state) {
                             PlaybackState.STATE_PLAYING -> processPlayingMedia(packageName, title, progress)
                             PlaybackState.STATE_PAUSED -> handleScrobblePause(title, progress)
                             PlaybackState.STATE_STOPPED,
                             PlaybackState.STATE_NONE -> handleScrobbleStop(title, progress)
-                            else -> { /* no-op */ }
+                            else -> {}
                         }
                     }
                 } catch (e: Exception) {
                     Log.w(TAG, "Session polling error", e)
                 }
-                delay(30_000) // Poll every 30 seconds
+                delay(30_000)
             }
         }
     }
@@ -101,26 +87,15 @@ class MediaSessionScrobbler @Inject constructor(
     }
 
     private suspend fun processPlayingMedia(packageName: String, rawTitle: String, progress: Float?) {
-        if (rawTitle == currentlyScrobbling) return // already handling this title
-
+        if (rawTitle == currentlyScrobbling) return
         val candidate = matchTitle(packageName, rawTitle) ?: return
-
         if (candidate.confidence >= AUTO_SCROBBLE_THRESHOLD) {
             autoScrobble(candidate, progress)
         } else if (candidate.confidence >= OVERLAY_THRESHOLD) {
             _pendingConfirmation.emit(candidate)
         }
-        // confidence < 0.70 → too uncertain, don't scrobble
     }
 
-    /**
-     * Computes playback progress as a percentage (0.0–100.0) from the current
-     * MediaSession state, or null if duration/position are unavailable.
-     *
-     * Trakt treats progress >= 80 on /scrobble/stop as "watched", so sending a
-     * real progress value prevents accidentally marking partially-watched
-     * episodes as fully watched.
-     */
     internal fun computeProgress(
         playbackState: PlaybackState,
         metadata: android.media.MediaMetadata
@@ -131,30 +106,20 @@ class MediaSessionScrobbler @Inject constructor(
         return (positionMs * 100f / durationMs).coerceIn(0f, 100f)
     }
 
-    // ── Fuzzy Matching ───────────────────────────────────────────────────────
+    // ── Fuzzy Matching ────────────────────────────────────────────────────────
 
-    /**
-     * Fuzzy-match the media title to a show+episode.
-     * Searches the local show cache first. If no good match is found, falls back
-     * to TMDB search using the API key provided by the best connected phone.
-     * The TV never calls the Trakt API directly.
-     */
     internal suspend fun matchTitle(packageName: String, rawTitle: String): ScrobbleCandidate? {
         val episodePattern = Regex("""(?i)S(\d{1,2})E(\d{1,2})""")
         val match = episodePattern.find(rawTitle)
-
         val showTitle = if (match != null) rawTitle.substringBefore(match.value).trim() else rawTitle
         val season = match?.groupValues?.get(1)?.toIntOrNull()
         val episode = match?.groupValues?.get(2)?.toIntOrNull()
-
         if (showTitle.isBlank()) return null
 
-        // 1. Search local cache first (shows come from the phone's /shows endpoint)
-        val cachedShows = tvShowCache.getCachedShows()
+        val cachedShows = watchedShowSource.getCachedShows()
         if (cachedShows.isNotEmpty()) {
             val bestCacheMatch = cachedShows.maxByOrNull { fuzzyScore(it.show.title, showTitle) }
             val cacheScore = bestCacheMatch?.let { fuzzyScore(it.show.title, showTitle) } ?: 0f
-
             if (cacheScore >= 0.70f && bestCacheMatch != null) {
                 return ScrobbleCandidate(
                     packageName = packageName,
@@ -167,15 +132,12 @@ class MediaSessionScrobbler @Inject constructor(
             }
         }
 
-        // 2. TMDB search fallback — uses TMDB API key provided by the best connected phone
-        val tmdbApiKey = phoneDiscovery.getBestPhone()?.capability?.tmdbApiKey ?: return null
+        val tmdbApiKey = watchedShowSource.getTmdbApiKey() ?: return null
         return try {
             val tmdbResults = tmdbApiService.searchTv(showTitle, tmdbApiKey).results
             val bestTmdbMatch = tmdbResults.maxByOrNull { fuzzyScore(it.name, showTitle) }
             val tmdbScore = bestTmdbMatch?.let { fuzzyScore(it.name, showTitle) } ?: 0f
-
             if (tmdbScore < 0.50f || bestTmdbMatch == null) return null
-
             ScrobbleCandidate(
                 packageName = packageName,
                 mediaTitle = rawTitle,
@@ -194,10 +156,6 @@ class MediaSessionScrobbler @Inject constructor(
         }
     }
 
-    /**
-     * Normalizes a title for comparison: lowercases, strips special chars and
-     * leading articles ("the"), collapses whitespace.
-     */
     internal fun normalize(title: String): String {
         return title
             .lowercase()
@@ -207,18 +165,12 @@ class MediaSessionScrobbler @Inject constructor(
             .replace(Regex("\\s+"), " ")
     }
 
-    /**
-     * Computes a fuzzy similarity score between two titles (0.0–1.0).
-     * Uses exact match → prefix match → Levenshtein distance.
-     */
     internal fun fuzzyScore(a: String, b: String): Float {
         val normA = normalize(a)
         val normB = normalize(b)
-
         if (normA.isEmpty() || normB.isEmpty()) return 0f
         if (normA == normB) return 1.0f
         if (normA.startsWith(normB) || normB.startsWith(normA)) return 0.95f
-
         val distance = levenshteinDistance(normA, normB)
         val maxLen = maxOf(normA.length, normB.length)
         return (1.0f - (distance.toFloat() / maxLen)).coerceAtLeast(0f)
@@ -237,103 +189,37 @@ class MediaSessionScrobbler @Inject constructor(
         return dp[a.length][b.length]
     }
 
-    // ── Scrobble API (Issue #163) ────────────────────────────────────────────
+    // ── Scrobble API ──────────────────────────────────────────────────────────
 
-    /**
-     * Forwards a scrobble/start to each connected phone's HTTP API.
-     * Each phone records the episode on its own user's Trakt account using its own credentials.
-     * A failure for one phone does not block scrobbling for the others.
-     *
-     * Called automatically for high-confidence matches or via [ScrobbleViewModel] after
-     * user confirmation.
-     */
     suspend fun autoScrobble(candidate: ScrobbleCandidate, progress: Float? = null) {
-        val now = System.currentTimeMillis()
-        val phones = phoneDiscovery.discoveredPhones.value
-            .filter { it.capability?.isAvailable == true }
-            .filter { now - it.lastSuccessfulCheck < PRESENCE_STALENESS_MS }
-        if (phones.isEmpty()) {
-            Log.w(TAG, "No phones available — scrobble skipped")
-            return
-        }
-
         val show = candidate.matchedShow ?: return
         val episode = candidate.matchedEpisode ?: return
-        val request = PhoneScrobbleRequest(show = show, episode = episode, progress = progress ?: 0f)
-
-        coroutineScope {
-            phones.forEach { phone ->
-                launch {
-                    try {
-                        phoneApiClientFactory.createClient(phone.baseUrl).scrobbleStart(request)
-                        Log.i(TAG, "Scrobble started via ${phone.baseUrl}: ${show.title} S${episode.season}E${episode.number}")
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Scrobble start failed for ${phone.baseUrl}", e)
-                    }
-                }
-            }
-        }
+        scrobbleDispatcher.dispatchStart(show, episode, progress ?: 0f)
         currentlyScrobbling = candidate.mediaTitle
+        Log.i(TAG, "Scrobble started: ${show.title} S${episode.season}E${episode.number}")
     }
 
     internal suspend fun handleScrobblePause(rawTitle: String, progress: Float? = null) {
         if (rawTitle != currentlyScrobbling) return
-
-        val now = System.currentTimeMillis()
-        val phones = phoneDiscovery.discoveredPhones.value
-            .filter { it.capability?.isAvailable == true }
-            .filter { now - it.lastSuccessfulCheck < PRESENCE_STALENESS_MS }
-        if (phones.isEmpty()) return
         val candidate = matchTitle("", rawTitle) ?: return
         val show = candidate.matchedShow ?: return
         val episode = candidate.matchedEpisode ?: return
-        val request = PhoneScrobbleRequest(show = show, episode = episode, progress = progress ?: 50f)
-
-        coroutineScope {
-            phones.forEach { phone ->
-                launch {
-                    try {
-                        phoneApiClientFactory.createClient(phone.baseUrl).scrobblePause(request)
-                        Log.i(TAG, "Scrobble paused via ${phone.baseUrl}: ${show.title}")
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Scrobble pause failed for ${phone.baseUrl}", e)
-                    }
-                }
-            }
-        }
+        scrobbleDispatcher.dispatchPause(show, episode, progress ?: 50f)
+        Log.i(TAG, "Scrobble paused: ${show.title}")
     }
 
     internal suspend fun handleScrobbleStop(rawTitle: String, progress: Float? = null) {
         if (rawTitle != currentlyScrobbling) return
-
         if (progress == null) {
             Log.w(TAG, "Scrobble stop skipped — playback position/duration unavailable for '$rawTitle'")
             currentlyScrobbling = null
             return
         }
-
-        val now = System.currentTimeMillis()
-        val phones = phoneDiscovery.discoveredPhones.value
-            .filter { it.capability?.isAvailable == true }
-            .filter { now - it.lastSuccessfulCheck < PRESENCE_STALENESS_MS }
-        if (phones.isEmpty()) return
         val candidate = matchTitle("", rawTitle) ?: return
         val show = candidate.matchedShow ?: return
         val episode = candidate.matchedEpisode ?: return
-        val request = PhoneScrobbleRequest(show = show, episode = episode, progress = progress)
-
-        coroutineScope {
-            phones.forEach { phone ->
-                launch {
-                    try {
-                        phoneApiClientFactory.createClient(phone.baseUrl).scrobbleStop(request)
-                        Log.i(TAG, "Scrobble stopped via ${phone.baseUrl}: ${show.title} S${episode.season}E${episode.number}")
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Scrobble stop failed for ${phone.baseUrl}", e)
-                    }
-                }
-            }
-        }
+        scrobbleDispatcher.dispatchStop(show, episode, progress)
         currentlyScrobbling = null
+        Log.i(TAG, "Scrobble stopped: ${show.title} S${episode.season}E${episode.number}")
     }
 }
