@@ -71,7 +71,11 @@ class CompanionHttpServer @Inject constructor(
 
     fun start() {
         if (server != null) return
-        server = embeddedServer(Netty, port = PORT) {
+        // Bind explicitly to 0.0.0.0 so Netty never falls back to loopback-only
+        // on devices where the default binding behaves unexpectedly — the NSD
+        // advertisement pins the Wi-Fi IPv4, so the listener must accept
+        // connections on that interface (#265).
+        server = embeddedServer(Netty, host = "0.0.0.0", port = PORT) {
             configureCompanionRoutes(
                 recapGenerator, capabilityProvider, showRepository,
                 tokenRepository, tokenRefreshManager, traktApiService, tmdbApiService, tmdbCache,
