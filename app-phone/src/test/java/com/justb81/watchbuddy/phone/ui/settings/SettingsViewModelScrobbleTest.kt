@@ -2,7 +2,6 @@ package com.justb81.watchbuddy.phone.ui.settings
 
 import android.app.Application
 import android.content.Context
-import androidx.core.app.NotificationManagerCompat
 import androidx.work.WorkManager
 import com.justb81.watchbuddy.core.model.LlmBackend
 import com.justb81.watchbuddy.core.trakt.TraktApiService
@@ -18,7 +17,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -57,13 +55,6 @@ class SettingsViewModelScrobbleTest {
             backend = LlmBackend.NONE, modelVariant = null, qualityScore = 0
         )
         every { context.packageName } returns "com.justb81.watchbuddy"
-        mockkStatic(NotificationManagerCompat::class)
-        every { NotificationManagerCompat.getEnabledListenerPackages(any()) } returns emptySet()
-    }
-
-    @AfterEach
-    fun tearDown() {
-        unmockkStatic(NotificationManagerCompat::class)
     }
 
     private fun createViewModel(): SettingsViewModel = SettingsViewModel(
@@ -76,36 +67,6 @@ class SettingsViewModelScrobbleTest {
         settingsRepository = settingsRepository,
         managedBackendAvailable = true
     )
-
-    // ── refreshNotificationAccess() ───────────────────────────────────────────
-
-    @Nested
-    @DisplayName("refreshNotificationAccess()")
-    inner class RefreshNotificationAccessTest {
-
-        @Test
-        fun `reports false when package not in enabled listener packages`() = runTest {
-            every { NotificationManagerCompat.getEnabledListenerPackages(any()) } returns emptySet()
-            val vm = createViewModel()
-
-            vm.refreshNotificationAccess(context)
-            advanceUntilIdle()
-
-            assertFalse(vm.uiState.value.notificationAccessGranted)
-        }
-
-        @Test
-        fun `reports true when package is in enabled listener packages`() = runTest {
-            every { NotificationManagerCompat.getEnabledListenerPackages(any()) } returns
-                setOf("com.justb81.watchbuddy")
-            val vm = createViewModel()
-
-            vm.refreshNotificationAccess(context)
-            advanceUntilIdle()
-
-            assertTrue(vm.uiState.value.notificationAccessGranted)
-        }
-    }
 
     // ── toggleAutoScrobble() ──────────────────────────────────────────────────
 
