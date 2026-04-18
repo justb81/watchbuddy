@@ -2,21 +2,27 @@ package com.justb81.watchbuddy.phone.ui.showdetail
 
 import android.app.Application
 import androidx.lifecycle.SavedStateHandle
+import com.justb81.watchbuddy.core.model.EnrichedShowEntry
+import com.justb81.watchbuddy.core.model.TraktEpisode
 import com.justb81.watchbuddy.core.model.TraktIds
+import com.justb81.watchbuddy.core.model.TraktSeasonWithEpisodes
 import com.justb81.watchbuddy.core.model.TraktShow
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
 import com.justb81.watchbuddy.core.model.TraktWatchedEpisode
 import com.justb81.watchbuddy.core.model.TraktWatchedSeason
 import com.justb81.watchbuddy.core.tmdb.TmdbApiService
-import com.justb81.watchbuddy.core.trakt.TraktApiService
 import com.justb81.watchbuddy.phone.MainDispatcherRule
-import com.justb81.watchbuddy.phone.auth.TokenRepository
+import com.justb81.watchbuddy.phone.server.EpisodeRepository
+import com.justb81.watchbuddy.phone.server.ShowRepository
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
+import io.mockk.Runs
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
+import io.mockk.just
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -41,68 +47,266 @@ class ShowDetailViewModelTest {
     }
 
     private val application: Application = mockk(relaxed = true)
-    private val traktApi: TraktApiService = mockk(relaxed = true)
-    private val tokenRepository: TokenRepository = mockk(relaxed = true)
+    private val showRepository: ShowRepository = mockk(relaxed = true)
+    private val episodeRepository: EpisodeRepository = mockk()
     private val tmdbApiService: TmdbApiService = mockk(relaxed = true)
     private val settingsRepository: SettingsRepository = mockk(relaxed = true)
 
     private val savedStateHandle = SavedStateHandle(mapOf("traktShowId" to TRAKT_SHOW_ID))
 
-    private fun makeShow(
-        traktId: Int = TRAKT_SHOW_ID,
-        tmdbId: Int? = TMDB_SHOW_ID,
-        title: String = "Test Show"
-    ) = TraktShow(
-        title = title,
-        year = 2020,
-        ids = TraktIds(trakt = traktId, tmdb = tmdbId)
-    )
+    private val showsFlow = MutableStateFlow<List<EnrichedShowEntry>>(emptyList())
 
-    private fun makeEntry(
-        show: TraktShow = makeShow(),
-        seasons: List<TraktWatchedSeason> = emptyList()
-    ) = TraktWatchedEntry(show = show, seasons = seasons)
+    private val show = TraktShow(
+        title = "Test Show",
+        year = 2020,
+        ids = TraktIds(trakt = TRAKT_SHOW_ID, tmdb = TMDB_SHOW_ID)
+    )
 
     @BeforeEach
     fun setUp() {
-        every { tokenRepository.getAccessToken() } returns "valid-token"
-        every { settingsRepository.getTmdbApiKey() } returns flowOf("tmdb-key")
-        coEvery { traktApi.getWatchedShows(any()) } returns listOf(makeEntry())
-        coEvery { tmdbApiService.getShow(any(), any()) } returns
-            com.justb81.watchbuddy.core.model.TmdbShow(
-                id = TMDB_SHOW_ID,
-                name = "Test Show",
-                overview = "A great show.",
-                poster_path = "/poster.jpg"
-            )
+        every { showRepository.shows } returns showsFlow
+        every { showRepository.updateLocalWatched(any(), any(), any(), any()) } just Runs
+        every { settingsRepository.getTmdbApiKey() } returns flowOf("")
     }
+
+    private fun seedLibrary(
+        watchedSeasons: List<TraktWatchedSeason> = emptyList()
+    ) {
+        showsFlow.value = listOf(
+            EnrichedShowEntry(
+                entry = TraktWatchedEntry(show = show, seasons = watchedSeasons)
+            )
+        )
+    }
+
+    private fun seasonsPayload(
+        seasonToEpisodeCount: Map<Int, Int>
+    ): List<TraktSeasonWithEpisodes> =
+        seasonToEpisodeCount.map { (s, n) ->
+            TraktSeasonWithEpisodes(
+                number = s,
+                episodes = (1..n).map { e ->
+                    TraktEpisode(season = s, number = e, title = "S${s}E${e}")
+                }
+            )
+        }
 
     private fun createViewModel(): ShowDetailViewModel = ShowDetailViewModel(
         savedStateHandle = savedStateHandle,
         application = application,
-        traktApi = traktApi,
-        tokenRepository = tokenRepository,
+        showRepository = showRepository,
+        episodeRepository = episodeRepository,
         tmdbApiService = tmdbApiService,
         settingsRepository = settingsRepository
     )
 
     @Nested
-    @DisplayName("loadShowDetail")
-    inner class LoadShowDetailTest {
+    @DisplayName("default expansion")
+    inner class DefaultExpansionTest {
 
         @Test
-        fun `sets loading false and populates show on success`() = runTest {
+        fun `fresh show expands first non-special season`() = runTest {
+            seedLibrary(watchedSeasons = emptyList())
+            coEvery { episodeRepository.getSeasonsWithEpisodes(any()) } returns seasonsPayload(
+                mapOf(0 to 1, 1 to 3, 2 to 3)
+            )
+
             val vm = createViewModel()
             advanceUntilIdle()
 
-            assertFalse(vm.uiState.value.isLoading)
-            assertEquals("Test Show", vm.uiState.value.show?.title)
-            assertNull(vm.uiState.value.error)
+            val seasons = vm.uiState.value.seasons
+            assertEquals(1, seasons.first().number)
+            assertTrue(seasons.first().expanded)
+            assertTrue(seasons.drop(1).none { it.expanded })
         }
 
         @Test
-        fun `sets error when no access token`() = runTest {
-            every { tokenRepository.getAccessToken() } returns null
+        fun `partially watched show expands current season`() = runTest {
+            // S1 fully watched (2/2), S2 halfway (1/3), S3 unwatched.
+            seedLibrary(
+                watchedSeasons = listOf(
+                    TraktWatchedSeason(1, listOf(
+                        TraktWatchedEpisode(1), TraktWatchedEpisode(2)
+                    )),
+                    TraktWatchedSeason(2, listOf(TraktWatchedEpisode(1)))
+                )
+            )
+            coEvery { episodeRepository.getSeasonsWithEpisodes(any()) } returns seasonsPayload(
+                mapOf(1 to 2, 2 to 3, 3 to 4)
+            )
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            val seasons = vm.uiState.value.seasons
+            assertEquals(2, seasons.first().number, "current watched season should be first")
+            assertTrue(seasons.first().expanded)
+            // Remaining seasons appear in ascending order with 2 pulled out.
+            assertEquals(listOf(2, 1, 3), seasons.map { it.number })
+        }
+
+        @Test
+        fun `fully caught up show expands latest watched season`() = runTest {
+            seedLibrary(
+                watchedSeasons = listOf(
+                    TraktWatchedSeason(1, listOf(
+                        TraktWatchedEpisode(1), TraktWatchedEpisode(2)
+                    )),
+                    TraktWatchedSeason(2, listOf(
+                        TraktWatchedEpisode(1), TraktWatchedEpisode(2), TraktWatchedEpisode(3)
+                    ))
+                )
+            )
+            coEvery { episodeRepository.getSeasonsWithEpisodes(any()) } returns seasonsPayload(
+                mapOf(1 to 2, 2 to 3)
+            )
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            val seasons = vm.uiState.value.seasons
+            assertEquals(2, seasons.first().number)
+            assertTrue(seasons.first().expanded)
+        }
+
+        @Test
+        fun `season after latest watched is preferred when current has no unwatched`() = runTest {
+            // S1 fully watched (2/2), S2 fully watched (3/3), S3 has unwatched episodes.
+            seedLibrary(
+                watchedSeasons = listOf(
+                    TraktWatchedSeason(1, listOf(
+                        TraktWatchedEpisode(1), TraktWatchedEpisode(2)
+                    )),
+                    TraktWatchedSeason(2, listOf(
+                        TraktWatchedEpisode(1), TraktWatchedEpisode(2), TraktWatchedEpisode(3)
+                    ))
+                )
+            )
+            coEvery { episodeRepository.getSeasonsWithEpisodes(any()) } returns seasonsPayload(
+                mapOf(1 to 2, 2 to 3, 3 to 4)
+            )
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            val seasons = vm.uiState.value.seasons
+            assertEquals(3, seasons.first().number)
+            assertTrue(seasons.first().expanded)
+        }
+    }
+
+    @Nested
+    @DisplayName("toggleEpisodeWatched")
+    inner class ToggleTest {
+
+        @Test
+        fun `optimistic flip + updateLocalWatched on success`() = runTest {
+            seedLibrary()
+            coEvery { episodeRepository.getSeasonsWithEpisodes(any()) } returns seasonsPayload(
+                mapOf(1 to 2)
+            )
+            coEvery { episodeRepository.markEpisodeWatched(any(), 1, 1) } returns Result.success(Unit)
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            val target = vm.uiState.value.seasons.first().episodes.first { it.number == 1 }
+            vm.toggleEpisodeWatched(target)
+            advanceUntilIdle()
+
+            val updated = vm.uiState.value.seasons.first().episodes.first { it.number == 1 }
+            assertTrue(updated.watched)
+            assertNull(vm.uiState.value.togglingEpisode)
+            assertNull(vm.uiState.value.toggleError)
+            coVerify(exactly = 1) {
+                showRepository.updateLocalWatched(TRAKT_SHOW_ID, 1, 1, true)
+            }
+        }
+
+        @Test
+        fun `rollback + toggleError on failure`() = runTest {
+            seedLibrary()
+            coEvery { episodeRepository.getSeasonsWithEpisodes(any()) } returns seasonsPayload(
+                mapOf(1 to 2)
+            )
+            coEvery { episodeRepository.markEpisodeWatched(any(), 1, 1) } returns
+                Result.failure(RuntimeException("boom"))
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            val target = vm.uiState.value.seasons.first().episodes.first { it.number == 1 }
+            vm.toggleEpisodeWatched(target)
+            advanceUntilIdle()
+
+            val reverted = vm.uiState.value.seasons.first().episodes.first { it.number == 1 }
+            assertFalse(reverted.watched)
+            assertNull(vm.uiState.value.togglingEpisode)
+            assertNotNull(vm.uiState.value.toggleError)
+            coVerify(exactly = 0) { showRepository.updateLocalWatched(any(), any(), any(), any()) }
+        }
+
+        @Test
+        fun `unmark watched calls markEpisodeUnwatched`() = runTest {
+            seedLibrary(
+                watchedSeasons = listOf(
+                    TraktWatchedSeason(1, listOf(TraktWatchedEpisode(1)))
+                )
+            )
+            coEvery { episodeRepository.getSeasonsWithEpisodes(any()) } returns seasonsPayload(
+                mapOf(1 to 2)
+            )
+            coEvery { episodeRepository.markEpisodeUnwatched(any(), 1, 1) } returns Result.success(Unit)
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            val target = vm.uiState.value.seasons.first().episodes.first { it.number == 1 }
+            assertTrue(target.watched)
+
+            vm.toggleEpisodeWatched(target)
+            advanceUntilIdle()
+
+            coVerify(exactly = 1) { episodeRepository.markEpisodeUnwatched(any(), 1, 1) }
+            coVerify(exactly = 1) {
+                showRepository.updateLocalWatched(TRAKT_SHOW_ID, 1, 1, false)
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("toggleSeasonExpanded")
+    inner class ExpandToggleTest {
+
+        @Test
+        fun `flips expanded state without touching other seasons`() = runTest {
+            seedLibrary()
+            coEvery { episodeRepository.getSeasonsWithEpisodes(any()) } returns seasonsPayload(
+                mapOf(1 to 1, 2 to 1)
+            )
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            val seasonTwo = vm.uiState.value.seasons.first { it.number == 2 }
+            val wasExpanded = seasonTwo.expanded
+
+            vm.toggleSeasonExpanded(2)
+
+            val after = vm.uiState.value.seasons.first { it.number == 2 }
+            assertEquals(!wasExpanded, after.expanded)
+        }
+    }
+
+    @Nested
+    @DisplayName("error handling")
+    inner class ErrorHandlingTest {
+
+        @Test
+        fun `sets error when show is not in the library`() = runTest {
+            // Empty library; cold-prime fetch returns nothing either.
+            showsFlow.value = emptyList()
+            coEvery { showRepository.getShows() } returns emptyList()
 
             val vm = createViewModel()
             advanceUntilIdle()
@@ -113,8 +317,10 @@ class ShowDetailViewModelTest {
         }
 
         @Test
-        fun `sets error when show not found in watched list`() = runTest {
-            coEvery { traktApi.getWatchedShows(any()) } returns emptyList()
+        fun `sets error when episode API throws`() = runTest {
+            seedLibrary()
+            coEvery { episodeRepository.getSeasonsWithEpisodes(any()) } throws
+                RuntimeException("Trakt down")
 
             val vm = createViewModel()
             advanceUntilIdle()
@@ -124,286 +330,24 @@ class ShowDetailViewModelTest {
         }
 
         @Test
-        fun `sets error when API throws`() = runTest {
-            coEvery { traktApi.getWatchedShows(any()) } throws RuntimeException("Network error")
-
-            val vm = createViewModel()
-            advanceUntilIdle()
-
-            assertFalse(vm.uiState.value.isLoading)
-            assertNotNull(vm.uiState.value.error)
-        }
-
-        @Test
-        fun `loads watched seasons sorted by number`() = runTest {
-            val entry = makeEntry(
-                seasons = listOf(
-                    TraktWatchedSeason(number = 3, episodes = listOf(TraktWatchedEpisode(number = 1))),
-                    TraktWatchedSeason(number = 1, episodes = listOf(TraktWatchedEpisode(number = 2))),
-                    TraktWatchedSeason(number = 2, episodes = listOf(TraktWatchedEpisode(number = 3)))
-                )
+        fun `clearToggleError resets the error`() = runTest {
+            seedLibrary()
+            coEvery { episodeRepository.getSeasonsWithEpisodes(any()) } returns seasonsPayload(
+                mapOf(1 to 1)
             )
-            coEvery { traktApi.getWatchedShows(any()) } returns listOf(entry)
+            coEvery { episodeRepository.markEpisodeWatched(any(), any(), any()) } returns
+                Result.failure(RuntimeException("fail"))
 
             val vm = createViewModel()
             advanceUntilIdle()
 
-            val seasons = vm.uiState.value.watchedSeasons
-            assertEquals(listOf(1, 2, 3), seasons.map { it.number })
-        }
-
-        @Test
-        fun `loads TMDB poster URL when tmdbId and key are available`() = runTest {
-            val vm = createViewModel()
-            advanceUntilIdle()
-
-            assertNotNull(vm.uiState.value.posterUrl)
-            assertTrue(vm.uiState.value.posterUrl!!.contains("poster.jpg"))
-        }
-
-        @Test
-        fun `does not load TMDB poster when tmdb key is blank`() = runTest {
-            every { settingsRepository.getTmdbApiKey() } returns flowOf("")
-
-            val vm = createViewModel()
-            advanceUntilIdle()
-
-            assertNull(vm.uiState.value.posterUrl)
-        }
-
-        @Test
-        fun `does not load TMDB poster when show has no tmdb id`() = runTest {
-            coEvery { traktApi.getWatchedShows(any()) } returns
-                listOf(makeEntry(show = makeShow(tmdbId = null)))
-
-            val vm = createViewModel()
-            advanceUntilIdle()
-
-            coVerify(exactly = 0) { tmdbApiService.getShow(any(), any()) }
-            assertNull(vm.uiState.value.posterUrl)
-        }
-
-        @Test
-        fun `TMDB failure does not set error state`() = runTest {
-            coEvery { tmdbApiService.getShow(any(), any()) } throws RuntimeException("TMDB down")
-
-            val vm = createViewModel()
-            advanceUntilIdle()
-
-            assertNull(vm.uiState.value.error)
-            assertNotNull(vm.uiState.value.show)
-        }
-
-        @Test
-        fun `loads TMDB overview`() = runTest {
-            val vm = createViewModel()
-            advanceUntilIdle()
-
-            assertEquals("A great show.", vm.uiState.value.overview)
-        }
-
-        @Test
-        fun `reload clears previous error`() = runTest {
-            coEvery { traktApi.getWatchedShows(any()) } throws RuntimeException("fail")
-
-            val vm = createViewModel()
-            advanceUntilIdle()
-            assertNotNull(vm.uiState.value.error)
-
-            coEvery { traktApi.getWatchedShows(any()) } returns listOf(makeEntry())
-            vm.loadShowDetail()
-            advanceUntilIdle()
-
-            assertNull(vm.uiState.value.error)
-            assertNotNull(vm.uiState.value.show)
-        }
-    }
-
-    @Nested
-    @DisplayName("toggleEpisodeWatched")
-    inner class ToggleEpisodeTest {
-
-        @Test
-        fun `removes episode from watched seasons when marking unwatched`() = runTest {
-            val entry = makeEntry(
-                seasons = listOf(
-                    TraktWatchedSeason(
-                        number = 1,
-                        episodes = listOf(
-                            TraktWatchedEpisode(number = 1),
-                            TraktWatchedEpisode(number = 2)
-                        )
-                    )
-                )
-            )
-            coEvery { traktApi.getWatchedShows(any()) } returns listOf(entry)
-
-            val vm = createViewModel()
-            advanceUntilIdle()
-
-            vm.toggleEpisodeWatched(season = 1, episode = 1, currentlyWatched = true)
-            advanceUntilIdle()
-
-            val season1 = vm.uiState.value.watchedSeasons.find { it.number == 1 }
-            assertNotNull(season1)
-            assertEquals(1, season1!!.episodes.size)
-            assertEquals(2, season1.episodes[0].number)
-        }
-
-        @Test
-        fun `removes season when last episode is unmarked`() = runTest {
-            val entry = makeEntry(
-                seasons = listOf(
-                    TraktWatchedSeason(number = 1, episodes = listOf(TraktWatchedEpisode(number = 1)))
-                )
-            )
-            coEvery { traktApi.getWatchedShows(any()) } returns listOf(entry)
-
-            val vm = createViewModel()
-            advanceUntilIdle()
-
-            vm.toggleEpisodeWatched(season = 1, episode = 1, currentlyWatched = true)
-            advanceUntilIdle()
-
-            assertTrue(vm.uiState.value.watchedSeasons.isEmpty())
-        }
-
-        @Test
-        fun `adds episode to existing season when marking watched`() = runTest {
-            val entry = makeEntry(
-                seasons = listOf(
-                    TraktWatchedSeason(number = 1, episodes = listOf(TraktWatchedEpisode(number = 1)))
-                )
-            )
-            coEvery { traktApi.getWatchedShows(any()) } returns listOf(entry)
-
-            val vm = createViewModel()
-            advanceUntilIdle()
-
-            vm.toggleEpisodeWatched(season = 1, episode = 3, currentlyWatched = false)
-            advanceUntilIdle()
-
-            val season1 = vm.uiState.value.watchedSeasons.find { it.number == 1 }
-            assertNotNull(season1)
-            assertEquals(2, season1!!.episodes.size)
-            assertTrue(season1.episodes.any { it.number == 3 })
-        }
-
-        @Test
-        fun `adds new season when marking episode watched in new season`() = runTest {
-            val entry = makeEntry(
-                seasons = listOf(
-                    TraktWatchedSeason(number = 1, episodes = listOf(TraktWatchedEpisode(number = 1)))
-                )
-            )
-            coEvery { traktApi.getWatchedShows(any()) } returns listOf(entry)
-
-            val vm = createViewModel()
-            advanceUntilIdle()
-
-            vm.toggleEpisodeWatched(season = 2, episode = 1, currentlyWatched = false)
-            advanceUntilIdle()
-
-            assertEquals(2, vm.uiState.value.watchedSeasons.size)
-            assertNotNull(vm.uiState.value.watchedSeasons.find { it.number == 2 })
-        }
-
-        @Test
-        fun `calls removeFromHistory when unmarking episode`() = runTest {
-            val entry = makeEntry(
-                seasons = listOf(
-                    TraktWatchedSeason(number = 1, episodes = listOf(TraktWatchedEpisode(number = 1)))
-                )
-            )
-            coEvery { traktApi.getWatchedShows(any()) } returns listOf(entry)
-
-            val vm = createViewModel()
-            advanceUntilIdle()
-
-            vm.toggleEpisodeWatched(season = 1, episode = 1, currentlyWatched = true)
-            advanceUntilIdle()
-
-            coVerify(exactly = 1) { traktApi.removeFromHistory(any(), any()) }
-            coVerify(exactly = 0) { traktApi.addToHistory(any(), any()) }
-        }
-
-        @Test
-        fun `calls addToHistory when marking episode watched`() = runTest {
-            val entry = makeEntry(
-                seasons = listOf(
-                    TraktWatchedSeason(number = 1, episodes = listOf(TraktWatchedEpisode(number = 1)))
-                )
-            )
-            coEvery { traktApi.getWatchedShows(any()) } returns listOf(entry)
-
-            val vm = createViewModel()
-            advanceUntilIdle()
-
-            vm.toggleEpisodeWatched(season = 1, episode = 2, currentlyWatched = false)
-            advanceUntilIdle()
-
-            coVerify(exactly = 1) { traktApi.addToHistory(any(), any()) }
-            coVerify(exactly = 0) { traktApi.removeFromHistory(any(), any()) }
-        }
-
-        @Test
-        fun `sets toggleError when API call fails`() = runTest {
-            val entry = makeEntry(
-                seasons = listOf(
-                    TraktWatchedSeason(number = 1, episodes = listOf(TraktWatchedEpisode(number = 1)))
-                )
-            )
-            coEvery { traktApi.getWatchedShows(any()) } returns listOf(entry)
-            coEvery { traktApi.removeFromHistory(any(), any()) } throws RuntimeException("Network error")
-
-            val vm = createViewModel()
-            advanceUntilIdle()
-
-            vm.toggleEpisodeWatched(season = 1, episode = 1, currentlyWatched = true)
-            advanceUntilIdle()
-
-            assertNotNull(vm.uiState.value.toggleError)
-            assertNull(vm.uiState.value.togglingEpisode)
-        }
-
-        @Test
-        fun `clearToggleError removes the error message`() = runTest {
-            val entry = makeEntry(
-                seasons = listOf(
-                    TraktWatchedSeason(number = 1, episodes = listOf(TraktWatchedEpisode(number = 1)))
-                )
-            )
-            coEvery { traktApi.getWatchedShows(any()) } returns listOf(entry)
-            coEvery { traktApi.removeFromHistory(any(), any()) } throws RuntimeException("fail")
-
-            val vm = createViewModel()
-            advanceUntilIdle()
-
-            vm.toggleEpisodeWatched(season = 1, episode = 1, currentlyWatched = true)
+            val target = vm.uiState.value.seasons.first().episodes.first()
+            vm.toggleEpisodeWatched(target)
             advanceUntilIdle()
             assertNotNull(vm.uiState.value.toggleError)
 
             vm.clearToggleError()
-
             assertNull(vm.uiState.value.toggleError)
-        }
-
-        @Test
-        fun `togglingEpisode is null after successful toggle`() = runTest {
-            val entry = makeEntry(
-                seasons = listOf(
-                    TraktWatchedSeason(number = 1, episodes = listOf(TraktWatchedEpisode(number = 1)))
-                )
-            )
-            coEvery { traktApi.getWatchedShows(any()) } returns listOf(entry)
-
-            val vm = createViewModel()
-            advanceUntilIdle()
-
-            vm.toggleEpisodeWatched(season = 1, episode = 1, currentlyWatched = true)
-            advanceUntilIdle()
-
-            assertNull(vm.uiState.value.togglingEpisode)
         }
     }
 }

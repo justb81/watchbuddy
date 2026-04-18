@@ -1,6 +1,7 @@
 package com.justb81.watchbuddy.core.trakt
 
 import com.justb81.watchbuddy.core.model.TraktEpisode
+import com.justb81.watchbuddy.core.model.TraktSeasonWithEpisodes
 import com.justb81.watchbuddy.core.model.TraktShow
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
 import kotlinx.serialization.Serializable
@@ -63,6 +64,15 @@ interface TraktApiService {
         @Query("query") query: String,
         @Query("limit") limit: Int = 5
     ): List<TraktSearchResult>
+
+    // ── Shows ─────────────────────────────────────────────────────────────────
+
+    @GET("shows/{id}/seasons")
+    suspend fun getShowSeasons(
+        @Header("Authorization") bearer: String,
+        @Path("id") showId: String,
+        @Query("extended") extended: String = "episodes"
+    ): List<TraktSeasonWithEpisodes>
 
     // ── Sync History ──────────────────────────────────────────────────────────
 

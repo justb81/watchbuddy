@@ -61,11 +61,25 @@ class HomeViewModel @Inject constructor(
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
     init {
+        observeShows()
         loadShows()
         checkServiceConnections()
         observeCompanionState()
         observeScrobbleEvents()
         observeWifiState()
+    }
+
+    private fun observeShows() {
+        viewModelScope.launch {
+            showRepository.shows.collect { shows ->
+                val progressMap = shows.mapNotNull { enriched ->
+                    enriched.entry.show.ids.trakt?.let { traktId ->
+                        traktId to ShowProgressCalculator.compute(enriched.entry, enriched.tmdb)
+                    }
+                }.toMap()
+                _uiState.update { it.copy(shows = shows, progress = progressMap) }
+            }
+        }
     }
 
     private fun checkServiceConnections() {
@@ -140,24 +154,19 @@ class HomeViewModel @Inject constructor(
 
     fun loadShows() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, error = null)
+            _uiState.update { it.copy(isLoading = true, error = null) }
             try {
                 val token = tokenRepository.getAccessToken()
                     ?: throw IllegalStateException("No access token available")
                 // Touch token to surface keystore exceptions here so catch translates them into UI error.
                 @Suppress("UNUSED_VARIABLE") val _t = token
-                val shows = showRepository.getShows()
-                val progressMap = shows.mapNotNull { enriched ->
-                    enriched.entry.show.ids.trakt?.let { traktId ->
-                        traktId to ShowProgressCalculator.compute(enriched.entry, enriched.tmdb)
-                    }
-                }.toMap()
-                _uiState.value = _uiState.value.copy(
-                    isLoading    = false,
-                    shows        = shows,
-                    progress     = progressMap,
-                    lastSyncTime = getApplication<Application>().getString(R.string.home_just_now)
-                )
+                showRepository.getShows() // Result flows into observeShows() via StateFlow.
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        lastSyncTime = getApplication<Application>().getString(R.string.home_just_now)
+                    )
+                }
             } catch (e: Exception) {
                 val httpCode = (e as? retrofit2.HttpException)?.code()
                 val errorMsg = if (httpCode == 401 || httpCode == 403) {
@@ -165,7 +174,7 @@ class HomeViewModel @Inject constructor(
                 } else {
                     getApplication<Application>().getString(R.string.home_sync_failed, e.message)
                 }
-                _uiState.value = _uiState.value.copy(isLoading = false, error = errorMsg)
+                _uiState.update { it.copy(isLoading = false, error = errorMsg) }
             }
         }
     }

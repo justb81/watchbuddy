@@ -114,6 +114,32 @@ Multi-user: when multiple phones are connected, each user's watch history is rec
 independently — one `/scrobble/*` call per phone, in parallel. A failure for one user
 does not block the others. The TV never calls the Trakt API directly for any operation.
 
+## Manual Watched-State Marking (Phone)
+
+Tapping a show on the phone `HomeScreen` opens `ShowDetailScreen`. The detail view
+fetches the full season / episode structure for that show via Trakt
+`GET shows/:id/seasons?extended=episodes`, wrapped in `EpisodeRepository` with a
+10-minute per-show TTL cache. Each episode renders as a checkbox row reflecting its
+watched state as derived from the user's existing `sync/watched/shows` cache in
+`ShowRepository`.
+
+Toggling a checkbox is **optimistic**: the UI flips immediately, the row is marked
+pending, and `EpisodeRepository.markEpisode{Watched,Unwatched}` forwards the write to
+Trakt `POST sync/history` or `POST sync/history/remove` with a single-show /
+single-season / single-episode body. On success, `ShowRepository.updateLocalWatched(...)`
+mutates the in-memory watched-shows list so any home-screen progress counter
+recomputes live through the reactive `shows: StateFlow`. On failure the UI reverts
+and a snackbar surfaces `show_detail_error_toggle`.
+
+Default layout puts the user's current season (the lowest-numbered season at or
+above the last-watched season that still has unwatched episodes) **first and
+expanded**; every other season — older caught-up seasons, specials, future seasons —
+sits below, collapsed behind a progress chip.
+
+A connected TV picks up the change on its next 5-minute `/shows` poll from the phone.
+The TV side has no write path for Trakt history; all manual edits originate from the
+phone (#216).
+
 ## Companion Service Lifecycle (Phone)
 
 The phone's companion service is controlled via the "I am watching TV" toggle on the HomeScreen.

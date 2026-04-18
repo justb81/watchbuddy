@@ -47,6 +47,12 @@ data class TraktWatchedEpisode(
     val last_watched_at: String? = null
 )
 
+@Serializable
+data class TraktSeasonWithEpisodes(
+    val number: Int,
+    val episodes: List<TraktEpisode> = emptyList()
+)
+
 // ── TMDB Models ───────────────────────────────────────────────────────────────
 
 @Serializable
