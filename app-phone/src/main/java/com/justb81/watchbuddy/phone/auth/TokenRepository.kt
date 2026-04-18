@@ -16,25 +16,15 @@ class TokenRepository @Inject constructor(@ApplicationContext context: Context) 
 
     init {
         DiagnosticLog.event(TAG, "init: requesting Keystore master key")
-        val masterKeyAlias = try {
-            MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC)
-        } catch (e: Exception) {
-            DiagnosticLog.error(TAG, "MasterKeys.getOrCreate failed", e)
-            throw e
-        }
+        val masterKeyAlias = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC)
         DiagnosticLog.event(TAG, "init: opening EncryptedSharedPreferences")
-        prefs = try {
-            EncryptedSharedPreferences.create(
-                "watchbuddy_tokens",
-                masterKeyAlias,
-                context,
-                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-            )
-        } catch (e: Exception) {
-            DiagnosticLog.error(TAG, "EncryptedSharedPreferences.create failed", e)
-            throw e
-        }
+        prefs = EncryptedSharedPreferences.create(
+            "watchbuddy_tokens",
+            masterKeyAlias,
+            context,
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        )
         DiagnosticLog.event(TAG, "init: ready")
     }
 

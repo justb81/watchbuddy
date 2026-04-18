@@ -18,6 +18,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 
 @DisplayName("TokenRepository")
 class TokenRepositoryTest {
@@ -51,6 +52,20 @@ class TokenRepositoryTest {
     @Test
     fun `constructor opens EncryptedSharedPreferences with correct parameters`() {
         verify { EncryptedSharedPreferences.create(any(), any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `constructor propagates SecurityException when MasterKeys throws`() {
+        every { MasterKeys.getOrCreate(any()) } throws SecurityException("Keystore unavailable")
+        assertThrows<SecurityException> { TokenRepository(context) }
+    }
+
+    @Test
+    fun `constructor propagates SecurityException when EncryptedSharedPreferences throws`() {
+        every {
+            EncryptedSharedPreferences.create(any(), any(), any(), any(), any())
+        } throws SecurityException("AES key invalid")
+        assertThrows<SecurityException> { TokenRepository(context) }
     }
 
     @Nested
