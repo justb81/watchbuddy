@@ -384,4 +384,34 @@ class PhoneDiscoveryManagerTest {
     fun `stopDiscovery does not throw`() {
         manager.stopDiscovery()
     }
+
+    // ── DiscoveryConstants ─────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("DiscoveryConstants")
+    inner class DiscoveryConstantsTest {
+
+        @Test
+        fun `PRESENCE_STALENESS_MS is strictly greater than HEARTBEAT_INTERVAL_MS`() {
+            assertTrue(
+                DiscoveryConstants.PRESENCE_STALENESS_MS > DiscoveryConstants.HEARTBEAT_INTERVAL_MS,
+                "A single missed heartbeat must not immediately evict a healthy phone"
+            )
+        }
+
+        @Test
+        fun `HEARTBEAT_INTERVAL_MS is 60 seconds`() {
+            assertEquals(60_000L, DiscoveryConstants.HEARTBEAT_INTERVAL_MS)
+        }
+
+        @Test
+        fun `PRESENCE_STALENESS_MS is 2x the heartbeat interval`() {
+            assertEquals(2 * DiscoveryConstants.HEARTBEAT_INTERVAL_MS, DiscoveryConstants.PRESENCE_STALENESS_MS)
+        }
+
+        @Test
+        fun `MAX_CONSECUTIVE_FAILURES is 3`() {
+            assertEquals(3, DiscoveryConstants.MAX_CONSECUTIVE_FAILURES)
+        }
+    }
 }

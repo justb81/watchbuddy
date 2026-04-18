@@ -4,6 +4,7 @@ import android.util.Log
 import com.justb81.watchbuddy.core.model.TraktEpisode
 import com.justb81.watchbuddy.core.model.TraktShow
 import com.justb81.watchbuddy.core.scrobbler.ScrobbleDispatcher
+import com.justb81.watchbuddy.tv.discovery.DiscoveryConstants
 import com.justb81.watchbuddy.tv.discovery.PhoneApiClientFactory
 import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
 import com.justb81.watchbuddy.tv.discovery.PhoneScrobbleRequest
@@ -27,14 +28,13 @@ class TvScrobbleDispatcher @Inject constructor(
 
     companion object {
         private const val TAG = "TvScrobbleDispatcher"
-        private const val PRESENCE_STALENESS_MS = 2 * 60_000L
     }
 
     private fun availablePhones(): List<PhoneDiscoveryManager.DiscoveredPhone> {
         val now = System.currentTimeMillis()
         return phoneDiscovery.discoveredPhones.value
             .filter { it.capability?.isAvailable == true }
-            .filter { now - it.lastSuccessfulCheck < PRESENCE_STALENESS_MS }
+            .filter { now - it.lastSuccessfulCheck < DiscoveryConstants.PRESENCE_STALENESS_MS }
     }
 
     override suspend fun dispatchStart(show: TraktShow, episode: TraktEpisode, progress: Float) {
