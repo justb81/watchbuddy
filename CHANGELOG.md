@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.16.2](https://github.com/justb81/watchbuddy/compare/v0.16.1...v0.16.2) (2026-04-18)
+
+
+### Bug Fixes
+
+* **phone:** remove phone-side auto-scrobble and notification-listener permission ([#272](https://github.com/justb81/watchbuddy/issues/272)) ([5f8dd4f](https://github.com/justb81/watchbuddy/commit/5f8dd4fdadc9d8692afaf3493ad497f61eb4eaf5)), closes [#269](https://github.com/justb81/watchbuddy/issues/269)
+* **release:** revert Play release name grouping and upload native debug symbols ([#270](https://github.com/justb81/watchbuddy/issues/270)) ([e30174a](https://github.com/justb81/watchbuddy/commit/e30174a8e2e145a95e25d60f9bbf754083b612c5))
+
 ## [0.16.1](https://github.com/justb81/watchbuddy/compare/v0.16.0...v0.16.1) (2026-04-18)
 
 
