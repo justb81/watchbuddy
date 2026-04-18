@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.16.3](https://github.com/justb81/watchbuddy/compare/v0.16.2...v0.16.3) (2026-04-18)
+
+
+### Bug Fixes
+
+* **phone:** gate companion service start on Wi-Fi connectivity ([#278](https://github.com/justb81/watchbuddy/issues/278)) ([#302](https://github.com/justb81/watchbuddy/issues/302)) ([4c7f921](https://github.com/justb81/watchbuddy/commit/4c7f921c9018f19fa9c4623446ab3550ee1b4504))
+* **release:** upload per-AAB R8 mapping files to Play Store ([#273](https://github.com/justb81/watchbuddy/issues/273)) ([#303](https://github.com/justb81/watchbuddy/issues/303)) ([a59c268](https://github.com/justb81/watchbuddy/commit/a59c268187ead8cba226655028d0675353184ccc))
+
 ## [0.16.2](https://github.com/justb81/watchbuddy/compare/v0.16.1...v0.16.2) (2026-04-18)
 
 
