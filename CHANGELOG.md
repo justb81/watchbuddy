@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.17.0](https://github.com/justb81/watchbuddy/compare/v0.16.3...v0.17.0) (2026-04-18)
+
+
+### Features
+
+* **discovery:** add BLE fallback channel for phone↔TV pairing ([#315](https://github.com/justb81/watchbuddy/issues/315)) ([f3ad543](https://github.com/justb81/watchbuddy/commit/f3ad543bf791093eff0c06353be8be579ca8882c))
+* **phone:** current-season-first detail view with per-episode watched toggle ([#314](https://github.com/justb81/watchbuddy/issues/314)) ([34639b8](https://github.com/justb81/watchbuddy/commit/34639b80f897050a79f63dabad98fbb1827044eb))
+
 ## [0.16.3](https://github.com/justb81/watchbuddy/compare/v0.16.2...v0.16.3) (2026-04-18)
 
 
