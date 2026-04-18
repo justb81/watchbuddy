@@ -10,5 +10,7 @@ data class AppSettings(
     val modelDownloadUrl: String = "",
     val tmdbApiKey: String = "",
     /** True when a default TMDB API key was baked in at build time. */
-    val defaultTmdbApiKeyAvailable: Boolean = false
+    val defaultTmdbApiKeyAvailable: Boolean = false,
+    /** True when the user has enabled auto-scrobble for media sessions on the phone. */
+    val autoScrobbleEnabled: Boolean = false
 )

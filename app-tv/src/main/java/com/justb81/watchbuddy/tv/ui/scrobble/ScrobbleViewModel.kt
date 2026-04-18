@@ -3,7 +3,7 @@ package com.justb81.watchbuddy.tv.ui.scrobble
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.justb81.watchbuddy.core.model.ScrobbleCandidate
-import com.justb81.watchbuddy.tv.scrobbler.MediaSessionScrobbler
+import com.justb81.watchbuddy.core.scrobbler.MediaSessionScrobbler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

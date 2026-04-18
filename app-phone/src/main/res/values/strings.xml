@@ -128,6 +128,15 @@
     <string name="home_scrobble_stopped">Finished watching</string>
     <string name="companion_auto_deactivated">Companion deactivated — TV not responding</string>
 
+    <!-- Auto-Scrobble Settings -->
+    <string name="settings_scrobble">Auto-Scrobble</string>
+    <string name="settings_scrobble_toggle">Auto-scrobble on phone</string>
+    <string name="settings_scrobble_description">Automatically track shows you watch on this phone</string>
+    <string name="settings_scrobble_grant_access">Grant access</string>
+    <string name="settings_scrobble_notification_access">Notification access</string>
+    <string name="settings_scrobble_access_granted">Granted</string>
+    <string name="settings_scrobble_access_missing">Not granted — required for scrobbling</string>
+
     <!-- Companion Service -->
     <string name="companion_channel_name">Companion Service</string>
     <string name="companion_channel_description">Shows when the companion server is active for TV connections</string>
