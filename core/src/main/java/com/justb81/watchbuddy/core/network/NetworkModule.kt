@@ -23,7 +23,6 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideOkHttpClient(
-        @Named("isDebugBuild") isDebug: Boolean,
         @Named("traktClientId") traktClientId: String,
     ): OkHttpClient = OkHttpClient.Builder()
         .addInterceptor { chain ->
@@ -36,7 +35,7 @@ object NetworkModule {
             chain.proceed(builder.build())
         }
         .addInterceptor(HttpLoggingInterceptor().apply {
-            level = if (isDebug) HttpLoggingInterceptor.Level.BODY
+            level = if (com.justb81.watchbuddy.core.BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BODY
                     else HttpLoggingInterceptor.Level.NONE
         })
         .build()

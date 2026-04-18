@@ -2,6 +2,7 @@ package com.justb81.watchbuddy.core.network
 
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.logging.HttpLoggingInterceptor
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.jupiter.api.AfterEach
@@ -34,7 +35,7 @@ class NetworkModuleTest {
         @Test
         fun `adds Content-Type header`() {
             server.enqueue(MockResponse().setBody("{}"))
-            val client = NetworkModule.provideOkHttpClient(isDebug = false, traktClientId = "test-id")
+            val client = NetworkModule.provideOkHttpClient(traktClientId = "test-id")
             client.newCall(Request.Builder().url(server.url("/test")).build()).execute()
             val recorded = server.takeRequest()
             assertEquals("application/json", recorded.getHeader("Content-Type"))
@@ -43,7 +44,7 @@ class NetworkModuleTest {
         @Test
         fun `adds trakt-api-version header`() {
             server.enqueue(MockResponse().setBody("{}"))
-            val client = NetworkModule.provideOkHttpClient(isDebug = false, traktClientId = "test-id")
+            val client = NetworkModule.provideOkHttpClient(traktClientId = "test-id")
             client.newCall(Request.Builder().url(server.url("/test")).build()).execute()
             val recorded = server.takeRequest()
             assertEquals("2", recorded.getHeader("trakt-api-version"))
@@ -52,7 +53,7 @@ class NetworkModuleTest {
         @Test
         fun `adds trakt-api-key header when client id is provided`() {
             server.enqueue(MockResponse().setBody("{}"))
-            val client = NetworkModule.provideOkHttpClient(isDebug = false, traktClientId = "abc-123")
+            val client = NetworkModule.provideOkHttpClient(traktClientId = "abc-123")
             client.newCall(Request.Builder().url(server.url("/test")).build()).execute()
             val recorded = server.takeRequest()
             assertEquals("abc-123", recorded.getHeader("trakt-api-key"))
@@ -61,7 +62,7 @@ class NetworkModuleTest {
         @Test
         fun `omits trakt-api-key header when client id is blank`() {
             server.enqueue(MockResponse().setBody("{}"))
-            val client = NetworkModule.provideOkHttpClient(isDebug = false, traktClientId = "")
+            val client = NetworkModule.provideOkHttpClient(traktClientId = "")
             client.newCall(Request.Builder().url(server.url("/test")).build()).execute()
             val recorded = server.takeRequest()
             assertNull(recorded.getHeader("trakt-api-key"))
@@ -69,8 +70,22 @@ class NetworkModuleTest {
 
         @Test
         fun `does not apply certificate pinning`() {
-            val client = NetworkModule.provideOkHttpClient(isDebug = false, traktClientId = "test-id")
+            val client = NetworkModule.provideOkHttpClient(traktClientId = "test-id")
             assertTrue(client.certificatePinner.pins.isEmpty())
+        }
+
+        @Test
+        fun `logging interceptor level matches BuildConfig DEBUG`() {
+            val client = NetworkModule.provideOkHttpClient(traktClientId = "test-id")
+            val loggingInterceptor = client.interceptors
+                .filterIsInstance<HttpLoggingInterceptor>()
+                .firstOrNull()
+            assertNotNull(loggingInterceptor, "HttpLoggingInterceptor should be present")
+            val expectedLevel = if (com.justb81.watchbuddy.core.BuildConfig.DEBUG)
+                HttpLoggingInterceptor.Level.BODY
+            else
+                HttpLoggingInterceptor.Level.NONE
+            assertEquals(expectedLevel, loggingInterceptor!!.level)
         }
     }
 
