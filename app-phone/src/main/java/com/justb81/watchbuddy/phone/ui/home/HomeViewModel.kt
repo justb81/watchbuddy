@@ -9,6 +9,7 @@ import com.justb81.watchbuddy.core.model.ScrobbleDisplayEvent
 import com.justb81.watchbuddy.core.progress.ShowProgress
 import com.justb81.watchbuddy.core.progress.ShowProgressCalculator
 import com.justb81.watchbuddy.phone.auth.TokenRepository
+import com.justb81.watchbuddy.phone.network.WifiStateProvider
 import com.justb81.watchbuddy.phone.server.ShowRepository
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import com.justb81.watchbuddy.service.CompanionService
@@ -32,9 +33,14 @@ data class HomeUiState(
     val lastSyncTime: String? = null,
     val error: String? = null,
     val canWatch: Boolean = false,
+    // Default true so a cold-start render doesn't flash a "no Wi-Fi" reason
+    // before the first WifiStateProvider emission arrives.
+    val isOnWifi: Boolean = true,
     val isWatchingTv: Boolean = false,
     val latestScrobbleEvent: ScrobbleDisplayEvent? = null
-)
+) {
+    val canStartCompanion: Boolean get() = canWatch && isOnWifi
+}
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
@@ -42,7 +48,8 @@ class HomeViewModel @Inject constructor(
     private val showRepository: ShowRepository,
     private val tokenRepository: TokenRepository,
     private val settingsRepository: SettingsRepository,
-    private val companionStateManager: CompanionStateManager
+    private val companionStateManager: CompanionStateManager,
+    private val wifiStateProvider: WifiStateProvider
 ) : AndroidViewModel(application) {
 
     companion object {
@@ -58,6 +65,7 @@ class HomeViewModel @Inject constructor(
         checkServiceConnections()
         observeCompanionState()
         observeScrobbleEvents()
+        observeWifiState()
     }
 
     private fun checkServiceConnections() {
@@ -100,7 +108,26 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    private fun observeWifiState() {
+        viewModelScope.launch {
+            wifiStateProvider.isOnWifi.collect { onWifi ->
+                val wasWatching = _uiState.value.isWatchingTv
+                _uiState.update { it.copy(isOnWifi = onWifi) }
+                // Auto-stop a running companion when Wi-Fi drops: without it the
+                // NSD advertisement binds to nothing and the foreground
+                // notification lingers on a non-functional state.
+                if (!onWifi && wasWatching) {
+                    toggleWatchingTv(false)
+                }
+            }
+        }
+    }
+
     fun toggleWatchingTv(enabled: Boolean) {
+        // Hard-gate start requests when Wi-Fi is missing. The UI disables the
+        // switch, but onboarding from a notification action or future entry
+        // points must also respect the gate.
+        if (enabled && !_uiState.value.isOnWifi) return
         viewModelScope.launch {
             settingsRepository.setCompanionEnabled(enabled)
             if (enabled) {

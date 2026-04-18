@@ -117,7 +117,12 @@ does not block the others. The TV never calls the Trakt API directly for any ope
 ## Companion Service Lifecycle (Phone)
 
 The phone's companion service is controlled via the "I am watching TV" toggle on the HomeScreen.
-The toggle is visible only when both Trakt and TMDB connections are configured.
+The toggle is always visible, but is enabled only when all three prerequisites are satisfied:
+Trakt is connected, TMDB is configured, **and** the phone is currently on a Wi-Fi network.
+When any prerequisite is missing, the toggle is disabled and the reason is shown inline
+(Trakt/TMDB missing vs. Wi-Fi missing). The Wi-Fi requirement is tracked reactively by
+`phone/network/WifiStateProvider` (a `StateFlow<Boolean>` backed by a
+`ConnectivityManager.registerDefaultNetworkCallback`).
 
 **State management:** `CompanionStateManager` (Hilt singleton) is the shared state hub between
 the `CompanionService`, `CompanionHttpServer`, and `HomeViewModel`. It tracks:
@@ -125,12 +130,19 @@ the `CompanionService`, `CompanionHttpServer`, and `HomeViewModel`. It tracks:
 - `lastScrobbleEvent` — the latest scrobble event for display on the phone HomeScreen
 - `isServiceRunning` — whether the foreground service is active
 
-**Auto-reconnect:** The service registers a `ConnectivityManager.NetworkCallback` for Wi-Fi.
-When Wi-Fi is lost, NSD is unregistered (HTTP server stays alive). When Wi-Fi returns,
-`onAvailable` is debounced for 2 s, then the existing registration is torn down and a fresh
-one is registered 300 ms later. The unregister-then-register sequence is required because
-`NsdManager.unregisterService` is asynchronous — calling `registerService` before the
-teardown completes leaves duplicate advertisements on the network.
+**Wi-Fi precondition & auto-stop:** `CompanionService.onStartCommand` probes
+`wifiIpv4Address()` before doing any work. If the phone is not on Wi-Fi, the service clears
+`companionEnabled` in settings, calls `stopSelf(startId)`, and returns `START_NOT_STICKY`
+so the system does not re-deliver the start intent. While running, the service registers a
+`ConnectivityManager.NetworkCallback` for Wi-Fi. When Wi-Fi is lost, NSD is unregistered
+immediately and a 3 s grace timer runs; if Wi-Fi has not returned by then, the service
+self-stops and clears `companionEnabled` so the foreground notification is dismissed. The
+grace period tolerates brief SSID handoffs where `onLost(oldNet)` fires just before
+`onAvailable(newNet)`. When Wi-Fi returns within the grace period, `onAvailable` is debounced
+for 2 s, the existing registration is torn down, and a fresh one is registered 300 ms later.
+The unregister-then-register sequence is required because `NsdManager.unregisterService` is
+asynchronous — calling `registerService` before the teardown completes leaves duplicate
+advertisements on the network (#264, #278).
 
 **NSD registration state machine:** `registerNsd` / `unregisterNsd` transition an
 `IDLE → REGISTERING → REGISTERED → UNREGISTERING → IDLE` state under a single lock. The
