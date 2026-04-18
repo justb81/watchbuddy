@@ -51,10 +51,12 @@ android {
 
         // Package native debug symbols into the AAB so Google Play Console can
         // symbolicate native stack traces.  LiteRT-LM, AICore and Tink all ship
-        // .so libraries; SYMBOL_TABLE yields readable frames without inflating
-        // the bundle the way FULL (with line numbers) would.
+        // .so libraries.  FULL is required — SYMBOL_TABLE strips line numbers
+        // and Play Console still flags the bundle as "no symbols for debugging"
+        // (#262).  AGP also emits native-debug-symbols.zip alongside the AAB,
+        // which CI uploads to Play and attaches to the GitHub Release.
         ndk {
-            debugSymbolLevel = "SYMBOL_TABLE"
+            debugSymbolLevel = "FULL"
         }
     }
 
