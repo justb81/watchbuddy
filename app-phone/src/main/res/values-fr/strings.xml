@@ -132,15 +132,19 @@
     <string name="show_detail_seasons">Saisons</string>
     <string name="show_detail_season">Saison %1$d</string>
     <string name="show_detail_episode">É%1$02d</string>
+    <string name="show_detail_episode_label">S%1$02dÉ%2$02d</string>
+    <string name="show_detail_season_progress">%1$d / %2$d</string>
     <string name="show_detail_watched">Vu</string>
     <string name="show_detail_not_watched">Non vu</string>
     <string name="show_detail_mark_watched">Marquer comme vu</string>
     <string name="show_detail_mark_unwatched">Retirer de l\'historique</string>
-    <string name="show_detail_no_episodes">Aucun épisode vu pour l\'instant.</string>
+    <string name="show_detail_no_episodes">Aucun épisode trouvé pour cette série.</string>
     <string name="show_detail_error_toggle">Impossible de mettre à jour le statut. Veuillez réessayer.</string>
     <string name="show_detail_cd_back">Retour</string>
     <string name="show_detail_cd_poster">Affiche de la série</string>
     <string name="show_detail_cd_toggle_watched">Modifier le statut de visionnage de l\'épisode %1$d de la saison %2$d</string>
+    <string name="show_detail_cd_expand_season">Développer la saison %1$d</string>
+    <string name="show_detail_cd_collapse_season">Réduire la saison %1$d</string>
 
     <!-- Common -->
     <string name="no_description">Aucune description disponible.</string>

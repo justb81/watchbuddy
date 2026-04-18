@@ -148,15 +148,19 @@
     <string name="show_detail_seasons">Seasons</string>
     <string name="show_detail_season">Season %1$d</string>
     <string name="show_detail_episode">E%1$02d</string>
+    <string name="show_detail_episode_label">S%1$02dE%2$02d</string>
+    <string name="show_detail_season_progress">%1$d / %2$d</string>
     <string name="show_detail_watched">Watched</string>
     <string name="show_detail_not_watched">Not watched</string>
     <string name="show_detail_mark_watched">Mark as watched</string>
     <string name="show_detail_mark_unwatched">Remove from history</string>
-    <string name="show_detail_no_episodes">No watched episodes yet.</string>
+    <string name="show_detail_no_episodes">No episodes found for this show.</string>
     <string name="show_detail_error_toggle">Could not update watched status. Please try again.</string>
     <string name="show_detail_cd_back">Back</string>
     <string name="show_detail_cd_poster">Show poster</string>
     <string name="show_detail_cd_toggle_watched">Toggle watched status for episode %1$d of season %2$d</string>
+    <string name="show_detail_cd_expand_season">Expand season %1$d</string>
+    <string name="show_detail_cd_collapse_season">Collapse season %1$d</string>
 
     <!-- Common -->
     <string name="no_description">No description available.</string>

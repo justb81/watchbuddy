@@ -45,13 +45,32 @@ class HomeViewModelTest {
     private val companionStateManager = CompanionStateManager()
     private val wifiStateProvider: WifiStateProvider = mockk(relaxed = true)
     private val wifiFlow = MutableStateFlow(true)
+    private val showsFlow = MutableStateFlow<List<EnrichedShowEntry>>(emptyList())
+
+    /**
+     * Helper for tests that previously did `coEvery { showRepository.getShows() } returns shows`.
+     * Mirrors what the real repo does: both returns the list and emits it to the reactive flow
+     * that `HomeViewModel.observeShows()` collects.
+     */
+    private fun stubShows(shows: List<EnrichedShowEntry>) {
+        coEvery { showRepository.getShows() } coAnswers {
+            showsFlow.value = shows
+            shows
+        }
+    }
+
+    private fun stubShowsThrows(throwable: Throwable) {
+        coEvery { showRepository.getShows() } throws throwable
+    }
 
     @BeforeEach
     fun setUp() {
         every { settingsRepository.settings } returns flowOf(AppSettings())
         every { settingsRepository.getTmdbApiKey() } returns flowOf("")
         every { tokenRepository.getAccessToken() } returns null
-        coEvery { showRepository.getShows() } returns emptyList()
+        showsFlow.value = emptyList()
+        every { showRepository.shows } returns showsFlow
+        stubShows(emptyList())
         wifiFlow.value = true
         every { wifiStateProvider.isOnWifi } returns wifiFlow
     }
@@ -88,7 +107,7 @@ class HomeViewModelTest {
         fun `loads shows successfully when token is available`() = runTest {
             val shows = listOf(enriched("Breaking Bad"), enriched("The Wire"))
             every { tokenRepository.getAccessToken() } returns "valid-token"
-            coEvery { showRepository.getShows() } returns shows
+            stubShows(shows)
 
             val vm = createViewModel()
             advanceUntilIdle()
@@ -101,7 +120,7 @@ class HomeViewModelTest {
         @Test
         fun `sets lastSyncTime after successful load`() = runTest {
             every { tokenRepository.getAccessToken() } returns "valid-token"
-            coEvery { showRepository.getShows() } returns emptyList()
+            stubShows(emptyList())
 
             val vm = createViewModel()
             advanceUntilIdle()
@@ -112,7 +131,7 @@ class HomeViewModelTest {
         @Test
         fun `sets error and clears loading when repository throws`() = runTest {
             every { tokenRepository.getAccessToken() } returns "valid-token"
-            coEvery { showRepository.getShows() } throws RuntimeException("Network error")
+            stubShowsThrows(RuntimeException("Network error"))
 
             val vm = createViewModel()
             advanceUntilIdle()
@@ -126,7 +145,7 @@ class HomeViewModelTest {
         fun `shows auth error message on HTTP 401`() = runTest {
             every { tokenRepository.getAccessToken() } returns "valid-token"
             val httpEx = HttpException(retrofit2.Response.error<Any>(401, ResponseBody.create(null, "")))
-            coEvery { showRepository.getShows() } throws httpEx
+            stubShowsThrows(httpEx)
             every { application.getString(com.justb81.watchbuddy.R.string.home_sync_failed_auth) } returns "Session expired"
 
             val vm = createViewModel()
@@ -140,7 +159,7 @@ class HomeViewModelTest {
         fun `shows auth error message on HTTP 403`() = runTest {
             every { tokenRepository.getAccessToken() } returns "valid-token"
             val httpEx = HttpException(retrofit2.Response.error<Any>(403, ResponseBody.create(null, "")))
-            coEvery { showRepository.getShows() } throws httpEx
+            stubShowsThrows(httpEx)
             every { application.getString(com.justb81.watchbuddy.R.string.home_sync_failed_auth) } returns "Session expired"
 
             val vm = createViewModel()
@@ -153,14 +172,14 @@ class HomeViewModelTest {
         @Test
         fun `clears error on successful reload after failure`() = runTest {
             every { tokenRepository.getAccessToken() } returns "valid-token"
-            coEvery { showRepository.getShows() } throws RuntimeException("fail")
+            stubShowsThrows(RuntimeException("fail"))
 
             val vm = createViewModel()
             advanceUntilIdle()
             assertNotNull(vm.uiState.value.error)
 
             val shows = listOf(enriched("Test"))
-            coEvery { showRepository.getShows() } returns shows
+            stubShows(shows)
 
             vm.loadShows()
             advanceUntilIdle()
@@ -172,7 +191,7 @@ class HomeViewModelTest {
         @Test
         fun `empty show list is a valid success result`() = runTest {
             every { tokenRepository.getAccessToken() } returns "valid-token"
-            coEvery { showRepository.getShows() } returns emptyList()
+            stubShows(emptyList())
 
             val vm = createViewModel()
             advanceUntilIdle()
@@ -192,13 +211,13 @@ class HomeViewModelTest {
             val initialShows = listOf(enriched("Show A"))
             val updatedShows = listOf(enriched("Show A"), enriched("Show B"))
             every { tokenRepository.getAccessToken() } returns "valid-token"
-            coEvery { showRepository.getShows() } returns initialShows
+            stubShows(initialShows)
 
             val vm = createViewModel()
             advanceUntilIdle()
             assertEquals(initialShows, vm.uiState.value.shows)
 
-            coEvery { showRepository.getShows() } returns updatedShows
+            stubShows(updatedShows)
             vm.sync()
             advanceUntilIdle()
 
@@ -208,13 +227,13 @@ class HomeViewModelTest {
         @Test
         fun `sync clears error from previous failed load`() = runTest {
             every { tokenRepository.getAccessToken() } returns "valid-token"
-            coEvery { showRepository.getShows() } throws RuntimeException("fail")
+            stubShowsThrows(RuntimeException("fail"))
 
             val vm = createViewModel()
             advanceUntilIdle()
             assertNotNull(vm.uiState.value.error)
 
-            coEvery { showRepository.getShows() } returns emptyList()
+            stubShows(emptyList())
             vm.sync()
             advanceUntilIdle()
 

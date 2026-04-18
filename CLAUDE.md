@@ -15,14 +15,14 @@ watchbuddy/
 │       ├── auth/       TokenRepository, AuthModule (Trakt OAuth, Keystore)
 │       ├── di/         AppModule (Hilt dependency injection)
 │       ├── llm/        LlmOrchestrator, RecapGenerator, LlmProviders (LiteRT-LM / AICore)
-│       ├── server/     CompanionHttpServer (Ktor, port 8765), DeviceCapabilityProvider, ShowRepository
+│       ├── server/     CompanionHttpServer (Ktor, port 8765), DeviceCapabilityProvider, ShowRepository (reactive `shows` StateFlow), EpisodeRepository (10-min per-show TTL + sync/history writes)
 │       ├── settings/   AppSettings, SettingsRepository (DataStore)
 │       ├── ui/         MainActivity, PhoneNavGraph
 │       │   ├── home/       HomeScreen, HomeViewModel
 │       │   ├── navigation/ PhoneNavGraph
 │       │   ├── onboarding/ OnboardingScreen, OnboardingViewModel
 │       │   ├── settings/   SettingsScreen, SettingsViewModel
-│       │   ├── showdetail/ ShowDetailScreen, ShowDetailViewModel
+│       │   ├── showdetail/ ShowDetailScreen, ShowDetailViewModel (current-season-first layout; per-episode watched/unwatched checkbox)
 │       │   └── theme/      Material 3 theme
 │       └── (service/)  CompanionService, CompanionStateManager (foreground NSD server + shared state)
 ├── app-tv/             Google TV app (Kotlin, Compose for TV)
@@ -211,6 +211,7 @@ The TV ranks connected phones by LLM quality and uses the best one. Failover cha
 - **LLM selection:** `LlmOrchestrator` checks AICore first, then falls back to LiteRT-LM with a Gemma 4 model (E4B or E2B) sized to available RAM.
 - **Auth modes:** Managed backend (default), self-hosted proxy, or direct Trakt credentials.
 - **Multi-user:** Multiple phones can connect to one TV simultaneously; scrobbling records the episode for each connected user independently; shared watch mode avoids recap spoilers.
+- **Manual episode marking (phone):** Tapping a show on HomeScreen opens `ShowDetailScreen`, which fetches the full season/episode structure via `EpisodeRepository.getSeasonsWithEpisodes` (Trakt `shows/:id/seasons?extended=episodes`, 10-min per-show cache). Each episode has a checkbox; toggling calls `sync/history` add or remove through `EpisodeRepository`, optimistically flips the UI, and on success calls `ShowRepository.updateLocalWatched(...)`. That mutates the in-memory `shows` `StateFlow` so `HomeViewModel` counters update without a round-trip (#216). The layout pulls the season the user is currently mid-watching to the top, expanded; all other seasons appear below, collapsed.
 
 ## Documentation Maintenance
 

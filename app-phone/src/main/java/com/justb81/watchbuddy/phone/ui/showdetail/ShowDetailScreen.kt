@@ -1,27 +1,31 @@
 package com.justb81.watchbuddy.phone.ui.showdetail
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import com.justb81.watchbuddy.R
-import com.justb81.watchbuddy.core.model.TraktWatchedEpisode
-import com.justb81.watchbuddy.core.model.TraktWatchedSeason
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -30,11 +34,13 @@ fun ShowDetailScreen(
     viewModel: ShowDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val toggleFailedLabel = stringResource(R.string.show_detail_error_toggle)
 
-    uiState.toggleError?.let { error ->
-        LaunchedEffect(error) {
-            viewModel.clearToggleError()
-        }
+    LaunchedEffect(uiState.toggleError) {
+        val error = uiState.toggleError ?: return@LaunchedEffect
+        snackbarHostState.showSnackbar(message = error.ifBlank { toggleFailedLabel })
+        viewModel.clearToggleError()
     }
 
     Scaffold(
@@ -60,6 +66,7 @@ fun ShowDetailScreen(
                 )
             )
         },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
         Box(
@@ -95,8 +102,8 @@ fun ShowDetailScreen(
 
                 else -> {
                     LazyColumn(
-                        contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         item {
                             ShowHeader(
@@ -107,7 +114,7 @@ fun ShowDetailScreen(
                             )
                         }
 
-                        if (uiState.watchedSeasons.isEmpty()) {
+                        if (uiState.seasons.isEmpty()) {
                             item {
                                 Text(
                                     text = stringResource(R.string.show_detail_no_episodes),
@@ -123,27 +130,12 @@ fun ShowDetailScreen(
                                     fontWeight = FontWeight.SemiBold
                                 )
                             }
-                            items(uiState.watchedSeasons) { season ->
-                                SeasonSection(
+                            items(uiState.seasons, key = { it.number }) { season ->
+                                SeasonCard(
                                     season = season,
                                     togglingEpisode = uiState.togglingEpisode,
-                                    onToggle = { episode, watched ->
-                                        viewModel.toggleEpisodeWatched(
-                                            season = season.number,
-                                            episode = episode,
-                                            currentlyWatched = watched
-                                        )
-                                    }
-                                )
-                            }
-                        }
-
-                        uiState.toggleError?.let { error ->
-                            item {
-                                Text(
-                                    text = error,
-                                    color = MaterialTheme.colorScheme.error,
-                                    style = MaterialTheme.typography.bodySmall
+                                    onExpandToggle = { viewModel.toggleSeasonExpanded(season.number) },
+                                    onEpisodeToggle = { episode -> viewModel.toggleEpisodeWatched(episode) }
                                 )
                             }
                         }
@@ -216,11 +208,22 @@ private fun ShowHeader(
 }
 
 @Composable
-private fun SeasonSection(
-    season: TraktWatchedSeason,
+private fun SeasonCard(
+    season: SeasonUi,
     togglingEpisode: Pair<Int, Int>?,
-    onToggle: (episodeNumber: Int, currentlyWatched: Boolean) -> Unit
+    onExpandToggle: () -> Unit,
+    onEpisodeToggle: (EpisodeUi) -> Unit
 ) {
+    val rotation by animateFloatAsState(
+        targetValue = if (season.expanded) 180f else 0f,
+        label = "season-chevron"
+    )
+    val headerCd = stringResource(
+        if (season.expanded) R.string.show_detail_cd_collapse_season
+        else R.string.show_detail_cd_expand_season,
+        season.number
+    )
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -228,20 +231,51 @@ private fun SeasonSection(
             containerColor = MaterialTheme.colorScheme.surfaceVariant
         )
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Text(
-                text = stringResource(R.string.show_detail_season, season.number),
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-            season.episodes.sortedBy { it.number }.forEach { episode ->
-                EpisodeRow(
-                    season = season.number,
-                    episode = episode,
-                    isToggling = togglingEpisode == (season.number to episode.number),
-                    onToggle = { onToggle(episode.number, true) }
+        Column {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onExpandToggle)
+                    .padding(horizontal = 12.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = stringResource(R.string.show_detail_season, season.number),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f)
                 )
+                Text(
+                    text = stringResource(
+                        R.string.show_detail_season_progress,
+                        season.watchedCount,
+                        season.totalCount
+                    ),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                )
+                Icon(
+                    imageVector = Icons.Default.KeyboardArrowDown,
+                    contentDescription = headerCd,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.rotate(rotation)
+                )
+            }
+
+            AnimatedVisibility(visible = season.expanded) {
+                Column(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                ) {
+                    season.episodes.forEach { episode ->
+                        EpisodeRow(
+                            episode = episode,
+                            isToggling = togglingEpisode == (episode.season to episode.number),
+                            onToggle = { onEpisodeToggle(episode) }
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
             }
         }
     }
@@ -249,52 +283,56 @@ private fun SeasonSection(
 
 @Composable
 private fun EpisodeRow(
-    season: Int,
-    episode: TraktWatchedEpisode,
+    episode: EpisodeUi,
     isToggling: Boolean,
     onToggle: () -> Unit
 ) {
+    val toggleCd = stringResource(
+        R.string.show_detail_cd_toggle_watched,
+        episode.number,
+        episode.season
+    )
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable(enabled = !isToggling, onClick = onToggle)
+            .semantics { contentDescription = toggleCd }
             .padding(vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        Box(
+            modifier = Modifier.size(40.dp),
+            contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = Icons.Default.Check,
-                contentDescription = stringResource(R.string.show_detail_watched),
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(16.dp)
-            )
-            Text(
-                text = stringResource(R.string.show_detail_episode, episode.number),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-        }
-
-        if (isToggling) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(20.dp),
-                strokeWidth = 2.dp,
-                color = MaterialTheme.colorScheme.primary
-            )
-        } else {
-            TextButton(
-                onClick = onToggle,
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
-            ) {
-                Text(
-                    text = stringResource(R.string.show_detail_mark_unwatched),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.error
+            if (isToggling) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            } else {
+                Checkbox(
+                    checked = episode.watched,
+                    onCheckedChange = { onToggle() }
                 )
             }
         }
+        Text(
+            text = formatEpisodeLabel(episode),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f)
+        )
     }
+}
+
+@Composable
+private fun formatEpisodeLabel(episode: EpisodeUi): String {
+    val prefix = stringResource(
+        R.string.show_detail_episode_label,
+        episode.season,
+        episode.number
+    )
+    return if (episode.title.isNullOrBlank()) prefix
+    else "$prefix — ${episode.title}"
 }
