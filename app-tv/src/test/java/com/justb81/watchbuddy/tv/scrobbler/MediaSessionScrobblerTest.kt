@@ -1,6 +1,7 @@
 package com.justb81.watchbuddy.tv.scrobbler
 
 import android.content.Context
+import android.media.session.MediaSessionManager
 import com.justb81.watchbuddy.core.model.ScrobbleCandidate
 import com.justb81.watchbuddy.core.model.TraktEpisode
 import com.justb81.watchbuddy.core.model.TraktIds
@@ -45,6 +46,9 @@ class MediaSessionScrobblerTest {
 
     @BeforeEach
     fun setUp() {
+        val mockSessionManager = mockk<MediaSessionManager>(relaxed = true)
+        every { context.getSystemService(Context.MEDIA_SESSION_SERVICE) } returns mockSessionManager
+        every { mockSessionManager.getActiveSessions(any()) } returns emptyList()
         scrobbler = MediaSessionScrobbler(context, tmdbApiService, watchedShowSource, scrobbleDispatcher)
     }
 
