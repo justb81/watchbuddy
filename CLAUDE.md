@@ -189,6 +189,8 @@ The phone acts as an NSD/mDNS server on port 8765. The TV discovers phone(s) on 
 
 The TV ranks connected phones by LLM quality and uses the best one. Failover chain: best phone → next phone → local cache → TMDB synopsis only.
 
+**NSD TXT record contract:** The phone advertises three attributes — `version` (the phone app's `BuildConfig.VERSION_NAME`, e.g. `0.15.1`, **not** a protocol version), `modelQuality` (integer 0–150), and `llmBackend` (one of the `LlmBackend` enum names). The TV parses `llmBackend` leniently (unknown values fall back to `LlmBackend.NONE`) but treats missing / unparseable `version` or `modelQuality` as a hard failure. Contract is pinned by `CompanionServiceNsdTest` and `PhoneDiscoveryManagerTest`.
+
 ## Important Patterns
 
 - **Watching TV toggle:** The phone HomeScreen shows an "I am watching TV" toggle, gated by Trakt + TMDB availability. Toggling starts/stops the `CompanionService`. When the user swipes the app from recents, the service auto-stops via `onTaskRemoved()`.
