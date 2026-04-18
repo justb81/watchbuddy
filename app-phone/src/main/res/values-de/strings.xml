@@ -132,6 +132,9 @@
     <string name="companion_channel_description">Zeigt an, wenn der Companion-Server für TV-Verbindungen aktiv ist</string>
     <string name="companion_notification_title">WatchBuddy Companion</string>
     <string name="companion_notification_text">Bereit für TV-Verbindung</string>
+    <string name="companion_notification_permission_rationale_title">Benachrichtigungen erlauben</string>
+    <string name="companion_notification_permission_rationale_body">WatchBuddy zeigt während der TV-Verbindung eine dauerhafte Benachrichtigung, damit Android den Dienst nicht im Hintergrund beendet. Aktiviere Benachrichtigungen in den App-Einstellungen, um fortzufahren.</string>
+    <string name="companion_notification_permission_open_settings">Einstellungen öffnen</string>
 
     <!-- Show Detail -->
     <string name="show_detail_seasons">Staffeln</string>

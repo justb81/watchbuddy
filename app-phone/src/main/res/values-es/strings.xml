@@ -132,6 +132,9 @@
     <string name="companion_channel_description">Muestra cuando el servidor compañero está activo para conexiones de TV</string>
     <string name="companion_notification_title">WatchBuddy Companion</string>
     <string name="companion_notification_text">Listo para conexión con TV</string>
+    <string name="companion_notification_permission_rationale_title">Permitir notificaciones</string>
+    <string name="companion_notification_permission_rationale_body">WatchBuddy muestra una notificación persistente mientras el servicio compañero está en ejecución para que Android no lo detenga en segundo plano. Activa las notificaciones en los ajustes de la app para continuar.</string>
+    <string name="companion_notification_permission_open_settings">Abrir ajustes</string>
 
     <!-- Show Detail -->
     <string name="show_detail_seasons">Temporadas</string>
