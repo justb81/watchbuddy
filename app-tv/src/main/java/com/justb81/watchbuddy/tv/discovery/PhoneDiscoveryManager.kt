@@ -110,7 +110,11 @@ class PhoneDiscoveryManager @Inject constructor(
             if (errorCode == NsdManager.FAILURE_ALREADY_ACTIVE && isDiscovering) {
                 heartbeatScope.launch {
                     delay(RESTART_BACKOFF_MS)
-                    Log.i(TAG, "retrying discovery after FAILURE_ALREADY_ACTIVE")
+                    Log.i(
+                        TAG,
+                        "self-heal: retrying discovery after FAILURE_ALREADY_ACTIVE " +
+                            "(stale listener registration in system NSD service)"
+                    )
                     restartDiscoveryInternal()
                 }
             }
@@ -135,9 +139,13 @@ class PhoneDiscoveryManager @Inject constructor(
                 override fun onServiceResolved(serviceInfo: NsdServiceInfo) {
                     @Suppress("DEPRECATION")
                     val host = serviceInfo.host?.hostAddress
+                    val attrs = serviceInfo.attributes
+                        ?.mapValues { (_, v) -> v?.toString(Charsets.UTF_8) ?: "<null>" }
+                        ?: emptyMap()
                     Log.i(
                         TAG,
-                        "service resolved: ${serviceInfo.serviceName} → $host:${serviceInfo.port}"
+                        "service resolved: name=${serviceInfo.serviceName} " +
+                            "host=$host port=${serviceInfo.port} TXT=$attrs"
                     )
                     fetchCapabilityAndAdd(serviceInfo)
                 }
@@ -237,7 +245,10 @@ class PhoneDiscoveryManager @Inject constructor(
     // an app holds a multicast lock, so NsdManager runs but never receives the
     // phone's mDNS announcements. Hold the lock only while discovery is active.
     private fun acquireMulticastLock() {
-        if (multicastLock?.isHeld == true) return
+        if (multicastLock?.isHeld == true) {
+            Log.i(TAG, "multicast lock already held; skipping acquire")
+            return
+        }
         val wifi = wifiManager ?: run {
             Log.w(TAG, "WifiManager unavailable; skipping multicast lock")
             return
@@ -248,15 +259,22 @@ class PhoneDiscoveryManager @Inject constructor(
                 acquire()
             }
             multicastLock = lock
-            Log.i(TAG, "multicast lock acquired")
+            Log.i(TAG, "multicast lock acquired (held=${lock.isHeld})")
         }.onFailure { Log.e(TAG, "multicast lock acquire failed", it) }
     }
 
     private fun releaseMulticastLock() {
-        val lock = multicastLock ?: return
+        val lock = multicastLock ?: run {
+            Log.i(TAG, "multicast lock release skipped: no lock held")
+            return
+        }
         runCatching {
-            if (lock.isHeld) lock.release()
-            Log.i(TAG, "multicast lock released")
+            if (lock.isHeld) {
+                lock.release()
+                Log.i(TAG, "multicast lock released")
+            } else {
+                Log.i(TAG, "multicast lock already released")
+            }
         }.onFailure { Log.w(TAG, "multicast lock release failed", it) }
         multicastLock = null
     }
@@ -284,8 +302,14 @@ class PhoneDiscoveryManager @Inject constructor(
             // NSD service may have silently dropped our listener (seen on some
             // Google TV ROMs). Cycle discovery so we recover without relaunch.
             if (isDiscovering) {
-                Log.i(TAG, "no phones discovered; cycling NSD discovery")
+                Log.i(
+                    TAG,
+                    "heartbeat self-heal: no phones discovered → restarting NSD discovery " +
+                        "(multicastLockHeld=${multicastLock?.isHeld == true})"
+                )
                 restartDiscoveryInternal()
+            } else {
+                Log.d(TAG, "heartbeat tick: no phones and discovery inactive; nothing to do")
             }
             return
         }
@@ -355,22 +379,59 @@ class PhoneDiscoveryManager @Inject constructor(
 
     /**
      * Parses WatchBuddy TXT records from a resolved NsdServiceInfo.
-     * Returns null if any required field is missing or unparseable.
+     *
+     * Returns null if `version` or `modelQuality` is missing / unparseable.
+     * `llmBackend` parsing is lenient: unknown values fall back to
+     * [LlmBackend.NONE] so a new phone-side enum value does not make the
+     * phone silently invisible to older TV builds.
+     *
+     * Every failure path logs a structured reason — this code path is the
+     * primary suspect when a phone is emitting mDNS but the TV does not list
+     * it, and silent returns were observed to mask the root cause in the
+     * field (see #259).
      */
     private fun parseTxtRecord(serviceInfo: NsdServiceInfo): PhoneTxtRecord? {
         return try {
-            val attrs = serviceInfo.attributes
-            val version = attrs["version"]?.toString(Charsets.UTF_8) ?: return null
-            val modelQuality = attrs["modelQuality"]?.toString(Charsets.UTF_8)?.toIntOrNull()
-                ?: return null
-            val llmBackendStr = attrs["llmBackend"]?.toString(Charsets.UTF_8) ?: return null
-            val llmBackend = try {
-                LlmBackend.valueOf(llmBackendStr)
-            } catch (_: IllegalArgumentException) {
+            val attrs = serviceInfo.attributes ?: emptyMap()
+            val decoded = attrs.mapValues { (_, v) ->
+                v?.toString(Charsets.UTF_8) ?: "<null>"
+            }
+            Log.d(TAG, "parseTxtRecord: attrs=$decoded")
+
+            val version = attrs["version"]?.toString(Charsets.UTF_8)
+            if (version == null) {
+                Log.w(TAG, "parseTxtRecord: missing 'version' attribute; attrs=$decoded")
                 return null
             }
+            val modelQualityRaw = attrs["modelQuality"]?.toString(Charsets.UTF_8)
+            if (modelQualityRaw == null) {
+                Log.w(TAG, "parseTxtRecord: missing 'modelQuality' attribute; attrs=$decoded")
+                return null
+            }
+            val modelQuality = modelQualityRaw.toIntOrNull()
+            if (modelQuality == null) {
+                Log.w(
+                    TAG,
+                    "parseTxtRecord: unparseable 'modelQuality'='$modelQualityRaw'; attrs=$decoded"
+                )
+                return null
+            }
+            val llmBackendStr = attrs["llmBackend"]?.toString(Charsets.UTF_8)
+            if (llmBackendStr == null) {
+                Log.w(TAG, "parseTxtRecord: missing 'llmBackend' attribute; attrs=$decoded")
+                return null
+            }
+            val llmBackend = runCatching { LlmBackend.valueOf(llmBackendStr) }
+                .getOrElse {
+                    Log.w(
+                        TAG,
+                        "parseTxtRecord: unknown llmBackend='$llmBackendStr' → falling back to NONE"
+                    )
+                    LlmBackend.NONE
+                }
             PhoneTxtRecord(version = version, modelQuality = modelQuality, llmBackend = llmBackend)
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Log.w(TAG, "parseTxtRecord: unexpected error", e)
             null
         }
     }

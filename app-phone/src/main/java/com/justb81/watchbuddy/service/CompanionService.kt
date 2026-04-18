@@ -15,6 +15,7 @@ import android.net.nsd.NsdServiceInfo
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import com.justb81.watchbuddy.BuildConfig
 import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.phone.llm.LlmOrchestrator
 import com.justb81.watchbuddy.phone.server.CompanionHttpServer
@@ -38,7 +39,6 @@ class CompanionService : Service() {
         private const val NOTIFICATION_ID = 1
         private const val NSD_SERVICE_TYPE = "_watchbuddy._tcp."
         private const val NSD_SERVICE_NAME = "watchbuddy-companion"
-        private const val NSD_TXT_VERSION = "1"
 
         /** How often to check whether the TV is still polling us. */
         private const val PRESENCE_CHECK_INTERVAL_MS = 60_000L
@@ -53,6 +53,21 @@ class CompanionService : Service() {
         fun stop(context: Context) {
             context.stopService(Intent(context, CompanionService::class.java))
         }
+
+        /**
+         * Builds the NSD TXT record attributes for the WatchBuddy companion service.
+         *
+         * `version` carries the phone app's `versionName` (e.g. `0.15.1`), not a
+         * protocol version. The HTTP contract is versioned by endpoint.
+         */
+        fun buildTxtAttributes(
+            versionName: String,
+            llmConfig: LlmOrchestrator.LlmConfig
+        ): Map<String, String> = mapOf(
+            "version" to versionName,
+            "modelQuality" to llmConfig.qualityScore.toString(),
+            "llmBackend" to llmConfig.backend.name
+        )
     }
 
     @Inject lateinit var companionHttpServer: CompanionHttpServer
@@ -183,18 +198,17 @@ class CompanionService : Service() {
         if (nsdRegistrationListener != null) return
 
         val llmConfig = llmOrchestrator.selectConfig()
+        val txtAttributes = buildTxtAttributes(BuildConfig.VERSION_NAME, llmConfig)
         val serviceInfo = NsdServiceInfo().apply {
             serviceName = NSD_SERVICE_NAME
             serviceType = NSD_SERVICE_TYPE
             port = CompanionHttpServer.PORT
-            setAttribute("version", NSD_TXT_VERSION)
-            setAttribute("modelQuality", llmConfig.qualityScore.toString())
-            setAttribute("llmBackend", llmConfig.backend.name)
+            txtAttributes.forEach { (key, value) -> setAttribute(key, value) }
         }
 
         val listener = object : NsdManager.RegistrationListener {
             override fun onServiceRegistered(info: NsdServiceInfo) {
-                Log.i(TAG, "NSD service registered: ${info.serviceName}")
+                Log.i(TAG, "NSD service registered: ${info.serviceName} TXT=$txtAttributes")
             }
             override fun onRegistrationFailed(info: NsdServiceInfo, errorCode: Int) {
                 Log.e(TAG, "NSD registration failed: error=$errorCode, service=${info.serviceName}")

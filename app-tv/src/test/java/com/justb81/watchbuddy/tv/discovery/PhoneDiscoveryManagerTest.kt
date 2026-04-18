@@ -276,53 +276,89 @@ class PhoneDiscoveryManagerTest {
                     "llmBackend" to "LITERT".toByteArray()
                 )
             )
-            assertNull(parseTxtRecord(info))
+            assertNull(
+                parseTxtRecord(info),
+                "Missing 'version' must hard-fail parsing; do not mask as NONE fallback"
+            )
         }
 
         @Test
         fun `returns null when modelQuality attribute is missing`() {
             val info = mockServiceInfo(
                 mapOf(
-                    "version" to "1".toByteArray(),
+                    "version" to "0.15.1".toByteArray(),
                     "llmBackend" to "LITERT".toByteArray()
                 )
             )
-            assertNull(parseTxtRecord(info))
+            assertNull(
+                parseTxtRecord(info),
+                "Missing 'modelQuality' must hard-fail parsing; do not fall back to 0"
+            )
         }
 
         @Test
         fun `returns null when llmBackend attribute is missing`() {
             val info = mockServiceInfo(
                 mapOf(
-                    "version" to "1".toByteArray(),
+                    "version" to "0.15.1".toByteArray(),
                     "modelQuality" to "70".toByteArray()
                 )
             )
-            assertNull(parseTxtRecord(info))
+            assertNull(
+                parseTxtRecord(info),
+                "Missing 'llmBackend' (distinct from unknown value) must hard-fail parsing"
+            )
         }
 
         @Test
         fun `returns null when modelQuality is not a valid integer`() {
             val info = mockServiceInfo(
                 mapOf(
-                    "version" to "1".toByteArray(),
+                    "version" to "0.15.1".toByteArray(),
                     "modelQuality" to "not-a-number".toByteArray(),
                     "llmBackend" to "LITERT".toByteArray()
                 )
             )
-            assertNull(parseTxtRecord(info))
+            assertNull(
+                parseTxtRecord(info),
+                "Unparseable 'modelQuality' must hard-fail parsing; do not fall back to 0"
+            )
         }
 
         @Test
-        fun `returns null when llmBackend is an unknown value`() {
+        fun `falls back to NONE when llmBackend is an unknown value`() {
+            // A phone running a newer build may advertise an enum value this TV
+            // build does not know about yet. We must not make the phone silently
+            // invisible — fall back to LlmBackend.NONE instead.
             val info = mockServiceInfo(
                 mapOf(
-                    "version" to "1".toByteArray(),
+                    "version" to "0.15.1".toByteArray(),
                     "modelQuality" to "70".toByteArray(),
                     "llmBackend" to "UNKNOWN_BACKEND".toByteArray()
                 )
             )
-            assertNull(parseTxtRecord(info))
+            val result = parseTxtRecord(info)
+            assertNotNull(result)
+            assertEquals(LlmBackend.NONE, result!!.llmBackend)
+            // Other fields must be preserved so the phone still ranks correctly.
+            assertEquals("0.15.1", result.version)
+            assertEquals(70, result.modelQuality)
+        }
+
+        @Test
+        fun `preserves semver version string verbatim`() {
+            // The phone now advertises its real versionName (e.g. "0.15.1") in
+            // the TXT `version` field, not a hardcoded protocol placeholder.
+            val info = mockServiceInfo(
+                mapOf(
+                    "version" to "0.15.1".toByteArray(),
+                    "modelQuality" to "90".toByteArray(),
+                    "llmBackend" to "LITERT".toByteArray()
+                )
+            )
+            val result = parseTxtRecord(info)
+            assertNotNull(result)
+            assertEquals("0.15.1", result!!.version)
         }
 
         @Test

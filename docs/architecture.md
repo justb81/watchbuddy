@@ -25,8 +25,20 @@ graph TB
 Service name:  watchbuddy-{username}
 Service type:  _watchbuddy._tcp.
 Port:          8765
-TXT records:   version=1, modelQuality=70, llmBackend=LITERT
+TXT records:   version=0.15.1, modelQuality=70, llmBackend=LITERT
 ```
+
+**TXT record contract:**
+- `version` — the phone app's `versionName` (e.g. `0.15.1`), sourced from
+  `BuildConfig.VERSION_NAME`. This is **not** a protocol version; the HTTP
+  contract is versioned by endpoint. If a protocol version is ever needed, a
+  new TXT key (`proto`) will be added — `version` will not be reused.
+- `modelQuality` — integer 0–150, matches `LlmOrchestrator.LlmConfig.qualityScore`.
+- `llmBackend` — one of the `LlmBackend` enum names. The TV parses this
+  leniently: unknown values fall back to `LlmBackend.NONE` so a new phone-side
+  enum value does not make the phone silently invisible to older TVs. Missing
+  or unparseable `version` / `modelQuality`, however, cause the entry to be
+  rejected outright.
 
 ### HTTP API (Phone exposes, TV calls)
 
