@@ -42,7 +42,6 @@ class SettingsRepository @Inject constructor(
         val MODEL_DOWNLOAD_URL = stringPreferencesKey("model_download_url")
         val MODEL_READY = booleanPreferencesKey("model_ready")
         val TMDB_API_KEY = stringPreferencesKey("tmdb_api_key")
-        val AUTO_SCROBBLE_ENABLED = booleanPreferencesKey("auto_scrobble_enabled")
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -74,8 +73,7 @@ class SettingsRepository @Inject constructor(
             companionEnabled = prefs[Keys.COMPANION_ENABLED] ?: false,
             modelDownloadUrl = prefs[Keys.MODEL_DOWNLOAD_URL] ?: "",
             tmdbApiKey = prefs[Keys.TMDB_API_KEY] ?: "",
-            defaultTmdbApiKeyAvailable = defaultTmdbApiKey.isNotBlank(),
-            autoScrobbleEnabled = prefs[Keys.AUTO_SCROBBLE_ENABLED] ?: false
+            defaultTmdbApiKeyAvailable = defaultTmdbApiKey.isNotBlank()
         )
     }
 
@@ -87,13 +85,6 @@ class SettingsRepository @Inject constructor(
             prefs[Keys.COMPANION_ENABLED] = settings.companionEnabled
             prefs[Keys.MODEL_DOWNLOAD_URL] = settings.modelDownloadUrl
             prefs[Keys.TMDB_API_KEY] = settings.tmdbApiKey
-            prefs[Keys.AUTO_SCROBBLE_ENABLED] = settings.autoScrobbleEnabled
-        }
-    }
-
-    suspend fun setAutoScrobbleEnabled(enabled: Boolean) {
-        context.dataStore.edit { prefs ->
-            prefs[Keys.AUTO_SCROBBLE_ENABLED] = enabled
         }
     }
 

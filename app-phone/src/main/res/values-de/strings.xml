@@ -118,15 +118,6 @@
     <string name="home_scrobble_stopped">Wiedergabe beendet</string>
     <string name="companion_auto_deactivated">Companion deaktiviert — TV antwortet nicht</string>
 
-    <!-- Auto-Scrobble Einstellungen -->
-    <string name="settings_scrobble">Auto-Scrobble</string>
-    <string name="settings_scrobble_toggle">Auto-Scrobble auf dem Handy</string>
-    <string name="settings_scrobble_description">Serien, die du auf diesem Handy schaust, automatisch tracken</string>
-    <string name="settings_scrobble_grant_access">Zugriff gewähren</string>
-    <string name="settings_scrobble_notification_access">Benachrichtigungszugriff</string>
-    <string name="settings_scrobble_access_granted">Gewährt</string>
-    <string name="settings_scrobble_access_missing">Nicht gewährt — für Scrobbling erforderlich</string>
-
     <!-- Companion Service -->
     <string name="companion_channel_name">Companion-Dienst</string>
     <string name="companion_channel_description">Zeigt an, wenn der Companion-Server für TV-Verbindungen aktiv ist</string>
