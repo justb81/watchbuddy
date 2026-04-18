@@ -7,7 +7,6 @@ import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
-import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
@@ -20,12 +19,6 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
-
-    private val json = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-        coerceInputValues = true
-    }
 
     @Provides
     @Singleton
@@ -70,7 +63,7 @@ object NetworkModule {
     fun provideTraktRetrofit(client: OkHttpClient): Retrofit = Retrofit.Builder()
         .baseUrl("https://api.trakt.tv/")
         .client(client)
-        .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
+        .addConverterFactory(WatchBuddyJson.asConverterFactory("application/json".toMediaType()))
         .build()
 
     @Provides
@@ -79,7 +72,7 @@ object NetworkModule {
     fun provideTmdbRetrofit(client: OkHttpClient): Retrofit = Retrofit.Builder()
         .baseUrl("https://api.themoviedb.org/3/")
         .client(client)
-        .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
+        .addConverterFactory(WatchBuddyJson.asConverterFactory("application/json".toMediaType()))
         .build()
 
     @Provides
@@ -115,7 +108,7 @@ object NetworkModule {
         return Retrofit.Builder()
             .baseUrl(url)
             .client(client)
-            .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
+            .addConverterFactory(WatchBuddyJson.asConverterFactory("application/json".toMediaType()))
             .build()
     }
 

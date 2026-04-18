@@ -18,8 +18,8 @@ import com.justb81.watchbuddy.phone.ui.settings.AuthMode
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
+import com.justb81.watchbuddy.core.network.WatchBuddyJson
 import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -78,10 +78,8 @@ class OnboardingViewModel @Inject constructor(
     private var countdownJob: Job? = null
     private var pollingJob: Job? = null
 
-    private val json = Json { ignoreUnknownKeys = true }
-
     private fun saveDeviceCodeToState(response: DeviceCodeResponse) {
-        savedStateHandle[KEY_DEVICE_CODE_JSON] = json.encodeToString(response)
+        savedStateHandle[KEY_DEVICE_CODE_JSON] = WatchBuddyJson.encodeToString(response)
         savedStateHandle[KEY_DEVICE_CODE_TIMESTAMP] = System.currentTimeMillis()
     }
 
@@ -89,7 +87,7 @@ class OnboardingViewModel @Inject constructor(
         val jsonStr = savedStateHandle.get<String>(KEY_DEVICE_CODE_JSON) ?: return null
         val timestamp = savedStateHandle.get<Long>(KEY_DEVICE_CODE_TIMESTAMP) ?: return null
         return try {
-            val response = json.decodeFromString<DeviceCodeResponse>(jsonStr)
+            val response = WatchBuddyJson.decodeFromString<DeviceCodeResponse>(jsonStr)
             val elapsedSeconds = ((System.currentTimeMillis() - timestamp) / 1000).toInt()
             val remainingSeconds = response.expires_in - elapsedSeconds
             if (remainingSeconds > 0) {

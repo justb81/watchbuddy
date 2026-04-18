@@ -1,6 +1,6 @@
 package com.justb81.watchbuddy.tv.discovery
 
-import kotlinx.serialization.json.Json
+import com.justb81.watchbuddy.core.network.WatchBuddyJson
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
@@ -12,12 +12,6 @@ import javax.inject.Singleton
 class PhoneApiClientFactory @Inject constructor(
     private val httpClient: OkHttpClient
 ) {
-    private val json = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-        coerceInputValues = true
-    }
-
     private val cache = mutableMapOf<String, PhoneApiService>()
 
     fun createClient(baseUrl: String): PhoneApiService =
@@ -25,7 +19,7 @@ class PhoneApiClientFactory @Inject constructor(
             Retrofit.Builder()
                 .baseUrl(baseUrl)
                 .client(httpClient)
-                .addConverterFactory(json.asConverterFactory("application/json".toMediaType()))
+                .addConverterFactory(WatchBuddyJson.asConverterFactory("application/json".toMediaType()))
                 .build()
                 .create(PhoneApiService::class.java)
         }
