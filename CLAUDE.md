@@ -152,8 +152,9 @@ The `release-please--` prefix is reserved for the automated release-please bot â
 
 ### Distribution
 - **Google Play Store:** AABs are automatically uploaded to the **internal** track on each release. Promote to production via Google Play Console.
-- **GitHub Releases:** Signed APKs and AABs are attached to each GitHub Release for sideloading.
+- **GitHub Releases:** Signed APKs, AABs, and per-module `native-debug-symbols.zip` files are attached to each GitHub Release for sideloading and crash triage.
 - **Multi-APK delivery:** Both apps share `applicationId = com.justb81.watchbuddy` with a multiplier-based versionCode scheme (`run_number * 10 + 1` for phone, `run_number * 10 + 2` for TV) to guarantee no collisions. The TV manifest requires `android.software.leanback` so Google Play serves the correct AAB per device type.
+- **Native debug symbols:** Release AABs use `debugSymbolLevel = "FULL"`. AGP-emitted `native-debug-symbols.zip` is uploaded to Play per AAB via the Play upload action's `debugSymbols:` input so native crashes/ANRs are symbolicated (#262).
 - **CI secrets for Play Store:** `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` (Google Cloud service account key with Google Play Android Developer API access). If not set, the Play Store upload step is skipped gracefully.
 
 ### Localization

@@ -224,6 +224,8 @@ this flow and shows a "Now Watching" card with the show title, episode number, a
 | touchscreen required | true | false |
 | 64-bit (Aug 2026) | ✅ | ✅ |
 
+Release AABs are built with `debugSymbolLevel = "FULL"`. AGP emits a per-module `native-debug-symbols.zip` alongside each AAB; CI uploads it with the matching AAB to the Play Store (via `r0adkll/upload-google-play`'s `debugSymbols:` input) and attaches it to the GitHub Release so native crashes and ANRs can be symbolicated.
+
 ## Deep Links
 
 | Service | Package | Link Template |
