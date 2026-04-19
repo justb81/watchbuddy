@@ -277,7 +277,7 @@ WatchBuddy supports three authentication modes, configurable in Advanced Setting
 
 ```mermaid
 flowchart LR
-    Phone["Phone"] -->|"POST /trakt/token\n{ code }"| Backend["WatchBuddy Backend\napi.watchbuddy.app\nInjects client_secret"]
+    Phone["Phone"] -->|"POST /trakt/token\n{ code }"| Backend["WatchBuddy Backend\nwatchbuddy.server.rang.it\nInjects client_secret"]
     Backend -->|"POST /oauth/device/token\n{ code, client_id, client_secret }"| Trakt["Trakt API"]
 ```
 
