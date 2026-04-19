@@ -6,6 +6,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.justb81.watchbuddy.phone.ui.diagnostics.DiagnosticsScreen
 import com.justb81.watchbuddy.phone.ui.home.HomeScreen
 import com.justb81.watchbuddy.phone.ui.onboarding.OnboardingScreen
 import com.justb81.watchbuddy.phone.ui.settings.SettingsScreen
@@ -16,6 +17,7 @@ sealed class PhoneRoute(val route: String) {
     object Home        : PhoneRoute("home")
     object Settings    : PhoneRoute("settings")
     object Connect     : PhoneRoute("connect")
+    object Diagnostics : PhoneRoute("diagnostics")
     object ShowDetail  : PhoneRoute("show_detail/{traktShowId}") {
         fun route(traktShowId: Int) = "show_detail/$traktShowId"
     }
@@ -65,8 +67,13 @@ fun PhoneNavGraph(
                         popUpTo(navController.graph.id) { inclusive = true }
                     }
                 },
-                onConnectClick = { navController.navigate(PhoneRoute.Connect.route) }
+                onConnectClick = { navController.navigate(PhoneRoute.Connect.route) },
+                onDiagnosticsClick = { navController.navigate(PhoneRoute.Diagnostics.route) }
             )
+        }
+
+        composable(PhoneRoute.Diagnostics.route) {
+            DiagnosticsScreen(onBack = { navController.popBackStack() })
         }
 
         composable(PhoneRoute.Connect.route) {

@@ -14,9 +14,11 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.justb81.watchbuddy.BuildConfig
 import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
 
@@ -26,6 +28,7 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onDisconnected: () -> Unit,
     onConnectClick: () -> Unit,
+    onDiagnosticsClick: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     LaunchedEffect(Unit) {
@@ -72,6 +75,31 @@ fun SettingsScreen(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            // ── Diagnostics entry point ──────────────────────────────────────
+            SettingsSectionHeader(stringResource(R.string.settings_diagnostics))
+
+            SettingsCard {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onDiagnosticsClick)
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        stringResource(R.string.settings_diagnostics_row),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        "›",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                    )
+                }
+            }
+
             // ── Account Section ───────────────────────────────────────────────
             SettingsSectionHeader(stringResource(R.string.settings_account))
 
@@ -277,6 +305,20 @@ fun SettingsScreen(
             }
 
             Spacer(Modifier.height(32.dp))
+
+            Text(
+                text = stringResource(
+                    R.string.settings_version_footer,
+                    BuildConfig.VERSION_NAME,
+                    BuildConfig.VERSION_CODE,
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp, bottom = 16.dp)
+            )
         }
     }
 

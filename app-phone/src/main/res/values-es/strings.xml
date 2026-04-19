@@ -170,4 +170,39 @@
         <item quantity="one">%d serie</item>
         <item quantity="other">%d series</item>
     </plurals>
+
+    <!-- Diagnostics -->
+    <string name="settings_diagnostics">Diagnóstico</string>
+    <string name="settings_diagnostics_row">Diagnóstico de conexión</string>
+    <string name="diagnostics_title">Diagnóstico</string>
+    <string name="diagnostics_share_button">Compartir diagnóstico</string>
+    <string name="diagnostics_section_connectivity">Conectividad</string>
+    <string name="diagnostics_section_nsd">NSD / servicio companion</string>
+    <string name="diagnostics_section_http">Servidor HTTP</string>
+    <string name="diagnostics_section_ble">Difusión BLE</string>
+    <string name="diagnostics_section_scrobble">Último scrobble</string>
+    <string name="diagnostics_section_build">Información de build</string>
+    <string name="diagnostics_row_wifi">Wi-Fi</string>
+    <string name="diagnostics_row_ipv4">Dirección IPv4</string>
+    <string name="diagnostics_row_multicast_lock">Bloqueo multicast</string>
+    <string name="diagnostics_row_service_running">Servicio activo</string>
+    <string name="diagnostics_row_nsd_state">Estado NSD</string>
+    <string name="diagnostics_row_nsd_error">Código de error NSD</string>
+    <string name="diagnostics_row_http_binding">Dirección vinculada</string>
+    <string name="diagnostics_row_last_capability_poll">Último sondeo TV</string>
+    <string name="diagnostics_row_ble_state">Estado de difusión</string>
+    <string name="diagnostics_row_ble_error">Código de error BLE</string>
+    <string name="diagnostics_row_scrobble_show">Serie</string>
+    <string name="diagnostics_row_scrobble_progress">Progreso</string>
+    <string name="diagnostics_row_scrobble_time">Hora</string>
+    <string name="diagnostics_row_version_name">Nombre de versión</string>
+    <string name="diagnostics_row_version_code">Código de versión</string>
+    <string name="diagnostics_value_unknown">Desconocido</string>
+    <string name="diagnostics_value_yes">Sí</string>
+    <string name="diagnostics_value_no">No</string>
+    <string name="diagnostics_value_stopped">Detenido</string>
+    <string name="diagnostics_value_none">Ninguno</string>
+
+    <!-- Version footer -->
+    <string name="settings_version_footer">WatchBuddy v%1$s (build %2$d)</string>
 </resources>

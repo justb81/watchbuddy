@@ -55,8 +55,30 @@ class PhoneDiscoveryManager @Inject constructor(
         private const val RESTART_BACKOFF_MS = 500L
     }
 
+    enum class BleScanState { IDLE, SCANNING, FAILED }
+
     private val _discoveredPhones = MutableStateFlow<List<DiscoveredPhone>>(emptyList())
     val discoveredPhones: StateFlow<List<DiscoveredPhone>> = _discoveredPhones
+
+    private val _discoveryActive = MutableStateFlow(false)
+    /** True between [startDiscovery] and [stopDiscovery]. */
+    val discoveryActive: StateFlow<Boolean> = _discoveryActive
+
+    private val _multicastLockHeld = MutableStateFlow(false)
+    /** Whether this manager currently holds a Wi-Fi multicast lock. */
+    val multicastLockHeld: StateFlow<Boolean> = _multicastLockHeld
+
+    private val _bleScanState = MutableStateFlow(BleScanState.IDLE)
+    /** Current state of the BLE fallback scanner. */
+    val bleScanState: StateFlow<BleScanState> = _bleScanState
+
+    private val _bleScanErrorCode = MutableStateFlow<Int?>(null)
+    /** Last `onScanFailed` error code reported by the BLE scanner, or null. */
+    val bleScanErrorCode: StateFlow<Int?> = _bleScanErrorCode
+
+    private val _lastHeartbeatTick = MutableStateFlow(0L)
+    /** Epoch millis of the last heartbeat loop pass, or 0 before the first tick. */
+    val lastHeartbeatTick: StateFlow<Long> = _lastHeartbeatTick
 
     // Nullable + runCatching so that a missing NSD system service on unusual
     // TV ROMs cannot throw during Hilt singleton construction, which would
@@ -163,6 +185,7 @@ class PhoneDiscoveryManager @Inject constructor(
     fun startDiscovery() {
         Log.i(TAG, "startDiscovery: type=$SERVICE_TYPE")
         isDiscovering = true
+        _discoveryActive.value = true
         acquireMulticastLock()
         val mgr = nsdManager
         if (mgr != null) {
@@ -180,6 +203,7 @@ class PhoneDiscoveryManager @Inject constructor(
     fun stopDiscovery() {
         Log.i(TAG, "stopDiscovery")
         isDiscovering = false
+        _discoveryActive.value = false
         heartbeatJob?.cancel()
         unregisterNetworkCallback()
         val mgr = nsdManager
@@ -187,6 +211,8 @@ class PhoneDiscoveryManager @Inject constructor(
             runCatching { mgr.stopServiceDiscovery(discoveryListener) }
         }
         bleScanner.stop()
+        _bleScanState.value = BleScanState.IDLE
+        _bleScanErrorCode.value = null
         releaseMulticastLock()
     }
 
@@ -271,6 +297,7 @@ class PhoneDiscoveryManager @Inject constructor(
                 acquire()
             }
             multicastLock = lock
+            _multicastLockHeld.value = lock.isHeld
             Log.i(TAG, "multicast lock acquired (held=${lock.isHeld})")
         }.onFailure { Log.e(TAG, "multicast lock acquire failed", it) }
     }
@@ -278,6 +305,7 @@ class PhoneDiscoveryManager @Inject constructor(
     private fun releaseMulticastLock() {
         val lock = multicastLock ?: run {
             Log.i(TAG, "multicast lock release skipped: no lock held")
+            _multicastLockHeld.value = false
             return
         }
         runCatching {
@@ -289,6 +317,7 @@ class PhoneDiscoveryManager @Inject constructor(
             }
         }.onFailure { Log.w(TAG, "multicast lock release failed", it) }
         multicastLock = null
+        _multicastLockHeld.value = false
     }
 
     private fun nsdErrorName(errorCode: Int): String = when (errorCode) {
@@ -302,6 +331,7 @@ class PhoneDiscoveryManager @Inject constructor(
         heartbeatJob = heartbeatScope.launch {
             while (true) {
                 delay(DiscoveryConstants.HEARTBEAT_INTERVAL_MS)
+                _lastHeartbeatTick.value = System.currentTimeMillis()
                 checkAllPhones()
             }
         }
@@ -522,8 +552,21 @@ class PhoneDiscoveryManager @Inject constructor(
     }
 
     private fun startBleScan() {
-        bleScanner.start { ipv4, port, quality, backend ->
-            onBleAdvertisement(ipv4, port, quality, backend)
+        val started = bleScanner.start(
+            listener = { ipv4, port, quality, backend ->
+                onBleAdvertisement(ipv4, port, quality, backend)
+            },
+            onFailure = { errorCode ->
+                _bleScanState.value = BleScanState.FAILED
+                _bleScanErrorCode.value = errorCode
+            },
+        )
+        if (started) {
+            _bleScanState.value = BleScanState.SCANNING
+            _bleScanErrorCode.value = null
+        } else if (_bleScanState.value != BleScanState.FAILED) {
+            // Permission denied, BLE off, or unsupported hardware — all soft failures.
+            _bleScanState.value = BleScanState.IDLE
         }
     }
 

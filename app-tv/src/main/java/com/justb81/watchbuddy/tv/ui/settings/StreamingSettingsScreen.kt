@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.tv.material3.*
+import com.justb81.watchbuddy.BuildConfig
 import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.core.model.StreamingService
 import com.justb81.watchbuddy.tv.ui.theme.extendedColors
@@ -26,6 +27,7 @@ import com.justb81.watchbuddy.tv.ui.theme.extendedColors
 @Composable
 fun StreamingSettingsScreen(
     onBack: () -> Unit,
+    onDiagnosticsClick: () -> Unit = {},
     viewModel: StreamingSettingsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -85,9 +87,25 @@ fun StreamingSettingsScreen(
 
             Spacer(Modifier.height(16.dp))
 
-            // Back button
-            OutlinedButton(onClick = onBack) {
-                Text(stringResource(R.string.tv_back))
+            Text(
+                text = stringResource(
+                    R.string.settings_version_footer,
+                    BuildConfig.VERSION_NAME,
+                    BuildConfig.VERSION_CODE,
+                ),
+                fontSize = 12.sp,
+                color = Color.White.copy(alpha = 0.5f),
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
+            // Footer actions
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                OutlinedButton(onClick = onBack) {
+                    Text(stringResource(R.string.tv_back))
+                }
+                OutlinedButton(onClick = onDiagnosticsClick) {
+                    Text(stringResource(R.string.tv_diagnostics_title))
+                }
             }
         }
     }
