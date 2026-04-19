@@ -110,13 +110,19 @@ class ScrobbleViewModelTest {
     @DisplayName("DismissedEpisodesCleanup")
     inner class DismissedEpisodesCleanupTest {
 
+        private fun invokeOnCleared() {
+            val method = viewModel.javaClass.getDeclaredMethod("onCleared")
+            method.isAccessible = true
+            method.invoke(viewModel)
+        }
+
         @Test
         fun `dismissedEpisodes cleared on onCleared`() = runTest {
             pendingFlow.emit(testCandidate)
             viewModel.dismissScrobble()
             assertTrue(viewModel.dismissedEpisodes.isNotEmpty())
 
-            viewModel.onCleared()
+            invokeOnCleared()
 
             assertTrue(viewModel.dismissedEpisodes.isEmpty())
         }
@@ -134,7 +140,7 @@ class ScrobbleViewModelTest {
             }
             assertEquals(3, viewModel.dismissedEpisodes.size)
 
-            viewModel.onCleared()
+            invokeOnCleared()
 
             assertTrue(viewModel.dismissedEpisodes.isEmpty())
         }
