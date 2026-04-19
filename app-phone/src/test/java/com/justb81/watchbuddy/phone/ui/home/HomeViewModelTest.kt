@@ -240,6 +240,48 @@ class HomeViewModelTest {
 
             assertNull(vm.uiState.value.error)
         }
+
+        @Test
+        fun `sync resets isSyncing to false after successful load`() = runTest {
+            every { tokenRepository.getAccessToken() } returns "valid-token"
+            stubShows(emptyList())
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            vm.sync()
+            advanceUntilIdle()
+
+            assertFalse(vm.uiState.value.isSyncing)
+        }
+
+        @Test
+        fun `sync resets isSyncing to false after failed load`() = runTest {
+            every { tokenRepository.getAccessToken() } returns "valid-token"
+            stubShowsThrows(RuntimeException("network error"))
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            vm.sync()
+            advanceUntilIdle()
+
+            assertFalse(vm.uiState.value.isSyncing)
+        }
+
+        @Test
+        fun `sync calls invalidateCache to bypass TTL`() = runTest {
+            every { tokenRepository.getAccessToken() } returns "valid-token"
+            stubShows(emptyList())
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            vm.sync()
+            advanceUntilIdle()
+
+            coVerify(exactly = 1) { showRepository.invalidateCache() }
+        }
     }
 
     @Nested

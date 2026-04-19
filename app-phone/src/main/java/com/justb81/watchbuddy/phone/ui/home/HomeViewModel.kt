@@ -169,35 +169,41 @@ class HomeViewModel @Inject constructor(
     }
 
     fun loadShows() {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null) }
-            try {
-                val token = tokenRepository.getAccessToken()
-                    ?: throw IllegalStateException("No access token available")
-                showRepository.getShows() // Result flows into observeShows() via StateFlow.
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        lastSyncTime = getApplication<Application>().getString(R.string.home_just_now)
-                    )
-                }
-            } catch (e: Exception) {
-                val httpCode = (e as? retrofit2.HttpException)?.code()
-                val errorMsg = if (httpCode == 401 || httpCode == 403) {
-                    getApplication<Application>().getString(R.string.home_sync_failed_auth)
-                } else {
-                    getApplication<Application>().getString(R.string.home_sync_failed, e.message)
-                }
-                _uiState.update { it.copy(isLoading = false, error = errorMsg) }
-            }
-        }
+        viewModelScope.launch { fetchShows() }
     }
 
     fun sync() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isSyncing = true)
-            loadShows()
-            _uiState.value = _uiState.value.copy(isSyncing = false)
+            _uiState.update { it.copy(isSyncing = true) }
+            showRepository.invalidateCache()
+            try {
+                fetchShows()
+            } finally {
+                _uiState.update { it.copy(isSyncing = false) }
+            }
+        }
+    }
+
+    private suspend fun fetchShows() {
+        _uiState.update { it.copy(isLoading = true, error = null) }
+        try {
+            val token = tokenRepository.getAccessToken()
+                ?: throw IllegalStateException("No access token available")
+            showRepository.getShows() // Result flows into observeShows() via StateFlow.
+            _uiState.update {
+                it.copy(
+                    isLoading = false,
+                    lastSyncTime = getApplication<Application>().getString(R.string.home_just_now)
+                )
+            }
+        } catch (e: Exception) {
+            val httpCode = (e as? retrofit2.HttpException)?.code()
+            val errorMsg = if (httpCode == 401 || httpCode == 403) {
+                getApplication<Application>().getString(R.string.home_sync_failed_auth)
+            } else {
+                getApplication<Application>().getString(R.string.home_sync_failed, e.message)
+            }
+            _uiState.update { it.copy(isLoading = false, error = errorMsg) }
         }
     }
 }

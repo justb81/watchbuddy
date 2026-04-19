@@ -56,6 +56,10 @@ class ShowRepository @Inject constructor(
         ShowProgressCalculator.latestWatchedInstant(it.entry)
     }.thenBy { it.entry.show.title.lowercase() }
 
+    fun invalidateCache() {
+        lastFetch = 0L
+    }
+
     suspend fun getShows(): List<EnrichedShowEntry> {
         val now = System.currentTimeMillis()
         val cached = _shows.value
