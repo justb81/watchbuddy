@@ -2,39 +2,6 @@
 <issues format="6" by="lint 9.0.1" type="baseline" client="gradle" dependencies="true" name="AGP (9.0.1)" variant="all" version="9.0.1">
 
     <issue
-        id="MissingPermission"
-        message="Call requires permission which may be rejected by user: code should explicitly check to see if permission is available (with `checkPermission`) or explicitly handle a potential `SecurityException`"
-        errorLine1="            leScanner.startScan(listOf(filter), settings, callback)"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/justb81/watchbuddy/tv/discovery/PhoneBleScanner.kt"
-            line="125"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="MissingPermission"
-        message="Call requires permission which may be rejected by user: code should explicitly check to see if permission is available (with `checkPermission`) or explicitly handle a potential `SecurityException`"
-        errorLine1="        runCatching { sc.stopScan(cb) }"
-        errorLine2="                      ~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/justb81/watchbuddy/tv/discovery/PhoneBleScanner.kt"
-            line="153"
-            column="23"/>
-    </issue>
-
-    <issue
-        id="MissingClass"
-        message="Class referenced in the manifest, `androidx.startup.InitializationProvider`, was not found in the project or the libraries"
-        errorLine1="            android:name=&quot;androidx.startup.InitializationProvider&quot;"
-        errorLine2="                          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/AndroidManifest.xml"
-            line="93"
-            column="27"/>
-    </issue>
-
-    <issue
         id="OldTargetApi"
         message="Not targeting the latest versions of Android; compatibility modes apply. Consider testing and updating this version. Consult the `android.os.Build.VERSION_CODES` javadoc for details."
         errorLine1="        targetSdk = 35"
@@ -54,17 +21,6 @@
             file="src/main/AndroidManifest.xml"
             line="9"
             column="5"/>
-    </issue>
-
-    <issue
-        id="ProtectedPermissions"
-        message="Permission is only granted to system apps"
-        errorLine1="    &lt;uses-permission android:name=&quot;android.permission.BIND_NOTIFICATION_LISTENER_SERVICE&quot; />"
-        errorLine2="                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/AndroidManifest.xml"
-            line="36"
-            column="22"/>
     </issue>
 
     <issue
@@ -510,7 +466,7 @@
         errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
             file="src/main/AndroidManifest.xml"
-            line="79"
+            line="83"
             column="13"/>
     </issue>
 
@@ -620,7 +576,7 @@
         errorLine2="                             ~~~~~">
         <location
             file="src/main/AndroidManifest.xml"
-            line="68"
+            line="72"
             column="30"/>
     </issue>
 

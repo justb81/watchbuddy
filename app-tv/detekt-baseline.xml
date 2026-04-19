@@ -136,7 +136,7 @@
     <ID>NoWildcardImports:TvScrobbleDispatcherTest.kt$import io.mockk.*</ID>
     <ID>NoWildcardImports:TvScrobbleDispatcherTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
     <ID>NoWildcardImports:TvShowCacheTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
-    <ID>ReturnCount:PhoneBleScanner.kt$PhoneBleScanner$fun start( listener: Listener, onFailure: (Int) -&gt; Unit = {}, ): Boolean</ID>
+    <ID>ReturnCount:PhoneBleScanner.kt$PhoneBleScanner$@SuppressLint("MissingPermission") // Guarded by hasScanPermission() below. fun start( listener: Listener, onFailure: (Int) -&gt; Unit = {}, ): Boolean</ID>
     <ID>ReturnCount:PhoneDiscoveryManager.kt$PhoneDiscoveryManager$@VisibleForTesting internal fun parseTxtRecord(serviceInfo: NsdServiceInfo): PhoneTxtRecord?</ID>
     <ID>SpacingBetweenDeclarationsWithAnnotations:PhoneDiscoveryManager.kt$PhoneDiscoveryManager$@Volatile private var isDiscovering: Boolean = false</ID>
     <ID>SpacingBetweenDeclarationsWithAnnotations:TvDiscoveryService.kt$TvDiscoveryService$@Inject lateinit var preferences: StreamingPreferencesRepository</ID>

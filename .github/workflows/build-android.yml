@@ -74,18 +74,23 @@ jobs:
         run: ./gradlew :app-phone:lintDebug :app-tv:lintDebug
 
       # Always gather SARIF so PRs that failed lint/detekt still get inline
-      # annotations in the Files-changed tab.
+      # annotations in the Files-changed tab. Flatten to unique names because
+      # upload-sarif rejects duplicate basenames across subdirectories.
       - name: Collect SARIF reports
         if: always()
         run: |
           mkdir -p sarif-reports
-          find app-phone app-tv core -type f -name "*.sarif" -print -exec cp {} sarif-reports/$(basename {}).$(date +%s%N).sarif \; 2>/dev/null || true
-          # De-dupe: keep the latest per original filename.
-          ls -la sarif-reports/ || true
+          while IFS= read -r f; do
+            mod=$(echo "$f" | cut -d/ -f1)
+            name=$(basename "$f")
+            cp "$f" "sarif-reports/${mod}-${name}"
+          done < <(find app-phone app-tv core -type f -name "*.sarif" 2>/dev/null)
+          ls -la sarif-reports/
 
       - name: Upload SARIF to GitHub code scanning
         if: always()
-        uses: github/codeql-action/upload-sarif@v3
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: sarif-reports
           category: watchbuddy-static-analysis

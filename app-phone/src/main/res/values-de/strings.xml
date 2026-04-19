@@ -142,6 +142,12 @@
     <string name="companion_notification_permission_rationale_body">WatchBuddy zeigt während der TV-Verbindung eine dauerhafte Benachrichtigung, damit Android den Dienst nicht im Hintergrund beendet. Aktiviere Benachrichtigungen in den App-Einstellungen, um fortzufahren.</string>
     <string name="companion_notification_permission_open_settings">Einstellungen öffnen</string>
 
+    <!-- Model Download -->
+    <string name="model_download_channel_name">Modell-Download</string>
+    <string name="model_download_channel_description">Zeigt den Fortschritt beim Herunterladen des KI-Modells</string>
+    <string name="model_download_notification_title">KI-Modell wird heruntergeladen</string>
+    <string name="model_download_notification_text">WatchBuddy lädt das KI-Modell im Hintergrund herunter</string>
+
     <!-- Show Detail -->
     <string name="show_detail_seasons">Staffeln</string>
     <string name="show_detail_season">Staffel %1$d</string>

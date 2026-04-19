@@ -189,7 +189,7 @@
     <ID>NoWildcardImports:ShowRepositoryTest.kt$import io.mockk.*</ID>
     <ID>NoWildcardImports:ShowRepositoryTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
     <ID>NoWildcardImports:TestFixtures.kt$import com.justb81.watchbuddy.core.model.*</ID>
-    <ID>ReturnCount:CompanionBleAdvertiser.kt$CompanionBleAdvertiser$fun start( ipv4: Inet4Address, port: Int, modelQuality: Int, llmBackendOrdinal: Int, ): Boolean</ID>
+    <ID>ReturnCount:CompanionBleAdvertiser.kt$CompanionBleAdvertiser$@SuppressLint("MissingPermission") // Guarded by hasAdvertisePermission() below. fun start( ipv4: Inet4Address, port: Int, modelQuality: Int, llmBackendOrdinal: Int, ): Boolean</ID>
     <ID>ReturnCount:CompanionService.kt$CompanionService$private fun wifiIpv4Address(): InetAddress?</ID>
     <ID>SpacingBetweenDeclarationsWithAnnotations:CompanionService.kt$CompanionService$/** * Last IPv4 address published in the NSD TXT record / pinned as * [NsdServiceInfo.host]. Used by [registerNetworkCallback] to skip the * full `unregister → 300 ms → register` dance when Wi-Fi re-announces a * network whose IPv4 didn't actually change (#345 Opt D): on many OEM * stacks `NetworkCallback.onAvailable` fires repeatedly during captive * portal / DNS retries without any real handoff, and each churn briefly * removes our advertisement from the network. */ @Volatile private var lastRegisteredIpv4: String? = null</ID>
     <ID>SpacingBetweenDeclarationsWithAnnotations:CompanionService.kt$CompanionService$@Inject lateinit var bleAdvertiser: CompanionBleAdvertiser</ID>

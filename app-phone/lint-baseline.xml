@@ -2,28 +2,6 @@
 <issues format="6" by="lint 9.0.1" type="baseline" client="gradle" dependencies="true" name="AGP (9.0.1)" variant="all" version="9.0.1">
 
     <issue
-        id="MissingPermission"
-        message="Call requires permission which may be rejected by user: code should explicitly check to see if permission is available (with `checkPermission`) or explicitly handle a potential `SecurityException`"
-        errorLine1="            leAdvertiser.startAdvertising(settings, data, callback)"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/justb81/watchbuddy/service/CompanionBleAdvertiser.kt"
-            line="153"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="MissingPermission"
-        message="Call requires permission which may be rejected by user: code should explicitly check to see if permission is available (with `checkPermission`) or explicitly handle a potential `SecurityException`"
-        errorLine1="        runCatching { adv.stopAdvertising(cb) }"
-        errorLine2="                      ~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/justb81/watchbuddy/service/CompanionBleAdvertiser.kt"
-            line="183"
-            column="23"/>
-    </issue>
-
-    <issue
         id="OldTargetApi"
         message="Not targeting the latest versions of Android; compatibility modes apply. Consider testing and updating this version. Consult the `android.os.Build.VERSION_CODES` javadoc for details."
         errorLine1="        targetSdk = 35"
@@ -477,7 +455,7 @@
         errorLine2="    ^">
         <location
             file="src/main/res/values-es/strings.xml"
-            line="179"
+            line="185"
             column="5"/>
     </issue>
 
@@ -488,7 +466,7 @@
         errorLine2="    ^">
         <location
             file="src/main/res/values-fr/strings.xml"
-            line="179"
+            line="185"
             column="5"/>
     </issue>
 
@@ -499,7 +477,7 @@
         errorLine2="    ^">
         <location
             file="src/main/res/values-es/strings.xml"
-            line="183"
+            line="189"
             column="5"/>
     </issue>
 
@@ -510,52 +488,8 @@
         errorLine2="    ^">
         <location
             file="src/main/res/values-fr/strings.xml"
-            line="183"
+            line="189"
             column="5"/>
-    </issue>
-
-    <issue
-        id="MissingTranslation"
-        message="&quot;model_download_channel_name&quot; is not translated in &quot;de&quot; (German), &quot;fr&quot; (French), &quot;es&quot; (Spanish)"
-        errorLine1="    &lt;string name=&quot;model_download_channel_name&quot;>Model Download&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="155"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="MissingTranslation"
-        message="&quot;model_download_channel_description&quot; is not translated in &quot;de&quot; (German), &quot;fr&quot; (French), &quot;es&quot; (Spanish)"
-        errorLine1="    &lt;string name=&quot;model_download_channel_description&quot;>Shows progress while downloading the AI model&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="156"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="MissingTranslation"
-        message="&quot;model_download_notification_title&quot; is not translated in &quot;de&quot; (German), &quot;fr&quot; (French), &quot;es&quot; (Spanish)"
-        errorLine1="    &lt;string name=&quot;model_download_notification_title&quot;>Downloading AI model&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="157"
-            column="13"/>
-    </issue>
-
-    <issue
-        id="MissingTranslation"
-        message="&quot;model_download_notification_text&quot; is not translated in &quot;de&quot; (German), &quot;fr&quot; (French), &quot;es&quot; (Spanish)"
-        errorLine1="    &lt;string name=&quot;model_download_notification_text&quot;>WatchBuddy is downloading the AI model in the background&lt;/string>"
-        errorLine2="            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/res/values/strings.xml"
-            line="158"
-            column="13"/>
     </issue>
 
     <issue
