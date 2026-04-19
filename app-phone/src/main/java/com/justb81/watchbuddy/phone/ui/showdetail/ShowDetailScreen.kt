@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -101,6 +102,11 @@ fun ShowDetailScreen(
                 }
 
                 else -> {
+                    PullToRefreshBox(
+                        isRefreshing = uiState.isRefreshing,
+                        onRefresh = { viewModel.loadShowDetail(isRefresh = true) },
+                        modifier = Modifier.fillMaxSize()
+                    ) {
                     LazyColumn(
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -139,6 +145,7 @@ fun ShowDetailScreen(
                                 )
                             }
                         }
+                    }
                     }
                 }
             }

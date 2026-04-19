@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -238,7 +239,9 @@ fun HomeScreen(
                         HomeContent(
                             state = uiState,
                             onShowClick = onShowClick,
-                            onToggleWatchingTv = handleToggleWatchingTv
+                            onToggleWatchingTv = handleToggleWatchingTv,
+                            isRefreshing = uiState.isSyncing,
+                            onRefresh = { viewModel.sync() }
                         )
                     }
                 }
@@ -247,11 +250,14 @@ fun HomeScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun HomeContent(
     state: HomeUiState,
     onShowClick: (Int) -> Unit,
-    onToggleWatchingTv: (Boolean) -> Unit
+    onToggleWatchingTv: (Boolean) -> Unit,
+    isRefreshing: Boolean,
+    onRefresh: () -> Unit
 ) {
     val orientation = LocalConfiguration.current.orientation
     val isLandscape = orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -265,6 +271,11 @@ private fun HomeContent(
     }
     var allShowsExpanded by rememberSaveable { mutableStateOf(false) }
 
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = onRefresh,
+        modifier = Modifier.fillMaxSize()
+    ) {
     LazyColumn(
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -345,6 +356,7 @@ private fun HomeContent(
                 )
             }
         }
+    }
     }
 }
 

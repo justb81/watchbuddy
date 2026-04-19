@@ -24,6 +24,7 @@ import javax.inject.Inject
 
 data class ShowDetailUiState(
     val isLoading: Boolean = true,
+    val isRefreshing: Boolean = false,
     val show: TraktShow? = null,
     val posterUrl: String? = null,
     val overview: String? = null,
@@ -69,26 +70,37 @@ class ShowDetailViewModel @Inject constructor(
         loadShowDetail()
     }
 
-    fun loadShowDetail() {
+    fun loadShowDetail(isRefresh: Boolean = false) {
         viewModelScope.launch {
-            _uiState.value = ShowDetailUiState(isLoading = true)
+            if (isRefresh) {
+                _uiState.update { it.copy(isRefreshing = true, error = null) }
+            } else {
+                _uiState.value = ShowDetailUiState(isLoading = true)
+            }
             try {
                 val watchedEntry = findWatchedEntry()
                 val seasons = episodeRepository.getSeasonsWithEpisodes(traktShowId.toString())
                 val seasonUis = buildSeasonUis(seasons, watchedEntry)
 
-                _uiState.value = ShowDetailUiState(
-                    isLoading = false,
-                    show = watchedEntry.show,
-                    seasons = seasonUis
-                )
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        isRefreshing = false,
+                        show = watchedEntry.show,
+                        seasons = seasonUis,
+                        error = null
+                    )
+                }
 
                 watchedEntry.show.ids.tmdb?.let { tmdbId -> loadTmdbDetails(tmdbId) }
             } catch (e: Exception) {
-                _uiState.value = ShowDetailUiState(
-                    isLoading = false,
-                    error = getApplication<Application>().getString(R.string.error_generic)
-                )
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        isRefreshing = false,
+                        error = getApplication<Application>().getString(R.string.error_generic)
+                    )
+                }
             }
         }
     }

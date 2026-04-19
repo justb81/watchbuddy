@@ -120,6 +120,20 @@ class ShowRepositoryTest {
     }
 
     @Test
+    fun `invalidateCache causes getShows to hit network even within TTL`() = runTest {
+        coEvery { tokenRefreshManager.getValidAccessToken() } returns "test-token"
+        coEvery { traktApi.getWatchedShows(any()) } returns testShows
+
+        repository.getShows()
+        coVerify(exactly = 1) { traktApi.getWatchedShows(any()) }
+
+        repository.invalidateCache()
+        repository.getShows()
+
+        coVerify(exactly = 2) { traktApi.getWatchedShows(any()) }
+    }
+
+    @Test
     fun `getShows enriches entries with TMDB poster path when API key is set`() = runTest {
         every { settingsRepository.getTmdbApiKey() } returns flowOf("api-key")
         coEvery { tokenRefreshManager.getValidAccessToken() } returns "test-token"
