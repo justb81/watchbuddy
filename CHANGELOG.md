@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.19.1](https://github.com/justb81/watchbuddy/compare/v0.19.0...v0.19.1) (2026-04-19)
+
+
+### Bug Fixes
+
+* BLE advertising overflow on Android 16 + TV discovery cleanup ([#345](https://github.com/justb81/watchbuddy/issues/345), [#281](https://github.com/justb81/watchbuddy/issues/281)) ([#347](https://github.com/justb81/watchbuddy/issues/347)) ([23928e5](https://github.com/justb81/watchbuddy/commit/23928e5ff8c9b3fbada25e0624eed5a0d6344c24))
+
 ## [0.19.0](https://github.com/justb81/watchbuddy/compare/v0.18.0...v0.19.0) (2026-04-19)
 
 
