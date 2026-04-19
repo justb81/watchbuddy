@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.20.0](https://github.com/justb81/watchbuddy/compare/v0.19.1...v0.20.0) (2026-04-19)
+
+
+### Features
+
+* BLE throttling + NSD re-register dedup ([#345](https://github.com/justb81/watchbuddy/issues/345) PR 2) ([#349](https://github.com/justb81/watchbuddy/issues/349)) ([5a987db](https://github.com/justb81/watchbuddy/commit/5a987dbc305056f7d374d3618a88e3a5786f77f9))
+* **tv:** Settings hub, phone-discovery toggle, boot autostart ([#344](https://github.com/justb81/watchbuddy/issues/344)) ([#360](https://github.com/justb81/watchbuddy/issues/360)) ([ef00a9a](https://github.com/justb81/watchbuddy/commit/ef00a9ad83fca3d614ba05e2847e266c8cd6d816))
+
 ## [0.19.1](https://github.com/justb81/watchbuddy/compare/v0.19.0...v0.19.1) (2026-04-19)
 
 
