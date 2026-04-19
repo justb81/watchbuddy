@@ -82,7 +82,8 @@ class OnboardingViewModelRetryTest {
         buildConfigClientId = BUILD_CLIENT_ID,
         tokenRepository = tokenRepository,
         settingsRepository = settingsRepository,
-        tokenProxyServiceFactory = tokenProxyServiceFactory
+        tokenProxyServiceFactory = tokenProxyServiceFactory,
+        managedBackendAvailable = true
     )
 
     @Nested

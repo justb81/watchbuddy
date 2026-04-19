@@ -63,6 +63,7 @@ class TokenRefreshManagerTest {
             traktApi = traktApi,
             tokenProxy = tokenProxy,
             tokenProxyServiceFactory = tokenProxyServiceFactory,
+            managedBackendAvailable = true,
             clientId = buildClientId
         )
     }
@@ -119,8 +120,9 @@ class TokenRefreshManagerTest {
                 tokenRepository = tokenRepository,
                 settingsRepository = settingsRepository,
                 traktApi = traktApi,
-                tokenProxy = null,
+                tokenProxy = tokenProxy,
                 tokenProxyServiceFactory = tokenProxyServiceFactory,
+                managedBackendAvailable = false,
                 clientId = buildClientId
             )
 
