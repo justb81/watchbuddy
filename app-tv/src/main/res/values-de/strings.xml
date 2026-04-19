@@ -64,6 +64,20 @@
     <string name="tv_error_phone_unreachable">Begleit-App nicht erreichbar. Zwischengespeicherte Daten werden angezeigt.</string>
     <string name="tv_error_phone_unreachable_no_cache">Begleit-App nicht erreichbar. Stelle sicher, dass WatchBuddy auf deinem Handy läuft.</string>
 
+    <!-- Einstellungen -->
+    <string name="tv_settings_title">Einstellungen</string>
+    <string name="tv_settings_button">Einstellungen</string>
+    <string name="tv_settings_phone_discovery_title">Handysuche</string>
+    <string name="tv_settings_phone_discovery_subtitle">Netzwerk nach WatchBuddy-Handys durchsuchen</string>
+    <string name="tv_settings_autostart_title">Autostart beim Booten</string>
+    <string name="tv_settings_autostart_subtitle">Suche automatisch starten, wenn der Fernseher eingeschaltet wird</string>
+    <string name="tv_settings_streaming_services">Streamingdienste</string>
+    <string name="tv_settings_diagnostics">Diagnose</string>
+
+    <!-- Hintergrundservice-Benachrichtigung -->
+    <string name="tv_discovery_notification_channel_name">WatchBuddy-Suche</string>
+    <string name="tv_discovery_notification_text">Suche nach WatchBuddy-Handys…</string>
+
     <!-- Streaming settings -->
     <string name="tv_streaming_settings_button">Dienste</string>
     <string name="tv_streaming_settings_title">Streamingdienste</string>

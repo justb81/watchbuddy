@@ -64,6 +64,20 @@
     <string name="tv_error_phone_unreachable">Companion app unreachable. Showing cached data.</string>
     <string name="tv_error_phone_unreachable_no_cache">Companion app unreachable. Make sure WatchBuddy is running on your phone.</string>
 
+    <!-- Generic Settings hub -->
+    <string name="tv_settings_title">Settings</string>
+    <string name="tv_settings_button">Settings</string>
+    <string name="tv_settings_phone_discovery_title">Phone discovery</string>
+    <string name="tv_settings_phone_discovery_subtitle">Scan the network for WatchBuddy phones</string>
+    <string name="tv_settings_autostart_title">Autostart at boot</string>
+    <string name="tv_settings_autostart_subtitle">Start discovery automatically when the TV turns on</string>
+    <string name="tv_settings_streaming_services">Streaming services</string>
+    <string name="tv_settings_diagnostics">Diagnostics</string>
+
+    <!-- Discovery background service notification -->
+    <string name="tv_discovery_notification_channel_name">WatchBuddy Discovery</string>
+    <string name="tv_discovery_notification_text">Searching for WatchBuddy phones…</string>
+
     <!-- Streaming settings -->
     <string name="tv_streaming_settings_button">Services</string>
     <string name="tv_streaming_settings_title">Streaming Services</string>

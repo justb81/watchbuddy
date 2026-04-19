@@ -5,8 +5,10 @@ import androidx.lifecycle.viewModelScope
 import com.justb81.watchbuddy.core.model.EnrichedShowEntry
 import com.justb81.watchbuddy.core.progress.ShowProgress
 import com.justb81.watchbuddy.core.progress.ShowProgressCalculator
+import com.justb81.watchbuddy.tv.data.StreamingPreferencesRepository
 import com.justb81.watchbuddy.tv.data.TvShowCache
 import com.justb81.watchbuddy.tv.data.UserSessionRepository
+import com.justb81.watchbuddy.tv.discovery.TvDiscoveryService
 import com.justb81.watchbuddy.tv.discovery.PhoneApiClientFactory
 import com.justb81.watchbuddy.tv.discovery.PhoneApiService
 import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
@@ -44,7 +46,8 @@ class TvHomeViewModel @Inject constructor(
     private val phoneDiscovery: PhoneDiscoveryManager,
     private val phoneApiClientFactory: PhoneApiClientFactory,
     private val userSessionRepository: UserSessionRepository,
-    private val tvShowCache: TvShowCache
+    private val tvShowCache: TvShowCache,
+    private val streamingPreferencesRepository: StreamingPreferencesRepository,
 ) : ViewModel() {
 
     companion object {
@@ -61,9 +64,17 @@ class TvHomeViewModel @Inject constructor(
     private var loadedOffset: Int = 0
 
     init {
-        runCatching { phoneDiscovery.startDiscovery() }
+        observeDiscoveryEnabled()
         observePhones()
         observeSelectedUsers()
+    }
+
+    private fun observeDiscoveryEnabled() {
+        viewModelScope.launch {
+            streamingPreferencesRepository.isPhoneDiscoveryEnabled.collect { enabled ->
+                runCatching { phoneDiscovery.setEnabled(enabled) }
+            }
+        }
     }
 
     private fun observePhones() {
@@ -215,7 +226,10 @@ class TvHomeViewModel @Inject constructor(
 
     override fun onCleared() {
         super.onCleared()
-        phoneDiscovery.stopDiscovery()
+        // Leave discovery running when the background service owns the lifecycle.
+        if (!TvDiscoveryService.isRunning) {
+            phoneDiscovery.stopDiscovery()
+        }
     }
 }
 

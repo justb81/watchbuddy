@@ -1,13 +1,18 @@
 package com.justb81.watchbuddy.tv.di
 
+import android.content.Context
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 import com.justb81.watchbuddy.core.scrobbler.ScrobbleDispatcher
 import com.justb81.watchbuddy.core.scrobbler.WatchedShowSource
+import com.justb81.watchbuddy.tv.data.getStreamingDataStore
 import com.justb81.watchbuddy.tv.scrobbler.TvScrobbleDispatcher
 import com.justb81.watchbuddy.tv.scrobbler.TvWatchedShowSource
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Named
 import javax.inject.Singleton
@@ -23,6 +28,11 @@ abstract class AppModule {
     abstract fun bindScrobbleDispatcher(impl: TvScrobbleDispatcher): ScrobbleDispatcher
 
     companion object {
+
+        @Provides
+        @Singleton
+        fun provideStreamingDataStore(@ApplicationContext context: Context): DataStore<Preferences> =
+            context.getStreamingDataStore()
 
         /**
          * Token proxy backend URL — the TV app uses no token proxy, so this is blank.

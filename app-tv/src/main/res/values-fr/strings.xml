@@ -64,6 +64,20 @@
     <string name="tv_error_phone_unreachable">Application compagnon inaccessible. Affichage des données en cache.</string>
     <string name="tv_error_phone_unreachable_no_cache">Application compagnon inaccessible. Assurez-vous que WatchBuddy est en cours d\'exécution sur votre téléphone.</string>
 
+    <!-- Paramètres -->
+    <string name="tv_settings_title">Paramètres</string>
+    <string name="tv_settings_button">Paramètres</string>
+    <string name="tv_settings_phone_discovery_title">Détection de téléphones</string>
+    <string name="tv_settings_phone_discovery_subtitle">Rechercher les téléphones WatchBuddy sur le réseau</string>
+    <string name="tv_settings_autostart_title">Démarrage automatique</string>
+    <string name="tv_settings_autostart_subtitle">Lancer la détection automatiquement au démarrage du téléviseur</string>
+    <string name="tv_settings_streaming_services">Services de streaming</string>
+    <string name="tv_settings_diagnostics">Diagnostic</string>
+
+    <!-- Notification du service de fond -->
+    <string name="tv_discovery_notification_channel_name">Détection WatchBuddy</string>
+    <string name="tv_discovery_notification_text">Recherche de téléphones WatchBuddy…</string>
+
     <!-- Streaming settings -->
     <string name="tv_streaming_settings_button">Services</string>
     <string name="tv_streaming_settings_title">Services de streaming</string>

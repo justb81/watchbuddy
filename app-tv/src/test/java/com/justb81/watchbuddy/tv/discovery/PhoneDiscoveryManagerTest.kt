@@ -353,6 +353,50 @@ class PhoneDiscoveryManagerTest {
 
     // ── constants ──────────────────────────────────────────────────────────────
 
+    // ── setEnabled ─────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("setEnabled")
+    inner class SetEnabledTest {
+
+        @Test
+        fun `setEnabled(true) starts discovery when not already discovering`() {
+            manager.setEnabled(true)
+            verify { nsdManager.discoverServices(any(), any(), any()) }
+        }
+
+        @Test
+        fun `setEnabled(true) is idempotent when already discovering`() {
+            manager.startDiscovery()
+            clearMocks(nsdManager, answers = false)
+            every { nsdManager.discoverServices(any(), any(), any()) } just runs
+
+            manager.setEnabled(true)
+
+            verify(exactly = 0) { nsdManager.discoverServices(any(), any(), any()) }
+        }
+
+        @Test
+        fun `setEnabled(false) stops discovery and clears phone list`() {
+            manager.startDiscovery()
+            val serviceInfo = mockk<android.net.nsd.NsdServiceInfo>()
+            every { serviceInfo.serviceName } returns "test"
+            manager.setDiscoveredPhonesForTest(
+                listOf(makePhone(capability = null, name = "test"))
+            )
+
+            manager.setEnabled(false)
+
+            assertTrue(manager.discoveredPhones.value.isEmpty())
+        }
+
+        @Test
+        fun `setEnabled(false) is a no-op when not discovering`() {
+            manager.setEnabled(false)
+            assertTrue(manager.discoveredPhones.value.isEmpty())
+        }
+    }
+
     @Test
     fun `SERVICE_TYPE constant is correct`() {
         assertEquals("_watchbuddy._tcp.", PhoneDiscoveryManager.SERVICE_TYPE)

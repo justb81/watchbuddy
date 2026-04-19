@@ -4,6 +4,10 @@
 
     <!-- Network -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- Required for foreground services of type connectedDevice on Android 14+ -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
@@ -69,6 +73,25 @@
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Boot receiver: starts TvDiscoveryService when the TV powers on,
+             if the user has enabled autostart in Settings. Exported=false because
+             it only needs to receive the system BOOT_COMPLETED broadcast. -->
+        <receiver
+            android:name=".tv.boot.BootReceiver"
+            android:exported="false"
+            android:directBootAware="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Background discovery service: keeps PhoneDiscoveryManager alive after boot.
+             Started by BootReceiver; binds to TvMainActivity when the user opens the app. -->
+        <service
+            android:name=".tv.discovery.TvDiscoveryService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
 
         <!-- TV app does not use WorkManager; disable its auto-init so the
              startup path does not build a Room-backed WorkDatabase for

@@ -48,7 +48,7 @@ import java.time.ZoneId
 fun TvHomeScreen(
     onShowClick: (TraktWatchedEntry) -> Unit,
     onUserSelectClick: () -> Unit,
-    onStreamingSettingsClick: () -> Unit = {},
+    onSettingsClick: () -> Unit = {},
     viewModel: TvHomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -89,9 +89,9 @@ fun TvHomeScreen(
                     }
 
                     OutlinedButton(
-                        onClick = onStreamingSettingsClick,
+                        onClick = onSettingsClick,
                         scale = ButtonDefaults.scale(scale = 1f)
-                    ) { Text(stringResource(R.string.tv_streaming_settings_button)) }
+                    ) { Text(stringResource(R.string.tv_settings_button)) }
 
                     Button(
                         onClick = onUserSelectClick,

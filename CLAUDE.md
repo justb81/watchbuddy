@@ -28,9 +28,10 @@ watchbuddy/
 │       └── (service/)  CompanionService, CompanionStateManager (foreground NSD server + shared state)
 ├── app-tv/             Google TV app (Kotlin, Compose for TV)
 │   └── src/main/java/com/justb81/watchbuddy/tv/
+│       ├── boot/       BootReceiver (starts TvDiscoveryService on BOOT_COMPLETED when autostart pref is true)
 │       ├── data/       StreamingPreferencesRepository, UserSessionRepository, TvShowCache
 │       ├── di/         AppModule (Hilt dependency injection)
-│       ├── discovery/  PhoneDiscoveryManager, PhoneApiService, PhoneApiClientFactory
+│       ├── discovery/  PhoneDiscoveryManager, PhoneApiService, PhoneApiClientFactory, TvDiscoveryService (foreground service; keeps discovery alive after boot)
 │       ├── scrobbler/  TvScrobbleDispatcher, TvWatchedShowSource
 │       ├── ui/         TvMainActivity, TvNavGraph
 │       │   ├── home/       TvHomeScreen, TvHomeViewModel
@@ -38,7 +39,7 @@ watchbuddy/
 │       │   ├── recap/      RecapScreen, RecapViewModel
 │       │   ├── diagnostics/ TvDiagnosticsScreen, TvDiagnosticsViewModel (discovery / BLE / discovered-phones health — view-only, no Share)
 │       │   ├── scrobble/   ScrobbleOverlay, ScrobbleViewModel
-│       │   ├── settings/   StreamingSettingsScreen, StreamingSettingsViewModel
+│       │   ├── settings/   TvSettingsScreen, TvSettingsViewModel (phone-discovery toggle + boot-autostart toggle + nav to StreamingSettings/Diagnostics), StreamingSettingsScreen, StreamingSettingsViewModel
 │       │   ├── showdetail/ ShowDetailScreen, ShowDetailViewModel
 │       │   ├── theme/      TV Material theme
 │       │   └── userselect/ UserSelectScreen, UserSelectViewModel
@@ -206,6 +207,7 @@ For the authoritative HTTP API table, NSD TXT-record contract (`version`, `model
 - **Multi-user:** Multiple phones can connect to one TV simultaneously; scrobbling records the episode for each connected user independently; shared watch mode avoids recap spoilers.
 - **Manual episode marking (phone):** Tapping a show on HomeScreen opens `ShowDetailScreen`, which fetches the full season/episode structure via `EpisodeRepository.getSeasonsWithEpisodes` (Trakt `shows/:id/seasons?extended=episodes`, 10-min per-show cache). Each episode has a checkbox; toggling calls `sync/history` add or remove through `EpisodeRepository`, optimistically flips the UI, and on success calls `ShowRepository.updateLocalWatched(...)`. That mutates the in-memory `shows` `StateFlow` so `HomeViewModel` counters update without a round-trip (#216). The layout pulls the season the user is currently mid-watching to the top, expanded; all other seasons appear below, collapsed.
 - **Diagnostics view:** Settings → Diagnostics on both apps renders live phone↔TV connection health from the existing shared singletons (`CompanionStateManager` on phone, `PhoneDiscoveryManager` on TV) — Wi-Fi / multicast lock / NSD state / HTTP bind / BLE state on the phone; discovery active / heartbeat age / BLE scan state / per-phone score + failCount on the TV (#331). Status dots are color-coded (green/yellow/red) so users can tell "AP isolation" (no phones at all) apart from "`/capability` 500" (discovered but broken). On the **phone only**, a "Share diagnostics" button funnels through `DiagnosticShare.launchShare()` so the `DiagnosticLog` breadcrumb snapshot + any pending crash reports can be exported via the system share sheet (#338). The TV screen is view-only — TV share was removed because the Android TV system share sheet is effectively unusable with a D-pad. For the snapshot to be actionable, connectivity subsystems on the phone (`CompanionService`, NSD state machine, `CompanionHttpServer` request log, `CompanionBleAdvertiser`, `WifiStateProvider`, `HomeViewModel` toggle) emit `DiagnosticLog.event(...)` breadcrumbs — without those the ring only carries auth/settings/app-lifecycle traces. Available in release builds; no new build variant.
+- **TV phone-discovery toggle and boot autostart (#344):** `TvSettingsScreen` (reached via the Settings button on the TV home screen) exposes two toggles stored in `StreamingPreferencesRepository`: `isPhoneDiscoveryEnabled` (default true) and `isAutostartEnabled` (default false). Disabling `isPhoneDiscoveryEnabled` stops `PhoneDiscoveryManager` and clears the discovered-phone list; re-enabling restarts it. Enabling `isAutostartEnabled` causes `BootReceiver` to start `TvDiscoveryService` at TV boot. `TvDiscoveryService` (foreground, `connectedDevice`) self-stops when both prefs become false. `TvHomeViewModel.onCleared` skips `stopDiscovery()` while `TvDiscoveryService.isRunning` is true so the service lifetime is independent of the UI.
 
 ## Documentation Maintenance
 

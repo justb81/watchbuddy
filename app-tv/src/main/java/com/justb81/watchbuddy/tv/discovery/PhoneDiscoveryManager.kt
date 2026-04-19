@@ -201,6 +201,24 @@ class PhoneDiscoveryManager @Inject constructor(
         }
     }
 
+    /**
+     * Idempotent enable/disable toggle for phone discovery.
+     *
+     * Calling `setEnabled(true)` when already discovering is a no-op.
+     * Calling `setEnabled(false)` stops all discovery channels and clears the
+     * discovered phone list so the TV home screen reflects the change immediately.
+     */
+    fun setEnabled(enabled: Boolean) {
+        if (enabled) {
+            if (!isDiscovering) startDiscovery()
+        } else {
+            if (isDiscovering) {
+                stopDiscovery()
+                _discoveredPhones.value = emptyList()
+            }
+        }
+    }
+
     fun startDiscovery() {
         Log.i(TAG, "startDiscovery: type=$SERVICE_TYPE")
         isDiscovering = true

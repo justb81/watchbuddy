@@ -269,6 +269,26 @@ real network handoff. Each churn briefly yanks the NSD advertisement off the net
 callback and skips the full `unregister → 300 ms → register` dance when the new IPv4
 matches the cached one.
 
+## TV Boot Autostart and Background Discovery
+
+`TvDiscoveryService` is a foreground service (`foregroundServiceType="connectedDevice"`) that
+keeps `PhoneDiscoveryManager` alive after the TV boots. It is started by `BootReceiver`
+(registered for `ACTION_BOOT_COMPLETED`, `exported=false`) when the user has enabled the
+"Start at Boot" preference in TV Settings.
+
+Lifecycle:
+- `BootReceiver.onReceive` reads `isAutostartEnabled` from `StreamingPreferencesRepository`
+  synchronously (`runBlocking`) and calls `ContextCompat.startForegroundService` when true.
+- `TvDiscoveryService.onStartCommand` calls `PhoneDiscoveryManager.setEnabled(true)` and
+  then starts observing both `isPhoneDiscoveryEnabled` and `isAutostartEnabled`. When both
+  become false (user disabled discovery *and* autostart from TV Settings), the service calls
+  `stopSelf()`.
+- `TvHomeViewModel.onCleared` checks `TvDiscoveryService.isRunning` before stopping
+  discovery — if the service owns the lifecycle, the ViewModel leaves discovery running.
+
+`PhoneDiscoveryManager.setEnabled(Boolean)` is idempotent: calling `setEnabled(true)` when
+already discovering, or `setEnabled(false)` when idle, are both no-ops.
+
 ## Diagnostics View
 
 Both apps expose a **Diagnostics** screen under Settings → Diagnostics. It renders the

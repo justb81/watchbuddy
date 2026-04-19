@@ -40,6 +40,8 @@ watchbuddy/
 - **RAM-adaptive LLM** — AICore (Gemini Nano) if available, otherwise LiteRT-LM with auto-selected Gemma model based on free RAM
 - **Resilient pairing** — NSD/mDNS with a parallel BLE fallback so phone ↔ TV discovery keeps working on guest Wi-Fi, mesh routers, and other networks where multicast is blocked
 - **In-app diagnostics** — Settings → Diagnostics on both apps shows live connection health (Wi-Fi / NSD / HTTP / BLE on the phone; discovery / heartbeat / discovered phones on the TV) with a one-tap "Share diagnostics" button that exports the `DiagnosticLog` and any pending crash reports for bug reports
+- **Toggleable phone discovery** — Settings → Phone Discovery on the TV app lets users disable background phone scanning; discovery resumes automatically when re-enabled
+- **TV autostart** — Settings → Start at Boot on the TV app keeps discovery running after the TV powers on via a foreground service started by the boot receiver
 
 ## Module Structure
 
