@@ -1,7 +1,6 @@
 package com.justb81.watchbuddy.phone.ui.onboarding
 
 import android.app.Application
-import androidx.lifecycle.SavedStateHandle
 import com.justb81.watchbuddy.core.network.TokenProxyServiceFactory
 import com.justb81.watchbuddy.core.trakt.DeviceCodeResponse
 import com.justb81.watchbuddy.core.trakt.DeviceTokenResponse
@@ -20,8 +19,6 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.*
@@ -72,10 +69,8 @@ class OnboardingViewModelTest {
     private fun createViewModel(
         buildClientId: String = BUILD_CLIENT_ID,
         proxy: TokenProxyService? = tokenProxy,
-        savedStateHandle: SavedStateHandle = SavedStateHandle()
     ): OnboardingViewModel = OnboardingViewModel(
         application = application,
-        savedStateHandle = savedStateHandle,
         traktApi = traktApi,
         tokenProxy = proxy,
         buildConfigClientId = buildClientId,
@@ -361,6 +356,57 @@ class OnboardingViewModelTest {
         }
 
         @Test
+        fun `shows Error immediately on HTTP 410 during polling`() = runTest {
+            every { settingsRepository.settings } returns flowOf(
+                AppSettings(authMode = AuthMode.MANAGED)
+            )
+            coEvery { traktApi.requestDeviceCode(any()) } returns deviceCodeResponse
+            coEvery { tokenProxy.exchangeDeviceCode(any()) } throws
+                HttpException(Response.error<Any>(410, "".toResponseBody()))
+            every { application.getString(any<Int>()) } returns "Expired"
+
+            val vm = createViewModel()
+            vm.requestDeviceCode()
+            advanceUntilIdle()
+
+            assertTrue(vm.state.value is OnboardingState.Error)
+        }
+
+        @Test
+        fun `shows Error immediately on HTTP 418 during polling`() = runTest {
+            every { settingsRepository.settings } returns flowOf(
+                AppSettings(authMode = AuthMode.MANAGED)
+            )
+            coEvery { traktApi.requestDeviceCode(any()) } returns deviceCodeResponse
+            coEvery { tokenProxy.exchangeDeviceCode(any()) } throws
+                HttpException(Response.error<Any>(418, "".toResponseBody()))
+            every { application.getString(any<Int>()) } returns "Denied"
+
+            val vm = createViewModel()
+            vm.requestDeviceCode()
+            advanceUntilIdle()
+
+            assertTrue(vm.state.value is OnboardingState.Error)
+        }
+
+        @Test
+        fun `shows Error immediately on HTTP 409 during polling`() = runTest {
+            every { settingsRepository.settings } returns flowOf(
+                AppSettings(authMode = AuthMode.MANAGED)
+            )
+            coEvery { traktApi.requestDeviceCode(any()) } returns deviceCodeResponse
+            coEvery { tokenProxy.exchangeDeviceCode(any()) } throws
+                HttpException(Response.error<Any>(409, "".toResponseBody()))
+            every { application.getString(any<Int>()) } returns "Expired"
+
+            val vm = createViewModel()
+            vm.requestDeviceCode()
+            advanceUntilIdle()
+
+            assertTrue(vm.state.value is OnboardingState.Error)
+        }
+
+        @Test
         fun `shows Error after 3 consecutive network failures during polling`() = runTest {
             every { settingsRepository.settings } returns flowOf(
                 AppSettings(authMode = AuthMode.MANAGED)
@@ -435,57 +481,55 @@ class OnboardingViewModelTest {
     }
 
     @Nested
-    @DisplayName("Process death survival")
-    inner class ProcessDeathSurvival {
-
-        private val json = Json { ignoreUnknownKeys = true }
-
-        private fun savedStateWithCode(
-            response: DeviceCodeResponse = deviceCodeResponse,
-            timestamp: Long = System.currentTimeMillis()
-        ): SavedStateHandle = SavedStateHandle(
-            mapOf(
-                "device_code_json" to json.encodeToString(response),
-                "device_code_timestamp" to timestamp
-            )
-        )
+    @DisplayName("Device code in-memory caching")
+    inner class DeviceCodeCaching {
 
         @Test
-        fun `restores saved device code instead of requesting a new one`() = runTest {
+        fun `reuses in-memory device code on second requestDeviceCode call within same session`() = runTest {
             every { settingsRepository.settings } returns flowOf(
                 AppSettings(authMode = AuthMode.MANAGED)
             )
             coEvery { traktApi.requestDeviceCode(any()) } returns deviceCodeResponse
 
-            val handle = savedStateWithCode()
-            val vm = createViewModel(savedStateHandle = handle)
+            val vm = createViewModel()
+            vm.requestDeviceCode()
+            // State is WaitingForPin; code is cached in currentDeviceCode
+
+            // Second call must NOT re-fetch a new device code
             vm.requestDeviceCode()
 
-            val state = vm.state.value
-            assertTrue(state is OnboardingState.WaitingForPin)
-            assertEquals("ABC123", (state as OnboardingState.WaitingForPin).userCode)
-            coVerify(exactly = 0) { traktApi.requestDeviceCode(any()) }
-        }
-
-        @Test
-        fun `requests new code when saved code has expired`() = runTest {
-            every { settingsRepository.settings } returns flowOf(
-                AppSettings(authMode = AuthMode.MANAGED)
-            )
-            coEvery { traktApi.requestDeviceCode(any()) } returns deviceCodeResponse
-
-            val expiredTimestamp = System.currentTimeMillis() - 700_000L // 700s ago, code was 600s
-            val handle = savedStateWithCode(timestamp = expiredTimestamp)
-            val vm = createViewModel(savedStateHandle = handle)
-            vm.requestDeviceCode()
-
-            val state = vm.state.value
-            assertTrue(state is OnboardingState.WaitingForPin)
             coVerify(exactly = 1) { traktApi.requestDeviceCode(any()) }
+            assertTrue(vm.state.value is OnboardingState.WaitingForPin || vm.state.value is OnboardingState.LoadingCode)
         }
 
         @Test
-        fun `clears saved state on successful authentication`() = runTest {
+        fun `fetches new device code after terminal polling failure clears the cached code`() = runTest {
+            every { settingsRepository.settings } returns flowOf(
+                AppSettings(authMode = AuthMode.MANAGED)
+            )
+            coEvery { traktApi.requestDeviceCode(any()) } returns deviceCodeResponse
+            coEvery { tokenProxy.exchangeDeviceCode(any()) } throws
+                HttpException(Response.error<Any>(410, "".toResponseBody()))
+            every { application.getString(any<Int>()) } returns "Expired"
+
+            val vm = createViewModel()
+            vm.requestDeviceCode()
+            advanceUntilIdle()
+
+            // After 410 failPolling clears currentDeviceCode
+            assertTrue(vm.state.value is OnboardingState.Error)
+
+            // Retry must request a fresh code
+            coEvery { tokenProxy.exchangeDeviceCode(any()) } throws
+                HttpException(Response.error<Any>(400, "".toResponseBody()))
+            vm.requestDeviceCode()
+            advanceUntilIdle()
+
+            coVerify(exactly = 2) { traktApi.requestDeviceCode(any()) }
+        }
+
+        @Test
+        fun `clears cached device code on successful authentication`() = runTest {
             every { settingsRepository.settings } returns flowOf(
                 AppSettings(authMode = AuthMode.MANAGED)
             )
@@ -499,14 +543,19 @@ class OnboardingViewModelTest {
             )
             coEvery { traktApi.getProfile(any()) } returns TraktUserProfile(username = "user1")
 
-            val handle = SavedStateHandle()
-            val vm = createViewModel(savedStateHandle = handle)
+            val vm = createViewModel()
             vm.requestDeviceCode()
             advanceUntilIdle()
 
             assertTrue(vm.state.value is OnboardingState.Success)
-            assertNull(handle.get<String>("device_code_json"))
-            assertNull(handle.get<Long>("device_code_timestamp"))
+
+            // A fresh requestDeviceCode after success must fetch a new code, not reuse the old one
+            coEvery { tokenProxy.exchangeDeviceCode(any()) } throws
+                HttpException(Response.error<Any>(400, "".toResponseBody()))
+            vm.requestDeviceCode()
+            advanceUntilIdle()
+
+            coVerify(exactly = 2) { traktApi.requestDeviceCode(any()) }
         }
     }
 }
