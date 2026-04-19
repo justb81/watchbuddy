@@ -52,7 +52,10 @@ class PhoneBleScanner @Inject constructor(
     private var scanner: BluetoothLeScanner? = null
     private var activeCallback: ScanCallback? = null
 
-    fun start(listener: Listener): Boolean {
+    fun start(
+        listener: Listener,
+        onFailure: (Int) -> Unit = {},
+    ): Boolean {
         if (!hasScanPermission()) {
             Log.i(TAG, "start skipped: BLUETOOTH_SCAN permission not granted")
             return false
@@ -103,6 +106,7 @@ class PhoneBleScanner @Inject constructor(
                         scanner = null
                     }
                 }
+                onFailure(errorCode)
             }
         }
 

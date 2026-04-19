@@ -141,6 +141,8 @@ class CompanionService : Service() {
         }
         acquireMulticastLock()
         companionHttpServer.start()
+        stateManager.setHttpServerBinding("0.0.0.0:${CompanionHttpServer.PORT}")
+        stateManager.setWifiIpv4(wifiIpv4Address()?.hostAddress)
         registerNsd()
         startBleAdvertising()
         stateManager.setServiceRunning(true)
@@ -156,6 +158,8 @@ class CompanionService : Service() {
         bleAdvertiser.stop()
         releaseMulticastLock()
         companionHttpServer.stop()
+        stateManager.setHttpServerBinding(null)
+        stateManager.setWifiIpv4(null)
         stateManager.setServiceRunning(false)
         serviceScope.cancel()
         super.onDestroy()
@@ -309,6 +313,7 @@ class CompanionService : Service() {
             setReferenceCounted(false)
             acquire()
         }
+        stateManager.setMulticastLockHeld(true)
         Log.i(TAG, "Multicast lock acquired")
     }
 
@@ -317,6 +322,7 @@ class CompanionService : Service() {
             runCatching { it.release() }
         }
         multicastLock = null
+        stateManager.setMulticastLockHeld(false)
     }
 
     // ── NSD ──────────────────────────────────────────────────────────────────
@@ -332,6 +338,7 @@ class CompanionService : Service() {
             }
             nsdState = NsdState.REGISTERING
         }
+        stateManager.setNsdRegistrationState(CompanionStateManager.NsdRegistrationState.REGISTERING)
 
         val llmConfig = llmOrchestrator.selectConfig()
         val txtAttributes = buildTxtAttributes(BuildConfig.VERSION_NAME, llmConfig)
@@ -351,6 +358,7 @@ class CompanionService : Service() {
             override fun onServiceRegistered(info: NsdServiceInfo) {
                 Log.i(TAG, "NSD service registered: ${info.serviceName} TXT=$txtAttributes")
                 synchronized(nsdLock) { nsdState = NsdState.REGISTERED }
+                stateManager.setNsdRegistrationState(CompanionStateManager.NsdRegistrationState.REGISTERED)
             }
             override fun onRegistrationFailed(info: NsdServiceInfo, errorCode: Int) {
                 Log.e(TAG, "NSD registration failed: error=$errorCode, service=${info.serviceName}")
@@ -359,6 +367,10 @@ class CompanionService : Service() {
                     nsdManager = null
                     nsdState = NsdState.IDLE
                 }
+                stateManager.setNsdRegistrationState(
+                    CompanionStateManager.NsdRegistrationState.FAILED,
+                    errorCode = errorCode,
+                )
             }
             override fun onServiceUnregistered(info: NsdServiceInfo) {
                 Log.i(TAG, "NSD service unregistered: ${info.serviceName}")
@@ -367,6 +379,7 @@ class CompanionService : Service() {
                     nsdManager = null
                     nsdState = NsdState.IDLE
                 }
+                stateManager.setNsdRegistrationState(CompanionStateManager.NsdRegistrationState.IDLE)
             }
             override fun onUnregistrationFailed(info: NsdServiceInfo, errorCode: Int) {
                 Log.e(TAG, "NSD unregistration failed: error=$errorCode, service=${info.serviceName}")
@@ -375,6 +388,10 @@ class CompanionService : Service() {
                     nsdManager = null
                     nsdState = NsdState.IDLE
                 }
+                stateManager.setNsdRegistrationState(
+                    CompanionStateManager.NsdRegistrationState.FAILED,
+                    errorCode = errorCode,
+                )
             }
         }
 
@@ -391,6 +408,7 @@ class CompanionService : Service() {
                 nsdManager = null
                 nsdState = NsdState.IDLE
             }
+            stateManager.setNsdRegistrationState(CompanionStateManager.NsdRegistrationState.FAILED)
         }
     }
 
@@ -402,6 +420,7 @@ class CompanionService : Service() {
             nsdState = NsdState.UNREGISTERING
             nsdManager to nsdRegistrationListener
         }
+        stateManager.setNsdRegistrationState(CompanionStateManager.NsdRegistrationState.UNREGISTERING)
         if (mgr != null && listener != null) {
             runCatching { mgr.unregisterService(listener) }
                 .onFailure {
@@ -411,6 +430,7 @@ class CompanionService : Service() {
                         nsdManager = null
                         nsdState = NsdState.IDLE
                     }
+                    stateManager.setNsdRegistrationState(CompanionStateManager.NsdRegistrationState.IDLE)
                 }
         } else {
             synchronized(nsdLock) {
@@ -418,6 +438,7 @@ class CompanionService : Service() {
                 nsdManager = null
                 nsdState = NsdState.IDLE
             }
+            stateManager.setNsdRegistrationState(CompanionStateManager.NsdRegistrationState.IDLE)
         }
     }
 

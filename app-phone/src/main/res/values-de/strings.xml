@@ -170,4 +170,36 @@
         <item quantity="one">%d Serie</item>
         <item quantity="other">%d Serien</item>
     </plurals>
+
+    <!-- Diagnostics -->
+    <string name="settings_diagnostics">Diagnose</string>
+    <string name="settings_diagnostics_row">Verbindungsdiagnose</string>
+    <string name="diagnostics_title">Diagnose</string>
+    <string name="diagnostics_share_button">Diagnose teilen</string>
+    <string name="diagnostics_section_connectivity">Verbindung</string>
+    <string name="diagnostics_section_nsd">NSD / Companion-Dienst</string>
+    <string name="diagnostics_section_http">HTTP-Server</string>
+    <string name="diagnostics_section_ble">BLE-Advertiser</string>
+    <string name="diagnostics_section_scrobble">Letzter Scrobble</string>
+    <string name="diagnostics_section_build">Build-Infos</string>
+    <string name="diagnostics_row_wifi">WLAN</string>
+    <string name="diagnostics_row_ipv4">IPv4-Adresse</string>
+    <string name="diagnostics_row_multicast_lock">Multicast-Lock</string>
+    <string name="diagnostics_row_service_running">Dienst läuft</string>
+    <string name="diagnostics_row_nsd_state">NSD-Status</string>
+    <string name="diagnostics_row_nsd_error">NSD-Fehlercode</string>
+    <string name="diagnostics_row_http_binding">Bindungsadresse</string>
+    <string name="diagnostics_row_last_capability_poll">Letzter TV-Abruf</string>
+    <string name="diagnostics_row_ble_state">Advertiser-Status</string>
+    <string name="diagnostics_row_ble_error">BLE-Fehlercode</string>
+    <string name="diagnostics_row_scrobble_show">Serie</string>
+    <string name="diagnostics_row_scrobble_progress">Fortschritt</string>
+    <string name="diagnostics_row_scrobble_time">Zeitpunkt</string>
+    <string name="diagnostics_row_version_name">Versionsname</string>
+    <string name="diagnostics_row_version_code">Versionscode</string>
+    <string name="diagnostics_value_unknown">Unbekannt</string>
+    <string name="diagnostics_value_yes">Ja</string>
+    <string name="diagnostics_value_no">Nein</string>
+    <string name="diagnostics_value_stopped">Gestoppt</string>
+    <string name="diagnostics_value_none">Keine</string>
 </resources>

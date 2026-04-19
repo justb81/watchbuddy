@@ -30,6 +30,7 @@ import javax.inject.Singleton
 @Singleton
 class CompanionBleAdvertiser @Inject constructor(
     @param:ApplicationContext private val context: Context,
+    private val stateManager: CompanionStateManager,
 ) {
     companion object {
         private const val TAG = "CompanionBleAdvertiser"
@@ -113,10 +114,15 @@ class CompanionBleAdvertiser @Inject constructor(
                     "advertising started: ip=${ipv4.hostAddress} port=$port " +
                         "quality=$modelQuality backend=$llmBackendOrdinal"
                 )
+                stateManager.setBleAdvertiseState(CompanionStateManager.BleAdvertiseState.ADVERTISING)
             }
 
             override fun onStartFailure(errorCode: Int) {
                 Log.e(TAG, "advertising failed: ${errorName(errorCode)}")
+                stateManager.setBleAdvertiseState(
+                    CompanionStateManager.BleAdvertiseState.FAILED,
+                    errorCode = errorCode,
+                )
                 // Drop our reference so a later start() attempt can retry
                 // cleanly instead of tripping over a stale callback.
                 synchronized(this@CompanionBleAdvertiser) {
@@ -156,6 +162,7 @@ class CompanionBleAdvertiser @Inject constructor(
                 advertiser = null
                 activeCallback = null
             }
+            stateManager.setBleAdvertiseState(CompanionStateManager.BleAdvertiseState.IDLE)
             return
         }
         runCatching { adv.stopAdvertising(cb) }
@@ -164,6 +171,7 @@ class CompanionBleAdvertiser @Inject constructor(
             advertiser = null
             activeCallback = null
         }
+        stateManager.setBleAdvertiseState(CompanionStateManager.BleAdvertiseState.IDLE)
         Log.i(TAG, "advertising stopped")
     }
 

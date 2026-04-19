@@ -251,6 +251,28 @@ network callback restarts discovery when Wi-Fi returns, and an empty phone list 
 60 s heartbeat tick cycles discovery so the TV recovers from silent NSD failures without
 requiring an app relaunch.
 
+## Diagnostics View
+
+Both apps expose a **Diagnostics** screen under Settings → Diagnostics. It renders the
+live connection state from the shared singletons — `CompanionStateManager` on the phone,
+`PhoneDiscoveryManager` on the TV — so end users (and agents triaging bug reports) can
+distinguish the common causes of "TV can't see the phone":
+
+- **Phone** — Wi-Fi on/off + IPv4, multicast lock, NSD registration state (IDLE /
+  REGISTERING / REGISTERED / UNREGISTERING / FAILED + error code), HTTP listen address,
+  age of the most recent TV `/capability` poll, BLE advertiser state + error code, last
+  scrobble event, build info.
+- **TV** — multicast lock held, discovery active, heartbeat age, BLE scanner state +
+  error code, one card per discovered phone (name, `baseUrl`, score, `modelQuality`,
+  `llmBackend`, `failCount`, age of `lastSuccessfulCheck`), build info.
+
+Each row is colour-coded green / yellow / red so users can tell "AP isolation" (no phones
+at all, BLE scanning, multicast lock held) apart from "`/capability` 500" (phone
+discovered, non-zero `failCount`). A "Share diagnostics" button delegates to
+`DiagnosticShare.launchShare()`, which bundles the current `DiagnosticLog` snapshot and
+any pending crash reports through the system share sheet. The view is available in
+release builds; no new build variant was introduced (#331).
+
 ## Scrobble Event Display (Phone)
 
 When the phone's HTTP server receives a scrobble event (`/scrobble/start|pause|stop`), it

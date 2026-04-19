@@ -8,6 +8,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
+import com.justb81.watchbuddy.tv.ui.diagnostics.TvDiagnosticsScreen
 import com.justb81.watchbuddy.tv.ui.home.TvHomeScreen
 import com.justb81.watchbuddy.tv.ui.recap.RecapScreen
 import com.justb81.watchbuddy.tv.ui.scrobble.ScrobbleOverlay
@@ -22,6 +23,7 @@ sealed class TvRoute(val route: String) {
     object ShowDetail : TvRoute("tv_show_detail")
     object Recap              : TvRoute("tv_recap")
     object StreamingSettings  : TvRoute("tv_streaming_settings")
+    object Diagnostics        : TvRoute("tv_diagnostics")
 }
 
 @Composable
@@ -86,8 +88,13 @@ fun TvNavGraph() {
 
         composable(TvRoute.StreamingSettings.route) {
             StreamingSettingsScreen(
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                onDiagnosticsClick = { navController.navigate(TvRoute.Diagnostics.route) }
             )
+        }
+
+        composable(TvRoute.Diagnostics.route) {
+            TvDiagnosticsScreen(onBack = { navController.popBackStack() })
         }
     }
 

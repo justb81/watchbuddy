@@ -26,6 +26,7 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onDisconnected: () -> Unit,
     onConnectClick: () -> Unit,
+    onDiagnosticsClick: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     LaunchedEffect(Unit) {
@@ -72,6 +73,31 @@ fun SettingsScreen(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            // ── Diagnostics entry point ──────────────────────────────────────
+            SettingsSectionHeader(stringResource(R.string.settings_diagnostics))
+
+            SettingsCard {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onDiagnosticsClick)
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        stringResource(R.string.settings_diagnostics_row),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        "›",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                    )
+                }
+            }
+
             // ── Account Section ───────────────────────────────────────────────
             SettingsSectionHeader(stringResource(R.string.settings_account))
 

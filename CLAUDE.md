@@ -18,6 +18,7 @@ watchbuddy/
 │       ├── server/     CompanionHttpServer (Ktor, port 8765), DeviceCapabilityProvider, ShowRepository (reactive `shows` StateFlow), EpisodeRepository (10-min per-show TTL + sync/history writes)
 │       ├── settings/   AppSettings, SettingsRepository (DataStore)
 │       ├── ui/         MainActivity, PhoneNavGraph
+│       │   ├── diagnostics/ DiagnosticsScreen, DiagnosticsViewModel (Wi-Fi / NSD / HTTP / BLE live health + Share diagnostics)
 │       │   ├── home/       HomeScreen, HomeViewModel
 │       │   ├── navigation/ PhoneNavGraph
 │       │   ├── onboarding/ OnboardingScreen, OnboardingViewModel
@@ -35,6 +36,7 @@ watchbuddy/
 │       │   ├── home/       TvHomeScreen, TvHomeViewModel
 │       │   ├── navigation/ TvNavGraph
 │       │   ├── recap/      RecapScreen, RecapViewModel
+│       │   ├── diagnostics/ TvDiagnosticsScreen, TvDiagnosticsViewModel (discovery / BLE / discovered-phones health + Share diagnostics)
 │       │   ├── scrobble/   ScrobbleOverlay, ScrobbleViewModel
 │       │   ├── settings/   StreamingSettingsScreen, StreamingSettingsViewModel
 │       │   ├── showdetail/ ShowDetailScreen, ShowDetailViewModel
@@ -198,6 +200,7 @@ For the authoritative HTTP API table, NSD TXT-record contract (`version`, `model
 - **Auth modes:** Managed backend (default), self-hosted proxy, or direct Trakt credentials.
 - **Multi-user:** Multiple phones can connect to one TV simultaneously; scrobbling records the episode for each connected user independently; shared watch mode avoids recap spoilers.
 - **Manual episode marking (phone):** Tapping a show on HomeScreen opens `ShowDetailScreen`, which fetches the full season/episode structure via `EpisodeRepository.getSeasonsWithEpisodes` (Trakt `shows/:id/seasons?extended=episodes`, 10-min per-show cache). Each episode has a checkbox; toggling calls `sync/history` add or remove through `EpisodeRepository`, optimistically flips the UI, and on success calls `ShowRepository.updateLocalWatched(...)`. That mutates the in-memory `shows` `StateFlow` so `HomeViewModel` counters update without a round-trip (#216). The layout pulls the season the user is currently mid-watching to the top, expanded; all other seasons appear below, collapsed.
+- **Diagnostics view:** Settings → Diagnostics on both apps renders live phone↔TV connection health from the existing shared singletons (`CompanionStateManager` on phone, `PhoneDiscoveryManager` on TV) — Wi-Fi / multicast lock / NSD state / HTTP bind / BLE state on the phone; discovery active / heartbeat age / BLE scan state / per-phone score + failCount on the TV (#331). Status dots are color-coded (green/yellow/red) so users can tell "AP isolation" (no phones at all) apart from "`/capability` 500" (discovered but broken). A "Share diagnostics" button funnels through `DiagnosticShare.launchShare()` so the `DiagnosticLog` snapshot + any pending crash reports can be exported via the system share sheet. Available in release builds; no new build variant.
 
 ## Documentation Maintenance
 

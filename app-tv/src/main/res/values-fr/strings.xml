@@ -93,4 +93,27 @@
     <string name="cd_service_move_up">Monter %1$s dans la priorité</string>
     <string name="cd_service_move_down">Descendre %1$s dans la priorité</string>
 
+    <!-- Diagnostics -->
+    <string name="tv_diagnostics_title">Diagnostic</string>
+    <string name="tv_diagnostics_share_button">Partager le diagnostic</string>
+    <string name="tv_diagnostics_section_connectivity">Connectivité</string>
+    <string name="tv_diagnostics_section_nsd">Découverte (NSD)</string>
+    <string name="tv_diagnostics_section_ble">Scanner BLE</string>
+    <string name="tv_diagnostics_section_phones">Téléphones détectés</string>
+    <string name="tv_diagnostics_section_build">Infos build</string>
+    <string name="tv_diagnostics_row_multicast_lock">Verrou multicast</string>
+    <string name="tv_diagnostics_row_discovery_active">Découverte active</string>
+    <string name="tv_diagnostics_row_last_heartbeat">Dernier heartbeat</string>
+    <string name="tv_diagnostics_row_ble_state">État du scanner</string>
+    <string name="tv_diagnostics_row_ble_error">Code erreur BLE</string>
+    <string name="tv_diagnostics_row_phone_score">Score</string>
+    <string name="tv_diagnostics_row_phone_quality">Qualité du modèle</string>
+    <string name="tv_diagnostics_row_phone_backend">Backend LLM</string>
+    <string name="tv_diagnostics_row_phone_fail_count">Échecs consécutifs</string>
+    <string name="tv_diagnostics_row_phone_last_success">Dernier succès</string>
+    <string name="tv_diagnostics_row_version_name">Nom de version</string>
+    <string name="tv_diagnostics_row_version_code">Code de version</string>
+    <string name="tv_diagnostics_value_yes">Oui</string>
+    <string name="tv_diagnostics_value_no">Non</string>
+    <string name="tv_diagnostics_value_no_phones">Aucun téléphone détecté.</string>
 </resources>

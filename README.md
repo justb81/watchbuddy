@@ -39,6 +39,7 @@ watchbuddy/
 - **Multi-user** — multiple phones/users sync to one TV; shared watch mode avoids spoilers
 - **RAM-adaptive LLM** — AICore (Gemini Nano) if available, otherwise LiteRT-LM with auto-selected Gemma model based on free RAM
 - **Resilient pairing** — NSD/mDNS with a parallel BLE fallback so phone ↔ TV discovery keeps working on guest Wi-Fi, mesh routers, and other networks where multicast is blocked
+- **In-app diagnostics** — Settings → Diagnostics on both apps shows live connection health (Wi-Fi / NSD / HTTP / BLE on the phone; discovery / heartbeat / discovered phones on the TV) with a one-tap "Share diagnostics" button that exports the `DiagnosticLog` and any pending crash reports for bug reports
 
 ## Module Structure
 
