@@ -61,11 +61,12 @@ sealed class OnboardingState {
 class OnboardingViewModel @Inject constructor(
     application: Application,
     private val traktApi: TraktApiService,
-    private val tokenProxy: TokenProxyService?,
+    private val tokenProxy: TokenProxyService,
     @param:Named("traktClientId") private val buildConfigClientId: String,
     private val tokenRepository: TokenRepository,
     private val settingsRepository: SettingsRepository,
-    private val tokenProxyServiceFactory: TokenProxyServiceFactory
+    private val tokenProxyServiceFactory: TokenProxyServiceFactory,
+    @Named("managedBackendAvailable") private val managedBackendAvailable: Boolean
 ) : AndroidViewModel(application) {
 
     private val _state = MutableStateFlow<OnboardingState>(OnboardingState.Idle)
@@ -105,7 +106,7 @@ class OnboardingViewModel @Inject constructor(
     ): Pair<String?, NotConfiguredReason?> = when (authMode) {
         AuthMode.MANAGED -> when {
             buildConfigClientId.isBlank() -> null to NotConfiguredReason.MANAGED_MISSING_CLIENT_ID
-            tokenProxy == null -> null to NotConfiguredReason.MANAGED_MISSING_BACKEND
+            !managedBackendAvailable -> null to NotConfiguredReason.MANAGED_MISSING_BACKEND
             else -> buildConfigClientId to null
         }
         AuthMode.SELF_HOSTED -> when {
@@ -200,7 +201,7 @@ class OnboardingViewModel @Inject constructor(
 
                     when (authMode) {
                         AuthMode.MANAGED -> {
-                            val token = tokenProxy!!.exchangeDeviceCode(
+                            val token = tokenProxy.exchangeDeviceCode(
                                 ProxyTokenRequest(code = response.device_code)
                             )
                             accessToken = token.access_token

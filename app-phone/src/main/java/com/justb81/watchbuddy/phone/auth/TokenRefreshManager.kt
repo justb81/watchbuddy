@@ -37,8 +37,9 @@ class TokenRefreshManager @Inject constructor(
     private val tokenRepository: TokenRepository,
     private val settingsRepository: SettingsRepository,
     private val traktApi: TraktApiService,
-    private val tokenProxy: TokenProxyService?,
+    private val tokenProxy: TokenProxyService,
     private val tokenProxyServiceFactory: TokenProxyServiceFactory,
+    @Named("managedBackendAvailable") private val managedBackendAvailable: Boolean,
     @Named("traktClientId") private val clientId: String
 ) {
     private val mutex = Mutex()
@@ -94,11 +95,11 @@ class TokenRefreshManager @Inject constructor(
     }
 
     private suspend fun refreshViaManagedProxy(refreshToken: String): Triple<String, String, Int>? {
-        val proxy = tokenProxy ?: run {
+        if (!managedBackendAvailable) {
             Log.w(TAG, "Managed proxy not available — cannot refresh")
             return null
         }
-        val response = proxy.refreshToken(ProxyRefreshRequest(refresh_token = refreshToken))
+        val response = tokenProxy.refreshToken(ProxyRefreshRequest(refresh_token = refreshToken))
         return Triple(response.access_token, response.refresh_token, response.expires_in)
     }
 
