@@ -262,13 +262,8 @@ private fun HomeContent(
     val orientation = LocalConfiguration.current.orientation
     val isLandscape = orientation == Configuration.ORIENTATION_LANDSCAPE
 
-    val (continueWatching, allOthers) = remember(state.shows, state.progress) {
-        state.shows.partition { entry ->
-            val traktId = entry.entry.show.ids.trakt
-            val progress = traktId?.let { state.progress[it] }
-            progress is ShowProgress.InProgress || progress is ShowProgress.CaughtUpAiring
-        }
-    }
+    val continueWatching = state.continueWatching
+    val allOthers = state.allShows
     var allShowsExpanded by rememberSaveable { mutableStateOf(false) }
 
     PullToRefreshBox(
