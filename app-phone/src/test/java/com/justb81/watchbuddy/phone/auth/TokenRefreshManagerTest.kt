@@ -275,6 +275,7 @@ class TokenRefreshManagerTest {
                 traktApi = traktApi,
                 tokenProxy = tokenProxy,
                 tokenProxyServiceFactory = tokenProxyServiceFactory,
+                managedBackendAvailable = true,
                 clientId = ""
             )
 
