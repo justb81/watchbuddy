@@ -2,6 +2,8 @@ package com.justb81.watchbuddy.phone.ui.home
 
 import android.app.Application
 import com.justb81.watchbuddy.core.model.EnrichedShowEntry
+import com.justb81.watchbuddy.core.model.TraktWatchedEpisode
+import com.justb81.watchbuddy.core.model.TraktWatchedSeason
 import com.justb81.watchbuddy.phone.MainDispatcherRule
 import com.justb81.watchbuddy.phone.TestFixtures
 import com.justb81.watchbuddy.phone.auth.TokenRepository
@@ -28,6 +30,8 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
+import java.time.Instant
+import java.time.temporal.ChronoUnit
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @DisplayName("HomeViewModel")
@@ -87,6 +91,17 @@ class HomeViewModelTest {
 
     private fun enriched(title: String) =
         EnrichedShowEntry(entry = TestFixtures.traktWatchedEntry(show = TestFixtures.traktShow(title)))
+
+    private fun enrichedWatched(title: String, lastWatchedAt: String) = EnrichedShowEntry(
+        entry = TestFixtures.traktWatchedEntry(show = TestFixtures.traktShow(title)).copy(
+            seasons = listOf(
+                TraktWatchedSeason(
+                    number = 1,
+                    episodes = listOf(TraktWatchedEpisode(number = 1, last_watched_at = lastWatchedAt))
+                )
+            )
+        )
+    )
 
     @Nested
     @DisplayName("loadShows")
@@ -361,6 +376,111 @@ class HomeViewModelTest {
             advanceUntilIdle()
 
             assertNotNull(vm.uiState.value.error)
+        }
+    }
+
+    @Nested
+    @DisplayName("partitionShows — 30-day Continue Watching window (#361)")
+    inner class PartitionShowsTest {
+
+        private val now = Instant.parse("2026-04-19T12:00:00Z")
+
+        @Test
+        fun `show watched 10 days ago goes into continueWatching`() {
+            val vm = createViewModel()
+            val tenDaysAgo = now.minus(10, ChronoUnit.DAYS).toString()
+            val show = enrichedWatched("Recent", tenDaysAgo)
+
+            val (cw, others) = vm.partitionShows(listOf(show), now)
+
+            assertEquals(listOf(show), cw)
+            assertTrue(others.isEmpty())
+        }
+
+        @Test
+        fun `show watched 31 days ago goes into allShows`() {
+            val vm = createViewModel()
+            val thirtyOneDaysAgo = now.minus(31, ChronoUnit.DAYS).toString()
+            val show = enrichedWatched("Old", thirtyOneDaysAgo)
+
+            val (cw, others) = vm.partitionShows(listOf(show), now)
+
+            assertTrue(cw.isEmpty())
+            assertEquals(listOf(show), others)
+        }
+
+        @Test
+        fun `show with no watch history goes into allShows`() {
+            val vm = createViewModel()
+            val show = enriched("Never")
+
+            val (cw, others) = vm.partitionShows(listOf(show), now)
+
+            assertTrue(cw.isEmpty())
+            assertEquals(listOf(show), others)
+        }
+
+        @Test
+        fun `allShows is sorted alphabetically case-insensitive`() {
+            val vm = createViewModel()
+            val shows = listOf(
+                enriched("Zebra Show"),
+                enriched("apple show"),
+                enriched("Mango Show")
+            )
+
+            val (_, others) = vm.partitionShows(shows, now)
+
+            assertEquals(listOf("apple show", "Mango Show", "Zebra Show"), others.map { it.entry.show.title })
+        }
+
+        @Test
+        fun `continueWatching preserves order from input (last-watched DESC)`() {
+            val vm = createViewModel()
+            val fiveDaysAgo = now.minus(5, ChronoUnit.DAYS).toString()
+            val tenDaysAgo = now.minus(10, ChronoUnit.DAYS).toString()
+            val showA = enrichedWatched("A", fiveDaysAgo)
+            val showB = enrichedWatched("B", tenDaysAgo)
+
+            val (cw, _) = vm.partitionShows(listOf(showA, showB), now)
+
+            assertEquals(listOf(showA, showB), cw)
+        }
+
+        @Test
+        fun `show watched exactly on cutoff boundary is excluded from continueWatching`() {
+            val vm = createViewModel()
+            val exactlyThirtyDaysAgo = now.minus(30, ChronoUnit.DAYS).toString()
+            val show = enrichedWatched("Edge", exactlyThirtyDaysAgo)
+
+            val (cw, others) = vm.partitionShows(listOf(show), now)
+
+            assertTrue(cw.isEmpty())
+            assertEquals(listOf(show), others)
+        }
+
+        @Test
+        fun `uiState continueWatching and allShows are populated after loadShows`() = runTest {
+            val recentTs = now.minus(5, ChronoUnit.DAYS).toString()
+            val oldTs = now.minus(40, ChronoUnit.DAYS).toString()
+            val recentShow = enrichedWatched("Recent", recentTs)
+            val oldShow = enrichedWatched("Old", oldTs)
+            val neverShow = enriched("Never")
+
+            every { tokenRepository.getAccessToken() } returns "token"
+            stubShows(listOf(recentShow, oldShow, neverShow))
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            val state = vm.uiState.value
+            // Recent show (5 days ago) should be in continueWatching
+            // Old show (40 days) and never-watched should be in allShows
+            assertEquals(1, state.continueWatching.size)
+            assertEquals(2, state.allShows.size)
+            assertEquals("Recent", state.continueWatching[0].entry.show.title)
+            // allShows sorted alphabetically: "Never" before "Old"
+            assertEquals(listOf("Never", "Old"), state.allShows.map { it.entry.show.title })
         }
     }
 

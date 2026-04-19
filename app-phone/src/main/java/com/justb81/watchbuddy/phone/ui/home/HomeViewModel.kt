@@ -7,7 +7,6 @@ import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.model.EnrichedShowEntry
 import com.justb81.watchbuddy.core.model.ScrobbleDisplayEvent
-import com.justb81.watchbuddy.core.progress.ShowProgress
 import com.justb81.watchbuddy.core.progress.ShowProgressCalculator
 import com.justb81.watchbuddy.phone.auth.TokenRepository
 import com.justb81.watchbuddy.phone.network.WifiStateProvider
@@ -25,14 +24,18 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.Duration
+import java.time.Instant
 import javax.inject.Inject
 
 data class HomeUiState(
     val isLoading: Boolean = false,
     val isSyncing: Boolean = false,
     val shows: List<EnrichedShowEntry> = emptyList(),
-    /** Progress keyed by Trakt id so the UI can look up per-card state in O(1). */
-    val progress: Map<Int, ShowProgress> = emptyMap(),
+    /** Shows watched within the last 30 days, sorted by last-watched DESC. */
+    val continueWatching: List<EnrichedShowEntry> = emptyList(),
+    /** All other shows (not in continueWatching), sorted alphabetically. */
+    val allShows: List<EnrichedShowEntry> = emptyList(),
     val lastSyncTime: String? = null,
     val error: String? = null,
     val canWatch: Boolean = false,
@@ -60,6 +63,9 @@ class HomeViewModel @Inject constructor(
 
         /** Hide scrobble events older than 30 minutes. */
         private const val SCROBBLE_DISPLAY_TTL_MS = 30 * 60_000L
+
+        /** Shows last watched within this window appear in "Continue Watching". */
+        val CONTINUE_WATCHING_WINDOW: Duration = Duration.ofDays(30)
     }
 
     private val _uiState = MutableStateFlow(HomeUiState(isLoading = true))
@@ -95,7 +101,15 @@ class HomeViewModel @Inject constructor(
                         traktId to ShowProgressCalculator.compute(enriched.entry, enriched.tmdb)
                     }
                 }.toMap()
-                _uiState.update { it.copy(shows = shows, progress = progressMap) }
+                val (continueWatching, allShows) = partitionShows(shows)
+                _uiState.update {
+                    it.copy(
+                        shows = shows,
+                        progress = progressMap,
+                        continueWatching = continueWatching,
+                        allShows = allShows
+                    )
+                }
             }
         }
     }
@@ -192,6 +206,18 @@ class HomeViewModel @Inject constructor(
                 _uiState.update { it.copy(isSyncing = false) }
             }
         }
+    }
+
+    internal fun partitionShows(
+        shows: List<EnrichedShowEntry>,
+        now: Instant = Instant.now()
+    ): Pair<List<EnrichedShowEntry>, List<EnrichedShowEntry>> {
+        val cutoff = now.minus(CONTINUE_WATCHING_WINDOW)
+        val (continueWatching, others) = shows.partition { entry ->
+            val lastWatched = ShowProgressCalculator.latestWatchedInstant(entry.entry)
+            lastWatched != null && lastWatched.isAfter(cutoff)
+        }
+        return continueWatching to others.sortedBy { it.entry.show.title.lowercase() }
     }
 
     private suspend fun fetchShows() {

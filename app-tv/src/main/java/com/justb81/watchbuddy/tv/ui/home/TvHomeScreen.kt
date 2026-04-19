@@ -144,13 +144,8 @@ private fun TvHomeShelves(
     onShowClick: (TraktWatchedEntry) -> Unit,
     onLoadMore: () -> Unit
 ) {
-    val (continueWatching, allOthers) = remember(state.shows, state.progress) {
-        state.shows.partition { entry ->
-            val id = entry.entry.show.ids.trakt
-            val p = id?.let { state.progress[it] }
-            p is ShowProgress.InProgress || p is ShowProgress.CaughtUpAiring
-        }
-    }
+    val continueWatching = state.continueWatching
+    val allOthers = state.allShows
     var allShowsExpanded by rememberSaveable { mutableStateOf(false) }
 
     LazyColumn(

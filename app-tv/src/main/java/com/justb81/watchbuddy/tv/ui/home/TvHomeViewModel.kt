@@ -16,6 +16,8 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.time.Duration
+import java.time.Instant
 import javax.inject.Inject
 
 /**
@@ -35,6 +37,10 @@ data class TvHomeUiState(
     val isLoading: Boolean = true,
     val isLoadingMore: Boolean = false,
     val shows: List<EnrichedShowEntry> = emptyList(),
+    /** Shows watched within the last 30 days, sorted by last-watched DESC. */
+    val continueWatching: List<EnrichedShowEntry> = emptyList(),
+    /** All other shows (not in continueWatching), sorted alphabetically. */
+    val allShows: List<EnrichedShowEntry> = emptyList(),
     /** Progress keyed by Trakt id. */
     val progress: Map<Int, ShowProgress> = emptyMap(),
     val connectedPhones: Int = 0,
@@ -62,6 +68,9 @@ class TvHomeViewModel @Inject constructor(
 
     companion object {
         val PAGE_SIZE = PhoneApiService.PAGE_SIZE
+
+        /** Shows last watched within this window appear in "Continue Watching". */
+        val CONTINUE_WATCHING_WINDOW: Duration = Duration.ofDays(30)
     }
 
     private val _uiState = MutableStateFlow(TvHomeUiState())
@@ -167,11 +176,14 @@ class TvHomeViewModel @Inject constructor(
                 fallbackCacheTimestamp = System.currentTimeMillis()
                 tvShowCache.updateShows(allShows.map { it.entry })
 
+                val (continueWatching, otherShows) = partitionShows(allShows)
                 _uiState.update {
                     it.copy(
                         isLoading = false,
                         isLoadingMore = false,
                         shows = allShows,
+                        continueWatching = continueWatching,
+                        allShows = otherShows,
                         progress = computeProgress(allShows),
                         canLoadMore = hasMore
                     )
@@ -191,14 +203,19 @@ class TvHomeViewModel @Inject constructor(
         _uiState.update {
             when (reason) {
                 is FailureReason.NoPhone -> when {
-                    cached != null -> it.copy(
-                        isLoading = false,
-                        isLoadingMore = false,
-                        shows = cached,
-                        progress = computeProgress(cached),
-                        noPhoneConnected = true,
-                        canLoadMore = false
-                    )
+                    cached != null -> {
+                        val (cw, others) = partitionShows(cached)
+                        it.copy(
+                            isLoading = false,
+                            isLoadingMore = false,
+                            shows = cached,
+                            continueWatching = cw,
+                            allShows = others,
+                            progress = computeProgress(cached),
+                            noPhoneConnected = true,
+                            canLoadMore = false
+                        )
+                    }
                     else -> it.copy(
                         isLoading = false,
                         isLoadingMore = false,
@@ -207,15 +224,20 @@ class TvHomeViewModel @Inject constructor(
                     )
                 }
                 is FailureReason.ApiError -> when {
-                    cached != null -> it.copy(
-                        isLoading = false,
-                        isLoadingMore = false,
-                        shows = cached,
-                        progress = computeProgress(cached),
-                        phoneApiError = reason.phoneFound,
-                        error = reason.message,
-                        canLoadMore = false
-                    )
+                    cached != null -> {
+                        val (cw, others) = partitionShows(cached)
+                        it.copy(
+                            isLoading = false,
+                            isLoadingMore = false,
+                            shows = cached,
+                            continueWatching = cw,
+                            allShows = others,
+                            progress = computeProgress(cached),
+                            phoneApiError = reason.phoneFound,
+                            error = reason.message,
+                            canLoadMore = false
+                        )
+                    }
                     else -> it.copy(
                         isLoading = false,
                         isLoadingMore = false,
@@ -227,6 +249,18 @@ class TvHomeViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    internal fun partitionShows(
+        shows: List<EnrichedShowEntry>,
+        now: Instant = Instant.now()
+    ): Pair<List<EnrichedShowEntry>, List<EnrichedShowEntry>> {
+        val cutoff = now.minus(CONTINUE_WATCHING_WINDOW)
+        val (continueWatching, others) = shows.partition { entry ->
+            val lastWatched = ShowProgressCalculator.latestWatchedInstant(entry.entry)
+            lastWatched != null && lastWatched.isAfter(cutoff)
+        }
+        return continueWatching to others.sortedBy { it.entry.show.title.lowercase() }
     }
 
     private fun computeProgress(shows: List<EnrichedShowEntry>): Map<Int, ShowProgress> =

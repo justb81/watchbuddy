@@ -4,6 +4,8 @@ import com.justb81.watchbuddy.core.model.EnrichedShowEntry
 import com.justb81.watchbuddy.core.model.TraktIds
 import com.justb81.watchbuddy.core.model.TraktShow
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
+import com.justb81.watchbuddy.core.model.TraktWatchedEpisode
+import com.justb81.watchbuddy.core.model.TraktWatchedSeason
 import com.justb81.watchbuddy.tv.MainDispatcherRule
 import com.justb81.watchbuddy.tv.data.StreamingPreferencesRepository
 import com.justb81.watchbuddy.tv.data.TvShowCache
@@ -23,6 +25,8 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
+import java.time.Instant
+import java.time.temporal.ChronoUnit
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @DisplayName("TvHomeViewModel")
@@ -376,6 +380,94 @@ class TvHomeViewModelTest {
 
             val allShows = (page1 + page2).sortedByLastWatched()
             verify { tvShowCache.updateShows(allShows.map { it.entry }) }
+        }
+    }
+
+    private fun enrichedWatched(title: String, lastWatchedAt: String, id: Int = title.hashCode()) =
+        EnrichedShowEntry(
+            entry = TraktWatchedEntry(
+                show = TraktShow(title, 2020, TraktIds(trakt = id)),
+                seasons = listOf(
+                    TraktWatchedSeason(
+                        number = 1,
+                        episodes = listOf(TraktWatchedEpisode(number = 1, last_watched_at = lastWatchedAt))
+                    )
+                )
+            )
+        )
+
+    @Nested
+    @DisplayName("partitionShows — 30-day Continue Watching window (#361)")
+    inner class PartitionShowsTest {
+
+        private val now = Instant.parse("2026-04-19T12:00:00Z")
+
+        @Test
+        fun `show watched 10 days ago goes into continueWatching`() {
+            val vm = createViewModel()
+            val show = enrichedWatched("Recent", now.minus(10, ChronoUnit.DAYS).toString())
+
+            val (cw, others) = vm.partitionShows(listOf(show), now)
+
+            assertEquals(listOf(show), cw)
+            assertTrue(others.isEmpty())
+        }
+
+        @Test
+        fun `show watched 31 days ago goes into allShows`() {
+            val vm = createViewModel()
+            val show = enrichedWatched("Old", now.minus(31, ChronoUnit.DAYS).toString())
+
+            val (cw, others) = vm.partitionShows(listOf(show), now)
+
+            assertTrue(cw.isEmpty())
+            assertEquals(listOf(show), others)
+        }
+
+        @Test
+        fun `show with no watch history goes into allShows`() {
+            val vm = createViewModel()
+            val show = EnrichedShowEntry(entry = TraktWatchedEntry(TraktShow("Never", 2020, TraktIds(trakt = 99))))
+
+            val (cw, others) = vm.partitionShows(listOf(show), now)
+
+            assertTrue(cw.isEmpty())
+            assertEquals(listOf(show), others)
+        }
+
+        @Test
+        fun `allShows is sorted alphabetically case-insensitive`() {
+            val vm = createViewModel()
+            val shows = listOf(
+                EnrichedShowEntry(entry = TraktWatchedEntry(TraktShow("Zebra", 2020, TraktIds(trakt = 1)))),
+                EnrichedShowEntry(entry = TraktWatchedEntry(TraktShow("apple", 2020, TraktIds(trakt = 2)))),
+                EnrichedShowEntry(entry = TraktWatchedEntry(TraktShow("Mango", 2020, TraktIds(trakt = 3))))
+            )
+
+            val (_, others) = vm.partitionShows(shows, now)
+
+            assertEquals(listOf("apple", "Mango", "Zebra"), others.map { it.entry.show.title })
+        }
+
+        @Test
+        fun `uiState sections are computed after loading shows`() = runTest {
+            val phone = mockk<PhoneDiscoveryManager.DiscoveredPhone>()
+            every { phone.baseUrl } returns "http://192.168.1.1:8765/"
+            every { phoneDiscovery.getBestPhone() } returns phone
+            every { phoneApiClientFactory.createClient(any()) } returns phoneApiService
+
+            val recent = enrichedWatched("Recent", Instant.now().minus(5, ChronoUnit.DAYS).toString(), id = 1)
+            val old = enrichedWatched("Old Show", Instant.now().minus(40, ChronoUnit.DAYS).toString(), id = 2)
+            coEvery { phoneApiService.getShows(any(), any()) } returns listOf(recent, old)
+
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            assertEquals(1, state.continueWatching.size)
+            assertEquals(1, state.allShows.size)
+            assertEquals("Recent", state.continueWatching[0].entry.show.title)
+            assertEquals("Old Show", state.allShows[0].entry.show.title)
         }
     }
 
