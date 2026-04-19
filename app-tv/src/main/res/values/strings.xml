@@ -69,6 +69,17 @@
     <string name="tv_streaming_settings_title">Streaming Services</string>
     <string name="tv_streaming_settings_subtitle">Select your subscribed services. Order determines priority for Watch Now.</string>
 
+    <!-- TV Settings hub (#344) -->
+    <string name="tv_settings_title">Settings</string>
+    <string name="tv_settings_phone_discovery_title">Phone discovery</string>
+    <string name="tv_settings_phone_discovery_subtitle">Scan the network for WatchBuddy phones</string>
+    <string name="tv_settings_autostart_title">Autostart at TV boot</string>
+    <string name="tv_settings_autostart_subtitle">Start discovery automatically when the TV turns on</string>
+    <string name="tv_settings_streaming_services">Streaming services</string>
+    <string name="tv_settings_diagnostics">Diagnostics</string>
+    <string name="tv_discovery_notification_channel_name">Phone discovery</string>
+    <string name="tv_discovery_notification_text">Looking for WatchBuddy phones on the network</string>
+
     <!-- Scrobble overlay -->
     <string name="tv_scrobble_question">Are you watching %1$s?</string>
     <string name="tv_scrobble_episode">S%1$02dE%2$02d</string>

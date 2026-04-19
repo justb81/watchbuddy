@@ -57,6 +57,10 @@ TXT records:   version=X.Y.Z, modelQuality=70, llmBackend=LITERT
 - **Phone API** — user library (`/shows`), scrobbling (`/scrobble/*`), recaps (`/recap/*`)
 - **Trakt API** — never called directly by the TV; all Trakt operations are proxied via the phone
 
+**TV discovery lifecycle (#344):** Discovery is user-controlled via two toggles in `TvSettingsScreen`, persisted in `StreamingPreferencesRepository`:
+- `isPhoneDiscoveryEnabled` (default `true`) drives `PhoneDiscoveryManager.setEnabled(...)`; `TvHomeViewModel` simply observes the flow and forwards it — the ViewModel no longer stops discovery in `onCleared`, so discovery survives activity recreation and can also be owned by the background service below.
+- `isAutostartEnabled` (default `false`) — when on, `BootReceiver` (exported, listening on `BOOT_COMPLETED`) starts the foreground `TvDiscoveryService` (FGS type `dataSync`) on device boot. The service holds a low-importance notification (channel `watchbuddy_tv_discovery`) and observes `isPhoneDiscoveryEnabled`; it self-stops when the user turns discovery off. `BootReceiver` is a plain `BroadcastReceiver` that reaches the Hilt singleton via `EntryPointAccessors`.
+
 ### Device Ranking (TV side)
 
 ```mermaid

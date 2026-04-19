@@ -28,9 +28,10 @@ watchbuddy/
 │       └── (service/)  CompanionService, CompanionStateManager (foreground NSD server + shared state)
 ├── app-tv/             Google TV app (Kotlin, Compose for TV)
 │   └── src/main/java/com/justb81/watchbuddy/tv/
-│       ├── data/       StreamingPreferencesRepository, UserSessionRepository, TvShowCache
+│       ├── boot/       BootReceiver (starts TvDiscoveryService on BOOT_COMPLETED when autostart is enabled)
+│       ├── data/       StreamingPreferencesRepository (+ phone-discovery / autostart toggles), UserSessionRepository, TvShowCache
 │       ├── di/         AppModule (Hilt dependency injection)
-│       ├── discovery/  PhoneDiscoveryManager, PhoneApiService, PhoneApiClientFactory
+│       ├── discovery/  PhoneDiscoveryManager, PhoneApiService, PhoneApiClientFactory, TvDiscoveryService (foreground service — keeps discovery alive post-boot)
 │       ├── scrobbler/  TvScrobbleDispatcher, TvWatchedShowSource
 │       ├── ui/         TvMainActivity, TvNavGraph
 │       │   ├── home/       TvHomeScreen, TvHomeViewModel
@@ -38,7 +39,7 @@ watchbuddy/
 │       │   ├── recap/      RecapScreen, RecapViewModel
 │       │   ├── diagnostics/ TvDiagnosticsScreen, TvDiagnosticsViewModel (discovery / BLE / discovered-phones health — view-only, no Share)
 │       │   ├── scrobble/   ScrobbleOverlay, ScrobbleViewModel
-│       │   ├── settings/   StreamingSettingsScreen, StreamingSettingsViewModel
+│       │   ├── settings/   TvSettingsScreen + TvSettingsViewModel (generic settings hub), StreamingSettingsScreen + StreamingSettingsViewModel (nested)
 │       │   ├── showdetail/ ShowDetailScreen, ShowDetailViewModel
 │       │   ├── theme/      TV Material theme
 │       │   └── userselect/ UserSelectScreen, UserSelectViewModel
@@ -198,6 +199,7 @@ For the authoritative HTTP API table, NSD TXT-record contract (`version`, `model
 
 - **Watching TV toggle:** The phone HomeScreen shows an "I am watching TV" toggle, gated by Trakt + TMDB availability **and** Wi-Fi connectivity. Toggling starts/stops the `CompanionService`. When the user swipes the app from recents, the service auto-stops via `onTaskRemoved()`. Off-Wi-Fi the toggle is disabled with a "connect to Wi-Fi" reason; a running companion self-stops when Wi-Fi is lost (after a 3 s grace period for SSID handoffs) and clears `companionEnabled` so the FG notification is dismissed (#278). Wi-Fi state is tracked by `phone/network/WifiStateProvider` and consulted both by `HomeViewModel` and defensively by `CompanionService.onStartCommand`.
 - **CompanionStateManager:** Hilt singleton (`service/CompanionStateManager.kt`) that is the shared state hub between `CompanionService`, `CompanionHttpServer`, and `HomeViewModel`. Tracks `lastCapabilityCheck`, `lastScrobbleEvent`, and `isServiceRunning`.
+- **TV discovery lifecycle & boot autostart (#344):** Phone discovery on the TV is controlled by a user-facing toggle in `TvSettingsScreen` and persisted in `StreamingPreferencesRepository` (`isPhoneDiscoveryEnabled`, default `true`). `TvHomeViewModel.init` observes the flow and calls `PhoneDiscoveryManager.setEnabled(...)` — discovery is no longer tied to the activity's lifecycle, so it can outlive `TvMainActivity` recreation. A second toggle (`isAutostartEnabled`, default `false`) controls whether `BootReceiver` starts `TvDiscoveryService` on `BOOT_COMPLETED`. The foreground service (`dataSync` FGS type, low-importance notification channel `watchbuddy_tv_discovery`) owns discovery in the background and self-stops when the discovery toggle flips off. `BootReceiver` is `exported=true` (required for system broadcasts) and uses `EntryPointAccessors` to reach the Hilt singleton — it is not `@AndroidEntryPoint`. Permissions: `RECEIVE_BOOT_COMPLETED`, `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_DATA_SYNC`, `POST_NOTIFICATIONS`.
 - **Presence heartbeat (TV):** `PhoneDiscoveryManager` runs a heartbeat every 60s, re-fetching `/capability` for each phone. 3 consecutive failures → phone removed from discovered list. `MediaSessionScrobbler` skips phones with stale presence (> 2 min) before scrobbling. A `WifiManager.MulticastLock` is held while discovery is active (required on most Android TV ROMs for mDNS to receive any packets), and discovery self-heals on `FAILURE_ALREADY_ACTIVE`, Wi-Fi reconnect, and an empty-list heartbeat tick. Once any phone has 3 consecutive heartbeat successes, the TV stops the BLE scanner to save radio (a Wi-Fi route is enough); any heartbeat miss resumes it, with a 2-min hysteresis guarding the stop transition (#345 Opt B).
 - **Presence timeout (phone):** If no TV polls `/capability` for 5 minutes, the companion service auto-deactivates.
 - **Auto-reconnect:** `CompanionService` registers a `ConnectivityManager.NetworkCallback` for Wi-Fi. On network loss, NSD is unregistered; on network available, `onAvailable` is debounced (2 s) and NSD is torn down then re-registered 300 ms later — `NsdManager.unregisterService` is async and calling `registerService` before its callback runs leaves ghost advertisements on the network (#264). All register/unregister transitions run through an `IDLE → REGISTERING → REGISTERED → UNREGISTERING` state machine under a single lock so concurrent callers (`onStartCommand` + network callback) can't race past the guard while a prior registration is still in flight. `onStartCommand` is also idempotent against duplicate starts. On Wi-Fi re-announces where the IPv4 hasn't changed the full unregister/register dance is skipped — `onAvailable` can fire repeatedly during captive-portal / DNS retries without any real handoff, and each needless churn briefly yanks the advertisement off the network (#345 Opt D).

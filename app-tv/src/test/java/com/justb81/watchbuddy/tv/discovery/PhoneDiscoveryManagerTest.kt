@@ -368,6 +368,37 @@ class PhoneDiscoveryManagerTest {
         manager.stopDiscovery()
     }
 
+    @Nested
+    @DisplayName("setEnabled")
+    inner class SetEnabledTest {
+
+        @Test
+        fun `setEnabled(false) clears discovered phones and stops BLE scanner`() {
+            val phone = makePhone(
+                capability = DeviceCapability("d", "u", null, "P", LlmBackend.NONE, 50, 4000, true),
+                score = 50,
+                name = "preload"
+            )
+            manager.setDiscoveredPhonesForTest(listOf(phone))
+            assertEquals(1, manager.discoveredPhones.value.size)
+
+            manager.setEnabled(false)
+
+            assertTrue(manager.discoveredPhones.value.isEmpty())
+            verify { bleScanner.stop() }
+        }
+
+        @Test
+        fun `setEnabled(true) then setEnabled(false) are idempotent for repeated calls`() {
+            manager.setEnabled(false)
+            manager.setEnabled(false)
+            manager.setEnabled(true)
+            manager.setEnabled(true)
+            // No exceptions, and the discovered list is still empty (no real NSD in test).
+            assertTrue(manager.discoveredPhones.value.isEmpty())
+        }
+    }
+
     // ── DiscoveryConstants ─────────────────────────────────────────────────────
 
     @Nested
