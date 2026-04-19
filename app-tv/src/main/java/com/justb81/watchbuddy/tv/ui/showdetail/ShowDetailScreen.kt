@@ -9,9 +9,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -35,6 +38,11 @@ fun ShowDetailScreen(
     val nextEpisode  = (lastEpisode?.number ?: 0) + 1
 
     val services by viewModel.availableServices.collectAsState(initial = emptyList())
+    val watchNowFocus = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) {
+        watchNowFocus.requestFocus()
+    }
 
     Box(
         modifier = Modifier
@@ -75,8 +83,11 @@ fun ShowDetailScreen(
             Text(
                 text       = entry.show.title,
                 fontSize   = 40.sp,
+                lineHeight = 46.sp,
                 fontWeight = FontWeight.Bold,
-                color      = Color.White
+                color      = Color.White,
+                maxLines   = 2,
+                overflow   = TextOverflow.Ellipsis
             )
 
             // Year + stats
@@ -128,6 +139,7 @@ fun ShowDetailScreen(
                             )
                         }
                     },
+                    modifier = Modifier.focusRequester(watchNowFocus),
                     colors = ButtonDefaults.colors(
                         containerColor = MaterialTheme.colorScheme.primary
                     )
@@ -141,11 +153,6 @@ fun ShowDetailScreen(
                 // Recap button
                 OutlinedButton(onClick = onRecapClick) {
                     Text(stringResource(R.string.tv_recap))
-                }
-
-                // Back
-                OutlinedButton(onClick = onBack) {
-                    Text(stringResource(R.string.tv_back))
                 }
             }
 
