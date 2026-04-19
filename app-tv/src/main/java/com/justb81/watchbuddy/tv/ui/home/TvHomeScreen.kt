@@ -33,11 +33,14 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.tv.material3.*
 import coil.compose.AsyncImage
+import coil.compose.SubcomposeAsyncImage
 import com.justb81.watchbuddy.R
+import com.justb81.watchbuddy.core.model.AvatarSource
 import com.justb81.watchbuddy.core.model.EnrichedShowEntry
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
 import com.justb81.watchbuddy.core.progress.ShowProgress
 import com.justb81.watchbuddy.core.tmdb.TmdbImageHelper
+import com.justb81.watchbuddy.tv.ui.components.InitialsAvatar
 import com.justb81.watchbuddy.tv.ui.theme.extendedColors
 import java.time.Instant
 import java.time.LocalDate
@@ -47,7 +50,6 @@ import java.time.ZoneId
 @Composable
 fun TvHomeScreen(
     onShowClick: (TraktWatchedEntry) -> Unit,
-    onUserSelectClick: () -> Unit,
     onSettingsClick: () -> Unit = {},
     viewModel: TvHomeViewModel = hiltViewModel()
 ) {
@@ -78,8 +80,8 @@ fun TvHomeScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    if (uiState.connectedPhones > 0) {
-                        PhoneStatusBadge(count = uiState.connectedPhones, bestName = uiState.bestPhoneName)
+                    if (uiState.activeViewers.isNotEmpty()) {
+                        ActiveViewersRow(viewers = uiState.activeViewers)
                     } else {
                         Text(
                             text = stringResource(R.string.tv_no_phone),
@@ -92,11 +94,6 @@ fun TvHomeScreen(
                         onClick = onSettingsClick,
                         scale = ButtonDefaults.scale(scale = 1f)
                     ) { Text(stringResource(R.string.tv_settings_title)) }
-
-                    Button(
-                        onClick = onUserSelectClick,
-                        scale = ButtonDefaults.scale(scale = 1f)
-                    ) { Text(stringResource(R.string.tv_select_user)) }
                 }
             }
 
@@ -546,32 +543,65 @@ private fun relativeDate(context: android.content.Context, moment: Instant, now:
 }
 
 @Composable
-private fun PhoneStatusBadge(count: Int, bestName: String?) {
-    Box(
+private fun ActiveViewersRow(viewers: List<ActiveViewer>) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier
             .padding(4.dp)
             .clip(RoundedCornerShape(20.dp))
             .background(MaterialTheme.colorScheme.surface)
+            .padding(horizontal = 12.dp, vertical = 6.dp)
+            .semantics(mergeDescendants = true) {}
     ) {
-        Row(
-            modifier = Modifier
-                .padding(horizontal = 12.dp, vertical = 6.dp)
-                .semantics(mergeDescendants = true) {},
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(8.dp)
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(MaterialTheme.extendedColors.success)
-                    .clearAndSetSemantics {}
-            )
+        viewers.take(4).forEach { viewer ->
+            ActiveViewerChip(viewer)
+        }
+        if (viewers.size > 4) {
             Text(
-                text = if (bestName != null) bestName else stringResource(R.string.tv_devices_count, count),
+                text = "+${viewers.size - 4}",
                 fontSize = 12.sp,
-                color = Color.White.copy(alpha = 0.8f)
+                color = Color.White.copy(alpha = 0.6f)
             )
+        }
+    }
+}
+
+@Composable
+private fun ActiveViewerChip(viewer: ActiveViewer) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        ViewerAvatar(viewer = viewer, size = 24.dp)
+        Text(
+            text = viewer.displayName,
+            fontSize = 12.sp,
+            color = Color.White.copy(alpha = 0.85f)
+        )
+    }
+}
+
+@Composable
+private fun ViewerAvatar(viewer: ActiveViewer, size: androidx.compose.ui.unit.Dp) {
+    when (viewer.avatarSource) {
+        AvatarSource.GENERATED -> InitialsAvatar(name = viewer.displayName, size = size)
+        AvatarSource.TRAKT, AvatarSource.CUSTOM -> {
+            val url = viewer.avatarUrl
+            if (url.isNullOrBlank()) {
+                InitialsAvatar(name = viewer.displayName, size = size)
+            } else {
+                SubcomposeAsyncImage(
+                    model = url,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(size)
+                        .clip(RoundedCornerShape(percent = 50)),
+                    loading = { InitialsAvatar(name = viewer.displayName, size = size) },
+                    error = { InitialsAvatar(name = viewer.displayName, size = size) }
+                )
+            }
         }
     }
 }

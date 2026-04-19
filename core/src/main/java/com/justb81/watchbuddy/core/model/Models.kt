@@ -133,10 +133,20 @@ data class DeviceCapability(
     val freeRamMb: Int,
     val isAvailable: Boolean = true,
     val tmdbConfigured: Boolean = false,
-    val tmdbApiKey: String? = null      // populated by phone so TV can call TMDB directly
+    val tmdbApiKey: String? = null,     // populated by phone so TV can call TMDB directly
+    /**
+     * Where the phone wants the TV to source this user's avatar from.
+     * TRAKT (default) → render [userAvatarUrl] directly (Trakt CDN).
+     * GENERATED → TV renders deterministic initials from [userName]; [userAvatarUrl] is null.
+     * CUSTOM → [userAvatarUrl] points at this phone's `/avatar?v=N` endpoint.
+     */
+    val avatarSource: AvatarSource = AvatarSource.TRAKT
 )
 
 enum class LlmBackend { AICORE, LITERT, NONE }
+
+@Serializable
+enum class AvatarSource { TRAKT, GENERATED, CUSTOM }
 
 // ── Scrobble / Session ────────────────────────────────────────────────────────
 

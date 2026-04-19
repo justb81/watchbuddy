@@ -9,7 +9,6 @@
     <string name="tv_no_shows">Keine Serien gefunden.\nVerbinde die WatchBuddy-App auf deinem Handy mit Trakt.</string>
     <string name="tv_no_phone">Kein Handy verbunden.\nStarte die WatchBuddy-App auf deinem Smartphone.\nFalls dein WLAN die Geräteerkennung blockiert, aktiviere Bluetooth auf beiden Geräten.</string>
     <string name="tv_retry">Erneut versuchen</string>
-    <string name="tv_devices_count">%1$d Gerät(e)</string>
     <string name="tv_last_watched">Zuletzt: %1$s, %2$s</string>
     <string name="tv_last_aired_episode">Ausgestrahlt: %1$s, %2$s</string>
     <string name="tv_next_aired">Nächste: %1$s, %2$s</string>
@@ -30,12 +29,6 @@
         <item quantity="other">%d Serien</item>
     </plurals>
 
-    <!-- User select -->
-    <string name="tv_select_user">Wer schaut?</string>
-    <string name="tv_select_user_subtitle">Wähle eine oder mehrere Personen aus</string>
-    <string name="tv_watching_together">Gemeinsam schauen</string>
-    <string name="tv_confirm_selection">Bestätigen</string>
-    <string name="tv_cancel">Abbrechen</string>
 
     <!-- Show detail -->
     <string name="tv_next_episode">Nächste Folge</string>
@@ -95,11 +88,8 @@
     <string name="tv_llm_aicore">AICore</string>
     <string name="tv_llm_gemma_gpu">Gemma GPU</string>
     <string name="tv_llm_gemma_cpu">Gemma CPU</string>
-    <string name="tv_llm_none">Kein LLM</string>
 
     <!-- Barrierefreiheit -->
-    <string name="cd_user_selected">%1$s, ausgewählt</string>
-    <string name="cd_user_unselected">%1$s, Drücken zum Auswählen</string>
     <string name="cd_scrobble_countdown">Automatisch bestätigen in %1$d Sekunden</string>
     <string name="cd_service_move_up">%1$s in der Priorität nach oben verschieben</string>
     <string name="cd_service_move_down">%1$s in der Priorität nach unten verschieben</string>

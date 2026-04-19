@@ -64,6 +64,20 @@
     <!-- Settings -->
     <string name="settings_title">Ajustes</string>
     <string name="settings_account">Cuenta</string>
+
+    <!-- Identity -->
+    <string name="settings_identity_section">Identidad</string>
+    <string name="settings_identity_fallback_name">tú</string>
+    <string name="settings_display_name_label">Nombre visible</string>
+    <string name="settings_display_name_helper">Se muestra en la TV. Déjalo vacío para usar tu usuario de Trakt.</string>
+    <string name="settings_avatar_source_label">Avatar</string>
+    <string name="settings_avatar_source_trakt">Foto de Trakt</string>
+    <string name="settings_avatar_source_generated">Generado desde el nombre</string>
+    <string name="settings_avatar_source_custom">Foto personalizada</string>
+    <string name="settings_avatar_choose_photo">Elegir foto…</string>
+    <string name="settings_avatar_preview_cd">Vista previa del avatar</string>
+    <string name="settings_avatar_import_failed">No se pudo importar la foto. Prueba con otra.</string>
+
     <string name="settings_trakt_account">Cuenta de Trakt</string>
     <string name="settings_tmdb">TMDB</string>
     <string name="settings_tmdb_account">Cuenta de TMDB</string>

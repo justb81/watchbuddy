@@ -1,8 +1,13 @@
 package com.justb81.watchbuddy.phone.ui.settings
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -10,6 +15,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -18,9 +26,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.justb81.watchbuddy.BuildConfig
 import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
+import com.justb81.watchbuddy.core.model.AvatarSource
+import com.justb81.watchbuddy.phone.ui.components.InitialsAvatar
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -49,6 +61,17 @@ fun SettingsScreen(
             viewModel.clearSaveSuccess()
         }
     }
+
+    val avatarImportErrorMessage = stringResource(R.string.settings_avatar_import_failed)
+    LaunchedEffect(uiState.customAvatarImportError) {
+        if (uiState.customAvatarImportError) {
+            snackbarHostState.showSnackbar(avatarImportErrorMessage)
+        }
+    }
+
+    val pickPhoto = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia()
+    ) { uri -> viewModel.onCustomAvatarPicked(uri) }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -98,6 +121,22 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
                     )
                 }
+            }
+
+            // ── Identity (display name + avatar source) ──────────────────────
+            SettingsSectionHeader(stringResource(R.string.settings_identity_section))
+
+            SettingsCard {
+                IdentitySection(
+                    state = uiState,
+                    onDisplayNameChange = viewModel::setDisplayNameOverride,
+                    onAvatarSourceChange = viewModel::setAvatarSource,
+                    onChoosePhotoClick = {
+                        pickPhoto.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                        )
+                    }
+                )
             }
 
             // ── Account Section ───────────────────────────────────────────────
@@ -561,6 +600,137 @@ private fun TmdbHelperLink() {
         textDecoration  = TextDecoration.Underline,
         modifier        = Modifier.clickable { uriHandler.openUri(url) }
     )
+}
+
+// ── Identity section (display name + avatar source) ─────────────────────────
+
+@Composable
+private fun IdentitySection(
+    state: SettingsUiState,
+    onDisplayNameChange: (String) -> Unit,
+    onAvatarSourceChange: (AvatarSource) -> Unit,
+    onChoosePhotoClick: () -> Unit
+) {
+    val previewName = state.displayNameOverride.ifBlank {
+        state.traktUsername ?: stringResource(R.string.settings_identity_fallback_name)
+    }
+    Column(modifier = Modifier.padding(16.dp)) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            IdentityPreview(state = state, previewName = previewName)
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = previewName,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = stringResource(
+                        when (state.avatarSource) {
+                            AvatarSource.TRAKT -> R.string.settings_avatar_source_trakt
+                            AvatarSource.GENERATED -> R.string.settings_avatar_source_generated
+                            AvatarSource.CUSTOM -> R.string.settings_avatar_source_custom
+                        }
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        OutlinedTextField(
+            value = state.displayNameOverride,
+            onValueChange = onDisplayNameChange,
+            label = { Text(stringResource(R.string.settings_display_name_label)) },
+            placeholder = {
+                Text(state.traktUsername ?: stringResource(R.string.settings_identity_fallback_name))
+            },
+            supportingText = { Text(stringResource(R.string.settings_display_name_helper)) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(Modifier.height(12.dp))
+
+        Text(
+            text = stringResource(R.string.settings_avatar_source_label),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary
+        )
+
+        AvatarSource.entries.forEach { source ->
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onAvatarSourceChange(source) }
+                    .padding(vertical = 2.dp)
+            ) {
+                RadioButton(
+                    selected = state.avatarSource == source,
+                    onClick = { onAvatarSourceChange(source) }
+                )
+                Text(
+                    text = stringResource(
+                        when (source) {
+                            AvatarSource.TRAKT -> R.string.settings_avatar_source_trakt
+                            AvatarSource.GENERATED -> R.string.settings_avatar_source_generated
+                            AvatarSource.CUSTOM -> R.string.settings_avatar_source_custom
+                        }
+                    ),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
+
+        if (state.avatarSource == AvatarSource.CUSTOM) {
+            Spacer(Modifier.height(8.dp))
+            Button(onClick = onChoosePhotoClick) {
+                Text(stringResource(R.string.settings_avatar_choose_photo))
+            }
+        }
+    }
+}
+
+@Composable
+private fun IdentityPreview(state: SettingsUiState, previewName: String) {
+    val androidContext = androidx.compose.ui.platform.LocalContext.current
+    val size = 64.dp
+    when (state.avatarSource) {
+        AvatarSource.GENERATED -> {
+            InitialsAvatar(name = previewName, size = size)
+        }
+        AvatarSource.CUSTOM -> {
+            if (state.hasCustomAvatar) {
+                val file = remember { java.io.File(androidContext.filesDir, "avatar.jpg") }
+                AsyncImage(
+                    model = ImageRequest.Builder(androidContext)
+                        .data(file)
+                        // Version-stamp the memory cache key so the preview
+                        // refreshes the moment the user picks a new photo.
+                        .memoryCacheKey("avatar-preview-${state.customAvatarVersion}")
+                        .diskCacheKey("avatar-preview-${state.customAvatarVersion}")
+                        .build(),
+                    contentDescription = stringResource(R.string.settings_avatar_preview_cd),
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(size)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                )
+            } else {
+                InitialsAvatar(name = previewName, size = size)
+            }
+        }
+        AvatarSource.TRAKT -> {
+            InitialsAvatar(name = previewName, size = size)
+        }
+    }
 }
 
 // ── Reusable components ───────────────────────────────────────────────────────

@@ -13,6 +13,7 @@ import com.justb81.watchbuddy.core.trakt.TraktApiService
 import com.justb81.watchbuddy.phone.auth.TokenRefreshManager
 import com.justb81.watchbuddy.phone.auth.TokenRepository
 import com.justb81.watchbuddy.phone.llm.RecapGenerator
+import com.justb81.watchbuddy.phone.settings.AvatarImageStore
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import com.justb81.watchbuddy.service.CompanionStateManager
 import kotlinx.coroutines.async
@@ -61,6 +62,7 @@ class CompanionHttpServer @Inject constructor(
     private val tmdbApiService: TmdbApiService,
     private val tmdbCache: TmdbCache,
     private val settingsRepository: SettingsRepository,
+    private val avatarImageStore: AvatarImageStore,
     private val stateManager: CompanionStateManager
 ) {
     companion object {
@@ -80,7 +82,7 @@ class CompanionHttpServer @Inject constructor(
                 configureCompanionRoutes(
                     recapGenerator, capabilityProvider, showRepository,
                     tokenRepository, tokenRefreshManager, traktApiService, tmdbApiService, tmdbCache,
-                    settingsRepository, stateManager
+                    settingsRepository, avatarImageStore, stateManager
                 )
             }.start(wait = false)
         }.onFailure {
@@ -109,6 +111,7 @@ internal fun Application.configureCompanionRoutes(
     tmdbApiService: TmdbApiService,
     tmdbCache: TmdbCache,
     settingsRepository: SettingsRepository,
+    avatarImageStore: AvatarImageStore,
     stateManager: CompanionStateManager
 ) {
     install(ContentNegotiation) {
@@ -136,6 +139,24 @@ internal fun Application.configureCompanionRoutes(
         get("/capability") {
             stateManager.onCapabilityChecked()
             call.respond(capabilityProvider.getCapability())
+        }
+
+        get("/avatar") {
+            val file = avatarImageStore.file()
+            if (!avatarImageStore.exists()) {
+                return@get call.respond(HttpStatusCode.NotFound, ErrorResponse("No custom avatar"))
+            }
+            val version = settingsRepository.settings.first().customAvatarVersion
+            val etag = "\"$version\""
+            if (call.request.headers[HttpHeaders.IfNoneMatch] == etag) {
+                return@get call.respond(HttpStatusCode.NotModified)
+            }
+            call.response.header(HttpHeaders.CacheControl, "private, max-age=60")
+            call.response.header(HttpHeaders.ETag, etag)
+            call.respondBytes(
+                bytes = file.readBytes(),
+                contentType = ContentType.Image.JPEG
+            )
         }
 
         get("/shows") {
