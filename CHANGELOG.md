@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.19.0](https://github.com/justb81/watchbuddy/compare/v0.18.0...v0.19.0) (2026-04-19)
+
+
+### Features
+
+* **phone:** add pull-to-refresh to Home and Show Detail screens ([#339](https://github.com/justb81/watchbuddy/issues/339)) ([3c69418](https://github.com/justb81/watchbuddy/commit/3c6941811c2c8a68530b0ce615aac686a4a29247))
+* **phone:** wire DiagnosticLog into companion service / HTTP / BLE / Wi-Fi ([#343](https://github.com/justb81/watchbuddy/issues/343)) ([741b004](https://github.com/justb81/watchbuddy/commit/741b00463e420fbaf8df6b799352e51a5f44b9f6))
+
 ## [0.18.0](https://github.com/justb81/watchbuddy/compare/v0.17.0...v0.18.0) (2026-04-19)
 
 
