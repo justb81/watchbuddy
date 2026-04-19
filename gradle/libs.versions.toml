@@ -26,6 +26,7 @@ androidx-test-core = "1.6.1"
 androidx-arch-core = "2.2.0"
 errorprone-annotations = "2.36.0"
 gradlePlayPublisher = "4.0.0"
+detekt = "1.23.8"
 
 [libraries]
 # AndroidX Core
@@ -106,6 +107,9 @@ androidx-test-core = { group = "androidx.test", name = "core-ktx", version.ref =
 androidx-arch-core-testing = { group = "androidx.arch.core", name = "core-testing", version.ref = "androidx-arch-core" }
 errorprone-annotations = { group = "com.google.errorprone", name = "error_prone_annotations", version.ref = "errorprone-annotations" }
 
+# Static analysis
+detekt-formatting = { group = "io.gitlab.arturbosch.detekt", name = "detekt-formatting", version.ref = "detekt" }
+
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 android-library = { id = "com.android.library", version.ref = "agp" }
@@ -114,3 +118,4 @@ hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 gradle-play-publisher = { id = "com.github.triplet.play", version.ref = "gradlePlayPublisher" }
+detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }

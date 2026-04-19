@@ -19,7 +19,8 @@ function mockFetchHtml(status) {
   return vi.fn().mockResolvedValue({
     ok: status >= 200 && status < 300,
     status,
-    json: () => Promise.reject(new SyntaxError("Unexpected token '<', \"<html>...\" is not valid JSON")),
+    json: () =>
+      Promise.reject(new SyntaxError('Unexpected token \'<\', "<html>..." is not valid JSON')),
     text: () => Promise.resolve('<html><body>Oops</body></html>'),
     headers: { forEach: (cb) => new Map().forEach((v, k) => cb(v, k)) },
   });
@@ -62,7 +63,11 @@ describe('GET /health', () => {
     await app.verifyCredentials();
     const res = await request(app).get('/health');
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ status: 'ok', trakt: 'connected', validated: 'client_id_via_oauth' });
+    expect(res.body).toEqual({
+      status: 'ok',
+      trakt: 'connected',
+      validated: 'client_id_via_oauth',
+    });
   });
 });
 
@@ -94,17 +99,13 @@ describe('POST /trakt/token', () => {
   });
 
   it('returns 400 when code is missing', async () => {
-    const res = await request(app)
-      .post('/trakt/token')
-      .send({});
+    const res = await request(app).post('/trakt/token').send({});
     expect(res.status).toBe(400);
     expect(res.body.error).toBe('Missing code');
   });
 
   it('exchanges code for tokens successfully', async () => {
-    const res = await request(app)
-      .post('/trakt/token')
-      .send({ code: 'device-code-abc' });
+    const res = await request(app).post('/trakt/token').send({ code: 'device-code-abc' });
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual({
@@ -117,9 +118,7 @@ describe('POST /trakt/token', () => {
   });
 
   it('sends correct payload to Trakt API', async () => {
-    await request(app)
-      .post('/trakt/token')
-      .send({ code: 'device-code-abc' });
+    await request(app).post('/trakt/token').send({ code: 'device-code-abc' });
 
     expect(fetchFn).toHaveBeenCalledWith(
       'https://api.trakt.tv/oauth/device/token',
@@ -136,14 +135,12 @@ describe('POST /trakt/token', () => {
           client_id: 'test-client-id',
           client_secret: 'test-client-secret',
         }),
-      }),
+      })
     );
   });
 
   it('does not leak client_secret in response', async () => {
-    const res = await request(app)
-      .post('/trakt/token')
-      .send({ code: 'device-code-abc' });
+    const res = await request(app).post('/trakt/token').send({ code: 'device-code-abc' });
 
     expect(res.body).not.toHaveProperty('client_secret');
     expect(JSON.stringify(res.body)).not.toContain('test-client-secret');
@@ -153,9 +150,7 @@ describe('POST /trakt/token', () => {
     const errorFetch = mockFetch(400, { error: 'invalid_grant' });
     const errorApp = buildApp(errorFetch);
 
-    const res = await request(errorApp)
-      .post('/trakt/token')
-      .send({ code: 'bad-code' });
+    const res = await request(errorApp).post('/trakt/token').send({ code: 'bad-code' });
 
     expect(res.status).toBe(400);
     expect(res.body).toEqual({ error: 'invalid_grant' });
@@ -165,9 +160,7 @@ describe('POST /trakt/token', () => {
     const failFetch = vi.fn().mockRejectedValue(new Error('ECONNREFUSED'));
     const failApp = buildApp(failFetch);
 
-    const res = await request(failApp)
-      .post('/trakt/token')
-      .send({ code: 'device-code-abc' });
+    const res = await request(failApp).post('/trakt/token').send({ code: 'device-code-abc' });
 
     expect(res.status).toBe(502);
     expect(res.body).toEqual({ error: 'Upstream error' });
@@ -177,18 +170,14 @@ describe('POST /trakt/token', () => {
     const rateFetch = mockFetch(429, { error: 'rate_limit_exceeded' });
     const rateApp = buildApp(rateFetch);
 
-    const res = await request(rateApp)
-      .post('/trakt/token')
-      .send({ code: 'device-code-abc' });
+    const res = await request(rateApp).post('/trakt/token').send({ code: 'device-code-abc' });
 
     expect(res.status).toBe(429);
     expect(res.body).toEqual({ error: 'rate_limit_exceeded' });
   });
 
   it('returns 400 when code is not a string', async () => {
-    const res = await request(app)
-      .post('/trakt/token')
-      .send({ code: 12345 });
+    const res = await request(app).post('/trakt/token').send({ code: 12345 });
     expect(res.status).toBe(400);
     expect(res.body.error).toBe('code must be a string');
   });
@@ -202,9 +191,7 @@ describe('POST /trakt/token', () => {
   });
 
   it('returns 400 when code contains invalid characters', async () => {
-    const res = await request(app)
-      .post('/trakt/token')
-      .send({ code: 'bad code!@#' });
+    const res = await request(app).post('/trakt/token').send({ code: 'bad code!@#' });
     expect(res.status).toBe(400);
     expect(res.body.error).toBe('code contains invalid characters');
   });
@@ -223,9 +210,7 @@ describe('POST /trakt/token', () => {
     });
     const timeoutApp = buildApp(hangingFetch, { fetchTimeoutMs: 50 });
 
-    const res = await request(timeoutApp)
-      .post('/trakt/token')
-      .send({ code: 'device-code-abc' });
+    const res = await request(timeoutApp).post('/trakt/token').send({ code: 'device-code-abc' });
 
     expect(res.status).toBe(504);
     expect(res.body).toEqual({ error: 'Upstream timeout' });
@@ -235,9 +220,7 @@ describe('POST /trakt/token', () => {
     const htmlFetch = mockFetchHtml(200);
     const htmlApp = buildApp(htmlFetch);
 
-    const res = await request(htmlApp)
-      .post('/trakt/token')
-      .send({ code: 'device-code-abc' });
+    const res = await request(htmlApp).post('/trakt/token').send({ code: 'device-code-abc' });
 
     expect(res.status).toBe(502);
     expect(res.body.error).toMatch(/non-JSON/i);
@@ -248,9 +231,7 @@ describe('POST /trakt/token', () => {
     const htmlFetch = mockFetchHtml(503);
     const htmlApp = buildApp(htmlFetch);
 
-    const res = await request(htmlApp)
-      .post('/trakt/token')
-      .send({ code: 'device-code-abc' });
+    const res = await request(htmlApp).post('/trakt/token').send({ code: 'device-code-abc' });
 
     expect(res.status).toBe(502);
     expect(res.body.error).toMatch(/non-JSON/i);
@@ -265,9 +246,7 @@ describe('POST /trakt/token', () => {
     const emptyFetch = mockFetchEmpty(400);
     const emptyApp = buildApp(emptyFetch);
 
-    const res = await request(emptyApp)
-      .post('/trakt/token')
-      .send({ code: 'device-code-abc' });
+    const res = await request(emptyApp).post('/trakt/token').send({ code: 'device-code-abc' });
 
     expect(res.status).toBe(400);
     expect(res.body).toEqual({ error: 'authorization_pending' });
@@ -277,9 +256,7 @@ describe('POST /trakt/token', () => {
     const emptyFetch = mockFetchEmpty(500);
     const emptyApp = buildApp(emptyFetch);
 
-    const res = await request(emptyApp)
-      .post('/trakt/token')
-      .send({ code: 'device-code-abc' });
+    const res = await request(emptyApp).post('/trakt/token').send({ code: 'device-code-abc' });
 
     expect(res.status).toBe(502);
     expect(res.body.error).toMatch(/non-JSON/i);
@@ -305,9 +282,7 @@ describe('POST /trakt/token/refresh', () => {
   });
 
   it('returns 400 when refresh_token is missing', async () => {
-    const res = await request(app)
-      .post('/trakt/token/refresh')
-      .send({});
+    const res = await request(app).post('/trakt/token/refresh').send({});
     expect(res.status).toBe(400);
     expect(res.body.error).toBe('Missing refresh_token');
   });
@@ -328,9 +303,7 @@ describe('POST /trakt/token/refresh', () => {
   });
 
   it('sends correct payload to Trakt API', async () => {
-    await request(app)
-      .post('/trakt/token/refresh')
-      .send({ refresh_token: 'old-ref-token' });
+    await request(app).post('/trakt/token/refresh').send({ refresh_token: 'old-ref-token' });
 
     expect(fetchFn).toHaveBeenCalledWith(
       'https://api.trakt.tv/oauth/token',
@@ -349,14 +322,12 @@ describe('POST /trakt/token/refresh', () => {
           redirect_uri: 'urn:ietf:wg:oauth:2.0:oob',
           grant_type: 'refresh_token',
         }),
-      }),
+      })
     );
   });
 
   it('includes redirect_uri in the refresh payload', async () => {
-    await request(app)
-      .post('/trakt/token/refresh')
-      .send({ refresh_token: 'old-ref-token' });
+    await request(app).post('/trakt/token/refresh').send({ refresh_token: 'old-ref-token' });
 
     const callBody = JSON.parse(fetchFn.mock.calls[0][1].body);
     expect(callBody.redirect_uri).toBe('urn:ietf:wg:oauth:2.0:oob');
@@ -483,18 +454,14 @@ describe('POST /trakt/token — server_misconfigured', () => {
 
   it('returns 503 server_misconfigured when clientSecret is missing', async () => {
     const app = buildApp(mockFetch(200, {}), { clientSecret: '' });
-    const res = await request(app)
-      .post('/trakt/token')
-      .send({ code: 'device-code-abc' });
+    const res = await request(app).post('/trakt/token').send({ code: 'device-code-abc' });
     expect(res.status).toBe(503);
     expect(res.body).toEqual({ error: 'server_misconfigured' });
   });
 
   it('returns 503 server_misconfigured when clientSecret is undefined', async () => {
     const app = buildApp(mockFetch(200, {}), { clientSecret: undefined });
-    const res = await request(app)
-      .post('/trakt/token')
-      .send({ code: 'device-code-abc' });
+    const res = await request(app).post('/trakt/token').send({ code: 'device-code-abc' });
     expect(res.status).toBe(503);
     expect(res.body).toEqual({ error: 'server_misconfigured' });
   });
@@ -502,9 +469,7 @@ describe('POST /trakt/token — server_misconfigured', () => {
   it('returns 503 server_misconfigured after verifyCredentials receives 401', async () => {
     const app = buildApp(mockFetch(401, { error: 'unauthorized' }));
     await app.verifyCredentials();
-    const res = await request(app)
-      .post('/trakt/token')
-      .send({ code: 'device-code-abc' });
+    const res = await request(app).post('/trakt/token').send({ code: 'device-code-abc' });
     expect(res.status).toBe(503);
     expect(res.body).toEqual({ error: 'server_misconfigured' });
   });
@@ -512,9 +477,7 @@ describe('POST /trakt/token — server_misconfigured', () => {
   it('returns 503 server_misconfigured after verifyCredentials receives 403', async () => {
     const app = buildApp(mockFetch(403, { error: 'invalid_api_key' }));
     await app.verifyCredentials();
-    const res = await request(app)
-      .post('/trakt/token')
-      .send({ code: 'device-code-abc' });
+    const res = await request(app).post('/trakt/token').send({ code: 'device-code-abc' });
     expect(res.status).toBe(503);
     expect(res.body).toEqual({ error: 'server_misconfigured' });
   });
@@ -522,9 +485,7 @@ describe('POST /trakt/token — server_misconfigured', () => {
   it('logs an error when blocking token exchange due to misconfiguration', async () => {
     const app = buildApp(mockFetch(200, {}), { clientSecret: '' });
     await request(app).post('/trakt/token').send({ code: 'device-code-abc' });
-    expect(errorSpy).toHaveBeenCalledWith(
-      expect.stringContaining('misconfigured'),
-    );
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('misconfigured'));
   });
 
   it('health returns 503 misconfigured when clientSecret is missing', async () => {
@@ -536,16 +497,16 @@ describe('POST /trakt/token — server_misconfigured', () => {
   });
 
   it('does not block token exchange when credentials are valid', async () => {
-    const app = buildApp(mockFetch(200, {
-      access_token: 'acc-123',
-      refresh_token: 'ref-456',
-      expires_in: 7776000,
-      token_type: 'Bearer',
-      scope: 'public',
-    }));
-    const res = await request(app)
-      .post('/trakt/token')
-      .send({ code: 'device-code-abc' });
+    const app = buildApp(
+      mockFetch(200, {
+        access_token: 'acc-123',
+        refresh_token: 'ref-456',
+        expires_in: 7776000,
+        token_type: 'Bearer',
+        scope: 'public',
+      })
+    );
+    const res = await request(app).post('/trakt/token').send({ code: 'device-code-abc' });
     expect(res.status).toBe(200);
     expect(res.body.access_token).toBe('acc-123');
   });
@@ -603,7 +564,7 @@ describe('Credential verification', () => {
           'User-Agent': 'WatchBuddy/0.0.0',
         }),
         body: JSON.stringify({ client_id: 'test-client-id' }),
-      }),
+      })
     );
   });
 
@@ -612,7 +573,11 @@ describe('Credential verification', () => {
     await app.verifyCredentials();
     const res = await request(app).get('/health');
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ status: 'ok', trakt: 'connected', validated: 'client_id_via_oauth' });
+    expect(res.body).toEqual({
+      status: 'ok',
+      trakt: 'connected',
+      validated: 'client_id_via_oauth',
+    });
   });
 
   it('health returns 503 invalid_client_id when Trakt returns 403', async () => {
@@ -677,9 +642,7 @@ describe('Credential verification', () => {
   it('logs error with TRAKT_CLIENT_ID hint on 403', async () => {
     const app = buildApp(mockFetch(403, {}));
     await app.verifyCredentials();
-    expect(errorSpy).toHaveBeenCalledWith(
-      expect.stringContaining('TRAKT_CLIENT_ID'),
-    );
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('TRAKT_CLIENT_ID'));
   });
 
   it('health returns 503 invalid_client_id when Trakt returns 401', async () => {
@@ -695,9 +658,7 @@ describe('Credential verification', () => {
   it('logs response body snippet when credential check fails', async () => {
     const app = buildApp(mockFetch(403, { error: 'invalid_api_key' }));
     await app.verifyCredentials();
-    expect(errorSpy).toHaveBeenCalledWith(
-      expect.stringContaining('invalid_api_key'),
-    );
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('invalid_api_key'));
   });
 
   it('handles non-JSON response gracefully during credential check', async () => {
@@ -805,7 +766,8 @@ describe('Credential verification retry', () => {
   });
 
   it('recovers to healthy after retry succeeds', async () => {
-    const fetchFn = vi.fn()
+    const fetchFn = vi
+      .fn()
       .mockResolvedValueOnce({
         ok: false,
         status: 503,
@@ -878,28 +840,20 @@ describe('Error logging improvements', () => {
   it('logs body snippet when Trakt returns non-OK on token exchange', async () => {
     const app = buildApp(mockFetch(403, { error: 'invalid_api_key' }));
     await request(app).post('/trakt/token').send({ code: 'test-code' });
-    expect(errorSpy).toHaveBeenCalledWith(
-      expect.stringContaining('HTTP 403'),
-    );
-    expect(errorSpy).toHaveBeenCalledWith(
-      expect.stringContaining('invalid_api_key'),
-    );
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('HTTP 403'));
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('invalid_api_key'));
   });
 
   it('logs TRAKT_CLIENT_ID hint on 403 for token exchange', async () => {
     const app = buildApp(mockFetch(403, { error: 'invalid_api_key' }));
     await request(app).post('/trakt/token').send({ code: 'test-code' });
-    expect(errorSpy).toHaveBeenCalledWith(
-      expect.stringContaining('TRAKT_CLIENT_ID'),
-    );
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('TRAKT_CLIENT_ID'));
   });
 
   it('logs TRAKT_CLIENT_ID hint on 403 for token refresh', async () => {
     const app = buildApp(mockFetch(403, { error: 'invalid_api_key' }));
     await request(app).post('/trakt/token/refresh').send({ refresh_token: 'old-token' });
-    expect(errorSpy).toHaveBeenCalledWith(
-      expect.stringContaining('TRAKT_CLIENT_ID'),
-    );
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('TRAKT_CLIENT_ID'));
   });
 
   it('does not log error or warn for HTTP 400 on token exchange (pending during polling)', async () => {
@@ -947,7 +901,7 @@ describe('Error logging improvements', () => {
     await request(app).post('/trakt/token').send({ code: 'test-code' });
     expect(errorSpy).toHaveBeenCalledWith(
       expect.stringContaining('network error (ECONNREFUSED)'),
-      expect.any(String),
+      expect.any(String)
     );
   });
 
@@ -959,7 +913,7 @@ describe('Error logging improvements', () => {
     await request(app).post('/trakt/token/refresh').send({ refresh_token: 'old-token' });
     expect(errorSpy).toHaveBeenCalledWith(
       expect.stringContaining('network error (ECONNREFUSED)'),
-      expect.any(String),
+      expect.any(String)
     );
   });
 });
@@ -982,7 +936,7 @@ describe('Debug logging (debug: true)', () => {
     await app.verifyCredentials();
     await request(app).get('/health');
     const healthLog = debugSpy.mock.calls.find(([msg]) =>
-      /\[DEBUG\].*GET.*\/health.*200/.test(msg),
+      /\[DEBUG\].*GET.*\/health.*200/.test(msg)
     );
     expect(healthLog).toBeDefined();
   });
@@ -992,7 +946,7 @@ describe('Debug logging (debug: true)', () => {
     await request(app).post('/trakt/token').send({ code: 'device-code-abc' });
     // The debug middleware logs request timing; logTraktCall also logs Trakt API details
     const requestLog = debugSpy.mock.calls.find(([msg]) =>
-      /\[DEBUG\].*POST.*\/trakt\/token.*\d+ms/.test(msg),
+      /\[DEBUG\].*POST.*\/trakt\/token.*\d+ms/.test(msg)
     );
     expect(requestLog).toBeDefined();
   });
@@ -1000,9 +954,7 @@ describe('Debug logging (debug: true)', () => {
   it('logs debug line even when the endpoint returns an error status', async () => {
     const app = buildApp(mockFetch(400, { error: 'invalid_grant' }), { debug: true });
     await request(app).post('/trakt/token').send({ code: 'bad-code' });
-    const requestLog = debugSpy.mock.calls.find(([msg]) =>
-      /\[DEBUG\].*400.*ms/.test(msg),
-    );
+    const requestLog = debugSpy.mock.calls.find(([msg]) => /\[DEBUG\].*400.*ms/.test(msg));
     expect(requestLog).toBeDefined();
   });
 
@@ -1052,69 +1004,99 @@ describe('Debug logging — Trakt API call details (debug: true)', () => {
   });
 
   it('logs outgoing request details for token exchange', async () => {
-    const app = buildApp(mockFetch(200, {
-      access_token: 'acc-123',
-      refresh_token: 'ref-456',
-      expires_in: 7776000,
-      token_type: 'Bearer',
-      scope: 'public',
-    }), { debug: true });
+    const app = buildApp(
+      mockFetch(200, {
+        access_token: 'acc-123',
+        refresh_token: 'ref-456',
+        expires_in: 7776000,
+        token_type: 'Bearer',
+        scope: 'public',
+      }),
+      { debug: true }
+    );
 
     await request(app).post('/trakt/token').send({ code: 'device-code-abc' });
 
-    const allLogs = debugSpy.mock.calls.map(c => c.join(' '));
-    expect(allLogs.some(l => l.includes('Token exchange') && l.includes('/oauth/device/token'))).toBe(true);
-    expect(allLogs.some(l => l.includes('Token exchange') && l.includes('request body'))).toBe(true);
-    expect(allLogs.some(l => l.includes('Token exchange') && l.includes('response status') && l.includes('200'))).toBe(true);
-    expect(allLogs.some(l => l.includes('Token exchange') && l.includes('response body'))).toBe(true);
+    const allLogs = debugSpy.mock.calls.map((c) => c.join(' '));
+    expect(
+      allLogs.some((l) => l.includes('Token exchange') && l.includes('/oauth/device/token'))
+    ).toBe(true);
+    expect(allLogs.some((l) => l.includes('Token exchange') && l.includes('request body'))).toBe(
+      true
+    );
+    expect(
+      allLogs.some(
+        (l) => l.includes('Token exchange') && l.includes('response status') && l.includes('200')
+      )
+    ).toBe(true);
+    expect(allLogs.some((l) => l.includes('Token exchange') && l.includes('response body'))).toBe(
+      true
+    );
   });
 
   it('logs outgoing request details for token refresh', async () => {
-    const app = buildApp(mockFetch(200, {
-      access_token: 'new-acc-789',
-      refresh_token: 'new-ref-012',
-      expires_in: 7776000,
-    }), { debug: true });
+    const app = buildApp(
+      mockFetch(200, {
+        access_token: 'new-acc-789',
+        refresh_token: 'new-ref-012',
+        expires_in: 7776000,
+      }),
+      { debug: true }
+    );
 
     await request(app).post('/trakt/token/refresh').send({ refresh_token: 'old-ref-token' });
 
-    const allLogs = debugSpy.mock.calls.map(c => c.join(' '));
-    expect(allLogs.some(l => l.includes('Token refresh') && l.includes('/oauth/token'))).toBe(true);
-    expect(allLogs.some(l => l.includes('Token refresh') && l.includes('request body'))).toBe(true);
-    expect(allLogs.some(l => l.includes('Token refresh') && l.includes('response status') && l.includes('200'))).toBe(true);
+    const allLogs = debugSpy.mock.calls.map((c) => c.join(' '));
+    expect(allLogs.some((l) => l.includes('Token refresh') && l.includes('/oauth/token'))).toBe(
+      true
+    );
+    expect(allLogs.some((l) => l.includes('Token refresh') && l.includes('request body'))).toBe(
+      true
+    );
+    expect(
+      allLogs.some(
+        (l) => l.includes('Token refresh') && l.includes('response status') && l.includes('200')
+      )
+    ).toBe(true);
   });
 
   it('masks client_secret in debug logs', async () => {
-    const app = buildApp(mockFetch(200, {
-      access_token: 'acc-123',
-      refresh_token: 'ref-456',
-      expires_in: 7776000,
-      token_type: 'Bearer',
-      scope: 'public',
-    }), { debug: true });
+    const app = buildApp(
+      mockFetch(200, {
+        access_token: 'acc-123',
+        refresh_token: 'ref-456',
+        expires_in: 7776000,
+        token_type: 'Bearer',
+        scope: 'public',
+      }),
+      { debug: true }
+    );
 
     await request(app).post('/trakt/token').send({ code: 'device-code-abc' });
 
-    const allLogs = debugSpy.mock.calls.map(c => c.join(' '));
-    const bodyLog = allLogs.find(l => l.includes('request body'));
+    const allLogs = debugSpy.mock.calls.map((c) => c.join(' '));
+    const bodyLog = allLogs.find((l) => l.includes('request body'));
     expect(bodyLog).toBeDefined();
     expect(bodyLog).not.toContain('test-client-secret');
     expect(bodyLog).toContain('test***');
   });
 
   it('masks access_token and refresh_token in response body debug logs', async () => {
-    const app = buildApp(mockFetch(200, {
-      access_token: 'acc-full-secret-token',
-      refresh_token: 'ref-full-secret-token',
-      expires_in: 7776000,
-      token_type: 'Bearer',
-      scope: 'public',
-    }), { debug: true });
+    const app = buildApp(
+      mockFetch(200, {
+        access_token: 'acc-full-secret-token',
+        refresh_token: 'ref-full-secret-token',
+        expires_in: 7776000,
+        token_type: 'Bearer',
+        scope: 'public',
+      }),
+      { debug: true }
+    );
 
     await request(app).post('/trakt/token').send({ code: 'device-code-abc' });
 
-    const allLogs = debugSpy.mock.calls.map(c => c.join(' '));
-    const bodyLog = allLogs.find(l => l.includes('response body'));
+    const allLogs = debugSpy.mock.calls.map((c) => c.join(' '));
+    const bodyLog = allLogs.find((l) => l.includes('response body'));
     expect(bodyLog).toBeDefined();
     expect(bodyLog).not.toContain('acc-full-secret-token');
     expect(bodyLog).not.toContain('ref-full-secret-token');
@@ -1127,18 +1109,25 @@ describe('Debug logging — Trakt API call details (debug: true)', () => {
       ['x-ratelimit-limit', '1000'],
       ['content-type', 'application/json'],
     ]);
-    const app = buildApp(mockFetch(200, {
-      access_token: 'acc-123',
-      refresh_token: 'ref-456',
-      expires_in: 7776000,
-      token_type: 'Bearer',
-      scope: 'public',
-    }, headers), { debug: true });
+    const app = buildApp(
+      mockFetch(
+        200,
+        {
+          access_token: 'acc-123',
+          refresh_token: 'ref-456',
+          expires_in: 7776000,
+          token_type: 'Bearer',
+          scope: 'public',
+        },
+        headers
+      ),
+      { debug: true }
+    );
 
     await request(app).post('/trakt/token').send({ code: 'device-code-abc' });
 
-    const allLogs = debugSpy.mock.calls.map(c => c.join(' '));
-    const headerLog = allLogs.find(l => l.includes('response headers'));
+    const allLogs = debugSpy.mock.calls.map((c) => c.join(' '));
+    const headerLog = allLogs.find((l) => l.includes('response headers'));
     expect(headerLog).toBeDefined();
     expect(headerLog).toContain('x-ratelimit-limit');
     expect(headerLog).toContain('1000');
@@ -1146,33 +1135,40 @@ describe('Debug logging — Trakt API call details (debug: true)', () => {
 
   it('logs response body for credential check when debug is enabled', async () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    const app = buildApp(mockFetch(200, {
-      device_code: 'mock-device-code',
-      user_code: 'ABCD1234',
-      verification_url: 'https://trakt.tv/activate',
-      expires_in: 600,
-      interval: 5,
-    }), { debug: true });
+    const app = buildApp(
+      mockFetch(200, {
+        device_code: 'mock-device-code',
+        user_code: 'ABCD1234',
+        verification_url: 'https://trakt.tv/activate',
+        expires_in: 600,
+        interval: 5,
+      }),
+      { debug: true }
+    );
     await app.verifyCredentials();
     logSpy.mockRestore();
 
-    const allLogs = debugSpy.mock.calls.map(c => c.join(' '));
-    expect(allLogs.some(l => l.includes('Credential check') && l.includes('response body'))).toBe(true);
+    const allLogs = debugSpy.mock.calls.map((c) => c.join(' '));
+    expect(allLogs.some((l) => l.includes('Credential check') && l.includes('response body'))).toBe(
+      true
+    );
   });
 
   it('does not log Trakt API call details when debug is false', async () => {
-    const app = buildApp(mockFetch(200, {
-      access_token: 'acc-123',
-      refresh_token: 'ref-456',
-      expires_in: 7776000,
-      token_type: 'Bearer',
-      scope: 'public',
-    }));
+    const app = buildApp(
+      mockFetch(200, {
+        access_token: 'acc-123',
+        refresh_token: 'ref-456',
+        expires_in: 7776000,
+        token_type: 'Bearer',
+        scope: 'public',
+      })
+    );
 
     await request(app).post('/trakt/token').send({ code: 'device-code-abc' });
 
-    const allLogs = debugSpy.mock.calls.map(c => c.join(' '));
-    expect(allLogs.some(l => l.includes('Token exchange'))).toBe(false);
+    const allLogs = debugSpy.mock.calls.map((c) => c.join(' '));
+    expect(allLogs.some((l) => l.includes('Token exchange'))).toBe(false);
   });
 });
 
@@ -1192,9 +1188,7 @@ describe('filterTokenResponse — extra Trakt fields are stripped', () => {
     });
     const app = buildApp(fetchFn);
 
-    const res = await request(app)
-      .post('/trakt/token')
-      .send({ code: 'device-code-abc' });
+    const res = await request(app).post('/trakt/token').send({ code: 'device-code-abc' });
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual({
@@ -1242,14 +1236,15 @@ describe('filterTokenResponse — extra Trakt fields are stripped', () => {
 
 describe('handleUpstreamError — consistent error responses across both endpoints', () => {
   it('returns 504 on timeout for token exchange', async () => {
-    const hangingFetch = vi.fn().mockImplementation((_url, options) =>
-      new Promise((_resolve, reject) => {
-        options?.signal?.addEventListener('abort', () => {
-          const err = new Error('aborted');
-          err.name = 'AbortError';
-          reject(err);
-        });
-      }),
+    const hangingFetch = vi.fn().mockImplementation(
+      (_url, options) =>
+        new Promise((_resolve, reject) => {
+          options?.signal?.addEventListener('abort', () => {
+            const err = new Error('aborted');
+            err.name = 'AbortError';
+            reject(err);
+          });
+        })
     );
     const app = buildApp(hangingFetch, { fetchTimeoutMs: 50 });
     const res = await request(app).post('/trakt/token').send({ code: 'x' });
@@ -1258,14 +1253,15 @@ describe('handleUpstreamError — consistent error responses across both endpoin
   });
 
   it('returns 504 on timeout for token refresh', async () => {
-    const hangingFetch = vi.fn().mockImplementation((_url, options) =>
-      new Promise((_resolve, reject) => {
-        options?.signal?.addEventListener('abort', () => {
-          const err = new Error('aborted');
-          err.name = 'AbortError';
-          reject(err);
-        });
-      }),
+    const hangingFetch = vi.fn().mockImplementation(
+      (_url, options) =>
+        new Promise((_resolve, reject) => {
+          options?.signal?.addEventListener('abort', () => {
+            const err = new Error('aborted');
+            err.name = 'AbortError';
+            reject(err);
+          });
+        })
     );
     const app = buildApp(hangingFetch, { fetchTimeoutMs: 50 });
     const res = await request(app).post('/trakt/token/refresh').send({ refresh_token: 'x' });

@@ -1,0 +1,133 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>AnnotationOnSeparateLine:CrashReporter.kt$CrashReporter$@Suppress("DEPRECATION") info.versionCode.toString()</ID>
+    <ID>CommentWrapping:BleDiscoveryContractTest.kt$BleDiscoveryContractTest$/* AD type 0x21 */</ID>
+    <ID>CommentWrapping:BleDiscoveryContractTest.kt$BleDiscoveryContractTest$/* UUID */</ID>
+    <ID>CommentWrapping:BleDiscoveryContractTest.kt$BleDiscoveryContractTest$/* length */</ID>
+    <ID>ComplexCondition:ShowProgressCalculator.kt$ShowProgressCalculator$best == null || season.number &gt; best.season || (season.number == best.season &amp;&amp; ep.number &gt; best.episode)</ID>
+    <ID>ConstructorParameterNaming:Models.kt$TmdbEpisode$val air_date: String? = null</ID>
+    <ID>ConstructorParameterNaming:Models.kt$TmdbEpisode$val episode_number: Int</ID>
+    <ID>ConstructorParameterNaming:Models.kt$TmdbEpisode$val season_number: Int</ID>
+    <ID>ConstructorParameterNaming:Models.kt$TmdbEpisode$val still_path: String? = null</ID>
+    <ID>ConstructorParameterNaming:Models.kt$TmdbEpisodeSummary$val air_date: String? = null</ID>
+    <ID>ConstructorParameterNaming:Models.kt$TmdbEpisodeSummary$val episode_number: Int</ID>
+    <ID>ConstructorParameterNaming:Models.kt$TmdbEpisodeSummary$val season_number: Int</ID>
+    <ID>ConstructorParameterNaming:Models.kt$TmdbSeasonSummary$val episode_count: Int</ID>
+    <ID>ConstructorParameterNaming:Models.kt$TmdbSeasonSummary$val season_number: Int</ID>
+    <ID>ConstructorParameterNaming:Models.kt$TmdbShow$val backdrop_path: String? = null</ID>
+    <ID>ConstructorParameterNaming:Models.kt$TmdbShow$val first_air_date: String? = null</ID>
+    <ID>ConstructorParameterNaming:Models.kt$TmdbShow$val last_episode_to_air: TmdbEpisodeSummary? = null</ID>
+    <ID>ConstructorParameterNaming:Models.kt$TmdbShow$val next_episode_to_air: TmdbEpisodeSummary? = null</ID>
+    <ID>ConstructorParameterNaming:Models.kt$TmdbShow$val number_of_episodes: Int? = null</ID>
+    <ID>ConstructorParameterNaming:Models.kt$TmdbShow$val poster_path: String? = null</ID>
+    <ID>ConstructorParameterNaming:Models.kt$TraktWatchedEpisode$val last_watched_at: String? = null</ID>
+    <ID>ConstructorParameterNaming:TokenProxyService.kt$ProxyRefreshRequest$val refresh_token: String</ID>
+    <ID>ConstructorParameterNaming:TokenProxyService.kt$ProxyTokenResponse$val access_token: String</ID>
+    <ID>ConstructorParameterNaming:TokenProxyService.kt$ProxyTokenResponse$val expires_in: Int</ID>
+    <ID>ConstructorParameterNaming:TokenProxyService.kt$ProxyTokenResponse$val refresh_token: String</ID>
+    <ID>ConstructorParameterNaming:TokenProxyService.kt$ProxyTokenResponse$val token_type: String</ID>
+    <ID>ConstructorParameterNaming:TraktApiService.kt$DeviceCodeRequest$val client_id: String</ID>
+    <ID>ConstructorParameterNaming:TraktApiService.kt$DeviceCodeResponse$val device_code: String</ID>
+    <ID>ConstructorParameterNaming:TraktApiService.kt$DeviceCodeResponse$val expires_in: Int</ID>
+    <ID>ConstructorParameterNaming:TraktApiService.kt$DeviceCodeResponse$val user_code: String</ID>
+    <ID>ConstructorParameterNaming:TraktApiService.kt$DeviceCodeResponse$val verification_url: String</ID>
+    <ID>ConstructorParameterNaming:TraktApiService.kt$DeviceTokenRequest$val client_id: String</ID>
+    <ID>ConstructorParameterNaming:TraktApiService.kt$DeviceTokenRequest$val client_secret: String // injected at runtime — never hardcoded</ID>
+    <ID>ConstructorParameterNaming:TraktApiService.kt$DeviceTokenResponse$val access_token: String</ID>
+    <ID>ConstructorParameterNaming:TraktApiService.kt$DeviceTokenResponse$val expires_in: Int</ID>
+    <ID>ConstructorParameterNaming:TraktApiService.kt$DeviceTokenResponse$val refresh_token: String</ID>
+    <ID>ConstructorParameterNaming:TraktApiService.kt$DeviceTokenResponse$val token_type: String</ID>
+    <ID>ConstructorParameterNaming:TraktApiService.kt$RefreshTokenRequest$val client_id: String</ID>
+    <ID>ConstructorParameterNaming:TraktApiService.kt$RefreshTokenRequest$val client_secret: String</ID>
+    <ID>ConstructorParameterNaming:TraktApiService.kt$RefreshTokenRequest$val grant_type: String = "refresh_token"</ID>
+    <ID>ConstructorParameterNaming:TraktApiService.kt$RefreshTokenRequest$val refresh_token: String</ID>
+    <ID>ConstructorParameterNaming:TraktApiService.kt$SyncHistoryResult$val not_found: SyncHistoryNotFound? = null</ID>
+    <ID>MagicNumber:BleDiscoveryContract.kt$BleDiscoveryContract$0xFF</ID>
+    <ID>MagicNumber:BleDiscoveryContract.kt$BleDiscoveryContract$4</ID>
+    <ID>MagicNumber:BleDiscoveryContract.kt$BleDiscoveryContract$5</ID>
+    <ID>MagicNumber:BleDiscoveryContract.kt$BleDiscoveryContract$6</ID>
+    <ID>MagicNumber:BleDiscoveryContract.kt$BleDiscoveryContract$7</ID>
+    <ID>MagicNumber:BleDiscoveryContract.kt$BleDiscoveryContract$8</ID>
+    <ID>MagicNumber:DiagnosticLog.kt$DiagnosticLog$5</ID>
+    <ID>MagicNumber:MediaSessionScrobbler.kt$MediaSessionScrobbler$0.50f</ID>
+    <ID>MagicNumber:MediaSessionScrobbler.kt$MediaSessionScrobbler$0.70f</ID>
+    <ID>MagicNumber:MediaSessionScrobbler.kt$MediaSessionScrobbler$30_000</ID>
+    <ID>MagicNumber:MediaSessionScrobbler.kt$MediaSessionScrobbler$4</ID>
+    <ID>MagicNumber:MediaSessionScrobbler.kt$MediaSessionScrobbler$50f</ID>
+    <ID>MagicNumber:NetworkModule.kt$NetworkModule$30</ID>
+    <ID>MagicNumber:NetworkModule.kt$NetworkModule$60</ID>
+    <ID>MagicNumber:TokenProxyService.kt$503</ID>
+    <ID>MaxLineLength:Models.kt$StreamingService("disney", "Disney+", "com.disney.disneyplus", "https://www.disneyplus.com/series/{slug}/{tmdb_id}")</ID>
+    <ID>MaxLineLength:Models.kt$StreamingService("prime", "Prime Video", "com.amazon.amazonvideo.livingroom", "https://www.primevideo.com/search?phrase={slug}")</ID>
+    <ID>MaxLineLength:TraktApiServiceDtoTest.kt$TraktApiServiceDtoTest.DeviceCodeResponseTest$val jsonStr = """{"device_code":"dc","user_code":"1234","verification_url":"https://trakt.tv/activate","expires_in":600,"interval":5}"""</ID>
+    <ID>MaxLineLength:TraktApiServiceDtoTest.kt$TraktApiServiceDtoTest.TraktUserProfileTest$val jsonStr = """{"username":"user1","name":"User One","vip":true,"images":{"avatar":{"full":"https://example.com/avatar.jpg"}}}"""</ID>
+    <ID>MultiLineIfElse:DiagnosticLog.kt$DiagnosticLog$Log.e(androidTag, entry.message)</ID>
+    <ID>MultiLineIfElse:DiagnosticLog.kt$DiagnosticLog$Log.e(androidTag, entry.message, throwable)</ID>
+    <ID>MultiLineIfElse:DiagnosticLog.kt$DiagnosticLog$Log.w(androidTag, entry.message)</ID>
+    <ID>MultiLineIfElse:DiagnosticLog.kt$DiagnosticLog$Log.w(androidTag, entry.message, throwable)</ID>
+    <ID>MultiLineIfElse:MediaSessionScrobbler.kt$MediaSessionScrobbler$1 + minOf(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1])</ID>
+    <ID>MultiLineIfElse:MediaSessionScrobbler.kt$MediaSessionScrobbler$TraktEpisode(season = season, number = episode)</ID>
+    <ID>MultiLineIfElse:MediaSessionScrobbler.kt$MediaSessionScrobbler$dp[i - 1][j - 1]</ID>
+    <ID>MultiLineIfElse:MediaSessionScrobbler.kt$MediaSessionScrobbler$null</ID>
+    <ID>MultiLineIfElse:NetworkModule.kt$NetworkModule$HttpLoggingInterceptor.Level.BODY</ID>
+    <ID>MultiLineIfElse:NetworkModule.kt$NetworkModule$HttpLoggingInterceptor.Level.NONE</ID>
+    <ID>MultiLineIfElse:NetworkModuleTest.kt$NetworkModuleTest.OkHttpClientTest$HttpLoggingInterceptor.Level.BODY</ID>
+    <ID>MultiLineIfElse:NetworkModuleTest.kt$NetworkModuleTest.OkHttpClientTest$HttpLoggingInterceptor.Level.NONE</ID>
+    <ID>MultiLineIfElse:ShowProgressCalculator.kt$ShowProgressCalculator$0</ID>
+    <ID>NoMultipleSpaces:Models.kt$ </ID>
+    <ID>NoMultipleSpaces:Models.kt$DeviceCapability$ </ID>
+    <ID>NoMultipleSpaces:Models.kt$ScrobbleCandidate$ </ID>
+    <ID>NoMultipleSpaces:Models.kt$StreamingService$ </ID>
+    <ID>NoMultipleSpaces:ShowProgressCalculatorTest.kt$ShowProgressCalculatorTest.InProgressTest$ </ID>
+    <ID>NoMultipleSpaces:TmdbCacheTest.kt$TmdbCacheTest.TtlTest$ </ID>
+    <ID>NoMultipleSpaces:TraktApiService.kt$DeviceTokenRequest$ </ID>
+    <ID>NoMultipleSpaces:TraktApiService.kt$ScrobbleBody$ </ID>
+    <ID>NoWildcardImports:KnownStreamingServicesTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>NoWildcardImports:LocaleHelperTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>NoWildcardImports:MediaSessionScrobbler.kt$import kotlinx.coroutines.*</ID>
+    <ID>NoWildcardImports:MediaSessionScrobblerFuzzyTest.kt$import io.mockk.*</ID>
+    <ID>NoWildcardImports:MediaSessionScrobblerFuzzyTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>NoWildcardImports:MediaSessionScrobblerLifecycleTest.kt$import io.mockk.*</ID>
+    <ID>NoWildcardImports:MediaSessionScrobblerLifecycleTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>NoWildcardImports:ModelsSerializationTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>NoWildcardImports:NetworkModuleTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>NoWildcardImports:SeasonsEndpointDtoTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>NoWildcardImports:SharedJsonTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>NoWildcardImports:TestFixtures.kt$import com.justb81.watchbuddy.core.model.*</ID>
+    <ID>NoWildcardImports:TmdbApiService.kt$import retrofit2.http.*</ID>
+    <ID>NoWildcardImports:TmdbCacheTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>NoWildcardImports:TmdbImageHelperTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>NoWildcardImports:TokenProxyServiceDtoTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>NoWildcardImports:TokenProxyServiceFactoryTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>NoWildcardImports:TraktApiService.kt$import retrofit2.http.*</ID>
+    <ID>NoWildcardImports:TraktApiServiceDtoTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>ReturnCount:MediaSessionScrobbler.kt$MediaSessionScrobbler$internal suspend fun handleScrobbleStop(rawTitle: String, progress: Float? = null)</ID>
+    <ID>ReturnCount:MediaSessionScrobbler.kt$MediaSessionScrobbler$internal suspend fun matchTitle(packageName: String, rawTitle: String): ScrobbleCandidate?</ID>
+    <ID>SpacingAroundComma:Models.kt$,</ID>
+    <ID>SpacingBetweenDeclarationsWithComments:CrashReporter.kt$CrashReporter$/** Keep at most this many crash files on disk to avoid unbounded growth. */</ID>
+    <ID>SpacingBetweenDeclarationsWithComments:MediaSessionScrobbler.kt$MediaSessionScrobbler$/** * Most recent candidate observed — regardless of whether it was auto-scrobbled * or emitted to [pendingConfirmation]. Populated only for candidates that * clear [OVERLAY_THRESHOLD]. Intended for diagnostics/UI surfacing so the * user can see "the scrobbler *is* seeing things" even when no match auto-fires. */</ID>
+    <ID>SpacingBetweenDeclarationsWithComments:MediaSessionScrobbler.kt$MediaSessionScrobbler$/** True while [startListening] is active; flips back to false on [stopListening]. */</ID>
+    <ID>StringTemplate:TmdbApiService.kt$TmdbImageHelper$${it}</ID>
+    <ID>WildcardImport:KnownStreamingServicesTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>WildcardImport:LocaleHelperTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>WildcardImport:MediaSessionScrobbler.kt$import kotlinx.coroutines.*</ID>
+    <ID>WildcardImport:MediaSessionScrobblerFuzzyTest.kt$import io.mockk.*</ID>
+    <ID>WildcardImport:MediaSessionScrobblerFuzzyTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>WildcardImport:MediaSessionScrobblerLifecycleTest.kt$import io.mockk.*</ID>
+    <ID>WildcardImport:MediaSessionScrobblerLifecycleTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>WildcardImport:ModelsSerializationTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>WildcardImport:NetworkModuleTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>WildcardImport:SeasonsEndpointDtoTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>WildcardImport:SharedJsonTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>WildcardImport:TestFixtures.kt$import com.justb81.watchbuddy.core.model.*</ID>
+    <ID>WildcardImport:TmdbApiService.kt$import retrofit2.http.*</ID>
+    <ID>WildcardImport:TmdbCacheTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>WildcardImport:TmdbImageHelperTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>WildcardImport:TokenProxyServiceDtoTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>WildcardImport:TokenProxyServiceFactoryTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>WildcardImport:TraktApiService.kt$import retrofit2.http.*</ID>
+    <ID>WildcardImport:TraktApiServiceDtoTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+  </CurrentIssues>
+</SmellBaseline>

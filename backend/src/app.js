@@ -132,9 +132,7 @@ export function createApp(config) {
       console.error(`${label}: upstream timeout after`, fetchTimeoutMs, 'ms');
       return res.status(504).json({ error: 'Upstream timeout' });
     }
-    const category = err.code
-      ? `network error (${err.code})`
-      : `unexpected error (${err.name})`;
+    const category = err.code ? `network error (${err.code})` : `unexpected error (${err.name})`;
     console.error(`${label}: ${category}:`, err.message);
     return res.status(502).json({ error: 'Upstream error' });
   }
@@ -145,9 +143,7 @@ export function createApp(config) {
   function logTraktCall(label, url, options, traktRes, data) {
     if (!debug) return;
 
-    const outgoingBody = options.body
-      ? maskSecrets(JSON.parse(options.body))
-      : undefined;
+    const outgoingBody = options.body ? maskSecrets(JSON.parse(options.body)) : undefined;
 
     const responseHeaders = {};
     if (traktRes.headers?.forEach) {
@@ -183,7 +179,7 @@ export function createApp(config) {
   let serverMisconfigured = !clientSecret;
   if (serverMisconfigured) {
     console.error(
-      'TRAKT_CLIENT_SECRET is missing — token exchange will be rejected with 503 server_misconfigured.',
+      'TRAKT_CLIENT_SECRET is missing — token exchange will be rejected with 503 server_misconfigured.'
     );
   }
 
@@ -192,12 +188,17 @@ export function createApp(config) {
 
   function scheduleRetry(attempt) {
     const delay = RETRY_DELAYS[Math.min(attempt, RETRY_DELAYS.length - 1)];
-    console.log(`Scheduling credential re-verification in ${delay / 1000}s (attempt ${attempt + 1})…`);
+    console.log(
+      `Scheduling credential re-verification in ${delay / 1000}s (attempt ${attempt + 1})…`
+    );
     retryTimer = setTimeout(() => verifyCredentials(attempt + 1), delay);
   }
 
   async function verifyCredentials(attempt = 0) {
-    if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
+    if (retryTimer) {
+      clearTimeout(retryTimer);
+      retryTimer = null;
+    }
     const url = `${traktApi}/oauth/device/code`;
     const options = {
       method: 'POST',
@@ -229,7 +230,9 @@ export function createApp(config) {
           const bodySnippet = JSON.stringify(data).slice(0, 200);
           console.error(`Credential check: Trakt response body: ${bodySnippet}`);
         }
-        console.error(`Trakt credential verification failed: HTTP ${res.status} — TRAKT_CLIENT_ID may be invalid.`);
+        console.error(
+          `Trakt credential verification failed: HTTP ${res.status} — TRAKT_CLIENT_ID may be invalid.`
+        );
         serverMisconfigured = true;
         // Do not retry on 401/403 — credentials are definitively wrong
       } else {
@@ -273,7 +276,7 @@ export function createApp(config) {
       res.on('finish', () => {
         const ms = Date.now() - start;
         console.debug(
-          `[DEBUG] ${new Date().toISOString()} ${req.method} ${req.path} from ${ip} \u2192 ${res.statusCode} (${ms}ms)`,
+          `[DEBUG] ${new Date().toISOString()} ${req.method} ${req.path} from ${ip} \u2192 ${res.statusCode} (${ms}ms)`
         );
       });
       next();
@@ -283,7 +286,7 @@ export function createApp(config) {
   // Rate limiting — Trakt allows 1000 calls/5min per app
   const limiter = rateLimit({
     windowMs: 60 * 1000, // 1 minute
-    max: 60,             // 60 requests per minute per IP
+    max: 60, // 60 requests per minute per IP
     message: { error: 'Too many requests, please try again later.' },
   });
   app.use('/trakt', limiter);
@@ -293,7 +296,9 @@ export function createApp(config) {
   // Calls Trakt /oauth/device/token with server-side secret injected
   app.post('/trakt/token', async (req, res) => {
     if (serverMisconfigured) {
-      console.error('Token exchange blocked: proxy is misconfigured (missing or rejected credentials).');
+      console.error(
+        'Token exchange blocked: proxy is misconfigured (missing or rejected credentials).'
+      );
       return res.status(503).json({ error: 'server_misconfigured' });
     }
 
@@ -333,7 +338,9 @@ export function createApp(config) {
         } else {
           console.error(`Token exchange: Trakt returned HTTP ${traktRes.status}: ${bodySnippet}`);
           if (traktRes.status === 403) {
-            console.error('Hint: HTTP 403 from Trakt usually means TRAKT_CLIENT_ID is invalid or revoked.');
+            console.error(
+              'Hint: HTTP 403 from Trakt usually means TRAKT_CLIENT_ID is invalid or revoked.'
+            );
           }
         }
         return res.status(traktRes.status).json(data);
@@ -379,7 +386,9 @@ export function createApp(config) {
         const bodySnippet = JSON.stringify(data).slice(0, 200);
         console.error(`Token refresh: Trakt returned HTTP ${traktRes.status}: ${bodySnippet}`);
         if (traktRes.status === 403) {
-          console.error('Hint: HTTP 403 from Trakt usually means TRAKT_CLIENT_ID is invalid or revoked.');
+          console.error(
+            'Hint: HTTP 403 from Trakt usually means TRAKT_CLIENT_ID is invalid or revoked.'
+          );
         }
         return res.status(traktRes.status).json(data);
       }
@@ -413,7 +422,9 @@ export function createApp(config) {
   });
 
   app.verifyCredentials = verifyCredentials;
-  app.clearRetryTimer = () => { if (retryTimer) clearTimeout(retryTimer); };
+  app.clearRetryTimer = () => {
+    if (retryTimer) clearTimeout(retryTimer);
+  };
 
   return app;
 }
