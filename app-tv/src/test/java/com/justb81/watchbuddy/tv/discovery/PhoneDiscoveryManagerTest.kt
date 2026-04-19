@@ -8,6 +8,7 @@ import com.justb81.watchbuddy.core.model.LlmBackend
 import io.mockk.*
 import okhttp3.OkHttpClient
 import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
@@ -26,6 +27,11 @@ class PhoneDiscoveryManagerTest {
     fun setUp() {
         every { context.getSystemService(Context.NSD_SERVICE) } returns nsdManager
         manager = PhoneDiscoveryManager(context, httpClient, bleScanner)
+    }
+
+    @AfterEach
+    fun tearDown() {
+        manager.stopDiscovery()
     }
 
     // ── DiscoveredPhone construction helpers ───────────────────────────────────
