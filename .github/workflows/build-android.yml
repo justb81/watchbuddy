@@ -37,6 +37,7 @@ jobs:
     if: needs.changes.outputs.android == 'true'
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v6
       - uses: ./.github/actions/setup-android-build
 
       # Decode release keystore when available so debug APKs are signed with the

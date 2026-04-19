@@ -34,6 +34,7 @@ jobs:
       VERSION: ${{ needs.release-please.outputs.version }}
       TAG: ${{ needs.release-please.outputs.tag_name }}
     steps:
+      - uses: actions/checkout@v6
       - uses: ./.github/actions/setup-android-build
 
       # -- Prepare release signing ----------------------------------------
