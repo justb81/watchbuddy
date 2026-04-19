@@ -221,68 +221,39 @@ internal fun Application.configureCompanionRoutes(
             call.respond(TokenResponse(accessToken = token))
         }
 
-        post("/scrobble/start") {
-            val token = tokenRefreshManager.getValidAccessToken()
-                ?: return@post call.respond(HttpStatusCode.Unauthorized, ErrorResponse("No access token"))
-            val body = try { call.receive<ScrobbleRequestBody>() } catch (_: Exception) {
-                return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid request body"))
-            }
-            try {
-                traktApiService.scrobbleStart(
-                    bearer = "Bearer $token",
-                    body = ScrobbleBody(show = body.show, episode = body.episode, progress = body.progress)
-                )
-                stateManager.onScrobbleEvent(
-                    ScrobbleDisplayEvent(ScrobbleAction.START, body.show, body.episode, body.progress, System.currentTimeMillis())
-                )
-                call.respond(ScrobbleActionResponse(success = true))
-            } catch (e: Exception) {
-                Log.e(TAG, "Scrobble start failed", e)
-                call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("Scrobble failed"))
+        ScrobbleAction.entries.forEach { action ->
+            post("/scrobble/${action.name.lowercase()}") {
+                call.handleScrobble(action, tokenRefreshManager, traktApiService, stateManager)
             }
         }
+    }
+}
 
-        post("/scrobble/pause") {
-            val token = tokenRefreshManager.getValidAccessToken()
-                ?: return@post call.respond(HttpStatusCode.Unauthorized, ErrorResponse("No access token"))
-            val body = try { call.receive<ScrobbleRequestBody>() } catch (_: Exception) {
-                return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid request body"))
-            }
-            try {
-                traktApiService.scrobblePause(
-                    bearer = "Bearer $token",
-                    body = ScrobbleBody(show = body.show, episode = body.episode, progress = body.progress)
-                )
-                stateManager.onScrobbleEvent(
-                    ScrobbleDisplayEvent(ScrobbleAction.PAUSE, body.show, body.episode, body.progress, System.currentTimeMillis())
-                )
-                call.respond(ScrobbleActionResponse(success = true))
-            } catch (e: Exception) {
-                Log.e(TAG, "Scrobble pause failed", e)
-                call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("Scrobble failed"))
-            }
+private suspend fun ApplicationCall.handleScrobble(
+    action: ScrobbleAction,
+    tokenRefreshManager: TokenRefreshManager,
+    traktApiService: TraktApiService,
+    stateManager: CompanionStateManager,
+) {
+    val token = tokenRefreshManager.getValidAccessToken()
+        ?: return respond(HttpStatusCode.Unauthorized, ErrorResponse("No access token"))
+    val body = try { receive<ScrobbleRequestBody>() } catch (_: Exception) {
+        return respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid request body"))
+    }
+    try {
+        val scrobbleBody = ScrobbleBody(show = body.show, episode = body.episode, progress = body.progress)
+        when (action) {
+            ScrobbleAction.START -> traktApiService.scrobbleStart("Bearer $token", scrobbleBody)
+            ScrobbleAction.PAUSE -> traktApiService.scrobblePause("Bearer $token", scrobbleBody)
+            ScrobbleAction.STOP -> traktApiService.scrobbleStop("Bearer $token", scrobbleBody)
         }
-
-        post("/scrobble/stop") {
-            val token = tokenRefreshManager.getValidAccessToken()
-                ?: return@post call.respond(HttpStatusCode.Unauthorized, ErrorResponse("No access token"))
-            val body = try { call.receive<ScrobbleRequestBody>() } catch (_: Exception) {
-                return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid request body"))
-            }
-            try {
-                traktApiService.scrobbleStop(
-                    bearer = "Bearer $token",
-                    body = ScrobbleBody(show = body.show, episode = body.episode, progress = body.progress)
-                )
-                stateManager.onScrobbleEvent(
-                    ScrobbleDisplayEvent(ScrobbleAction.STOP, body.show, body.episode, body.progress, System.currentTimeMillis())
-                )
-                call.respond(ScrobbleActionResponse(success = true))
-            } catch (e: Exception) {
-                Log.e(TAG, "Scrobble stop failed", e)
-                call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("Scrobble failed"))
-            }
-        }
+        stateManager.onScrobbleEvent(
+            ScrobbleDisplayEvent(action, body.show, body.episode, body.progress, System.currentTimeMillis())
+        )
+        respond(ScrobbleActionResponse(success = true))
+    } catch (e: Exception) {
+        Log.e(TAG, "Scrobble ${action.name.lowercase()} failed", e)
+        respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("Scrobble failed"))
     }
 }
 
