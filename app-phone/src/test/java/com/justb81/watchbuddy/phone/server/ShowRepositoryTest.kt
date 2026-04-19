@@ -183,6 +183,41 @@ class ShowRepositoryTest {
     }
 
     @Test
+    fun `updateLocalWatched back-fill does not change sort when a higher episode already exists`() = runTest {
+        // Show 1 has S02E01 (highest S×E, ts = recent). Show 2 has S01E01 (older).
+        // Back-filling S01E05 on show 1 (which gets Instant.now() as timestamp) must
+        // NOT displace show 1's sort key — S02E01 is still the highest S×E.
+        val entries = listOf(
+            TraktWatchedEntry(
+                show = TraktShow("Show 1", 2024, TraktIds(trakt = 1, tmdb = 100)),
+                seasons = listOf(
+                    TraktWatchedSeason(1, listOf(TraktWatchedEpisode(5, last_watched_at = "2026-04-01T10:00:00Z"))),
+                    TraktWatchedSeason(2, listOf(TraktWatchedEpisode(1, last_watched_at = "2026-04-20T10:00:00Z")))
+                )
+            ),
+            TraktWatchedEntry(
+                show = TraktShow("Show 2", 2024, TraktIds(trakt = 2, tmdb = 200)),
+                seasons = listOf(
+                    TraktWatchedSeason(1, listOf(TraktWatchedEpisode(1, last_watched_at = "2026-04-19T10:00:00Z")))
+                )
+            )
+        )
+        coEvery { tokenRefreshManager.getValidAccessToken() } returns "test-token"
+        coEvery { traktApi.getWatchedShows(any()) } returns entries
+        repository.getShows()
+
+        // Initial order: show 1 first (S02E01 ts=Apr 20 > show 2 ts=Apr 19)
+        assertEquals(listOf(1, 2), repository.shows.value.map { it.entry.show.ids.trakt })
+
+        // Back-fill S01E03 on show 1 — gets Instant.now() but S02E01 is still highest S×E
+        repository.updateLocalWatched(traktShowId = 1, season = 1, episode = 3, watched = true)
+
+        // Order must be unchanged: show 1 still on top because its highest S×E (S02E01)
+        // timestamp (Apr 20) is still newer than show 2's S01E01 timestamp (Apr 19).
+        assertEquals(listOf(1, 2), repository.shows.value.map { it.entry.show.ids.trakt })
+    }
+
+    @Test
     fun `getShows tolerates per-show TMDB failures`() = runTest {
         every { settingsRepository.getTmdbApiKey() } returns flowOf("api-key")
         coEvery { tokenRefreshManager.getValidAccessToken() } returns "test-token"
