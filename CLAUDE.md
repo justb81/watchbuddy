@@ -63,10 +63,14 @@ watchbuddy/
 ├── docs/
 │   ├── architecture.md  Detailed architecture, protocols, LLM strategy, deep links
 │   └── tmdb-integration.md  TMDB API usage, user journeys, connection handling
-├── .github/workflows/
-│   ├── build-android.yml   CI: builds debug APKs on push/PR
-│   ├── release.yml         CD: release-please + signed APK builds
-│   └── test-backend.yml    CI: tests for the Node.js backend
+├── .github/
+│   ├── actions/
+│   │   └── setup-android-build/
+│   │       └── action.yml  Composite action: checkout + JDK 17 + Gradle setup (shared by build-android.yml and release.yml)
+│   └── workflows/
+│       ├── build-android.yml   CI: builds debug APKs on push/PR
+│       ├── release.yml         CD: release-please + signed APK builds
+│       └── test-backend.yml    CI: tests for the Node.js backend
 └── gradle/
     └── libs.versions.toml  Version catalog (single source of truth for dependencies)
 ```
