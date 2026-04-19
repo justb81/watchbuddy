@@ -1,11 +1,15 @@
 package com.justb81.watchbuddy.tv.ui.settings
 
+import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.tv.MainDispatcherRule
 import com.justb81.watchbuddy.tv.data.StreamingPreferencesRepository
 import io.mockk.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -28,9 +32,15 @@ class StreamingSettingsViewModelTest {
 
     @BeforeEach
     fun setUp() {
+        DiagnosticLog.clear()
         every { repository.subscribedServiceIds } returns flowOf(emptyList())
         coEvery { repository.setSubscribedServices(any()) } just runs
         viewModel = StreamingSettingsViewModel(repository)
+    }
+
+    @AfterEach
+    fun tearDown() {
+        DiagnosticLog.clear()
     }
 
     @Nested
@@ -119,5 +129,45 @@ class StreamingSettingsViewModelTest {
         assertEquals(7, state.services.size) // KNOWN_STREAMING_SERVICES
         assertTrue(state.subscribedIds.isEmpty())
         assertTrue(state.orderedIds.isEmpty())
+    }
+
+    @Nested
+    @DisplayName("ErrorLogging")
+    inner class ErrorLoggingTest {
+
+        @Test
+        fun `flow observation failure logs via DiagnosticLog`() = runTest {
+            val error = RuntimeException("DataStore read failed")
+            every { repository.subscribedServiceIds } returns flow { throw error }
+
+            viewModel = StreamingSettingsViewModel(repository)
+            advanceUntilIdle()
+
+            val errors = DiagnosticLog.snapshot().filter {
+                it.level == DiagnosticLog.Level.ERROR
+            }
+            assertTrue(errors.isNotEmpty(), "Expected an error entry in DiagnosticLog")
+            assertTrue(
+                errors.any { it.message.contains("streaming prefs observation failed") },
+                "Expected 'streaming prefs observation failed' in log"
+            )
+        }
+
+        @Test
+        fun `write failure logs via DiagnosticLog`() = runTest {
+            coEvery { repository.setSubscribedServices(any()) } throws RuntimeException("DataStore write failed")
+
+            viewModel.toggleService("netflix")
+            advanceUntilIdle()
+
+            val errors = DiagnosticLog.snapshot().filter {
+                it.level == DiagnosticLog.Level.ERROR
+            }
+            assertTrue(errors.isNotEmpty(), "Expected an error entry in DiagnosticLog")
+            assertTrue(
+                errors.any { it.message.contains("streaming prefs write failed") },
+                "Expected 'streaming prefs write failed' in log"
+            )
+        }
     }
 }

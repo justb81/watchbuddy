@@ -1,5 +1,6 @@
 package com.justb81.watchbuddy.tv.ui.scrobble
 
+import androidx.annotation.VisibleForTesting
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.justb81.watchbuddy.core.model.ScrobbleCandidate
@@ -26,7 +27,8 @@ class ScrobbleViewModel @Inject constructor(
     private val _pendingCandidate = MutableStateFlow<ScrobbleCandidate?>(null)
     val pendingCandidate: StateFlow<ScrobbleCandidate?> = _pendingCandidate.asStateFlow()
 
-    private val dismissedEpisodes = mutableSetOf<String>()
+    @VisibleForTesting
+    internal val dismissedEpisodes = mutableSetOf<String>()
 
     init {
         viewModelScope.launch {
@@ -51,6 +53,11 @@ class ScrobbleViewModel @Inject constructor(
         val candidate = _pendingCandidate.value ?: return
         dismissedEpisodes.add(candidateKey(candidate))
         _pendingCandidate.value = null
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        dismissedEpisodes.clear()
     }
 
     private fun candidateKey(candidate: ScrobbleCandidate): String =
