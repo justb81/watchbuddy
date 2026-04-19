@@ -128,12 +128,17 @@ The only exceptions are **localization string resources** (`values-de/`, `values
 
 **The complete agent workflow:**
 
-1. Create a feature branch from `main`
-2. Make changes and commit using Conventional Commits (see below)
-3. Push the branch and open a PR against `main`
-4. **Wait for a green CI build** (`build-android.yml`) — do not continue if the build is red; fix the issue first
-5. **Auto-merge when green.** Once every required build step on the PR has completed successfully, the agent may merge the PR into `main` automatically (e.g. via `enable_pr_auto_merge` or by merging directly after CI passes). Use a squash merge and delete the branch after merge.
-6. If CI fails or a required check is still pending, do NOT merge — fix the failure or wait.
+1. **Check for concurrent agent work — MANDATORY first step.** Before doing anything else, verify that no other Claude Code session is already working on the same issue:
+   - Identify the target issue number from the triggering context (initial prompt, linked issue, or branch-name hint).
+   - Call `mcp__github__list_pull_requests` with `state: "open"` on `justb81/watchbuddy` and scan each PR's title **and** body for a closing keyword referencing the target issue: `Closes #N`, `Fixes #N`, `Resolves #N`, `Closes GH-N`, `Fixes GH-N`, `Resolves GH-N` (case-insensitive).
+   - If any open PR matches, post a single comment on the issue via `mcp__github__add_issue_comment` — e.g. *"Another Claude Code session is already working on this issue — see #\<PR-number\>. Aborting this session to avoid parallel work."* — and stop immediately. Do not create a branch, do not edit files, do not commit.
+   - Exception: skip this check when the session is explicitly invoked to continue work on a specific existing PR (e.g. responding to review comments on that PR).
+2. Create a feature branch from `main`
+3. Make changes and commit using Conventional Commits (see below)
+4. Push the branch and open a PR against `main`
+5. **Wait for a green CI build** (`build-android.yml`) — do not continue if the build is red; fix the issue first
+6. **Auto-merge when green.** Once every required build step on the PR has completed successfully, the agent may merge the PR into `main` automatically (e.g. via `enable_pr_auto_merge` or by merging directly after CI passes). Use a squash merge and delete the branch after merge.
+7. If CI fails or a required check is still pending, do NOT merge — fix the failure or wait.
 
 > One PR per task. Never merge with red or missing required checks. If a reviewer has requested changes, wait for their approval before merging even if CI is green.
 
