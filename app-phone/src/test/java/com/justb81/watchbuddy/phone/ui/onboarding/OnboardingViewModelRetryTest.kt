@@ -1,7 +1,6 @@
 package com.justb81.watchbuddy.phone.ui.onboarding
 
 import android.app.Application
-import androidx.lifecycle.SavedStateHandle
 import com.justb81.watchbuddy.core.network.TokenProxyServiceFactory
 import com.justb81.watchbuddy.core.trakt.DeviceCodeResponse
 import com.justb81.watchbuddy.core.trakt.ProxyTokenResponse
@@ -78,7 +77,6 @@ class OnboardingViewModelRetryTest {
 
     private fun createViewModel() = OnboardingViewModel(
         application = application,
-        savedStateHandle = SavedStateHandle(),
         traktApi = traktApi,
         tokenProxy = tokenProxy,
         buildConfigClientId = BUILD_CLIENT_ID,
