@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.21.0](https://github.com/justb81/watchbuddy/compare/v0.20.1...v0.21.0) (2026-04-19)
+
+
+### Features
+
+* **phone,tv:** editable identity ([#342](https://github.com/justb81/watchbuddy/issues/342)) + derive active viewers from discovery ([#353](https://github.com/justb81/watchbuddy/issues/353)) ([#374](https://github.com/justb81/watchbuddy/issues/374)) ([31a2a0f](https://github.com/justb81/watchbuddy/commit/31a2a0f66788546ff9ca0e5641415569873f7d1f))
+
+
+### Bug Fixes
+
+* **phone:** exclude Season 0 specials from episodes-behind delta ([#357](https://github.com/justb81/watchbuddy/issues/357)) ([#371](https://github.com/justb81/watchbuddy/issues/371)) ([2606f20](https://github.com/justb81/watchbuddy/commit/2606f200620fe2e3e05e27c5c1650d6560bc597c))
+* **phone:** pick highest S×E episode as last-watched, not latest timestamp ([#375](https://github.com/justb81/watchbuddy/issues/375)) ([a9e5067](https://github.com/justb81/watchbuddy/commit/a9e50674456f0e29c9008f4f8c3e6d16765d95f8))
+* **tv:** fix title line-height overlap and remove redundant Back button on ShowDetail ([#373](https://github.com/justb81/watchbuddy/issues/373)) ([4465d26](https://github.com/justb81/watchbuddy/commit/4465d26c6c3b19a961c998a22203da8fb4ff7620)), closes [#364](https://github.com/justb81/watchbuddy/issues/364) [#365](https://github.com/justb81/watchbuddy/issues/365)
+
 ## [0.20.1](https://github.com/justb81/watchbuddy/compare/v0.20.0...v0.20.1) (2026-04-19)
 
 
