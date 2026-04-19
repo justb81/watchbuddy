@@ -76,8 +76,19 @@ class PhoneBleScanner @Inject constructor(
         // Stop any prior scan — e.g. after permission grant or Wi-Fi reconnect.
         stopInternal(leScanner)
 
+        // Filter on the service-data AD field rather than the service-UUID
+        // AD field. The phone advertiser dropped the redundant UUID-list AD
+        // to stay under the 31-byte legacy envelope (#345), so only a
+        // setServiceData filter matches. The prefix byte pins the wire
+        // schema version, preventing a future incompatible schema from
+        // being handed to the current decoder. The 0xFF mask byte means
+        // "match this exact byte"; remaining bytes are unfiltered.
         val filter = ScanFilter.Builder()
-            .setServiceUuid(ParcelUuid(BleDiscoveryContract.SERVICE_UUID))
+            .setServiceData(
+                ParcelUuid(BleDiscoveryContract.SERVICE_UUID),
+                byteArrayOf(BleDiscoveryContract.PAYLOAD_SCHEMA_VERSION),
+                byteArrayOf(0xFF.toByte()),
+            )
             .build()
 
         val settings = ScanSettings.Builder()

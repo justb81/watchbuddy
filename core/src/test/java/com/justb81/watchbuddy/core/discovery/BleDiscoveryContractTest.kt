@@ -137,4 +137,26 @@ class BleDiscoveryContractTest {
             )
         }
     }
+
+    @Test
+    fun `advertisement fits within legacy 31-byte envelope`() {
+        // BLE legacy advertising envelope budget — strict stacks (Android 16
+        // / Nothing) reject anything larger with DATA_TOO_LARGE (#345).
+        // Fields we currently emit:
+        //   Flags AD        (stack-added)                                3 bytes
+        //   Service Data 128-bit (0x21): 1 len + 1 type + 16 UUID + N    18 + N
+        //
+        // Any future growth in the service-data payload must keep this
+        // assertion green, or scanners on strict stacks won't see us.
+        val envelopeBudget = 31
+        val flagsBytes = 3
+        val serviceDataAdOverhead = 1 /* length */ + 1 /* AD type 0x21 */ + 16 /* UUID */
+        val total = flagsBytes + serviceDataAdOverhead + BleDiscoveryContract.PAYLOAD_SIZE_BYTES
+        assertEquals(30, total, "expected 30-byte emission; recalculate if fields changed")
+        assertEquals(
+            true,
+            total <= envelopeBudget,
+            "emission $total bytes exceeds 31-byte legacy envelope — BLE discovery will fail",
+        )
+    }
 }
