@@ -1,11 +1,14 @@
 package com.justb81.watchbuddy.tv.data
 
 import android.content.Context
-import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.emptyPreferences
 import com.justb81.watchbuddy.tv.MainDispatcherRule
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.*
@@ -14,12 +17,12 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
-import org.junit.jupiter.api.io.TempDir
-import java.io.File
 
 /**
- * Tests for the new preference keys added in issue #344.
- * Uses an isolated file-backed DataStore per test method to avoid shared state.
+ * Tests for the preference keys added in issue #344.
+ *
+ * Uses an in-memory [DataStore] backed by [MutableStateFlow] so there are no
+ * file I/O or Android-runtime dependencies in the JVM unit-test environment.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 @DisplayName("StreamingPreferencesRepository — discovery and autostart prefs")
@@ -31,21 +34,14 @@ class StreamingPreferencesRepositoryTest {
         val mainDispatcherRule = MainDispatcherRule()
     }
 
-    @TempDir
-    lateinit var tempDir: File
-
     private lateinit var repository: StreamingPreferencesRepository
 
     @BeforeEach
     fun setUp() {
-        val prefsFile = File(tempDir, "streaming_prefs.preferences_pb")
-        val dataStore = PreferenceDataStoreFactory.create(
-            scope = kotlinx.coroutines.CoroutineScope(
-                mainDispatcherRule.testDispatcher + SupervisorJob()
-            ),
-            produceFile = { prefsFile }
+        repository = StreamingPreferencesRepository(
+            context = mockk<Context>(relaxed = true),
+            dataStore = InMemoryPreferencesDataStore(),
         )
-        repository = StreamingPreferencesRepository(mockk<Context>(relaxed = true), dataStore)
     }
 
     @Nested
@@ -92,5 +88,24 @@ class StreamingPreferencesRepositoryTest {
             repository.setAutostartEnabled(false)
             assertFalse(repository.isAutostartEnabled.first())
         }
+    }
+}
+
+/**
+ * Pure-JVM in-memory [DataStore] for unit tests.
+ *
+ * Stores [Preferences] in a [MutableStateFlow] so reads and writes are
+ * observable without any file I/O or Android runtime.
+ */
+private class InMemoryPreferencesDataStore : DataStore<Preferences> {
+
+    private val _prefs = MutableStateFlow(emptyPreferences())
+
+    override val data: Flow<Preferences> = _prefs
+
+    override suspend fun updateData(transform: suspend (t: Preferences) -> Preferences): Preferences {
+        val updated = transform(_prefs.value)
+        _prefs.value = updated
+        return updated
     }
 }
