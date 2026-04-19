@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.20.1](https://github.com/justb81/watchbuddy/compare/v0.20.0...v0.20.1) (2026-04-19)
+
+
+### Bug Fixes
+
+* **TV:** update german string for back ([#368](https://github.com/justb81/watchbuddy/issues/368)) ([ca261d9](https://github.com/justb81/watchbuddy/commit/ca261d9f6cfc42b021a363e5718459a137fa01fd))
+
 ## [0.20.0](https://github.com/justb81/watchbuddy/compare/v0.19.1...v0.20.0) (2026-04-19)
 
 
