@@ -64,6 +64,20 @@
     <!-- Settings -->
     <string name="settings_title">Einstellungen</string>
     <string name="settings_account">Konto</string>
+
+    <!-- Identity -->
+    <string name="settings_identity_section">Identität</string>
+    <string name="settings_identity_fallback_name">du</string>
+    <string name="settings_display_name_label">Anzeigename</string>
+    <string name="settings_display_name_helper">Wird auf dem TV angezeigt. Leer lassen, um den Trakt-Benutzernamen zu verwenden.</string>
+    <string name="settings_avatar_source_label">Avatar</string>
+    <string name="settings_avatar_source_trakt">Trakt-Foto</string>
+    <string name="settings_avatar_source_generated">Aus Name generiert</string>
+    <string name="settings_avatar_source_custom">Eigenes Foto</string>
+    <string name="settings_avatar_choose_photo">Foto auswählen…</string>
+    <string name="settings_avatar_preview_cd">Avatar-Vorschau</string>
+    <string name="settings_avatar_import_failed">Foto konnte nicht importiert werden. Bitte ein anderes versuchen.</string>
+
     <string name="settings_trakt_account">Trakt-Konto</string>
     <string name="settings_tmdb">TMDB</string>
     <string name="settings_tmdb_account">TMDB-Konto</string>

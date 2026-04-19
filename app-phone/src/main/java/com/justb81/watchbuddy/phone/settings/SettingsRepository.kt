@@ -5,9 +5,11 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
+import com.justb81.watchbuddy.core.model.AvatarSource
 import com.justb81.watchbuddy.phone.auth.TokenRepository
 import com.justb81.watchbuddy.phone.ui.settings.AuthMode
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -42,6 +44,9 @@ class SettingsRepository @Inject constructor(
         val MODEL_DOWNLOAD_URL = stringPreferencesKey("model_download_url")
         val MODEL_READY = booleanPreferencesKey("model_ready")
         val TMDB_API_KEY = stringPreferencesKey("tmdb_api_key")
+        val DISPLAY_NAME_OVERRIDE = stringPreferencesKey("display_name_override")
+        val AVATAR_SOURCE = stringPreferencesKey("avatar_source")
+        val CUSTOM_AVATAR_VERSION = longPreferencesKey("custom_avatar_version")
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -72,7 +77,12 @@ class SettingsRepository @Inject constructor(
             companionEnabled = prefs[Keys.COMPANION_ENABLED] ?: false,
             modelDownloadUrl = prefs[Keys.MODEL_DOWNLOAD_URL] ?: "",
             tmdbApiKey = prefs[Keys.TMDB_API_KEY] ?: "",
-            defaultTmdbApiKeyAvailable = defaultTmdbApiKey.isNotBlank()
+            defaultTmdbApiKeyAvailable = defaultTmdbApiKey.isNotBlank(),
+            displayNameOverride = prefs[Keys.DISPLAY_NAME_OVERRIDE] ?: "",
+            avatarSource = prefs[Keys.AVATAR_SOURCE]
+                ?.let { runCatching { AvatarSource.valueOf(it) }.getOrNull() }
+                ?: AvatarSource.TRAKT,
+            customAvatarVersion = prefs[Keys.CUSTOM_AVATAR_VERSION] ?: 0L
         )
     }
 
@@ -84,7 +94,36 @@ class SettingsRepository @Inject constructor(
             prefs[Keys.COMPANION_ENABLED] = settings.companionEnabled
             prefs[Keys.MODEL_DOWNLOAD_URL] = settings.modelDownloadUrl
             prefs[Keys.TMDB_API_KEY] = settings.tmdbApiKey
+            prefs[Keys.DISPLAY_NAME_OVERRIDE] = settings.displayNameOverride
+            prefs[Keys.AVATAR_SOURCE] = settings.avatarSource.name
+            prefs[Keys.CUSTOM_AVATAR_VERSION] = settings.customAvatarVersion
         }
+    }
+
+    /** Updates the identity override fields without touching unrelated settings. */
+    suspend fun setIdentity(
+        displayNameOverride: String,
+        avatarSource: AvatarSource
+    ) {
+        context.dataStore.edit { prefs ->
+            prefs[Keys.DISPLAY_NAME_OVERRIDE] = displayNameOverride
+            prefs[Keys.AVATAR_SOURCE] = avatarSource.name
+        }
+    }
+
+    /**
+     * Atomically bumps [Keys.CUSTOM_AVATAR_VERSION] by one after a new custom
+     * photo has been written to disk and returns the new value. The version
+     * is what `/avatar` exposes as its ETag and what appears in the URL the
+     * phone advertises via `/capability`, so Coil on the TV revalidates.
+     */
+    suspend fun bumpCustomAvatarVersion(): Long {
+        var next = 0L
+        context.dataStore.edit { prefs ->
+            next = (prefs[Keys.CUSTOM_AVATAR_VERSION] ?: 0L) + 1L
+            prefs[Keys.CUSTOM_AVATAR_VERSION] = next
+        }
+        return next
     }
 
     fun getClientSecret(): String = try {

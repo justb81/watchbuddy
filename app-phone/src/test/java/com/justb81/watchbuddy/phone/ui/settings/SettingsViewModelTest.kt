@@ -14,6 +14,7 @@ import com.justb81.watchbuddy.phone.llm.LlmOrchestrator
 import com.justb81.watchbuddy.phone.llm.ModelDownloadWorker
 import com.justb81.watchbuddy.phone.server.DeviceCapabilityProvider
 import com.justb81.watchbuddy.phone.settings.AppSettings
+import com.justb81.watchbuddy.phone.settings.AvatarImageStore
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -51,6 +52,7 @@ class SettingsViewModelTest {
     private val tokenRepository: TokenRepository = mockk(relaxed = true)
     private val deviceCapabilityProvider: DeviceCapabilityProvider = mockk(relaxed = true)
     private val settingsRepository: SettingsRepository = mockk(relaxed = true)
+    private val avatarImageStore: AvatarImageStore = mockk(relaxed = true)
     private val workManager: WorkManager = mockk(relaxed = true)
 
     private val downloadWorkInfoFlow = MutableStateFlow<List<WorkInfo>>(emptyList())
@@ -79,6 +81,7 @@ class SettingsViewModelTest {
             tokenRepository = tokenRepository,
             deviceCapabilityProvider = deviceCapabilityProvider,
             settingsRepository = settingsRepository,
+            avatarImageStore = avatarImageStore,
             managedBackendAvailable = managedBackendAvailable
         )
 

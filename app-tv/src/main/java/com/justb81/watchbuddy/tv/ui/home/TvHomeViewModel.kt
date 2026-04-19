@@ -2,12 +2,13 @@ package com.justb81.watchbuddy.tv.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.justb81.watchbuddy.core.model.AvatarSource
+import com.justb81.watchbuddy.core.model.DeviceCapability
 import com.justb81.watchbuddy.core.model.EnrichedShowEntry
 import com.justb81.watchbuddy.core.progress.ShowProgress
 import com.justb81.watchbuddy.core.progress.ShowProgressCalculator
 import com.justb81.watchbuddy.tv.data.StreamingPreferencesRepository
 import com.justb81.watchbuddy.tv.data.TvShowCache
-import com.justb81.watchbuddy.tv.data.UserSessionRepository
 import com.justb81.watchbuddy.tv.discovery.PhoneApiClientFactory
 import com.justb81.watchbuddy.tv.discovery.PhoneApiService
 import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
@@ -17,16 +18,27 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+/**
+ * Snapshot of a phone currently paired with this TV. Derived straight from
+ * [PhoneDiscoveryManager.discoveredPhones] — no manual selection, no user
+ * picker (issue #353). Rendered as a read-only chip strip on the home
+ * header so the household can see who the TV is scrobbling for.
+ */
+data class ActiveViewer(
+    val deviceId: String,
+    val displayName: String,
+    val avatarUrl: String?,
+    val avatarSource: AvatarSource
+)
+
 data class TvHomeUiState(
     val isLoading: Boolean = true,
     val isLoadingMore: Boolean = false,
     val shows: List<EnrichedShowEntry> = emptyList(),
     /** Progress keyed by Trakt id. */
     val progress: Map<Int, ShowProgress> = emptyMap(),
-    val selectedUserIds: Set<String> = emptySet(),
     val connectedPhones: Int = 0,
-    val bestPhoneName: String? = null,
-    val bestPhoneBackend: String? = null,
+    val activeViewers: List<ActiveViewer> = emptyList(),
     val noPhoneConnected: Boolean = false,
     /** True when a phone was discovered via NSD but its API call failed (distinct from noPhoneConnected). */
     val phoneApiError: Boolean = false,
@@ -44,7 +56,6 @@ private sealed interface FailureReason {
 class TvHomeViewModel @Inject constructor(
     private val phoneDiscovery: PhoneDiscoveryManager,
     private val phoneApiClientFactory: PhoneApiClientFactory,
-    private val userSessionRepository: UserSessionRepository,
     private val tvShowCache: TvShowCache,
     private val preferencesRepository: StreamingPreferencesRepository
 ) : ViewModel() {
@@ -65,7 +76,8 @@ class TvHomeViewModel @Inject constructor(
     init {
         observeDiscoveryPreference()
         observePhones()
-        observeSelectedUsers()
+        // Initial load — re-triggered whenever the best phone changes.
+        loadShows()
     }
 
     /**
@@ -84,25 +96,26 @@ class TvHomeViewModel @Inject constructor(
 
     private fun observePhones() {
         viewModelScope.launch {
+            var previousBestDeviceId: String? = null
             phoneDiscovery.discoveredPhones.collect { phones ->
-                val best = phones.firstOrNull()
+                val viewers = phones.mapNotNull { phone ->
+                    phone.capability?.let { cap -> cap.toActiveViewer() }
+                }
+                val bestDeviceId = phones.firstOrNull()?.capability?.deviceId
                 _uiState.update {
                     it.copy(
                         connectedPhones = phones.size,
-                        bestPhoneName   = best?.capability?.userName,
-                        bestPhoneBackend = best?.capability?.llmBackend?.name
+                        activeViewers = viewers
                     )
                 }
-            }
-        }
-    }
-
-    private fun observeSelectedUsers() {
-        viewModelScope.launch {
-            userSessionRepository.selectedUserIds.collect { ids ->
-                _uiState.update { it.copy(selectedUserIds = ids) }
-                loadedOffset = 0
-                doLoadShows(ids, append = false)
+                // When the best phone changes (new primary discovered or the
+                // previous one was evicted), refresh the show list from the
+                // new source so the TV never displays another user's shows.
+                if (bestDeviceId != previousBestDeviceId) {
+                    previousBestDeviceId = bestDeviceId
+                    loadedOffset = 0
+                    doLoadShows(append = false)
+                }
             }
         }
     }
@@ -111,7 +124,7 @@ class TvHomeViewModel @Inject constructor(
     fun loadShows() {
         viewModelScope.launch {
             loadedOffset = 0
-            doLoadShows(_uiState.value.selectedUserIds, append = false)
+            doLoadShows(append = false)
         }
     }
 
@@ -120,11 +133,11 @@ class TvHomeViewModel @Inject constructor(
         val state = _uiState.value
         if (!state.canLoadMore || state.isLoadingMore || state.isLoading) return
         viewModelScope.launch {
-            doLoadShows(state.selectedUserIds, append = true)
+            doLoadShows(append = true)
         }
     }
 
-    private suspend fun doLoadShows(selectedUserIds: Set<String>, append: Boolean) {
+    private suspend fun doLoadShows(append: Boolean) {
         if (append) {
             _uiState.update { it.copy(isLoadingMore = true) }
         } else {
@@ -230,6 +243,13 @@ class TvHomeViewModel @Inject constructor(
     }
 
 }
+
+internal fun DeviceCapability.toActiveViewer(): ActiveViewer = ActiveViewer(
+    deviceId = deviceId,
+    displayName = userName,
+    avatarUrl = userAvatarUrl,
+    avatarSource = avatarSource
+)
 
 /**
  * Defensive DESC-by-last-watched sort applied on top of the phone's already-sorted

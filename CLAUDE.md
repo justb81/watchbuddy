@@ -16,7 +16,7 @@ watchbuddy/
 │       ├── di/         AppModule (Hilt dependency injection)
 │       ├── llm/        LlmOrchestrator, RecapGenerator, LlmProviders (LiteRT-LM / AICore)
 │       ├── server/     CompanionHttpServer (Ktor, port 8765), DeviceCapabilityProvider, ShowRepository (reactive `shows` StateFlow), EpisodeRepository (10-min per-show TTL + sync/history writes)
-│       ├── settings/   AppSettings, SettingsRepository (DataStore)
+│       ├── settings/   AppSettings, SettingsRepository (DataStore), AvatarImageStore (custom-photo JPEG)
 │       ├── ui/         MainActivity, PhoneNavGraph
 │       │   ├── diagnostics/ DiagnosticsScreen, DiagnosticsViewModel (Wi-Fi / NSD / HTTP / BLE live health + Share diagnostics)
 │       │   ├── home/       HomeScreen, HomeViewModel
@@ -29,20 +29,20 @@ watchbuddy/
 ├── app-tv/             Google TV app (Kotlin, Compose for TV)
 │   └── src/main/java/com/justb81/watchbuddy/tv/
 │       ├── boot/       BootReceiver (starts TvDiscoveryService on BOOT_COMPLETED when autostart is enabled)
-│       ├── data/       StreamingPreferencesRepository (+ phone-discovery / autostart toggles), UserSessionRepository, TvShowCache
+│       ├── data/       StreamingPreferencesRepository (+ phone-discovery / autostart toggles), TvShowCache
 │       ├── di/         AppModule (Hilt dependency injection)
 │       ├── discovery/  PhoneDiscoveryManager, PhoneApiService, PhoneApiClientFactory, TvDiscoveryService (foreground service — keeps discovery alive post-boot)
 │       ├── scrobbler/  TvScrobbleDispatcher, TvWatchedShowSource
 │       ├── ui/         TvMainActivity, TvNavGraph
-│       │   ├── home/       TvHomeScreen, TvHomeViewModel
+│       │   ├── components/ InitialsAvatar
+│       │   ├── home/       TvHomeScreen, TvHomeViewModel (active viewers derived from discovered phones)
 │       │   ├── navigation/ TvNavGraph
 │       │   ├── recap/      RecapScreen, RecapViewModel
 │       │   ├── diagnostics/ TvDiagnosticsScreen, TvDiagnosticsViewModel (discovery / BLE / discovered-phones health — view-only, no Share)
 │       │   ├── scrobble/   ScrobbleOverlay, ScrobbleViewModel
 │       │   ├── settings/   TvSettingsScreen + TvSettingsViewModel (generic settings hub), StreamingSettingsScreen + StreamingSettingsViewModel (nested)
 │       │   ├── showdetail/ ShowDetailScreen, ShowDetailViewModel
-│       │   ├── theme/      TV Material theme
-│       │   └── userselect/ UserSelectScreen, UserSelectViewModel
+│       │   └── theme/      TV Material theme
 ├── core/               Shared library module
 │   └── src/main/java/com/justb81/watchbuddy/core/
 │       ├── locale/     LocaleHelper (LLM language resolution)
@@ -209,7 +209,8 @@ For the authoritative HTTP API table, NSD TXT-record contract (`version`, `model
 - **Scrobbling:** `MediaSessionScrobbler` (core, consumed by `TvScrobbleDispatcher`) listens to active media sessions on the TV, extracts package name + title, fuzzy-matches against the local show cache first, then falls back to TMDB title search (using the API key from the best phone's capability). Auto-scrobbles if confidence ≥ 95%, shows overlay confirmation between 70–95%, ignores below 70%. When a scrobble event occurs, `TvScrobbleDispatcher` calls `POST /scrobble/{start|pause|stop}` on **every** connected phone in parallel via `PhoneDiscoveryManager` + `PhoneApiClientFactory` — each phone records the episode on its own user's Trakt account using its own stored credentials. A failure for one phone does not block the others. The TV never calls the Trakt API directly for any operation. Progress is derived from `PlaybackState.position` and `MediaMetadata.METADATA_KEY_DURATION`; if unavailable, start/pause fall back to 0/50 and stop is skipped to avoid Trakt marking partially-watched episodes as watched (Trakt treats `progress >= 80` on `/scrobble/stop` as watched).
 - **LLM selection:** `LlmOrchestrator` checks AICore first, then falls back to LiteRT-LM with a Gemma 4 model (E4B or E2B) sized to available RAM.
 - **Auth modes:** Managed backend (default), self-hosted proxy, or direct Trakt credentials.
-- **Multi-user:** Multiple phones can connect to one TV simultaneously; scrobbling records the episode for each connected user independently; shared watch mode avoids recap spoilers.
+- **Multi-user:** Multiple phones can connect to one TV simultaneously; scrobbling records the episode for each connected user independently; shared watch mode avoids recap spoilers. The TV has no manual "who is watching" picker — active viewers are derived directly from `PhoneDiscoveryManager.discoveredPhones` and rendered as a read-only chip strip on `TvHomeScreen` (#353).
+- **Identity overrides (phone, #342):** The phone's Settings → Identity section lets the user override their Trakt display name and pick the avatar source — `TRAKT` (default, uses Trakt CDN URL), `GENERATED` (deterministic initials via `InitialsAvatar`), or `CUSTOM` (user-picked photo via the Android Photo Picker, decoded + downscaled to 256×256 JPEG by `AvatarImageStore`, served over the LAN by `GET /avatar` with an ETag keyed on `customAvatarVersion`). Both fields live in DataStore and are projected into `/capability` by `DeviceCapabilityProvider`; the `/capability` JSON grows an `avatarSource` enum.
 - **Manual episode marking (phone):** Tapping a show on HomeScreen opens `ShowDetailScreen`, which fetches the full season/episode structure via `EpisodeRepository.getSeasonsWithEpisodes` (Trakt `shows/:id/seasons?extended=episodes`, 10-min per-show cache). Each episode has a checkbox; toggling calls `sync/history` add or remove through `EpisodeRepository`, optimistically flips the UI, and on success calls `ShowRepository.updateLocalWatched(...)`. That mutates the in-memory `shows` `StateFlow` so `HomeViewModel` counters update without a round-trip (#216). The layout pulls the season the user is currently mid-watching to the top, expanded; all other seasons appear below, collapsed.
 - **Diagnostics view:** Settings → Diagnostics on both apps renders live phone↔TV connection health from the existing shared singletons (`CompanionStateManager` on phone, `PhoneDiscoveryManager` on TV) — Wi-Fi / multicast lock / NSD state / HTTP bind / BLE state on the phone; discovery active / heartbeat age / BLE scan state / per-phone score + failCount on the TV (#331). Status dots are color-coded (green/yellow/red) so users can tell "AP isolation" (no phones at all) apart from "`/capability` 500" (discovered but broken). On the **phone only**, a "Share diagnostics" button funnels through `DiagnosticShare.launchShare()` so the `DiagnosticLog` breadcrumb snapshot + any pending crash reports can be exported via the system share sheet (#338). The TV screen is view-only — TV share was removed because the Android TV system share sheet is effectively unusable with a D-pad. For the snapshot to be actionable, connectivity subsystems on the phone (`CompanionService`, NSD state machine, `CompanionHttpServer` request log, `CompanionBleAdvertiser`, `WifiStateProvider`, `HomeViewModel` toggle) emit `DiagnosticLog.event(...)` breadcrumbs — without those the ring only carries auth/settings/app-lifecycle traces. Available in release builds; no new build variant.
 

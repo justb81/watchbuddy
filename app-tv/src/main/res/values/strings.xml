@@ -9,7 +9,6 @@
     <string name="tv_no_shows">No shows found.\nConnect the WatchBuddy app on your phone with Trakt.</string>
     <string name="tv_no_phone">No phone connected.\nStart the WatchBuddy app on your smartphone.\nIf your Wi-Fi blocks device discovery, turn on Bluetooth on both devices.</string>
     <string name="tv_retry">Retry</string>
-    <string name="tv_devices_count">%1$d device(s)</string>
     <string name="tv_last_watched">Last: %1$s, %2$s</string>
     <string name="tv_last_aired_episode">Aired: %1$s, %2$s</string>
     <string name="tv_next_aired">Next: %1$s, %2$s</string>
@@ -30,12 +29,6 @@
         <item quantity="other">%d shows</item>
     </plurals>
 
-    <!-- User select -->
-    <string name="tv_select_user">Who\'s watching?</string>
-    <string name="tv_select_user_subtitle">Select one or more people</string>
-    <string name="tv_watching_together">Watch together</string>
-    <string name="tv_confirm_selection">Confirm</string>
-    <string name="tv_cancel">Cancel</string>
 
     <!-- Show detail -->
     <string name="tv_next_episode">Next episode</string>
@@ -95,11 +88,8 @@
     <string name="tv_llm_aicore">AICore</string>
     <string name="tv_llm_gemma_gpu">Gemma GPU</string>
     <string name="tv_llm_gemma_cpu">Gemma CPU</string>
-    <string name="tv_llm_none">No LLM</string>
 
     <!-- Accessibility content descriptions -->
-    <string name="cd_user_selected">%1$s, selected</string>
-    <string name="cd_user_unselected">%1$s, press to select</string>
     <string name="cd_scrobble_countdown">Auto-confirm in %1$d seconds</string>
     <string name="cd_service_move_up">Move %1$s up in priority</string>
     <string name="cd_service_move_down">Move %1$s down in priority</string>

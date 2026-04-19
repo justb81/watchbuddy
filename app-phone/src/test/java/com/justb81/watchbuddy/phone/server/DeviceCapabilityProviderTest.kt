@@ -7,7 +7,9 @@ import com.justb81.watchbuddy.core.trakt.TraktApiService
 import com.justb81.watchbuddy.core.trakt.TraktUserProfile
 import com.justb81.watchbuddy.phone.auth.TokenRepository
 import com.justb81.watchbuddy.phone.llm.LlmOrchestrator
+import com.justb81.watchbuddy.phone.settings.AppSettings
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
+import com.justb81.watchbuddy.service.CompanionStateManager
 import io.mockk.*
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
@@ -26,6 +28,7 @@ class DeviceCapabilityProviderTest {
     private val tokenRepository: TokenRepository = mockk()
     private val settingsRepository: SettingsRepository = mockk()
     private val activityManager: ActivityManager = mockk(relaxed = true)
+    private val stateManager = CompanionStateManager()
     private lateinit var provider: DeviceCapabilityProvider
 
     @BeforeEach
@@ -46,7 +49,10 @@ class DeviceCapabilityProviderTest {
             70
         )
         every { settingsRepository.getTmdbApiKey() } returns flowOf("")
-        provider = DeviceCapabilityProvider(context, orchestrator, traktApi, tokenRepository, settingsRepository)
+        every { settingsRepository.settings } returns flowOf(AppSettings())
+        provider = DeviceCapabilityProvider(
+            context, orchestrator, traktApi, tokenRepository, settingsRepository, stateManager
+        )
     }
 
     private fun setStaticField(fieldName: String, value: String) {

@@ -1,6 +1,7 @@
 package com.justb81.watchbuddy.phone.ui.settings
 
 import android.app.Application
+import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -13,6 +14,7 @@ import androidx.work.WorkManager
 import androidx.work.workDataOf
 import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
+import com.justb81.watchbuddy.core.model.AvatarSource
 import com.justb81.watchbuddy.core.trakt.TraktApiService
 import com.justb81.watchbuddy.phone.auth.TokenRepository
 import com.justb81.watchbuddy.service.CompanionService
@@ -20,6 +22,7 @@ import com.justb81.watchbuddy.phone.llm.LlmOrchestrator
 import com.justb81.watchbuddy.phone.llm.ModelDownloadWorker
 import com.justb81.watchbuddy.phone.server.DeviceCapabilityProvider
 import com.justb81.watchbuddy.phone.settings.AppSettings
+import com.justb81.watchbuddy.phone.settings.AvatarImageStore
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -38,6 +41,12 @@ enum class AuthMode { MANAGED, SELF_HOSTED, DIRECT }
 
 data class SettingsUiState(
     val traktUsername: String?     = null,
+    val displayNameOverride: String = "",
+    val avatarSource: AvatarSource = AvatarSource.TRAKT,
+    val hasCustomAvatar: Boolean   = false,
+    /** Bumped every time a new custom photo lands on disk so Coil-backed previews invalidate. */
+    val customAvatarVersion: Long  = 0L,
+    val customAvatarImportError: Boolean = false,
     val tmdbConnected: Boolean     = false,
     val tmdbApiKey: String         = "",
     /** True when the build ships a default TMDB API key and the user has not set a custom one. */
@@ -78,6 +87,7 @@ class SettingsViewModel @Inject constructor(
     private val tokenRepository: TokenRepository,
     private val deviceCapabilityProvider: DeviceCapabilityProvider,
     private val settingsRepository: SettingsRepository,
+    private val avatarImageStore: AvatarImageStore,
     @Named("managedBackendAvailable") private val managedBackendAvailable: Boolean
 ) : AndroidViewModel(application) {
 
@@ -177,7 +187,11 @@ class SettingsViewModel @Inject constructor(
                     defaultTmdbApiKeyAvailable = buildHasBundled && saved.tmdbApiKey.isBlank(),
                     buildHasBundledTmdbKey = buildHasBundled,
                     useBundledTmdbKey = saved.tmdbApiKey.isBlank() && buildHasBundled,
-                    forceShowAdvanced = !managedBackendAvailable || !buildHasBundled
+                    forceShowAdvanced = !managedBackendAvailable || !buildHasBundled,
+                    displayNameOverride = saved.displayNameOverride,
+                    avatarSource = saved.avatarSource,
+                    hasCustomAvatar = avatarImageStore.exists(),
+                    customAvatarVersion = saved.customAvatarVersion
                 )
                 Log.d(TAG, "loadPersistedSettings: authMode=$resolvedAuthMode tmdbConnected=${saved.tmdbApiKey.isNotBlank()}")
             } catch (e: Exception) {
@@ -436,6 +450,66 @@ class SettingsViewModel @Inject constructor(
             workRequest
         )
         // Progress is tracked by observeDownloadProgress() running since init
+    }
+
+    // ── Identity (display name + avatar source) ───────────────────────────
+
+    fun setDisplayNameOverride(name: String) {
+        _uiState.value = _uiState.value.copy(displayNameOverride = name)
+        launchSafe {
+            runCatching {
+                settingsRepository.setIdentity(name, _uiState.value.avatarSource)
+                deviceCapabilityProvider.invalidateCache()
+            }.onFailure { DiagnosticLog.error(TAG, "setDisplayNameOverride:failed", it) }
+        }
+    }
+
+    fun setAvatarSource(source: AvatarSource) {
+        val previous = _uiState.value.avatarSource
+        _uiState.value = _uiState.value.copy(avatarSource = source, customAvatarImportError = false)
+        launchSafe {
+            runCatching {
+                // Leaving CUSTOM? Drop the stored bytes so we don't keep a stale photo around.
+                if (previous == AvatarSource.CUSTOM && source != AvatarSource.CUSTOM) {
+                    avatarImageStore.clear()
+                    _uiState.value = _uiState.value.copy(hasCustomAvatar = false)
+                }
+                settingsRepository.setIdentity(_uiState.value.displayNameOverride, source)
+                deviceCapabilityProvider.invalidateCache()
+            }.onFailure { DiagnosticLog.error(TAG, "setAvatarSource:failed", it) }
+        }
+    }
+
+    /**
+     * Handles the Photo Picker callback. [uri] can be null when the user
+     * dismisses the picker. On success the avatar file is written, the
+     * version is bumped (which invalidates Coil's HTTP cache on the TV),
+     * and the avatar source snaps to [AvatarSource.CUSTOM].
+     */
+    fun onCustomAvatarPicked(uri: Uri?) {
+        if (uri == null) return
+        launchSafe {
+            when (val result = avatarImageStore.writeFromUri(uri)) {
+                AvatarImageStore.Result.Ok -> {
+                    val version = settingsRepository.bumpCustomAvatarVersion()
+                    settingsRepository.setIdentity(
+                        _uiState.value.displayNameOverride,
+                        AvatarSource.CUSTOM
+                    )
+                    deviceCapabilityProvider.invalidateCache()
+                    _uiState.value = _uiState.value.copy(
+                        avatarSource = AvatarSource.CUSTOM,
+                        hasCustomAvatar = true,
+                        customAvatarVersion = version,
+                        customAvatarImportError = false
+                    )
+                }
+                is AvatarImageStore.Result.Failed -> {
+                    DiagnosticLog.warn(TAG, "custom avatar import failed: ${result.reason}")
+                    _uiState.value = _uiState.value.copy(customAvatarImportError = true)
+                }
+            }
+        }
     }
 
     private companion object {

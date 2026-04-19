@@ -44,7 +44,8 @@ TXT records:   version=X.Y.Z, modelQuality=70, llmBackend=LITERT
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/capability` | Device info + LLM score + TMDB API key |
+| GET | `/capability` | Device info + LLM score + TMDB API key + `avatarSource` (#342) |
+| GET | `/avatar` | Custom avatar JPEG (200 bytes, ETag-revalidated; 404 when `avatarSource != CUSTOM`) |
 | GET | `/shows` | User's Trakt watched shows (cached) |
 | POST | `/recap/{traktShowId}` | Generate HTML recap for a show |
 | GET | `/auth/token` | Current access token (server-side, not used by TV) |

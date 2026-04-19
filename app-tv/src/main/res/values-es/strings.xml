@@ -9,7 +9,6 @@
     <string name="tv_no_shows">No se encontraron series.\nConecta la aplicación WatchBuddy en tu teléfono con Trakt.</string>
     <string name="tv_no_phone">Ningún teléfono conectado.\nInicia la aplicación WatchBuddy en tu smartphone.\nSi tu Wi-Fi bloquea la detección de dispositivos, activa el Bluetooth en ambos dispositivos.</string>
     <string name="tv_retry">Reintentar</string>
-    <string name="tv_devices_count">%1$d dispositivo(s)</string>
     <string name="tv_last_watched">Último: %1$s, %2$s</string>
     <string name="tv_last_aired_episode">Emitido: %1$s, %2$s</string>
     <string name="tv_next_aired">Siguiente: %1$s, %2$s</string>
@@ -30,12 +29,6 @@
         <item quantity="other">%d series</item>
     </plurals>
 
-    <!-- User select -->
-    <string name="tv_select_user">¿Quién está viendo?</string>
-    <string name="tv_select_user_subtitle">Selecciona una o varias personas</string>
-    <string name="tv_watching_together">Ver juntos</string>
-    <string name="tv_confirm_selection">Confirmar</string>
-    <string name="tv_cancel">Cancelar</string>
 
     <!-- Show detail -->
     <string name="tv_next_episode">Siguiente episodio</string>
@@ -95,11 +88,8 @@
     <string name="tv_llm_aicore">AICore</string>
     <string name="tv_llm_gemma_gpu">Gemma GPU</string>
     <string name="tv_llm_gemma_cpu">Gemma CPU</string>
-    <string name="tv_llm_none">Sin LLM</string>
 
     <!-- Accesibilidad -->
-    <string name="cd_user_selected">%1$s, seleccionado</string>
-    <string name="cd_user_unselected">%1$s, pulsar para seleccionar</string>
     <string name="cd_scrobble_countdown">Confirmación automática en %1$d segundos</string>
     <string name="cd_service_move_up">Subir %1$s en la prioridad</string>
     <string name="cd_service_move_down">Bajar %1$s en la prioridad</string>
