@@ -64,11 +64,7 @@ class PhoneDiscoveryManagerTest {
     inner class GetBestPhoneTest {
 
         private fun setPhones(vararg phones: PhoneDiscoveryManager.DiscoveredPhone) {
-            val field = PhoneDiscoveryManager::class.java.getDeclaredField("_discoveredPhones")
-            field.isAccessible = true
-            @Suppress("UNCHECKED_CAST")
-            val flow = field.get(manager) as kotlinx.coroutines.flow.MutableStateFlow<List<PhoneDiscoveryManager.DiscoveredPhone>>
-            flow.value = phones.toList()
+            manager.setDiscoveredPhonesForTest(phones.toList())
         }
 
         @Test
@@ -138,15 +134,7 @@ class PhoneDiscoveryManagerTest {
         private fun calculateScore(
             txt: PhoneDiscoveryManager.PhoneTxtRecord?,
             cap: DeviceCapability?
-        ): Int {
-            val method = PhoneDiscoveryManager::class.java.getDeclaredMethod(
-                "calculateScore",
-                PhoneDiscoveryManager.PhoneTxtRecord::class.java,
-                DeviceCapability::class.java
-            )
-            method.isAccessible = true
-            return method.invoke(manager, txt, cap) as Int
-        }
+        ): Int = manager.calculateScore(txt, cap)
 
         @Test
         fun `returns 0 when both txt and capability are null`() {
@@ -209,14 +197,8 @@ class PhoneDiscoveryManagerTest {
     @DisplayName("parseTxtRecord")
     inner class ParseTxtRecordTest {
 
-        private fun parseTxtRecord(serviceInfo: NsdServiceInfo): PhoneDiscoveryManager.PhoneTxtRecord? {
-            val method = PhoneDiscoveryManager::class.java.getDeclaredMethod(
-                "parseTxtRecord", NsdServiceInfo::class.java
-            )
-            method.isAccessible = true
-            @Suppress("UNCHECKED_CAST")
-            return method.invoke(manager, serviceInfo) as PhoneDiscoveryManager.PhoneTxtRecord?
-        }
+        private fun parseTxtRecord(serviceInfo: NsdServiceInfo): PhoneDiscoveryManager.PhoneTxtRecord? =
+            manager.parseTxtRecord(serviceInfo)
 
         private fun mockServiceInfo(attrs: Map<String, ByteArray>): NsdServiceInfo {
             val info = mockk<NsdServiceInfo>()

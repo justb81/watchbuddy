@@ -9,6 +9,7 @@ import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import android.net.wifi.WifiManager
 import android.util.Log
+import androidx.annotation.VisibleForTesting
 import com.justb81.watchbuddy.core.model.DeviceCapability
 import com.justb81.watchbuddy.core.model.LlmBackend
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -415,7 +416,8 @@ class PhoneDiscoveryManager @Inject constructor(
      * it, and silent returns were observed to mask the root cause in the
      * field (see #259).
      */
-    private fun parseTxtRecord(serviceInfo: NsdServiceInfo): PhoneTxtRecord? {
+    @VisibleForTesting
+    internal fun parseTxtRecord(serviceInfo: NsdServiceInfo): PhoneTxtRecord? {
         return try {
             val attrs = serviceInfo.attributes ?: emptyMap()
             val decoded = attrs.mapValues { (_, v) ->
@@ -459,6 +461,11 @@ class PhoneDiscoveryManager @Inject constructor(
             Log.w(TAG, "parseTxtRecord: unexpected error", e)
             null
         }
+    }
+
+    @VisibleForTesting
+    internal fun setDiscoveredPhonesForTest(phones: List<DiscoveredPhone>) {
+        _discoveredPhones.value = phones
     }
 
     private fun addOrUpdatePhone(phone: DiscoveredPhone) {
@@ -527,7 +534,8 @@ class PhoneDiscoveryManager @Inject constructor(
      * When only TXT records are available (capability fetch failed), modelQuality from
      * TXT records is used directly with no RAM bonus.
      */
-    private fun calculateScore(txt: PhoneTxtRecord?, cap: DeviceCapability?): Int {
+    @VisibleForTesting
+    internal fun calculateScore(txt: PhoneTxtRecord?, cap: DeviceCapability?): Int {
         if (cap != null) {
             val ramBonus = when {
                 cap.freeRamMb >= 6_000 -> 10
