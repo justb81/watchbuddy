@@ -5,7 +5,7 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
-import android.util.Log
+import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -53,12 +53,12 @@ class WifiStateProvider @Inject constructor(
             .build()
         val callback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
-                Log.d(TAG, "Wi-Fi available")
+                DiagnosticLog.event(TAG, "Wi-Fi onAvailable")
                 _isOnWifi.value = true
             }
 
             override fun onLost(network: Network) {
-                Log.d(TAG, "Wi-Fi lost")
+                DiagnosticLog.event(TAG, "Wi-Fi onLost")
                 _isOnWifi.value = probeCurrent()
             }
 
@@ -68,6 +68,6 @@ class WifiStateProvider @Inject constructor(
             }
         }
         runCatching { cm.registerNetworkCallback(request, callback) }
-            .onFailure { Log.w(TAG, "registerNetworkCallback failed", it) }
+            .onFailure { DiagnosticLog.warn(TAG, "registerNetworkCallback failed", it) }
     }
 }

@@ -16,6 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.justb81.watchbuddy.R
+import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.logging.DiagnosticShare
 import com.justb81.watchbuddy.service.CompanionStateManager
 
@@ -173,7 +174,13 @@ fun DiagnosticsScreen(
 
             Spacer(Modifier.height(8.dp))
             Button(
-                onClick = { DiagnosticShare.launchShare(context) },
+                onClick = {
+                    // End-marker in the breadcrumb ring so the snapshot always
+                    // has a clear "user hit share" line and the share-sheet
+                    // round-trip is visible in the exported log.
+                    DiagnosticLog.event("DiagnosticsScreen", "Share diagnostics clicked")
+                    DiagnosticShare.launchShare(context)
+                },
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(stringResource(R.string.diagnostics_share_button))

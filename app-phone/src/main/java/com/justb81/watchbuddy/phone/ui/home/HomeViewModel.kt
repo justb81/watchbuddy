@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.justb81.watchbuddy.R
+import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.model.EnrichedShowEntry
 import com.justb81.watchbuddy.core.model.ScrobbleDisplayEvent
 import com.justb81.watchbuddy.core.progress.ShowProgress
@@ -55,6 +56,8 @@ class HomeViewModel @Inject constructor(
 ) : AndroidViewModel(application) {
 
     companion object {
+        private const val TAG = "HomeViewModel"
+
         /** Hide scrobble events older than 30 minutes. */
         private const val SCROBBLE_DISPLAY_TTL_MS = 30 * 60_000L
     }
@@ -157,7 +160,14 @@ class HomeViewModel @Inject constructor(
         // Hard-gate start requests when Wi-Fi is missing. The UI disables the
         // switch, but onboarding from a notification action or future entry
         // points must also respect the gate.
-        if (enabled && !_uiState.value.isOnWifi) return
+        if (enabled && !_uiState.value.isOnWifi) {
+            DiagnosticLog.event(TAG, "toggleWatchingTv=on refused (no Wi-Fi)")
+            return
+        }
+        DiagnosticLog.event(
+            TAG,
+            "toggleWatchingTv=${if (enabled) "on" else "off"} canWatch=${_uiState.value.canWatch}"
+        )
         viewModelScope.launch {
             settingsRepository.setCompanionEnabled(enabled)
             if (enabled) {
