@@ -14,6 +14,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
+import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
 
@@ -103,5 +104,39 @@ class ScrobbleViewModelTest {
         // Different episode should appear
         pendingFlow.emit(candidate2)
         assertNotNull(viewModel.pendingCandidate.value)
+    }
+
+    @Nested
+    @DisplayName("DismissedEpisodesCleanup")
+    inner class DismissedEpisodesCleanupTest {
+
+        @Test
+        fun `dismissedEpisodes cleared on onCleared`() = runTest {
+            pendingFlow.emit(testCandidate)
+            viewModel.dismissScrobble()
+            assertTrue(viewModel.dismissedEpisodes.isNotEmpty())
+
+            viewModel.onCleared()
+
+            assertTrue(viewModel.dismissedEpisodes.isEmpty())
+        }
+
+        @Test
+        fun `dismissing multiple episodes all cleared on onCleared`() = runTest {
+            val episodes = listOf(
+                testCandidate,
+                testCandidate.copy(matchedEpisode = TraktEpisode(season = 1, number = 2)),
+                testCandidate.copy(matchedEpisode = TraktEpisode(season = 2, number = 1)),
+            )
+            episodes.forEach { candidate ->
+                pendingFlow.emit(candidate)
+                viewModel.dismissScrobble()
+            }
+            assertEquals(3, viewModel.dismissedEpisodes.size)
+
+            viewModel.onCleared()
+
+            assertTrue(viewModel.dismissedEpisodes.isEmpty())
+        }
     }
 }

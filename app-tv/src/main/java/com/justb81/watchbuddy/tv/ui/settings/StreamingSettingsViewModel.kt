@@ -2,6 +2,7 @@ package com.justb81.watchbuddy.tv.ui.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.model.KNOWN_STREAMING_SERVICES
 import com.justb81.watchbuddy.core.model.StreamingService
 import com.justb81.watchbuddy.tv.data.StreamingPreferencesRepository
@@ -24,6 +25,10 @@ class StreamingSettingsViewModel @Inject constructor(
     private val repository: StreamingPreferencesRepository
 ) : ViewModel() {
 
+    companion object {
+        private const val TAG = "StreamingSettingsViewModel"
+    }
+
     private val _uiState = MutableStateFlow(StreamingSettingsUiState())
     val uiState: StateFlow<StreamingSettingsUiState> = _uiState.asStateFlow()
 
@@ -32,7 +37,9 @@ class StreamingSettingsViewModel @Inject constructor(
      * flow doesn't force-close the TV Settings screen. Same pattern as the phone
      * SettingsViewModel in #224.
      */
-    private val coroutineExceptionHandler = CoroutineExceptionHandler { _, _ -> }
+    private val coroutineExceptionHandler = CoroutineExceptionHandler { _, throwable ->
+        DiagnosticLog.error(TAG, "streaming prefs write failed", throwable)
+    }
 
     private fun launchSafe(block: suspend CoroutineScope.() -> Unit): Job =
         viewModelScope.launch(coroutineExceptionHandler, block = block)
@@ -40,7 +47,7 @@ class StreamingSettingsViewModel @Inject constructor(
     init {
         launchSafe {
             repository.subscribedServiceIds
-                .catch { }
+                .catch { e -> DiagnosticLog.error(TAG, "streaming prefs observation failed", e) }
                 .collect { ids ->
                     _uiState.update {
                         it.copy(subscribedIds = ids.toSet(), orderedIds = ids)
