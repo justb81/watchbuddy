@@ -95,7 +95,6 @@
 
     <!-- Diagnostics -->
     <string name="tv_diagnostics_title">Diagnostic</string>
-    <string name="tv_diagnostics_share_button">Partager le diagnostic</string>
     <string name="tv_diagnostics_section_connectivity">Connectivité</string>
     <string name="tv_diagnostics_section_nsd">Découverte (NSD)</string>
     <string name="tv_diagnostics_section_ble">Scanner BLE</string>

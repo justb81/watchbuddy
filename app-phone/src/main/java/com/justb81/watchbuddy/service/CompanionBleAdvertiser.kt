@@ -9,9 +9,9 @@ import android.bluetooth.le.BluetoothLeAdvertiser
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.ParcelUuid
-import android.util.Log
 import androidx.core.content.ContextCompat
 import com.justb81.watchbuddy.core.discovery.BleDiscoveryContract
+import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.net.Inet4Address
 import javax.inject.Inject
@@ -57,19 +57,19 @@ class CompanionBleAdvertiser @Inject constructor(
         llmBackendOrdinal: Int,
     ): Boolean {
         if (!hasAdvertisePermission()) {
-            Log.i(TAG, "start skipped: BLUETOOTH_ADVERTISE permission not granted")
+            DiagnosticLog.event(TAG, "start skipped: BLUETOOTH_ADVERTISE permission not granted")
             return false
         }
         val adapter = bluetoothManager?.adapter ?: run {
-            Log.i(TAG, "start skipped: no Bluetooth adapter")
+            DiagnosticLog.event(TAG, "start skipped: no Bluetooth adapter")
             return false
         }
         if (!adapter.isEnabled) {
-            Log.i(TAG, "start skipped: Bluetooth adapter disabled")
+            DiagnosticLog.event(TAG, "start skipped: Bluetooth adapter disabled")
             return false
         }
         val leAdvertiser = adapter.bluetoothLeAdvertiser ?: run {
-            Log.i(TAG, "start skipped: BluetoothLeAdvertiser unavailable (BLE peripheral role unsupported)")
+            DiagnosticLog.event(TAG, "start skipped: BluetoothLeAdvertiser unavailable (BLE peripheral role unsupported)")
             return false
         }
 
@@ -84,7 +84,7 @@ class CompanionBleAdvertiser @Inject constructor(
             llmBackendOrdinal = llmBackendOrdinal.coerceIn(0, 255),
         )
         val payloadBytes = runCatching { BleDiscoveryContract.encode(payload) }
-            .onFailure { Log.w(TAG, "payload encode failed", it) }
+            .onFailure { DiagnosticLog.warn(TAG, "payload encode failed", it) }
             .getOrNull() ?: return false
 
         val settings = AdvertiseSettings.Builder()
@@ -109,16 +109,16 @@ class CompanionBleAdvertiser @Inject constructor(
 
         val callback = object : AdvertiseCallback() {
             override fun onStartSuccess(settingsInEffect: AdvertiseSettings) {
-                Log.i(
+                DiagnosticLog.event(
                     TAG,
-                    "advertising started: ip=${ipv4.hostAddress} port=$port " +
+                    "advertising started ip=${ipv4.hostAddress} port=$port " +
                         "quality=$modelQuality backend=$llmBackendOrdinal"
                 )
                 stateManager.setBleAdvertiseState(CompanionStateManager.BleAdvertiseState.ADVERTISING)
             }
 
             override fun onStartFailure(errorCode: Int) {
-                Log.e(TAG, "advertising failed: ${errorName(errorCode)}")
+                DiagnosticLog.error(TAG, "advertising failed: ${errorName(errorCode)}")
                 stateManager.setBleAdvertiseState(
                     CompanionStateManager.BleAdvertiseState.FAILED,
                     errorCode = errorCode,
@@ -141,7 +141,7 @@ class CompanionBleAdvertiser @Inject constructor(
                 activeCallback = callback
             }
             true
-        }.onFailure { Log.e(TAG, "startAdvertising threw", it) }
+        }.onFailure { DiagnosticLog.error(TAG, "startAdvertising threw", it) }
             .getOrDefault(false)
     }
 
@@ -166,13 +166,13 @@ class CompanionBleAdvertiser @Inject constructor(
             return
         }
         runCatching { adv.stopAdvertising(cb) }
-            .onFailure { Log.w(TAG, "stopAdvertising threw", it) }
+            .onFailure { DiagnosticLog.warn(TAG, "stopAdvertising threw", it) }
         synchronized(this) {
             advertiser = null
             activeCallback = null
         }
         stateManager.setBleAdvertiseState(CompanionStateManager.BleAdvertiseState.IDLE)
-        Log.i(TAG, "advertising stopped")
+        DiagnosticLog.event(TAG, "advertising stopped")
     }
 
     private fun hasAdvertisePermission(): Boolean =

@@ -1,7 +1,7 @@
 package com.justb81.watchbuddy.phone.server
 
-import android.util.Log
 import com.justb81.watchbuddy.core.locale.LocaleHelper
+import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.model.ScrobbleAction
 import com.justb81.watchbuddy.core.model.ScrobbleDisplayEvent
 import com.justb81.watchbuddy.core.model.TraktEpisode
@@ -75,18 +75,23 @@ class CompanionHttpServer @Inject constructor(
         // on devices where the default binding behaves unexpectedly — the NSD
         // advertisement pins the Wi-Fi IPv4, so the listener must accept
         // connections on that interface (#265).
-        server = embeddedServer(Netty, host = "0.0.0.0", port = PORT) {
-            configureCompanionRoutes(
-                recapGenerator, capabilityProvider, showRepository,
-                tokenRepository, tokenRefreshManager, traktApiService, tmdbApiService, tmdbCache,
-                settingsRepository, stateManager
-            )
-        }.start(wait = false)
+        runCatching {
+            server = embeddedServer(Netty, host = "0.0.0.0", port = PORT) {
+                configureCompanionRoutes(
+                    recapGenerator, capabilityProvider, showRepository,
+                    tokenRepository, tokenRefreshManager, traktApiService, tmdbApiService, tmdbCache,
+                    settingsRepository, stateManager
+                )
+            }.start(wait = false)
+        }.onFailure {
+            DiagnosticLog.error(TAG, "Netty bind 0.0.0.0:$PORT failed", it)
+        }
     }
 
     fun stop() {
         server?.stop(gracePeriodMillis = 1_000, timeoutMillis = 5_000)
         server = null
+        DiagnosticLog.event(TAG, "Netty stopped")
     }
 }
 
@@ -109,6 +114,24 @@ internal fun Application.configureCompanionRoutes(
     install(ContentNegotiation) {
         json(WatchBuddyJson)
     }
+    // Request-level breadcrumb. Only method / path / status / latency — never
+    // body or query to avoid leaking tokens or TMDB/Trakt identifiers. This
+    // makes connectivity issues (TV calling /capability but getting 500, TV
+    // never reaching /scrobble/start, etc.) visible in shared diagnostics.
+    intercept(ApplicationCallPipeline.Monitoring) {
+        val started = System.currentTimeMillis()
+        try {
+            proceed()
+        } finally {
+            val path = call.request.path()
+            val status = call.response.status()?.value ?: 0
+            val latency = System.currentTimeMillis() - started
+            DiagnosticLog.event(
+                TAG,
+                "${call.request.httpMethod.value} $path → $status ${latency}ms"
+            )
+        }
+    }
     routing {
         get("/capability") {
             stateManager.onCapabilityChecked()
@@ -125,10 +148,10 @@ internal fun Application.configureCompanionRoutes(
                 val shows = showRepository.getShows().drop(offset).take(limit)
                 call.respond(shows)
             } catch (e: SecurityException) {
-                Log.e(TAG, "Keystore unavailable", e)
+                DiagnosticLog.error(TAG, "Keystore unavailable", e)
                 call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("Service unavailable"))
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to fetch shows", e)
+                DiagnosticLog.error(TAG, "Failed to fetch shows", e)
                 call.respond(HttpStatusCode.InternalServerError, ErrorResponse("Internal server error"))
             }
         }
@@ -182,7 +205,7 @@ internal fun Application.configureCompanionRoutes(
                                         ?: tmdbApiService.getEpisode(tmdbId, season, episode, apiKey, language = tmdbLanguage)
                                             .also { tmdbCache.putEpisode(tmdbId, season, episode, it) }
                                 } catch (e: Exception) {
-                                    Log.w(TAG, "Failed to load TMDB episode S${season}E${episode}", e)
+                                    DiagnosticLog.warn(TAG, "Failed to load TMDB episode S${season}E${episode}", e)
                                     null
                                 }
                             }
@@ -207,10 +230,10 @@ internal fun Application.configureCompanionRoutes(
                 )
                 call.respond(mapOf("html" to html))
             } catch (e: SecurityException) {
-                Log.e(TAG, "Keystore unavailable", e)
+                DiagnosticLog.error(TAG, "Keystore unavailable", e)
                 call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("Service unavailable"))
             } catch (e: Exception) {
-                Log.e(TAG, "Recap generation failed for show $showId", e)
+                DiagnosticLog.error(TAG, "Recap generation failed for show $showId", e)
                 call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("Recap generation failed"))
             }
         }
@@ -250,9 +273,14 @@ private suspend fun ApplicationCall.handleScrobble(
         stateManager.onScrobbleEvent(
             ScrobbleDisplayEvent(action, body.show, body.episode, body.progress, System.currentTimeMillis())
         )
+        DiagnosticLog.event(
+            TAG,
+            "scrobble ${action.name.lowercase()} ok show=${body.show.title} " +
+                "S${body.episode.season}E${body.episode.number} progress=${body.progress}"
+        )
         respond(ScrobbleActionResponse(success = true))
     } catch (e: Exception) {
-        Log.e(TAG, "Scrobble ${action.name.lowercase()} failed", e)
+        DiagnosticLog.error(TAG, "scrobble ${action.name.lowercase()} failed", e)
         respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("Scrobble failed"))
     }
 }

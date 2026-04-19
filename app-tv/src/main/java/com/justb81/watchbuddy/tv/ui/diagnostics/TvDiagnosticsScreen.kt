@@ -9,7 +9,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -17,7 +16,6 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.tv.material3.*
 import com.justb81.watchbuddy.R
-import com.justb81.watchbuddy.core.logging.DiagnosticShare
 import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
 
 @OptIn(ExperimentalTvMaterial3Api::class)
@@ -27,7 +25,6 @@ fun TvDiagnosticsScreen(
     viewModel: TvDiagnosticsViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val context = LocalContext.current
 
     Box(
         modifier = Modifier
@@ -156,13 +153,8 @@ fun TvDiagnosticsScreen(
 
             item {
                 Spacer(Modifier.height(16.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    OutlinedButton(onClick = { DiagnosticShare.launchShare(context) }) {
-                        Text(stringResource(R.string.tv_diagnostics_share_button))
-                    }
-                    OutlinedButton(onClick = onBack) {
-                        Text(stringResource(R.string.tv_back))
-                    }
+                OutlinedButton(onClick = onBack) {
+                    Text(stringResource(R.string.tv_back))
                 }
             }
         }
