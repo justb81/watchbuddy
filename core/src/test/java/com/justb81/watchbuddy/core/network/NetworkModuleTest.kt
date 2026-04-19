@@ -1,5 +1,9 @@
 package com.justb81.watchbuddy.core.network
 
+import com.justb81.watchbuddy.core.trakt.NoOpTokenProxyService
+import com.justb81.watchbuddy.core.trakt.ProxyRefreshRequest
+import com.justb81.watchbuddy.core.trakt.ProxyTokenRequest
+import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.logging.HttpLoggingInterceptor
@@ -90,46 +94,42 @@ class NetworkModuleTest {
     }
 
     @Nested
-    @DisplayName("provideTokenProxyRetrofit")
-    inner class TokenProxyRetrofitTest {
-        @Test
-        fun `returns null for blank URL`() {
-            val result = NetworkModule.provideTokenProxyRetrofit("", OkHttpClient())
-            assertNull(result)
-        }
-
-        @Test
-        fun `returns null for whitespace-only URL`() {
-            val result = NetworkModule.provideTokenProxyRetrofit("   ", OkHttpClient())
-            assertNull(result)
-        }
-
-        @Test
-        fun `returns non-null for valid URL`() {
-            val result = NetworkModule.provideTokenProxyRetrofit("https://example.com", OkHttpClient())
-            assertNotNull(result)
-        }
-
-        @Test
-        fun `appends trailing slash if missing`() {
-            val result = NetworkModule.provideTokenProxyRetrofit("https://example.com", OkHttpClient())
-            assertEquals("https://example.com/", result!!.baseUrl().toString())
-        }
-
-        @Test
-        fun `preserves existing trailing slash`() {
-            val result = NetworkModule.provideTokenProxyRetrofit("https://example.com/", OkHttpClient())
-            assertEquals("https://example.com/", result!!.baseUrl().toString())
-        }
-    }
-
-    @Nested
     @DisplayName("provideTokenProxyService")
     inner class TokenProxyServiceTest {
+
         @Test
-        fun `returns null when retrofit is null`() {
-            val result = NetworkModule.provideTokenProxyService(null)
-            assertNull(result)
+        fun `returns NoOpTokenProxyService for blank URL`() {
+            val result = NetworkModule.provideTokenProxyService("", OkHttpClient())
+            assertInstanceOf(NoOpTokenProxyService::class.java, result)
+        }
+
+        @Test
+        fun `returns NoOpTokenProxyService for whitespace-only URL`() {
+            val result = NetworkModule.provideTokenProxyService("   ", OkHttpClient())
+            assertInstanceOf(NoOpTokenProxyService::class.java, result)
+        }
+
+        @Test
+        fun `returns non-null real service for valid URL`() {
+            val result = NetworkModule.provideTokenProxyService("https://example.com", OkHttpClient())
+            assertNotNull(result)
+            assertFalse(result is NoOpTokenProxyService)
+        }
+
+        @Test
+        fun `NoOpTokenProxyService throws UnsupportedOperationException on exchangeDeviceCode`() {
+            val noop = NoOpTokenProxyService()
+            assertThrows(UnsupportedOperationException::class.java) {
+                runBlocking { noop.exchangeDeviceCode(ProxyTokenRequest("code")) }
+            }
+        }
+
+        @Test
+        fun `NoOpTokenProxyService throws UnsupportedOperationException on refreshToken`() {
+            val noop = NoOpTokenProxyService()
+            assertThrows(UnsupportedOperationException::class.java) {
+                runBlocking { noop.refreshToken(ProxyRefreshRequest("token")) }
+            }
         }
     }
 

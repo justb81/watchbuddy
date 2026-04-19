@@ -1,6 +1,7 @@
 package com.justb81.watchbuddy.core.network
 
 import com.justb81.watchbuddy.core.tmdb.TmdbApiService
+import com.justb81.watchbuddy.core.trakt.NoOpTokenProxyService
 import com.justb81.watchbuddy.core.trakt.TokenProxyService
 import com.justb81.watchbuddy.core.trakt.TraktApiService
 import dagger.Module
@@ -85,35 +86,29 @@ object NetworkModule {
         retrofit.create(TmdbApiService::class.java)
 
     /**
-     * Retrofit instance for the token proxy backend.
+     * TokenProxyService for the WatchBuddy managed token proxy backend.
      *
-     * Only provided when [backendUrl] is non-blank — i.e. when
-     * BuildConfig.TOKEN_BACKEND_URL is set in app-phone/build.gradle.kts.
-     * Otherwise [TokenProxyService] is unavailable in the Hilt graph and
-     * the onboarding flow hides the Trakt sign-in option.
+     * Returns a real Retrofit-backed implementation when [backendUrl] is non-blank
+     * (i.e. TOKEN_BACKEND_URL is set in app-phone/build.gradle.kts). Returns a
+     * [NoOpTokenProxyService] when the URL is blank — callers must check the
+     * `@Named("managedBackendAvailable")` flag before invoking proxy methods.
      *
      * Note: The OkHttpClient is intentionally used without Trakt-specific
      * headers — the proxy does not require a 'trakt-api-version' header.
      */
     @Provides
     @Singleton
-    @Named("tokenProxy")
-    fun provideTokenProxyRetrofit(
+    fun provideTokenProxyService(
         backendUrl: @JvmSuppressWildcards String,
         client: OkHttpClient
-    ): Retrofit? {
-        if (backendUrl.isBlank()) return null
+    ): TokenProxyService {
+        if (backendUrl.isBlank()) return NoOpTokenProxyService()
         val url = if (backendUrl.endsWith("/")) backendUrl else "$backendUrl/"
         return Retrofit.Builder()
             .baseUrl(url)
             .client(client)
             .addConverterFactory(WatchBuddyJson.asConverterFactory("application/json".toMediaType()))
             .build()
+            .create(TokenProxyService::class.java)
     }
-
-    @Provides
-    @Singleton
-    fun provideTokenProxyService(
-        @Named("tokenProxy") retrofit: Retrofit?
-    ): TokenProxyService? = retrofit?.create(TokenProxyService::class.java)
 }

@@ -68,7 +68,8 @@ class OnboardingViewModelTest {
 
     private fun createViewModel(
         buildClientId: String = BUILD_CLIENT_ID,
-        proxy: TokenProxyService? = tokenProxy,
+        proxy: TokenProxyService = tokenProxy,
+        managedBackendAvailable: Boolean = true,
     ): OnboardingViewModel = OnboardingViewModel(
         application = application,
         traktApi = traktApi,
@@ -76,7 +77,8 @@ class OnboardingViewModelTest {
         buildConfigClientId = buildClientId,
         tokenRepository = tokenRepository,
         settingsRepository = settingsRepository,
-        tokenProxyServiceFactory = tokenProxyServiceFactory
+        tokenProxyServiceFactory = tokenProxyServiceFactory,
+        managedBackendAvailable = managedBackendAvailable
     )
 
     @Nested
@@ -100,11 +102,11 @@ class OnboardingViewModelTest {
         }
 
         @Test
-        fun `shows NotConfigured with MANAGED_MISSING_BACKEND when token proxy is null`() = runTest {
+        fun `shows NotConfigured with MANAGED_MISSING_BACKEND when managed backend is unavailable`() = runTest {
             every { settingsRepository.settings } returns flowOf(
                 AppSettings(authMode = AuthMode.MANAGED)
             )
-            val vm = createViewModel(proxy = null)
+            val vm = createViewModel(managedBackendAvailable = false)
             vm.requestDeviceCode()
             advanceUntilIdle()
             val state = vm.state.value
