@@ -87,11 +87,19 @@ class CompanionBleAdvertiser @Inject constructor(
             .onFailure { DiagnosticLog.warn(TAG, "payload encode failed", it) }
             .getOrNull() ?: return false
 
+        // Pick the advertise mode based on whether a TV is already polling us
+        // steadily over HTTP. BALANCED (~250 ms interval) is only useful while
+        // the TV doesn't yet have a Wi-Fi route to us; once a TV is polling
+        // `/capability` reliably, LOW_POWER (~1 s interval) carries the same
+        // fallback signal at a fraction of the radio cost (#345 Opt B).
+        val steady = stateManager.pairedSteadyState.value
+        val advertiseMode = if (steady) {
+            AdvertiseSettings.ADVERTISE_MODE_LOW_POWER
+        } else {
+            AdvertiseSettings.ADVERTISE_MODE_BALANCED
+        }
         val settings = AdvertiseSettings.Builder()
-            // Balanced keeps the advert interval around ~250 ms — fast enough
-            // to be discovered within a couple of seconds, light enough to run
-            // continuously without visibly draining battery.
-            .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_BALANCED)
+            .setAdvertiseMode(advertiseMode)
             .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_MEDIUM)
             // We only need the advertisement itself; we never accept inbound
             // BLE connections. Making the advert non-connectable also keeps it

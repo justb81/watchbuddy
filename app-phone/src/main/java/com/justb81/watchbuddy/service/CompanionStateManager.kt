@@ -15,6 +15,26 @@ import javax.inject.Singleton
 @Singleton
 class CompanionStateManager @Inject constructor() {
 
+    companion object {
+        /** Consecutive in-cadence `/capability` polls needed to enter steady state. */
+        internal const val STEADY_STATE_STREAK = 3
+
+        /**
+         * Maximum tolerated gap between two `/capability` polls before we
+         * count a heartbeat miss. TV side polls every 60 s; 90 s gives one
+         * late poll of slack before the streak resets.
+         */
+        internal const val MISS_THRESHOLD_MS = 90_000L
+
+        /**
+         * Minimum quiet window (no misses) required before the streak counter
+         * can flip us back into `pairedSteadyState`. Prevents a TV that
+         * briefly drops Wi-Fi every ~90 s from making the BLE advertiser
+         * oscillate between BALANCED and LOW_POWER modes.
+         */
+        internal const val HYSTERESIS_MS = 2 * 60_000L
+    }
+
     enum class NsdRegistrationState { IDLE, REGISTERING, REGISTERED, UNREGISTERING, FAILED }
 
     enum class BleAdvertiseState { IDLE, ADVERTISING, FAILED }
@@ -59,8 +79,52 @@ class CompanionStateManager @Inject constructor() {
     /** Latest resolved Wi-Fi IPv4 address seen by [CompanionService], or null off Wi-Fi. */
     val wifiIpv4: StateFlow<String?> = _wifiIpv4.asStateFlow()
 
+    private val _pairedSteadyState = MutableStateFlow(false)
+    /**
+     * True once the phone has received [STEADY_STATE_STREAK] consecutive
+     * `/capability` polls from TVs within the expected cadence and no miss
+     * has invalidated the streak. Consumers (notably [CompanionBleAdvertiser])
+     * can demote to a lower-power BLE advertise mode while this is true,
+     * because a TV that's polling us over Wi-Fi doesn't need a fast-cadence
+     * BLE beacon to rediscover us (#345 Opt B).
+     *
+     * Reverts to false on any heartbeat miss (poll gap > [MISS_THRESHOLD_MS]).
+     * After a miss, the [HYSTERESIS_MS] window guards re-entry so a flaky TV
+     * that drops Wi-Fi every 90s doesn't make us oscillate.
+     */
+    val pairedSteadyState: StateFlow<Boolean> = _pairedSteadyState.asStateFlow()
+
+    @Volatile private var consecutiveChecks: Int = 0
+    @Volatile private var lastMissAtMs: Long = 0L
+
     fun onCapabilityChecked() {
-        _lastCapabilityCheck.value = System.currentTimeMillis()
+        onCapabilityCheckedAt(System.currentTimeMillis())
+    }
+
+    /** Test-only overload — production always goes through [onCapabilityChecked]. */
+    internal fun onCapabilityCheckedAt(now: Long) {
+        val previous = _lastCapabilityCheck.value
+        _lastCapabilityCheck.value = now
+
+        // First poll of the session — can't tell cadence yet, just start counting.
+        if (previous == 0L) {
+            consecutiveChecks = 1
+            return
+        }
+        val gap = now - previous
+        if (gap > MISS_THRESHOLD_MS) {
+            // Heartbeat miss: reset streak, remember when it happened so
+            // hysteresis can guard re-entry to steady-state.
+            consecutiveChecks = 1
+            lastMissAtMs = now
+            if (_pairedSteadyState.value) _pairedSteadyState.value = false
+            return
+        }
+        consecutiveChecks += 1
+        val hysteresisOk = now - lastMissAtMs >= HYSTERESIS_MS
+        if (consecutiveChecks >= STEADY_STATE_STREAK && hysteresisOk && !_pairedSteadyState.value) {
+            _pairedSteadyState.value = true
+        }
     }
 
     fun onScrobbleEvent(event: ScrobbleDisplayEvent) {
@@ -79,6 +143,10 @@ class CompanionStateManager @Inject constructor() {
             _bleAdvertiseState.value = BleAdvertiseState.IDLE
             _bleAdvertiseErrorCode.value = null
             _wifiIpv4.value = null
+            _pairedSteadyState.value = false
+            consecutiveChecks = 0
+            lastMissAtMs = 0L
+            _lastCapabilityCheck.value = 0L
         }
     }
 
