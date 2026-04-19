@@ -103,7 +103,14 @@ class CompanionBleAdvertiser @Inject constructor(
         val data = AdvertiseData.Builder()
             .setIncludeDeviceName(false) // would blow the 31-byte envelope
             .setIncludeTxPowerLevel(false)
-            .addServiceUuid(ParcelUuid(BleDiscoveryContract.SERVICE_UUID))
+            // Intentionally no addServiceUuid(): that AD field plus the
+            // addServiceData() AD field below would both carry the same
+            // 16-byte UUID, and the legacy envelope overflows at 48 bytes.
+            // Strict BLE stacks (Android 16 / Nothing) then reject the
+            // whole advertisement with DATA_TOO_LARGE and the TV can never
+            // discover us via BLE. The UUID is still surfaced inside
+            // addServiceData(), which scanners match via setServiceData()
+            // filters — see PhoneBleScanner (#345).
             .addServiceData(ParcelUuid(BleDiscoveryContract.SERVICE_UUID), payloadBytes)
             .build()
 

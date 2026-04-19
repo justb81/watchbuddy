@@ -23,10 +23,19 @@ import java.util.UUID
  *   | 7      | 1     | modelQuality (0..255 clamped; semantic range 0..150) |
  *   | 8      | 1     | llmBackend ordinal (0..255)                        |
  *
- * Total: 9 bytes payload + 16 byte UUID = 27 bytes, well inside the 31-byte
- * legacy advertising envelope. `version` (app versionName) is intentionally
- * omitted from the BLE payload; the TV fetches it via `/capability` once it
- * has a routable `(ip, port)` pair.
+ * On the wire we emit **only** the Service Data 128-bit AD field — no
+ * separate Complete-List-of-128-bit-UUIDs AD. Carrying the UUID in both
+ * fields would push the envelope to 48 bytes (3 flags + 18 UUID list + 27
+ * service data), which the legacy 31-byte advertising envelope rejects on
+ * strict stacks (Android 16 / Nothing returns `DATA_TOO_LARGE`). With only
+ * the service-data AD, total emission is 3 (flags) + 27 (1 len + 1 type +
+ * 16 UUID + 9 payload) = **30 bytes**, inside the envelope on every tested
+ * chipset (#345). Scanners must therefore filter on `setServiceData`, not
+ * `setServiceUuid`.
+ *
+ * `version` (app versionName) is intentionally omitted from the BLE
+ * payload; the TV fetches it via `/capability` once it has a routable
+ * `(ip, port)` pair.
  *
  * Schema evolution: additive changes must bump [PAYLOAD_SCHEMA_VERSION];
  * decoders reject unknown versions to avoid misinterpreting future fields.

@@ -148,7 +148,9 @@ class PhoneDiscoveryManager @Inject constructor(
         }
 
         override fun onServiceFound(service: NsdServiceInfo) {
-            Log.i(TAG, "service found: ${service.serviceName} type=${service.serviceType}")
+            // "found" and "resolved" carry the same semantic signal for our UX —
+            // keep the resolve line as the single visible state change (#281).
+            Log.v(TAG, "service found: ${service.serviceName}")
             val mgr = nsdManager ?: return
             @Suppress("DEPRECATION")
             mgr.resolveService(service, object : NsdManager.ResolveListener {
@@ -162,13 +164,10 @@ class PhoneDiscoveryManager @Inject constructor(
                 override fun onServiceResolved(serviceInfo: NsdServiceInfo) {
                     @Suppress("DEPRECATION")
                     val host = serviceInfo.host?.hostAddress
-                    val attrs = serviceInfo.attributes
-                        ?.mapValues { (_, v) -> v?.toString(Charsets.UTF_8) ?: "<null>" }
-                        ?: emptyMap()
                     Log.i(
                         TAG,
                         "service resolved: name=${serviceInfo.serviceName} " +
-                            "host=$host port=${serviceInfo.port} TXT=$attrs"
+                            "host=$host port=${serviceInfo.port}"
                     )
                     fetchCapabilityAndAdd(serviceInfo)
                 }
@@ -187,14 +186,7 @@ class PhoneDiscoveryManager @Inject constructor(
         isDiscovering = true
         _discoveryActive.value = true
         acquireMulticastLock()
-        val mgr = nsdManager
-        if (mgr != null) {
-            runCatching {
-                mgr.discoverServices(SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, discoveryListener)
-            }.onFailure { Log.e(TAG, "discoverServices failed", it) }
-        } else {
-            Log.w(TAG, "NSD unavailable on this device; relying on BLE channel only")
-        }
+        performDiscovery()
         startBleScan()
         startHeartbeat()
         registerNetworkCallback()
@@ -234,9 +226,24 @@ class PhoneDiscoveryManager @Inject constructor(
         val mgr = nsdManager ?: return
         runCatching { mgr.stopServiceDiscovery(discoveryListener) }
         delay(RESTART_BACKOFF_MS)
+        performDiscovery()
+    }
+
+    /**
+     * Shared entry point for [startDiscovery] and [restartDiscoveryInternal].
+     * Wrapped in `runCatching` because NSD can reject the call synchronously
+     * (OEM bugs, already-active stale listener) and we must not crash the
+     * singleton's initializer or the restart loop.
+     */
+    private fun performDiscovery() {
+        val mgr = nsdManager
+        if (mgr == null) {
+            Log.w(TAG, "NSD unavailable on this device; relying on BLE channel only")
+            return
+        }
         runCatching {
             mgr.discoverServices(SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, discoveryListener)
-        }.onFailure { Log.e(TAG, "re-discoverServices failed", it) }
+        }.onFailure { Log.e(TAG, "discoverServices failed", it) }
     }
 
     // Mirrors the phone's CompanionService network callback: if the TV's Wi-Fi
@@ -357,7 +364,7 @@ class PhoneDiscoveryManager @Inject constructor(
         }
 
         val updated = phones.mapNotNull { phone ->
-            val url = "${phone.baseUrl}${CAPABILITY_PATH}".replace("//capability", "/capability")
+            val url = capabilityUrl(phone.baseUrl)
             try {
                 val response = httpClient.newCall(Request.Builder().url(url).build()).execute()
                 val capability = response.body?.string()?.let {
@@ -398,7 +405,7 @@ class PhoneDiscoveryManager @Inject constructor(
     private fun fetchCapabilityAndAdd(serviceInfo: NsdServiceInfo) {
         @Suppress("DEPRECATION")
         val hostAddress = serviceInfo.host?.hostAddress ?: return
-        val baseUrl = "http://${hostAddress}:${serviceInfo.port}/"
+        val baseUrl = phoneBaseUrl(hostAddress, serviceInfo.port)
         val txtRecord = parseTxtRecord(serviceInfo)
         fetchCapabilityAndAdd(serviceInfo, txtRecord, baseUrl)
     }
@@ -415,7 +422,7 @@ class PhoneDiscoveryManager @Inject constructor(
         txtRecord: PhoneTxtRecord?,
         baseUrl: String,
     ) {
-        val url = "${baseUrl.trimEnd('/')}${CAPABILITY_PATH}"
+        val url = capabilityUrl(baseUrl)
         try {
             val response = httpClient.newCall(Request.Builder().url(url).build()).execute()
             val capability = response.body?.string()?.let {
@@ -450,17 +457,14 @@ class PhoneDiscoveryManager @Inject constructor(
     internal fun parseTxtRecord(serviceInfo: NsdServiceInfo): PhoneTxtRecord? {
         return try {
             val attrs = serviceInfo.attributes ?: emptyMap()
-            val decoded = attrs.mapValues { (_, v) ->
-                v?.toString(Charsets.UTF_8) ?: "<null>"
-            }
-            Log.d(TAG, "parseTxtRecord: attrs=$decoded")
+            val decoded = attrs.mapValues { (_, v) -> v.utf8() ?: "<null>" }
 
-            val version = attrs["version"]?.toString(Charsets.UTF_8)
+            val version = attrs["version"].utf8()
             if (version == null) {
                 Log.w(TAG, "parseTxtRecord: missing 'version' attribute; attrs=$decoded")
                 return null
             }
-            val modelQualityRaw = attrs["modelQuality"]?.toString(Charsets.UTF_8)
+            val modelQualityRaw = attrs["modelQuality"].utf8()
             if (modelQualityRaw == null) {
                 Log.w(TAG, "parseTxtRecord: missing 'modelQuality' attribute; attrs=$decoded")
                 return null
@@ -473,7 +477,7 @@ class PhoneDiscoveryManager @Inject constructor(
                 )
                 return null
             }
-            val llmBackendStr = attrs["llmBackend"]?.toString(Charsets.UTF_8)
+            val llmBackendStr = attrs["llmBackend"].utf8()
             if (llmBackendStr == null) {
                 Log.w(TAG, "parseTxtRecord: missing 'llmBackend' attribute; attrs=$decoded")
                 return null
@@ -493,6 +497,13 @@ class PhoneDiscoveryManager @Inject constructor(
         }
     }
 
+    /**
+     * Decodes a single NSD TXT attribute value (a raw `ByteArray?`) as UTF-8.
+     * Pulled out as a named extension because it's called five times inside
+     * [parseTxtRecord] and the original nested call sites were hard to read.
+     */
+    private fun ByteArray?.utf8(): String? = this?.toString(Charsets.UTF_8)
+
     @VisibleForTesting
     internal fun setDiscoveredPhonesForTest(phones: List<DiscoveredPhone>) {
         _discoveredPhones.value = phones
@@ -508,6 +519,20 @@ class PhoneDiscoveryManager @Inject constructor(
             .filter { it.baseUrl != phone.baseUrl } + phone)
             .sortedByDescending { it.score }
     }
+
+    /**
+     * Canonical phone base-URL construction. Used wherever an HTTP endpoint is
+     * built — guarantees a single trailing slash so concatenating
+     * [CAPABILITY_PATH] can't yield `//capability`.
+     */
+    private fun phoneBaseUrl(host: String, port: Int): String = "http://$host:$port/"
+
+    /**
+     * Builds the `/capability` URL from a base URL emitted by [phoneBaseUrl].
+     * Tolerates both `.../` and `...` shapes.
+     */
+    private fun capabilityUrl(baseUrl: String): String =
+        "${baseUrl.trimEnd('/')}$CAPABILITY_PATH"
 
     /**
      * Entry point for advertisements surfaced by [PhoneBleScanner]. Dedups
@@ -526,7 +551,7 @@ class PhoneDiscoveryManager @Inject constructor(
         llmBackendOrdinal: Int,
     ) {
         val hostAddress = ipv4.hostAddress ?: return
-        val baseUrl = "http://$hostAddress:$port/"
+        val baseUrl = phoneBaseUrl(hostAddress, port)
         if (_discoveredPhones.value.any { it.baseUrl == baseUrl }) {
             // Already known via NSD or a prior BLE tick — heartbeat handles
             // aliveness from here.
