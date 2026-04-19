@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.22.0](https://github.com/justb81/watchbuddy/compare/v0.21.0...v0.22.0) (2026-04-19)
+
+
+### Features
+
+* **tv:** wire up MediaSession scrobbling end-to-end ([#376](https://github.com/justb81/watchbuddy/issues/376)) ([7110c05](https://github.com/justb81/watchbuddy/commit/7110c058bb99da55071119ae7c558287bd0a9960))
+
 ## [0.21.0](https://github.com/justb81/watchbuddy/compare/v0.20.1...v0.21.0) (2026-04-19)
 
 
