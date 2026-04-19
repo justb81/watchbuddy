@@ -8,7 +8,11 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -38,17 +42,14 @@ class TvSettingsViewModel @Inject constructor(
 
     init {
         launchSafe {
-            combine(
-                repository.isPhoneDiscoveryEnabled,
-                repository.isAutostartEnabled,
-            ) { discovery, autostart ->
-                TvSettingsUiState(
-                    isPhoneDiscoveryEnabled = discovery,
-                    isAutostartEnabled = autostart,
-                )
-            }
-            .catch { e -> DiagnosticLog.error(TAG, "settings prefs observation failed", e) }
-            .collect { _uiState.value = it }
+            repository.isPhoneDiscoveryEnabled
+                .catch { e -> DiagnosticLog.error(TAG, "settings prefs observation failed", e) }
+                .collect { enabled -> _uiState.update { it.copy(isPhoneDiscoveryEnabled = enabled) } }
+        }
+        launchSafe {
+            repository.isAutostartEnabled
+                .catch { e -> DiagnosticLog.error(TAG, "settings prefs observation failed", e) }
+                .collect { enabled -> _uiState.update { it.copy(isAutostartEnabled = enabled) } }
         }
     }
 

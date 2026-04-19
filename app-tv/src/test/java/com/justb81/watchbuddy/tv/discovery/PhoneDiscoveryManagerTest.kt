@@ -368,12 +368,9 @@ class PhoneDiscoveryManagerTest {
         @Test
         fun `setEnabled(true) is idempotent when already discovering`() {
             manager.startDiscovery()
-            clearMocks(nsdManager, answers = false)
-            every { nsdManager.discoverServices(any(), any(), any()) } just runs
-
             manager.setEnabled(true)
-
-            verify(exactly = 0) { nsdManager.discoverServices(any(), any(), any()) }
+            // discoverServices called exactly once (from startDiscovery), not again from setEnabled
+            verify(exactly = 1) { nsdManager.discoverServices(any(), any(), any()) }
         }
 
         @Test
