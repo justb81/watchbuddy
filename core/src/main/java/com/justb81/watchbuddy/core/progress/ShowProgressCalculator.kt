@@ -116,6 +116,10 @@ object ShowProgressCalculator {
         }
     }
 
+    /** Timestamp of the most recently watched non-special episode, or null if none. */
+    fun latestWatchedInstant(entry: TraktWatchedEntry): Instant? =
+        latestWatched(entry)?.instant
+
     private data class WatchedRef(val season: Int, val episode: Int, val instant: Instant) {
         val label: String get() = formatLabel(season, episode)
     }

@@ -8,6 +8,7 @@ import com.justb81.watchbuddy.core.model.TmdbShow
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
 import com.justb81.watchbuddy.core.model.TraktWatchedEpisode
 import com.justb81.watchbuddy.core.model.TraktWatchedSeason
+import com.justb81.watchbuddy.core.progress.ShowProgressCalculator
 import com.justb81.watchbuddy.core.tmdb.TmdbApiService
 import com.justb81.watchbuddy.core.trakt.TraktApiService
 import com.justb81.watchbuddy.phone.auth.TokenRefreshManager
@@ -51,6 +52,10 @@ class ShowRepository @Inject constructor(
 
     private var lastFetch: Long = 0L
 
+    private val showComparator = compareByDescending<EnrichedShowEntry> {
+        ShowProgressCalculator.latestWatchedInstant(it.entry)
+    }.thenBy { it.entry.show.title.lowercase() }
+
     suspend fun getShows(): List<EnrichedShowEntry> {
         val now = System.currentTimeMillis()
         val cached = _shows.value
@@ -59,7 +64,7 @@ class ShowRepository @Inject constructor(
                 ?: return cached
             try {
                 val trakt = traktApi.getWatchedShows("Bearer $token")
-                _shows.value = enrich(trakt)
+                _shows.value = enrich(trakt).sortedWith(showComparator)
                 lastFetch = now
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to fetch shows from Trakt; serving ${cached.size} cached entries", e)
@@ -91,7 +96,9 @@ class ShowRepository @Inject constructor(
         }
         if (updatedSeasons === existing.entry.seasons) return
         val updatedEntry = existing.copy(entry = existing.entry.copy(seasons = updatedSeasons))
-        _shows.value = current.toMutableList().also { it[index] = updatedEntry }
+        _shows.value = current.toMutableList()
+            .also { it[index] = updatedEntry }
+            .sortedWith(showComparator)
     }
 
     private fun addEpisode(

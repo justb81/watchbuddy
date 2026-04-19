@@ -4,6 +4,8 @@ import com.justb81.watchbuddy.core.model.TmdbShow
 import com.justb81.watchbuddy.core.model.TraktIds
 import com.justb81.watchbuddy.core.model.TraktShow
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
+import com.justb81.watchbuddy.core.model.TraktWatchedEpisode
+import com.justb81.watchbuddy.core.model.TraktWatchedSeason
 import com.justb81.watchbuddy.core.tmdb.TmdbApiService
 import com.justb81.watchbuddy.core.trakt.TraktApiService
 import com.justb81.watchbuddy.phone.auth.TokenRefreshManager
@@ -132,6 +134,41 @@ class ShowRepositoryTest {
     }
 
     @Test
+    fun `getShows emits shows sorted by last-watched DESC with unwatched at bottom`() = runTest {
+        val entries = listOf(
+            watchedEntry(trakt = 1, title = "Old", lastWatchedAt = "2026-04-10T10:00:00Z"),
+            watchedEntry(trakt = 2, title = "Newest", lastWatchedAt = "2026-04-15T10:00:00Z"),
+            watchedEntry(trakt = 3, title = "Never", lastWatchedAt = null)
+        )
+        coEvery { tokenRefreshManager.getValidAccessToken() } returns "test-token"
+        coEvery { traktApi.getWatchedShows(any()) } returns entries
+
+        val result = repository.getShows()
+
+        assertEquals(listOf(2, 1, 3), result.map { it.entry.show.ids.trakt })
+        assertEquals(listOf(2, 1, 3), repository.shows.value.map { it.entry.show.ids.trakt })
+    }
+
+    @Test
+    fun `updateLocalWatched re-sorts so a toggled older show moves to the top`() = runTest {
+        val entries = listOf(
+            watchedEntry(trakt = 1, title = "Old", lastWatchedAt = "2026-04-10T10:00:00Z"),
+            watchedEntry(trakt = 2, title = "Newest", lastWatchedAt = "2026-04-15T10:00:00Z")
+        )
+        coEvery { tokenRefreshManager.getValidAccessToken() } returns "test-token"
+        coEvery { traktApi.getWatchedShows(any()) } returns entries
+        repository.getShows()
+
+        assertEquals(listOf(2, 1), repository.shows.value.map { it.entry.show.ids.trakt })
+
+        // Marking a new episode on the older show "Old" should push it to the top:
+        // the freshly generated Instant.now() is newer than the other show's timestamp.
+        repository.updateLocalWatched(traktShowId = 1, season = 2, episode = 1, watched = true)
+
+        assertEquals(listOf(1, 2), repository.shows.value.map { it.entry.show.ids.trakt })
+    }
+
+    @Test
     fun `getShows tolerates per-show TMDB failures`() = runTest {
         every { settingsRepository.getTmdbApiKey() } returns flowOf("api-key")
         coEvery { tokenRefreshManager.getValidAccessToken() } returns "test-token"
@@ -146,4 +183,18 @@ class ShowRepositoryTest {
         assertNull(result[1].posterPath)
         assertNull(result[1].tmdb)
     }
+
+    private fun watchedEntry(
+        trakt: Int,
+        title: String,
+        lastWatchedAt: String?
+    ): TraktWatchedEntry = TraktWatchedEntry(
+        show = TraktShow(title, 2024, TraktIds(trakt = trakt, tmdb = trakt * 100)),
+        seasons = if (lastWatchedAt == null) emptyList() else listOf(
+            TraktWatchedSeason(
+                number = 1,
+                episodes = listOf(TraktWatchedEpisode(number = 1, last_watched_at = lastWatchedAt))
+            )
+        )
+    )
 }

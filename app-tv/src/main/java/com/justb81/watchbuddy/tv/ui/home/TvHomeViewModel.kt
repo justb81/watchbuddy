@@ -128,7 +128,11 @@ class TvHomeViewModel @Inject constructor(
                 val hasMore = newShows.size >= PAGE_SIZE
                 loadedOffset = currentOffset + newShows.size
 
-                val allShows = if (append) _uiState.value.shows + newShows else newShows
+                val allShows = if (append) {
+                    (_uiState.value.shows + newShows).sortedByLastWatched()
+                } else {
+                    newShows.sortedByLastWatched()
+                }
 
                 fallbackCache = allShows
                 fallbackCacheTimestamp = System.currentTimeMillis()
@@ -214,3 +218,15 @@ class TvHomeViewModel @Inject constructor(
         phoneDiscovery.stopDiscovery()
     }
 }
+
+/**
+ * Defensive DESC-by-last-watched sort applied on top of the phone's already-sorted
+ * pagination, so older phone builds (or a future phone-side regression) still yield
+ * a consistent order on the TV grid. Tie-break by title to match [ShowRepository].
+ */
+internal fun List<EnrichedShowEntry>.sortedByLastWatched(): List<EnrichedShowEntry> =
+    sortedWith(
+        compareByDescending<EnrichedShowEntry> {
+            ShowProgressCalculator.latestWatchedInstant(it.entry)
+        }.thenBy { it.entry.show.title.lowercase() }
+    )

@@ -119,7 +119,7 @@ class ShowDetailViewModel @Inject constructor(
             .map { season ->
                 val watchedEpisodes = watchedIndex[season.number].orEmpty()
                 val episodes = season.episodes
-                    .sortedBy { it.number }
+                    .sortedByDescending { it.number }
                     .map { ep ->
                         EpisodeUi(
                             season = season.number,
