@@ -1,5 +1,6 @@
 package com.justb81.watchbuddy.tv.ui.settings
 
+import android.app.Application
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.tv.MainDispatcherRule
 import com.justb81.watchbuddy.tv.data.StreamingPreferencesRepository
@@ -33,6 +34,7 @@ class TvSettingsViewModelTest {
         val mainDispatcherRule = MainDispatcherRule()
     }
 
+    private val application: Application = mockk(relaxed = true)
     private val repository: StreamingPreferencesRepository = mockk()
 
     @BeforeEach
@@ -54,7 +56,7 @@ class TvSettingsViewModelTest {
         every { repository.isPhoneDiscoveryEnabled } returns flowOf(false)
         every { repository.isAutostartEnabled } returns flowOf(true)
 
-        val vm = TvSettingsViewModel(repository)
+        val vm = TvSettingsViewModel(application, repository)
         advanceUntilIdle()
 
         assertFalse(vm.uiState.value.isPhoneDiscoveryEnabled)
@@ -63,7 +65,7 @@ class TvSettingsViewModelTest {
 
     @Test
     fun `setPhoneDiscoveryEnabled writes through and optimistically updates state`() = runTest {
-        val vm = TvSettingsViewModel(repository)
+        val vm = TvSettingsViewModel(application, repository)
         advanceUntilIdle()
 
         vm.setPhoneDiscoveryEnabled(false)
@@ -75,7 +77,7 @@ class TvSettingsViewModelTest {
 
     @Test
     fun `setAutostartEnabled writes through and optimistically updates state`() = runTest {
-        val vm = TvSettingsViewModel(repository)
+        val vm = TvSettingsViewModel(application, repository)
         advanceUntilIdle()
 
         vm.setAutostartEnabled(true)
@@ -90,7 +92,7 @@ class TvSettingsViewModelTest {
         val discoveryFlow = MutableStateFlow(true)
         every { repository.isPhoneDiscoveryEnabled } returns discoveryFlow
 
-        val vm = TvSettingsViewModel(repository)
+        val vm = TvSettingsViewModel(application, repository)
         advanceUntilIdle()
         assertTrue(vm.uiState.value.isPhoneDiscoveryEnabled)
 
@@ -103,7 +105,7 @@ class TvSettingsViewModelTest {
     fun `observation failure is logged via DiagnosticLog`() = runTest {
         every { repository.isPhoneDiscoveryEnabled } returns flow { throw RuntimeException("boom") }
 
-        TvSettingsViewModel(repository)
+        TvSettingsViewModel(application, repository)
         advanceUntilIdle()
 
         val errors = DiagnosticLog.snapshot().filter { it.level == DiagnosticLog.Level.ERROR }
@@ -114,12 +116,22 @@ class TvSettingsViewModelTest {
     fun `write failure is logged via DiagnosticLog`() = runTest {
         coEvery { repository.setPhoneDiscoveryEnabled(any()) } throws RuntimeException("write boom")
 
-        val vm = TvSettingsViewModel(repository)
+        val vm = TvSettingsViewModel(application, repository)
         advanceUntilIdle()
         vm.setPhoneDiscoveryEnabled(false)
         advanceUntilIdle()
 
         val errors = DiagnosticLog.snapshot().filter { it.level == DiagnosticLog.Level.ERROR }
         assertTrue(errors.any { it.message.contains("tv settings write failed") })
+    }
+
+    @Test
+    fun `refreshNotificationAccess is resilient to stubbed Android JAR`() = runTest {
+        val vm = TvSettingsViewModel(application, repository)
+        advanceUntilIdle()
+
+        vm.refreshNotificationAccess()
+
+        assertFalse(vm.uiState.value.isNotificationAccessGranted)
     }
 }

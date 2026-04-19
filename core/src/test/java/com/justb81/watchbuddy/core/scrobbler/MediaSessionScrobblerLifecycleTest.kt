@@ -66,6 +66,16 @@ class MediaSessionScrobblerLifecycleTest {
             scrobbler.startListening(component)
             scrobbler.stopListening()
         }
+
+        @Test
+        fun `isListening reflects start and stop transitions`() {
+            val component = mockk<ComponentName>()
+            assertFalse(scrobbler.isListening.value)
+            scrobbler.startListening(component)
+            assertTrue(scrobbler.isListening.value)
+            scrobbler.stopListening()
+            assertFalse(scrobbler.isListening.value)
+        }
     }
 
     // ── autoScrobble() ───────────────────────────────────────────────────────

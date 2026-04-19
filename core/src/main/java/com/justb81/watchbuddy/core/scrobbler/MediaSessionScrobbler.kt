@@ -13,7 +13,10 @@ import com.justb81.watchbuddy.core.tmdb.TmdbApiService
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -41,8 +44,28 @@ class MediaSessionScrobbler @Inject constructor(
         internal const val OVERLAY_THRESHOLD = 0.70f
     }
 
+    /** Diagnostic snapshot of a candidate the scrobbler recently saw. */
+    data class LastCandidate(
+        val candidate: ScrobbleCandidate,
+        val observedAtMs: Long,
+        val autoScrobbled: Boolean,
+    )
+
     private val _pendingConfirmation = MutableSharedFlow<ScrobbleCandidate>()
     val pendingConfirmation: SharedFlow<ScrobbleCandidate> = _pendingConfirmation
+
+    private val _isListening = MutableStateFlow(false)
+    /** True while [startListening] is active; flips back to false on [stopListening]. */
+    val isListening: StateFlow<Boolean> = _isListening.asStateFlow()
+
+    private val _lastCandidate = MutableStateFlow<LastCandidate?>(null)
+    /**
+     * Most recent candidate observed — regardless of whether it was auto-scrobbled
+     * or emitted to [pendingConfirmation]. Populated only for candidates that
+     * clear [OVERLAY_THRESHOLD]. Intended for diagnostics/UI surfacing so the
+     * user can see "the scrobbler *is* seeing things" even when no match auto-fires.
+     */
+    val lastCandidate: StateFlow<LastCandidate?> = _lastCandidate.asStateFlow()
 
     private var scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var pollingJob: Job? = null
@@ -51,6 +74,7 @@ class MediaSessionScrobbler @Inject constructor(
 
     fun startListening(notificationListenerComponent: ComponentName) {
         scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+        _isListening.value = true
         val sessionManager = context.getSystemService(Context.MEDIA_SESSION_SERVICE)
                 as MediaSessionManager
 
@@ -84,6 +108,7 @@ class MediaSessionScrobbler @Inject constructor(
     fun stopListening() {
         pollingJob?.cancel()
         scope.cancel()
+        _isListening.value = false
     }
 
     private suspend fun processPlayingMedia(packageName: String, rawTitle: String, progress: Float?) {
@@ -91,8 +116,10 @@ class MediaSessionScrobbler @Inject constructor(
         val candidate = matchTitle(packageName, rawTitle) ?: return
         if (candidate.confidence >= AUTO_SCROBBLE_THRESHOLD) {
             autoScrobble(candidate, progress)
+            _lastCandidate.value = LastCandidate(candidate, System.currentTimeMillis(), autoScrobbled = true)
         } else if (candidate.confidence >= OVERLAY_THRESHOLD) {
             _pendingConfirmation.emit(candidate)
+            _lastCandidate.value = LastCandidate(candidate, System.currentTimeMillis(), autoScrobbled = false)
         }
     }
 

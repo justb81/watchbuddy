@@ -70,6 +70,10 @@
     <string name="tv_settings_autostart_subtitle">Start discovery automatically when the TV turns on</string>
     <string name="tv_settings_streaming_services">Streaming services</string>
     <string name="tv_settings_diagnostics">Diagnostics</string>
+    <string name="tv_settings_notification_access_title">Notification access</string>
+    <string name="tv_settings_notification_access_subtitle">Required for scrobbling — lets WatchBuddy see what\'s playing on the TV</string>
+    <string name="tv_settings_status_granted">Granted</string>
+    <string name="tv_settings_status_not_granted">Not granted</string>
     <string name="tv_discovery_notification_channel_name">Phone discovery</string>
     <string name="tv_discovery_notification_text">Looking for WatchBuddy phones on the network</string>
 
@@ -99,8 +103,12 @@
     <string name="tv_diagnostics_section_connectivity">Connectivity</string>
     <string name="tv_diagnostics_section_nsd">Discovery (NSD)</string>
     <string name="tv_diagnostics_section_ble">BLE scanner</string>
+    <string name="tv_diagnostics_section_scrobble">Scrobble</string>
     <string name="tv_diagnostics_section_phones">Discovered phones</string>
     <string name="tv_diagnostics_section_build">Build info</string>
+    <string name="tv_diagnostics_row_notification_access">Notification access</string>
+    <string name="tv_diagnostics_row_scrobbler_listening">Scrobbler listening</string>
+    <string name="tv_diagnostics_row_last_candidate">Last candidate</string>
     <string name="tv_diagnostics_row_multicast_lock">Multicast lock</string>
     <string name="tv_diagnostics_row_discovery_active">Discovery active</string>
     <string name="tv_diagnostics_row_last_heartbeat">Last heartbeat</string>
