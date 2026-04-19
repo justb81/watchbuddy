@@ -133,10 +133,12 @@ class ShowProgressCalculatorTest {
         }
 
         @Test
-        fun `picks latest timestamp not highest episode number`() {
+        fun `picks highest episode number not latest timestamp`() {
+            // S01E03 was re-watched later (newer timestamp) but S01E05 is the furthest
+            // episode in the series — it must be reported as last-watched.
             val e = entry(
                 Triple(1, 5, "2024-01-05T10:00:00Z"),
-                Triple(1, 3, "2024-02-01T10:00:00Z") // re-watch, later timestamp
+                Triple(1, 3, "2024-02-01T10:00:00Z") // back-filled, newer timestamp
             )
             val h = hint(
                 lastAired = TmdbEpisodeSummary(1, 5, air_date = "2024-01-05"),
@@ -144,7 +146,41 @@ class ShowProgressCalculatorTest {
             )
             val result = ShowProgressCalculator.compute(e, h, utc)
             assertTrue(result is ShowProgress.InProgress)
-            assertEquals("S01E03", (result as ShowProgress.InProgress).latestWatchedLabel)
+            assertEquals("S01E05", (result as ShowProgress.InProgress).latestWatchedLabel)
+        }
+
+        @Test
+        fun `back-filling an earlier episode does not displace a higher watched episode`() {
+            // User has watched up to S02E03. They back-fill S01E02 which gets a newer
+            // Instant.now() timestamp. The displayed last-watched must remain S02E03.
+            val e = entry(
+                Triple(2, 3, "2024-03-01T10:00:00Z"),
+                Triple(1, 2, "2024-05-01T10:00:00Z")  // back-filled later
+            )
+            val h = hint(
+                lastAired = TmdbEpisodeSummary(2, 5, air_date = "2024-04-01"),
+                seasons = listOf(TmdbSeasonSummary(1, 10), TmdbSeasonSummary(2, 10))
+            )
+            val result = ShowProgressCalculator.compute(e, h, utc)
+            assertTrue(result is ShowProgress.InProgress)
+            assertEquals("S02E03", (result as ShowProgress.InProgress).latestWatchedLabel)
+        }
+
+        @Test
+        fun `picks highest season over higher episode number in a lower season`() {
+            // S01E10 has a higher episode number than S02E01, but S02 is the further
+            // season — S02E01 must win.
+            val e = entry(
+                Triple(1, 10, "2024-01-10T10:00:00Z"),
+                Triple(2, 1, "2024-02-01T10:00:00Z")
+            )
+            val h = hint(
+                lastAired = TmdbEpisodeSummary(2, 5, air_date = "2024-03-01"),
+                seasons = listOf(TmdbSeasonSummary(1, 10), TmdbSeasonSummary(2, 10))
+            )
+            val result = ShowProgressCalculator.compute(e, h, utc)
+            assertTrue(result is ShowProgress.InProgress)
+            assertEquals("S02E01", (result as ShowProgress.InProgress).latestWatchedLabel)
         }
 
         @Test
