@@ -105,7 +105,7 @@ Please make sure your PR:
 
 ## Privacy / Datenschutz
 
-WatchBuddy is designed with privacy in mind: no tracking SDKs, no analytics, no WatchBuddy-side user accounts. Trakt tokens stay in the Android Keystore on the phone, LLM recaps are generated entirely on-device, and the only server component (the optional token proxy at `watchbuddy.server.rang.it`) runs on an EU host and does not persist tokens.
+WatchBuddy is designed with privacy in mind: no tracking SDKs, no analytics, no WatchBuddy-side user accounts. Trakt tokens stay in the Android Keystore on the phone, LLM recaps are generated entirely on-device, and the only server component (the optional token proxy at `watchbuddy.server.rang.it`) runs on an EU host and does not persist tokens. The URL is injected at build time via `TOKEN_BACKEND_URL`; self-hosters can override it in `local.properties`.
 
 The full privacy policy is available in two language versions:
 

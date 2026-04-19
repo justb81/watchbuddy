@@ -264,7 +264,7 @@ this flow and shows a "Now Watching" card with the show title, episode number, a
 - `client_secret` lives ONLY on the token proxy backend
 - APK contains only `client_id` (public)
 - 3 auth modes (configurable in Advanced Settings):
-  1. **Managed** → `https://api.watchbuddy.app/trakt/token` (default)
+  1. **Managed** → `https://watchbuddy.server.rang.it/trakt/token` (default; injected at build time via `TOKEN_BACKEND_URL`, self-hosters can override it in `local.properties`)
   2. **Self-hosted** → user enters own proxy URL
   3. **Direct** → user enters own Client ID + Secret (stored in Keystore)
 
