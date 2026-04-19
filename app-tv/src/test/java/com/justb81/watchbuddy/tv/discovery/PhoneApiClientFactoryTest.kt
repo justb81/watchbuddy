@@ -1,6 +1,5 @@
 package com.justb81.watchbuddy.tv.discovery
 
-import io.mockk.mockk
 import okhttp3.OkHttpClient
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
@@ -43,11 +42,6 @@ class PhoneApiClientFactoryTest {
         factory.createClient("http://host1:8765/")
         factory.createClient("http://host2:8765/")
         factory.createClient("http://host1:8765/")
-        // Verify cache via accessing the private field
-        val cacheField = PhoneApiClientFactory::class.java.getDeclaredField("cache")
-        cacheField.isAccessible = true
-        @Suppress("UNCHECKED_CAST")
-        val cache = cacheField.get(factory) as Map<String, PhoneApiService>
-        assertEquals(2, cache.size)
+        assertEquals(2, factory.cacheSize())
     }
 }

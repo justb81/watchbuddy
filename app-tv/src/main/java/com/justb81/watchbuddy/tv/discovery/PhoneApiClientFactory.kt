@@ -1,5 +1,6 @@
 package com.justb81.watchbuddy.tv.discovery
 
+import androidx.annotation.VisibleForTesting
 import com.justb81.watchbuddy.core.network.WatchBuddyJson
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -23,4 +24,7 @@ class PhoneApiClientFactory @Inject constructor(
                 .build()
                 .create(PhoneApiService::class.java)
         }
+
+    @VisibleForTesting
+    internal fun cacheSize(): Int = cache.size
 }
