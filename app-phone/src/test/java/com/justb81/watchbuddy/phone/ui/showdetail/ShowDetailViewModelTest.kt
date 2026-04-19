@@ -153,6 +153,29 @@ class ShowDetailViewModelTest {
         }
 
         @Test
+        fun `loads episodes within each season sorted by number descending`() = runTest {
+            val entry = makeEntry(
+                seasons = listOf(
+                    TraktWatchedSeason(
+                        number = 1,
+                        episodes = listOf(
+                            TraktWatchedEpisode(number = 1),
+                            TraktWatchedEpisode(number = 5),
+                            TraktWatchedEpisode(number = 3)
+                        )
+                    )
+                )
+            )
+            coEvery { traktApi.getWatchedShows(any()) } returns listOf(entry)
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            val episodes = vm.uiState.value.watchedSeasons.first().episodes
+            assertEquals(listOf(5, 3, 1), episodes.map { it.number })
+        }
+
+        @Test
         fun `loads TMDB poster URL when tmdbId and key are available`() = runTest {
             val vm = createViewModel()
             advanceUntilIdle()

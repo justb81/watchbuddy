@@ -4,6 +4,8 @@ import com.justb81.watchbuddy.core.model.TmdbShow
 import com.justb81.watchbuddy.core.model.TraktIds
 import com.justb81.watchbuddy.core.model.TraktShow
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
+import com.justb81.watchbuddy.core.model.TraktWatchedEpisode
+import com.justb81.watchbuddy.core.model.TraktWatchedSeason
 import com.justb81.watchbuddy.core.tmdb.TmdbApiService
 import com.justb81.watchbuddy.core.trakt.TraktApiService
 import com.justb81.watchbuddy.phone.auth.TokenRefreshManager
@@ -129,6 +131,51 @@ class ShowRepositoryTest {
 
         assertEquals("/one.jpg", result[0].posterPath)
         assertEquals("/two.jpg", result[1].posterPath)
+    }
+
+    @Test
+    fun `getShows returns shows sorted by last-watched DESC`() = runTest {
+        val early = TraktWatchedEntry(
+            show = TraktShow("Early Show", 2020, TraktIds(trakt = 10)),
+            seasons = listOf(
+                TraktWatchedSeason(1, listOf(TraktWatchedEpisode(1, last_watched_at = "2026-04-10T10:00:00.000Z")))
+            )
+        )
+        val recent = TraktWatchedEntry(
+            show = TraktShow("Recent Show", 2021, TraktIds(trakt = 11)),
+            seasons = listOf(
+                TraktWatchedSeason(1, listOf(TraktWatchedEpisode(1, last_watched_at = "2026-04-15T10:00:00.000Z")))
+            )
+        )
+        val noWatch = TraktWatchedEntry(
+            show = TraktShow("Unwatched Show", 2022, TraktIds(trakt = 12)),
+            seasons = emptyList()
+        )
+        coEvery { tokenRefreshManager.getValidAccessToken() } returns "test-token"
+        coEvery { traktApi.getWatchedShows(any()) } returns listOf(early, noWatch, recent)
+
+        val result = repository.getShows()
+
+        assertEquals(listOf("Recent Show", "Early Show", "Unwatched Show"), result.map { it.entry.show.title })
+    }
+
+    @Test
+    fun `getShows breaks ties alphabetically when last-watched timestamps match`() = runTest {
+        val ts = "2026-04-15T10:00:00.000Z"
+        val showA = TraktWatchedEntry(
+            show = TraktShow("Zebra", 2020, TraktIds(trakt = 20)),
+            seasons = listOf(TraktWatchedSeason(1, listOf(TraktWatchedEpisode(1, last_watched_at = ts))))
+        )
+        val showB = TraktWatchedEntry(
+            show = TraktShow("Alpha", 2020, TraktIds(trakt = 21)),
+            seasons = listOf(TraktWatchedSeason(1, listOf(TraktWatchedEpisode(1, last_watched_at = ts))))
+        )
+        coEvery { tokenRefreshManager.getValidAccessToken() } returns "test-token"
+        coEvery { traktApi.getWatchedShows(any()) } returns listOf(showA, showB)
+
+        val result = repository.getShows()
+
+        assertEquals(listOf("Alpha", "Zebra"), result.map { it.entry.show.title })
     }
 
     @Test

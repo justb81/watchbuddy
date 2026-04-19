@@ -120,7 +120,8 @@ class TvHomeViewModel @Inject constructor(
                 val hasMore = newShows.size >= PAGE_SIZE
                 loadedOffset = currentOffset + newShows.size
 
-                val allShows = if (append) _uiState.value.shows + newShows else newShows
+                val allShows = (if (append) _uiState.value.shows + newShows else newShows)
+                    .sortedByLastWatched()
 
                 cachedShows = allShows
                 cacheTimestamp = System.currentTimeMillis()
@@ -207,3 +208,9 @@ class TvHomeViewModel @Inject constructor(
         phoneDiscovery.stopDiscovery()
     }
 }
+
+internal fun List<EnrichedShowEntry>.sortedByLastWatched(): List<EnrichedShowEntry> =
+    sortedWith(
+        compareByDescending<EnrichedShowEntry> { ShowProgressCalculator.latestWatchedInstant(it.entry) }
+            .thenBy { it.entry.show.title.lowercase() }
+    )

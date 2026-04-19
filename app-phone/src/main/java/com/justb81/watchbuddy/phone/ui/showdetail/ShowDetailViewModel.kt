@@ -69,7 +69,9 @@ class ShowDetailViewModel @Inject constructor(
                 _uiState.value = ShowDetailUiState(
                     isLoading = false,
                     show = entry.show,
-                    watchedSeasons = entry.seasons.sortedBy { it.number }
+                    watchedSeasons = entry.seasons
+                    .sortedBy { it.number }
+                    .map { s -> s.copy(episodes = s.episodes.sortedByDescending { it.number }) }
                 )
 
                 entry.show.ids.tmdb?.let { tmdbId -> loadTmdbDetails(tmdbId) }

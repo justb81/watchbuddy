@@ -120,6 +120,8 @@ object ShowProgressCalculator {
         val label: String get() = formatLabel(season, episode)
     }
 
+    fun latestWatchedInstant(entry: TraktWatchedEntry): Instant? = latestWatched(entry)?.instant
+
     private fun latestWatched(entry: TraktWatchedEntry): WatchedRef? {
         var best: WatchedRef? = null
         for (season in entry.seasons) {

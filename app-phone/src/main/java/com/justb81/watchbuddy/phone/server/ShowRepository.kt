@@ -6,6 +6,7 @@ import com.justb81.watchbuddy.core.model.EnrichedShowEntry
 import com.justb81.watchbuddy.core.model.TmdbProgressHint
 import com.justb81.watchbuddy.core.model.TmdbShow
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
+import com.justb81.watchbuddy.core.progress.ShowProgressCalculator
 import com.justb81.watchbuddy.core.tmdb.TmdbApiService
 import com.justb81.watchbuddy.core.trakt.TraktApiService
 import com.justb81.watchbuddy.phone.auth.TokenRefreshManager
@@ -46,7 +47,7 @@ class ShowRepository @Inject constructor(
                 ?: return emptyList()
             try {
                 val trakt = traktApi.getWatchedShows("Bearer $token")
-                cachedShows = enrich(trakt)
+                cachedShows = enrich(trakt).sortedWith(SHOW_COMPARATOR)
                 lastFetch = now
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to fetch shows from Trakt; serving ${cachedShows.size} cached entries", e)
@@ -87,6 +88,9 @@ class ShowRepository @Inject constructor(
 
     private companion object {
         const val CACHE_TTL = 5 * 60 * 1000L // 5 minutes
+        val SHOW_COMPARATOR: Comparator<EnrichedShowEntry> = compareByDescending<EnrichedShowEntry> {
+            ShowProgressCalculator.latestWatchedInstant(it.entry)
+        }.thenBy { it.entry.show.title.lowercase() }
     }
 }
 

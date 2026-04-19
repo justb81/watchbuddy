@@ -4,6 +4,8 @@ import com.justb81.watchbuddy.core.model.EnrichedShowEntry
 import com.justb81.watchbuddy.core.model.TraktIds
 import com.justb81.watchbuddy.core.model.TraktShow
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
+import com.justb81.watchbuddy.core.model.TraktWatchedEpisode
+import com.justb81.watchbuddy.core.model.TraktWatchedSeason
 import com.justb81.watchbuddy.tv.MainDispatcherRule
 import com.justb81.watchbuddy.tv.data.TvShowCache
 import com.justb81.watchbuddy.tv.data.UserSessionRepository
@@ -127,10 +129,40 @@ class TvHomeViewModelTest {
 
         val state = viewModel.uiState.value
         assertEquals(2, state.shows.size)
-        assertEquals("Show 1", state.shows[0].entry.show.title)
         assertFalse(state.isLoading)
         assertFalse(state.phoneApiError)
         assertFalse(state.noPhoneConnected)
+    }
+
+    @Test
+    fun `loadShows sorts shows by last-watched descending`() = runTest {
+        val phone = mockk<PhoneDiscoveryManager.DiscoveredPhone>()
+        every { phone.baseUrl } returns "http://192.168.1.1:8765/"
+        every { phoneDiscovery.getBestPhone() } returns phone
+        every { phoneApiClientFactory.createClient(any()) } returns phoneApiService
+
+        val recent = EnrichedShowEntry(
+            entry = TraktWatchedEntry(
+                show = TraktShow("Recent", 2024, TraktIds(trakt = 1)),
+                seasons = listOf(
+                    TraktWatchedSeason(1, listOf(TraktWatchedEpisode(1, last_watched_at = "2026-04-15T10:00:00.000Z")))
+                )
+            )
+        )
+        val older = EnrichedShowEntry(
+            entry = TraktWatchedEntry(
+                show = TraktShow("Older", 2023, TraktIds(trakt = 2)),
+                seasons = listOf(
+                    TraktWatchedSeason(1, listOf(TraktWatchedEpisode(1, last_watched_at = "2026-04-01T10:00:00.000Z")))
+                )
+            )
+        )
+        coEvery { phoneApiService.getShows(any(), any()) } returns listOf(older, recent)
+
+        val viewModel = createViewModel()
+        advanceUntilIdle()
+
+        assertEquals(listOf("Recent", "Older"), viewModel.uiState.value.shows.map { it.entry.show.title })
     }
 
     @Test
