@@ -366,8 +366,56 @@ class TvHomeViewModelTest {
             viewModel.loadMoreShows()
             advanceUntilIdle()
 
-            val allShows = page1 + page2
+            val allShows = (page1 + page2).sortedByLastWatched()
             verify { tvShowCache.updateShows(allShows.map { it.entry }) }
+        }
+    }
+
+    @Nested
+    @DisplayName("sort order")
+    inner class SortOrderTest {
+
+        @Test
+        fun `sortedByLastWatched sorts DESC by latest watched with null at bottom`() {
+            val a = EnrichedShowEntry(
+                entry = TraktWatchedEntry(
+                    show = TraktShow("Old", 2020, TraktIds(trakt = 1)),
+                    seasons = listOf(
+                        com.justb81.watchbuddy.core.model.TraktWatchedSeason(
+                            number = 1,
+                            episodes = listOf(
+                                com.justb81.watchbuddy.core.model.TraktWatchedEpisode(
+                                    number = 1,
+                                    last_watched_at = "2026-04-10T10:00:00Z"
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+            val b = EnrichedShowEntry(
+                entry = TraktWatchedEntry(
+                    show = TraktShow("Newest", 2020, TraktIds(trakt = 2)),
+                    seasons = listOf(
+                        com.justb81.watchbuddy.core.model.TraktWatchedSeason(
+                            number = 1,
+                            episodes = listOf(
+                                com.justb81.watchbuddy.core.model.TraktWatchedEpisode(
+                                    number = 1,
+                                    last_watched_at = "2026-04-15T10:00:00Z"
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+            val c = EnrichedShowEntry(
+                entry = TraktWatchedEntry(show = TraktShow("Never", 2020, TraktIds(trakt = 3)))
+            )
+
+            val sorted = listOf(a, c, b).sortedByLastWatched()
+
+            assertEquals(listOf(2, 1, 3), sorted.map { it.entry.show.ids.trakt })
         }
     }
 }

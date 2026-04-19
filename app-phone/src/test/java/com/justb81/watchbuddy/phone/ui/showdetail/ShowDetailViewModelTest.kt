@@ -196,6 +196,50 @@ class ShowDetailViewModelTest {
     }
 
     @Nested
+    @DisplayName("episode ordering")
+    inner class EpisodeOrderingTest {
+
+        @Test
+        fun `episodes within a season sort DESC by number`() = runTest {
+            seedLibrary()
+            coEvery { episodeRepository.getSeasonsWithEpisodes(any()) } returns seasonsPayload(
+                mapOf(1 to 5)
+            )
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            val episodes = vm.uiState.value.seasons.first { it.number == 1 }.episodes
+            assertEquals(listOf(5, 4, 3, 2, 1), episodes.map { it.number })
+        }
+
+        @Test
+        fun `DESC episode order preserved after pinned current season is chosen`() = runTest {
+            // S1 fully watched, S2 mid-watched. Current-season rule pins S2 on top and
+            // keeps S1 below; both seasons' episode lists must still be DESC by number.
+            seedLibrary(
+                watchedSeasons = listOf(
+                    TraktWatchedSeason(1, listOf(
+                        TraktWatchedEpisode(1), TraktWatchedEpisode(2), TraktWatchedEpisode(3)
+                    )),
+                    TraktWatchedSeason(2, listOf(TraktWatchedEpisode(1)))
+                )
+            )
+            coEvery { episodeRepository.getSeasonsWithEpisodes(any()) } returns seasonsPayload(
+                mapOf(1 to 3, 2 to 4)
+            )
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            val seasons = vm.uiState.value.seasons
+            assertEquals(2, seasons.first().number, "current-season rule should pin S2 on top")
+            assertEquals(listOf(4, 3, 2, 1), seasons.first { it.number == 2 }.episodes.map { it.number })
+            assertEquals(listOf(3, 2, 1), seasons.first { it.number == 1 }.episodes.map { it.number })
+        }
+    }
+
+    @Nested
     @DisplayName("toggleEpisodeWatched")
     inner class ToggleTest {
 
