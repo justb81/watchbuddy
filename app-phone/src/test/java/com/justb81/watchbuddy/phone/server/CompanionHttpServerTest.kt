@@ -2,6 +2,7 @@ package com.justb81.watchbuddy.phone.server
 
 import com.justb81.watchbuddy.core.model.EnrichedShowEntry
 import com.justb81.watchbuddy.core.model.LlmBackend
+import com.justb81.watchbuddy.core.model.ScrobbleAction
 import com.justb81.watchbuddy.core.model.DeviceCapability
 import com.justb81.watchbuddy.core.model.TmdbEpisode
 import com.justb81.watchbuddy.core.model.TmdbShow
@@ -729,6 +730,69 @@ class CompanionHttpServerTest {
 
             assertEquals(HttpStatusCode.ServiceUnavailable, response.status)
             assertFalse(response.bodyAsText().contains("Network error"))
+        }
+
+        @Test
+        fun `scrobble start updates stateManager with START action`() = testApp {
+            coEvery { tokenRefreshManager.getValidAccessToken() } returns "token"
+            stubSuccessfulScrobbleStart()
+
+            client.post("/scrobble/start") {
+                contentType(ContentType.Application.Json)
+                setBody(scrobbleBody)
+            }
+
+            assertEquals(ScrobbleAction.START, stateManager.lastScrobbleEvent.value?.action)
+        }
+
+        @Test
+        fun `scrobble pause updates stateManager with PAUSE action`() = testApp {
+            coEvery { tokenRefreshManager.getValidAccessToken() } returns "token"
+            stubSuccessfulScrobblePause()
+
+            client.post("/scrobble/pause") {
+                contentType(ContentType.Application.Json)
+                setBody(scrobbleBody)
+            }
+
+            assertEquals(ScrobbleAction.PAUSE, stateManager.lastScrobbleEvent.value?.action)
+        }
+
+        @Test
+        fun `scrobble stop updates stateManager with STOP action`() = testApp {
+            coEvery { tokenRefreshManager.getValidAccessToken() } returns "token"
+            stubSuccessfulScrobbleStop()
+
+            client.post("/scrobble/stop") {
+                contentType(ContentType.Application.Json)
+                setBody(scrobbleBody)
+            }
+
+            assertEquals(ScrobbleAction.STOP, stateManager.lastScrobbleEvent.value?.action)
+        }
+
+        @Test
+        fun `scrobble pause returns 400 when body is invalid`() = testApp {
+            coEvery { tokenRefreshManager.getValidAccessToken() } returns "token"
+
+            val response = client.post("/scrobble/pause") {
+                contentType(ContentType.Application.Json)
+                setBody("not-valid-json")
+            }
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+        }
+
+        @Test
+        fun `scrobble stop returns 400 when body is invalid`() = testApp {
+            coEvery { tokenRefreshManager.getValidAccessToken() } returns "token"
+
+            val response = client.post("/scrobble/stop") {
+                contentType(ContentType.Application.Json)
+                setBody("not-valid-json")
+            }
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
         }
     }
 }
