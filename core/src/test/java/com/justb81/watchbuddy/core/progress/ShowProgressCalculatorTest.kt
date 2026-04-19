@@ -134,14 +134,15 @@ class ShowProgressCalculatorTest {
 
         @Test
         fun `picks highest episode number not latest timestamp`() {
-            // S01E03 was re-watched later (newer timestamp) but S01E05 is the furthest
+            // S01E03 was back-filled later (newer timestamp) but S01E05 is the furthest
             // episode in the series — it must be reported as last-watched.
+            // lastAired=S01E08 so behind=3 → InProgress (not CaughtUp).
             val e = entry(
                 Triple(1, 5, "2024-01-05T10:00:00Z"),
                 Triple(1, 3, "2024-02-01T10:00:00Z") // back-filled, newer timestamp
             )
             val h = hint(
-                lastAired = TmdbEpisodeSummary(1, 5, air_date = "2024-01-05"),
+                lastAired = TmdbEpisodeSummary(1, 8, air_date = "2024-03-01"),
                 seasons = listOf(TmdbSeasonSummary(1, 10))
             )
             val result = ShowProgressCalculator.compute(e, h, utc)
