@@ -7,6 +7,7 @@ import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.model.EnrichedShowEntry
 import com.justb81.watchbuddy.core.model.ScrobbleDisplayEvent
+import com.justb81.watchbuddy.core.progress.ShowProgress
 import com.justb81.watchbuddy.core.progress.ShowProgressCalculator
 import com.justb81.watchbuddy.phone.auth.TokenRepository
 import com.justb81.watchbuddy.phone.network.WifiStateProvider
@@ -36,6 +37,8 @@ data class HomeUiState(
     val continueWatching: List<EnrichedShowEntry> = emptyList(),
     /** All other shows (not in continueWatching), sorted alphabetically. */
     val allShows: List<EnrichedShowEntry> = emptyList(),
+    /** Progress keyed by Trakt id. */
+    val progress: Map<Int, ShowProgress> = emptyMap(),
     val lastSyncTime: String? = null,
     val error: String? = null,
     val canWatch: Boolean = false,
