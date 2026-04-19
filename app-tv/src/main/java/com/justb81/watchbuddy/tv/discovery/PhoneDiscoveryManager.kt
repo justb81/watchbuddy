@@ -292,9 +292,14 @@ class PhoneDiscoveryManager @Inject constructor(
         val cm = runCatching {
             context.applicationContext.getSystemService(ConnectivityManager::class.java)
         }.getOrNull() ?: return
-        val request = NetworkRequest.Builder()
-            .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
-            .build()
+        val request = runCatching {
+            NetworkRequest.Builder()
+                .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+                .build()
+        }.getOrElse {
+            Log.w(TAG, "failed to build NetworkRequest; Wi-Fi reconnect recovery disabled", it)
+            return
+        }
         val callback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
                 Log.i(TAG, "Wi-Fi available — cycling discovery (NSD + BLE)")
