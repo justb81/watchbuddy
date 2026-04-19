@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.tv.material3.*
+import com.justb81.watchbuddy.BuildConfig
 import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.core.model.StreamingService
 import com.justb81.watchbuddy.tv.ui.theme.extendedColors
@@ -85,6 +86,17 @@ fun StreamingSettingsScreen(
             }
 
             Spacer(Modifier.height(16.dp))
+
+            Text(
+                text = stringResource(
+                    R.string.settings_version_footer,
+                    BuildConfig.VERSION_NAME,
+                    BuildConfig.VERSION_CODE,
+                ),
+                fontSize = 12.sp,
+                color = Color.White.copy(alpha = 0.5f),
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
 
             // Footer actions
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {

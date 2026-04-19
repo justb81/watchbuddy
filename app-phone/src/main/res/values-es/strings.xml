@@ -202,4 +202,7 @@
     <string name="diagnostics_value_no">No</string>
     <string name="diagnostics_value_stopped">Detenido</string>
     <string name="diagnostics_value_none">Ninguno</string>
+
+    <!-- Version footer -->
+    <string name="settings_version_footer">WatchBuddy v%1$s (build %2$d)</string>
 </resources>

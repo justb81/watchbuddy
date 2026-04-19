@@ -14,9 +14,11 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.justb81.watchbuddy.BuildConfig
 import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
 
@@ -303,6 +305,20 @@ fun SettingsScreen(
             }
 
             Spacer(Modifier.height(32.dp))
+
+            Text(
+                text = stringResource(
+                    R.string.settings_version_footer,
+                    BuildConfig.VERSION_NAME,
+                    BuildConfig.VERSION_CODE,
+                ),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp, bottom = 16.dp)
+            )
         }
     }
 

@@ -116,4 +116,7 @@
     <string name="tv_diagnostics_value_yes">Yes</string>
     <string name="tv_diagnostics_value_no">No</string>
     <string name="tv_diagnostics_value_no_phones">No phones discovered yet.</string>
+
+    <!-- Version footer -->
+    <string name="settings_version_footer">WatchBuddy v%1$s (build %2$d)</string>
 </resources>
