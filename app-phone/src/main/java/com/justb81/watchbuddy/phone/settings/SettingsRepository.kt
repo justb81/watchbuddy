@@ -50,7 +50,6 @@ class SettingsRepository @Inject constructor(
     val modelReady: StateFlow<Boolean> = _modelReady.asStateFlow()
 
     init {
-        DiagnosticLog.event(TAG, "init: subscribing to MODEL_READY")
         scope.launch {
             context.dataStore.data
                 .catch { e ->
