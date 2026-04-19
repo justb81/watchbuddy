@@ -1,5 +1,7 @@
 package com.justb81.watchbuddy.tv.ui.settings
 
+import android.app.Application
+import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
@@ -20,10 +22,12 @@ import javax.inject.Inject
 data class TvSettingsUiState(
     val isPhoneDiscoveryEnabled: Boolean = true,
     val isAutostartEnabled: Boolean = false,
+    val isNotificationAccessGranted: Boolean = false,
 )
 
 @HiltViewModel
 class TvSettingsViewModel @Inject constructor(
+    private val application: Application,
     private val repository: StreamingPreferencesRepository,
 ) : ViewModel() {
 
@@ -38,6 +42,7 @@ class TvSettingsViewModel @Inject constructor(
         viewModelScope.launch(exceptionHandler, block = block)
 
     init {
+        refreshNotificationAccess()
         launchSafe {
             combine(
                 repository.isPhoneDiscoveryEnabled,
@@ -63,6 +68,22 @@ class TvSettingsViewModel @Inject constructor(
     fun setAutostartEnabled(enabled: Boolean) {
         _uiState.update { it.copy(isAutostartEnabled = enabled) }
         launchSafe { repository.setAutostartEnabled(enabled) }
+    }
+
+    /**
+     * Re-read the system notification-access allowlist. Called from the UI
+     * on every ON_RESUME because there is no broadcast to observe — the user
+     * flips the toggle in system Settings and we only learn about it on
+     * return to our own screen. Wrapped in runCatching so unit tests (which
+     * run against a stubbed Android JAR) don't throw on the static
+     * [android.provider.Settings.Secure] lookup inside NotificationManagerCompat.
+     */
+    fun refreshNotificationAccess() {
+        val granted = runCatching {
+            NotificationManagerCompat.getEnabledListenerPackages(application)
+                .contains(application.packageName)
+        }.getOrDefault(false)
+        _uiState.update { it.copy(isNotificationAccessGranted = granted) }
     }
 
     companion object {

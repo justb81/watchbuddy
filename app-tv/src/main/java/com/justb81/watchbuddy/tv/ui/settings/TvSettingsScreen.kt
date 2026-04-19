@@ -1,5 +1,7 @@
 package com.justb81.watchbuddy.tv.ui.settings
 
+import android.content.Intent
+import android.provider.Settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -16,16 +18,21 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.tv.material3.Card
 import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.ExperimentalTvMaterial3Api
@@ -49,6 +56,8 @@ private sealed interface SettingsRow {
         val title: String,
         val subtitle: String,
         val onClick: () -> Unit,
+        val statusLabel: String? = null,
+        val statusOk: Boolean = false,
     ) : SettingsRow
 }
 
@@ -61,6 +70,22 @@ fun TvSettingsScreen(
     viewModel: TvSettingsViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    // Re-read notification-access state every time the screen resumes — the
+    // user flipped it in the system list and there's no broadcast we can
+    // observe, so we must poll on resume to catch the change.
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) viewModel.refreshNotificationAccess()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    val grantedLabel = stringResource(R.string.tv_settings_status_granted)
+    val notGrantedLabel = stringResource(R.string.tv_settings_status_not_granted)
 
     val rows: List<SettingsRow> = listOf(
         SettingsRow.Toggle(
@@ -76,6 +101,20 @@ fun TvSettingsScreen(
             subtitle = stringResource(R.string.tv_settings_autostart_subtitle),
             enabled = uiState.isAutostartEnabled,
             onChange = viewModel::setAutostartEnabled,
+        ),
+        SettingsRow.Navigate(
+            key = "notification_access",
+            title = stringResource(R.string.tv_settings_notification_access_title),
+            subtitle = stringResource(R.string.tv_settings_notification_access_subtitle),
+            onClick = {
+                context.startActivity(
+                    Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                )
+            },
+            statusLabel = if (uiState.isNotificationAccessGranted) grantedLabel else notGrantedLabel,
+            statusOk = uiState.isNotificationAccessGranted,
         ),
         SettingsRow.Navigate(
             key = "streaming_services",
@@ -206,12 +245,34 @@ private fun NavigateRow(row: SettingsRow.Navigate) {
                     color = Color.White.copy(alpha = 0.6f),
                 )
             }
+            row.statusLabel?.let { label ->
+                StatusChip(label = label, ok = row.statusOk)
+                Spacer(Modifier.size(12.dp))
+            }
             Text(
                 text = "\u203A",
                 fontSize = 22.sp,
                 color = Color.White.copy(alpha = 0.6f),
             )
         }
+    }
+}
+
+@Composable
+private fun StatusChip(label: String, ok: Boolean) {
+    val bg = if (ok) Color(0xFF2E7D32) else Color(0xFFF9A825)
+    Box(
+        modifier = Modifier
+            .background(bg.copy(alpha = 0.25f), RoundedCornerShape(8.dp))
+            .border(1.dp, bg, RoundedCornerShape(8.dp))
+            .padding(horizontal = 10.dp, vertical = 4.dp),
+    ) {
+        Text(
+            text = label,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            color = Color.White,
+        )
     }
 }
 

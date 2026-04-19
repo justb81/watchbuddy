@@ -9,13 +9,17 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.tv.material3.*
 import com.justb81.watchbuddy.R
+import com.justb81.watchbuddy.core.scrobbler.MediaSessionScrobbler
 import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
 
 @OptIn(ExperimentalTvMaterial3Api::class)
@@ -25,6 +29,15 @@ fun TvDiagnosticsScreen(
     viewModel: TvDiagnosticsViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) viewModel.refreshNotificationAccess()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     Box(
         modifier = Modifier
@@ -99,6 +112,33 @@ fun TvDiagnosticsScreen(
                                 Status.FAIL,
                             )
                         },
+                    ),
+                )
+            }
+
+            item {
+                DiagnosticsSection(
+                    title = stringResource(R.string.tv_diagnostics_section_scrobble),
+                    rows = listOf(
+                        DiagRow(
+                            stringResource(R.string.tv_diagnostics_row_notification_access),
+                            yesNoStr(uiState.notificationAccessGranted),
+                            if (uiState.notificationAccessGranted) Status.OK else Status.FAIL,
+                        ),
+                        DiagRow(
+                            stringResource(R.string.tv_diagnostics_row_scrobbler_listening),
+                            yesNoStr(uiState.scrobblerListening),
+                            when {
+                                uiState.scrobblerListening -> Status.OK
+                                uiState.notificationAccessGranted -> Status.WARN
+                                else -> Status.NEUTRAL
+                            },
+                        ),
+                        DiagRow(
+                            stringResource(R.string.tv_diagnostics_row_last_candidate),
+                            formatLastCandidate(uiState.lastCandidate),
+                            if (uiState.lastCandidate != null) Status.OK else Status.NEUTRAL,
+                        ),
                     ),
                 )
             }
@@ -302,4 +342,12 @@ private fun formatAge(timestampMs: Long): String {
         seconds < 3_600 -> "${seconds / 60}m ago"
         else -> "${seconds / 3_600}h ago"
     }
+}
+
+private fun formatLastCandidate(last: MediaSessionScrobbler.LastCandidate?): String {
+    if (last == null) return "—"
+    val title = last.candidate.matchedShow?.title ?: last.candidate.mediaTitle
+    val pct = (last.candidate.confidence * 100).toInt()
+    val marker = if (last.autoScrobbled) "auto" else "overlay"
+    return "$title @ ${pct}% · $marker · ${formatAge(last.observedAtMs)}"
 }

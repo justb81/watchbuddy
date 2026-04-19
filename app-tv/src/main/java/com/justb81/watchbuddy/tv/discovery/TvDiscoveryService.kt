@@ -5,12 +5,16 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.ComponentName
 import android.content.Intent
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
+import com.justb81.watchbuddy.core.scrobbler.MediaSessionScrobbler
 import com.justb81.watchbuddy.tv.data.StreamingPreferencesRepository
+import com.justb81.watchbuddy.tv.scrobbler.WatchBuddyNotificationListener
 import com.justb81.watchbuddy.tv.ui.TvMainActivity
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
@@ -35,6 +39,7 @@ class TvDiscoveryService : Service() {
 
     @Inject lateinit var phoneDiscovery: PhoneDiscoveryManager
     @Inject lateinit var preferences: StreamingPreferencesRepository
+    @Inject lateinit var scrobbler: MediaSessionScrobbler
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var observerJob: Job? = null
@@ -63,17 +68,42 @@ class TvDiscoveryService : Service() {
             preferences.isPhoneDiscoveryEnabled.collect { discovery ->
                 if (discovery) {
                     phoneDiscovery.setEnabled(true)
+                    startScrobblerIfPermitted()
                 } else {
                     DiagnosticLog.event(TAG, "phone discovery disabled — stopping self")
+                    scrobbler.stopListening()
                     stopSelf()
                 }
             }
         }
     }
 
+    /**
+     * Start [MediaSessionScrobbler] if the user has granted Notification Access
+     * to [WatchBuddyNotificationListener]. Without that grant,
+     * [android.media.session.MediaSessionManager.getActiveSessions] silently
+     * returns an empty list — log a breadcrumb so diagnostics can explain why
+     * scrobbling is inert, and leave phone discovery running regardless.
+     */
+    private fun startScrobblerIfPermitted() {
+        val component = ComponentName(this, WatchBuddyNotificationListener::class.java)
+        val granted = NotificationManagerCompat.getEnabledListenerPackages(this)
+            .contains(packageName)
+        if (granted) {
+            scrobbler.startListening(component)
+            DiagnosticLog.event(TAG, "scrobbler listening")
+        } else {
+            DiagnosticLog.event(
+                TAG,
+                "scrobbler idle — notification access not granted",
+            )
+        }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         DiagnosticLog.event(TAG, "service destroyed")
+        scrobbler.stopListening()
         observerJob?.cancel()
         scope.cancel()
     }
