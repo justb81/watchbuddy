@@ -1,5 +1,6 @@
 package com.justb81.watchbuddy.tv.boot
 
+import android.content.Context
 import android.content.Intent
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.tv.data.StreamingPreferencesRepository
@@ -12,22 +13,31 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 
 /**
- * Unit tests for [BootReceiver].
+ * Unit tests for [BootReceiver.handleBootIntent].
  *
- * Constructs the receiver directly (bypassing Hilt) so the preference guard
- * logic can be tested without a full Android environment.
+ * Tests call the companion-object function directly to avoid triggering Hilt's
+ * injection machinery (which requires an Application context) and to work around
+ * Android stub limitations (Intent constructors don't store fields under
+ * isReturnDefaultValues=true).
  */
 @DisplayName("BootReceiver")
 class BootReceiverTest {
 
     private val repository: StreamingPreferencesRepository = mockk()
-    private lateinit var receiver: BootReceiver
+    private val context: Context = mockk(relaxed = true)
+
+    private val bootIntent: Intent = mockk<Intent>().also {
+        every { it.action } returns Intent.ACTION_BOOT_COMPLETED
+    }
+    private val otherIntent: Intent = mockk<Intent>().also {
+        every { it.action } returns Intent.ACTION_PACKAGE_ADDED
+    }
 
     @BeforeEach
     fun setUp() {
         DiagnosticLog.clear()
-        receiver = BootReceiver()
-        receiver.preferencesRepository = repository
+        mockkStatic(androidx.core.content.ContextCompat::class)
+        every { androidx.core.content.ContextCompat.startForegroundService(any(), any()) } returns mockk()
     }
 
     @AfterEach
@@ -39,10 +49,8 @@ class BootReceiverTest {
     @Test
     fun `does nothing when autostart is disabled`() {
         every { repository.isAutostartEnabled } returns flowOf(false)
-        mockkStatic(androidx.core.content.ContextCompat::class)
-        val context = mockk<android.content.Context>(relaxed = true)
 
-        receiver.onReceive(context, Intent(Intent.ACTION_BOOT_COMPLETED))
+        BootReceiver.handleBootIntent(context, bootIntent, repository)
 
         verify(exactly = 0) {
             androidx.core.content.ContextCompat.startForegroundService(any(), any())
@@ -52,10 +60,8 @@ class BootReceiverTest {
     @Test
     fun `ignores intents that are not BOOT_COMPLETED`() {
         every { repository.isAutostartEnabled } returns flowOf(true)
-        mockkStatic(androidx.core.content.ContextCompat::class)
-        val context = mockk<android.content.Context>(relaxed = true)
 
-        receiver.onReceive(context, Intent(Intent.ACTION_PACKAGE_ADDED))
+        BootReceiver.handleBootIntent(context, otherIntent, repository)
 
         verify(exactly = 0) {
             androidx.core.content.ContextCompat.startForegroundService(any(), any())
@@ -65,11 +71,8 @@ class BootReceiverTest {
     @Test
     fun `starts TvDiscoveryService when autostart is enabled`() {
         every { repository.isAutostartEnabled } returns flowOf(true)
-        mockkStatic(androidx.core.content.ContextCompat::class)
-        every { androidx.core.content.ContextCompat.startForegroundService(any(), any()) } returns mockk()
-        val context = mockk<android.content.Context>(relaxed = true)
 
-        receiver.onReceive(context, Intent(Intent.ACTION_BOOT_COMPLETED))
+        BootReceiver.handleBootIntent(context, bootIntent, repository)
 
         verify(exactly = 1) {
             androidx.core.content.ContextCompat.startForegroundService(context, any())
@@ -79,13 +82,11 @@ class BootReceiverTest {
     @Test
     fun `emits DiagnosticLog breadcrumb when service start fails`() {
         every { repository.isAutostartEnabled } returns flowOf(true)
-        mockkStatic(androidx.core.content.ContextCompat::class)
         every {
             androidx.core.content.ContextCompat.startForegroundService(any(), any())
         } throws SecurityException("background start restricted")
-        val context = mockk<android.content.Context>(relaxed = true)
 
-        receiver.onReceive(context, Intent(Intent.ACTION_BOOT_COMPLETED))
+        BootReceiver.handleBootIntent(context, bootIntent, repository)
 
         val events = DiagnosticLog.snapshot()
         assertTrue(

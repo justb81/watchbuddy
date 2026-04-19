@@ -20,30 +20,43 @@ class BootReceiver : BroadcastReceiver() {
     lateinit var preferencesRepository: StreamingPreferencesRepository
 
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
-
-        val autostartEnabled = runBlocking { preferencesRepository.isAutostartEnabled.first() }
-        if (!autostartEnabled) {
-            Log.i(TAG, "autostart disabled; skipping boot-triggered discovery")
-            return
-        }
-
-        Log.i(TAG, "boot completed; starting TvDiscoveryService")
-        try {
-            ContextCompat.startForegroundService(
-                context,
-                Intent(context, TvDiscoveryService::class.java)
-            )
-        } catch (e: Exception) {
-            DiagnosticLog.event(
-                "tv.boot.autostart.failed",
-                "foreground service start failed: ${e.message}"
-            )
-            Log.e(TAG, "failed to start TvDiscoveryService on boot", e)
-        }
+        handleBootIntent(context, intent, preferencesRepository)
     }
 
     companion object {
         private const val TAG = "BootReceiver"
+
+        /**
+         * Core boot-intent handler, extracted for testability.
+         * Called from [onReceive] with the Hilt-injected repository in production,
+         * and directly (with a mock repository) in unit tests.
+         */
+        internal fun handleBootIntent(
+            context: Context,
+            intent: Intent,
+            repository: StreamingPreferencesRepository,
+        ) {
+            if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
+
+            val autostartEnabled = runBlocking { repository.isAutostartEnabled.first() }
+            if (!autostartEnabled) {
+                Log.i(TAG, "autostart disabled; skipping boot-triggered discovery")
+                return
+            }
+
+            Log.i(TAG, "boot completed; starting TvDiscoveryService")
+            try {
+                ContextCompat.startForegroundService(
+                    context,
+                    Intent(context, TvDiscoveryService::class.java)
+                )
+            } catch (e: Exception) {
+                DiagnosticLog.event(
+                    "tv.boot.autostart.failed",
+                    "foreground service start failed: ${e.message}"
+                )
+                Log.e(TAG, "failed to start TvDiscoveryService on boot", e)
+            }
+        }
     }
 }
