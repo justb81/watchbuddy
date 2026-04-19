@@ -46,7 +46,7 @@
     <string name="tv_watched_episodes">%1$d Folgen gesehen</string>
     <string name="tv_seasons">%1$d Staffeln</string>
     <string name="tv_back">Zurück</string>
-    <string name="tv_back_arrow">‹ Zurück</string>
+    <string name="tv_back_arrow">Zurück</string>
     <string name="tv_available_at">Verfügbar bei:</string>
     <string name="tv_no_description">Keine Beschreibung verfügbar.</string>
 
