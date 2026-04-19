@@ -127,7 +127,7 @@ object ShowProgressCalculator {
     private fun latestWatched(entry: TraktWatchedEntry): WatchedRef? {
         var best: WatchedRef? = null
         for (season in entry.seasons) {
-            if (season.number <= 0) continue
+            if (!isRegularSeason(season.number)) continue
             for (ep in season.episodes) {
                 val ts = parseInstant(ep.last_watched_at) ?: continue
                 if (best == null || ts.isAfter(best.instant)) {
@@ -139,9 +139,9 @@ object ShowProgressCalculator {
     }
 
     private fun absoluteOrdinal(season: Int, episode: Int, seasons: List<TmdbSeasonSummary>): Int {
-        if (season <= 0) return 0
+        if (!isRegularSeason(season)) return 0
         val priorSum = seasons
-            .filter { it.season_number in 1 until season }
+            .filter { isRegularSeason(it.season_number) && it.season_number < season }
             .sumOf { it.episode_count }
         return priorSum + episode
     }
@@ -167,3 +167,11 @@ object ShowProgressCalculator {
 
 internal fun formatLabel(season: Int, episode: Int): String =
     "S%02dE%02d".format(season, episode)
+
+/**
+ * Shared predicate for "is this a regular (non-special) season?" — specials
+ * live in season 0 (and never a negative number) and must be excluded from
+ * all progress arithmetic: `latestWatched`, absolute-ordinal sums, and the
+ * "episodes behind" delta.
+ */
+internal fun isRegularSeason(seasonNumber: Int): Boolean = seasonNumber >= 1
