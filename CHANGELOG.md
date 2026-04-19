@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.18.0](https://github.com/justb81/watchbuddy/compare/v0.17.0...v0.18.0) (2026-04-19)
+
+
+### Features
+
+* in-app diagnostics view + Settings version footer ([#331](https://github.com/justb81/watchbuddy/issues/331), [#330](https://github.com/justb81/watchbuddy/issues/330)) ([#335](https://github.com/justb81/watchbuddy/issues/335)) ([76bc0d6](https://github.com/justb81/watchbuddy/commit/76bc0d6b6f00a11d9a4b53a7f3ed803cb4335548))
+
+
+### Bug Fixes
+
+* sort shows by last-watched DESC and episodes by number DESC ([#326](https://github.com/justb81/watchbuddy/issues/326)) ([#332](https://github.com/justb81/watchbuddy/issues/332)) ([0455054](https://github.com/justb81/watchbuddy/commit/0455054973fba8e206556216ebe5173fb8633a8c))
+
 ## [0.17.0](https://github.com/justb81/watchbuddy/compare/v0.16.3...v0.17.0) (2026-04-18)
 
 
