@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.20.2](https://github.com/justb81/watchbuddy/compare/v0.20.1...v0.20.2) (2026-04-19)
+
+
+### Bug Fixes
+
+* **phone:** exclude Season 0 specials from episodes-behind delta ([#357](https://github.com/justb81/watchbuddy/issues/357)) ([#371](https://github.com/justb81/watchbuddy/issues/371)) ([2606f20](https://github.com/justb81/watchbuddy/commit/2606f200620fe2e3e05e27c5c1650d6560bc597c))
+
 ## [0.20.1](https://github.com/justb81/watchbuddy/compare/v0.20.0...v0.20.1) (2026-04-19)
 
 
