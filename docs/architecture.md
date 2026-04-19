@@ -25,7 +25,7 @@ graph TB
 Service name:  watchbuddy-{username}
 Service type:  _watchbuddy._tcp.
 Port:          8765
-TXT records:   version=0.15.1, modelQuality=70, llmBackend=LITERT
+TXT records:   version=X.Y.Z, modelQuality=70, llmBackend=LITERT
 ```
 
 **TXT record contract:**
@@ -170,11 +170,16 @@ The unregister-then-register sequence is required because `NsdManager.unregister
 asynchronous — calling `registerService` before the teardown completes leaves duplicate
 advertisements on the network (#264, #278).
 
-**NSD registration state machine:** `registerNsd` / `unregisterNsd` transition an
-`IDLE → REGISTERING → REGISTERED → UNREGISTERING → IDLE` state under a single lock. The
-state is flipped before calling the async `NsdManager` API so concurrent callers
-(`onStartCommand` + Wi-Fi `onAvailable`) cannot race past the guard while a prior
-registration is still in flight.
+**NSD registration state machine:** `registerNsd` / `unregisterNsd` transition states
+under a single lock. The state is flipped before calling the async `NsdManager` API so
+concurrent callers (`onStartCommand` + Wi-Fi `onAvailable`) cannot race past the guard
+while a prior registration is still in flight.
+
+```
+IDLE → REGISTERING → REGISTERED
+ ↑                       ↓
+ └──── UNREGISTERING ←───┘
+```
 
 **Multicast lock (phone side):** The service acquires a `WifiManager.MulticastLock` for
 its entire lifetime. Many phone OEM skins (OxygenOS, OneUI, MIUI) filter outgoing
