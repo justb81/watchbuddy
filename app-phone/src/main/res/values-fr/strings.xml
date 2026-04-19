@@ -142,6 +142,12 @@
     <string name="companion_notification_permission_rationale_body">WatchBuddy affiche une notification persistante pendant que le service compagnon fonctionne, afin qu\'Android ne l\'arrête pas en silence. Active les notifications dans les réglages de l\'application pour continuer.</string>
     <string name="companion_notification_permission_open_settings">Ouvrir les réglages</string>
 
+    <!-- Model Download -->
+    <string name="model_download_channel_name">Téléchargement du modèle</string>
+    <string name="model_download_channel_description">Affiche la progression du téléchargement du modèle IA</string>
+    <string name="model_download_notification_title">Téléchargement du modèle IA</string>
+    <string name="model_download_notification_text">WatchBuddy télécharge le modèle IA en arrière-plan</string>
+
     <!-- Show Detail -->
     <string name="show_detail_seasons">Saisons</string>
     <string name="show_detail_season">Saison %1$d</string>

@@ -104,7 +104,10 @@ Contributions are welcome! Here's how:
 Please make sure your PR:
 - Follows the existing code style and project structure
 - Builds successfully (`./gradlew assembleDebug`)
+- Passes static analysis (`./gradlew detektAll :app-phone:lintDebug :app-tv:lintDebug`; `npm --prefix backend run lint && npm --prefix backend run format:check`)
 - Includes a clear description of the changes
+
+CI runs detekt, Android Lint and (for backend changes) ESLint + Prettier on every PR. New findings beyond the committed baselines block the merge, and a per-module findings summary is posted to the PR. Inline annotations appear in the **Files changed** tab via GitHub code scanning.
 
 ## Privacy / Datenschutz
 

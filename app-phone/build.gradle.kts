@@ -117,6 +117,20 @@ android {
         buildConfig = true
     }
 
+    // Android Lint: SARIF output is consumed by the GitHub code-scanning upload
+    // in .github/workflows/build-android.yml. abortOnError makes the job fail
+    // on any new finding; the committed lint-baseline.xml covers pre-existing
+    // issues so they don't block new PRs.
+    lint {
+        sarifReport = true
+        htmlReport = true
+        xmlReport = false
+        baseline = file("lint-baseline.xml")
+        abortOnError = true
+        warningsAsErrors = false
+        checkDependencies = true
+    }
+
     // Ktor + Netty bring multiple META-INF files — exclude duplicates
     packaging {
         resources {

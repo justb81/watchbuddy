@@ -32,8 +32,12 @@
          NotificationListenerService so that MediaSessionManager.getActiveSessions()
          returns the TV's active media controllers. Without this the scrobbler
          silently sees an empty session list. The user must still toggle
-         WatchBuddy on under Settings → Notification access. -->
-    <uses-permission android:name="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE" />
+         WatchBuddy on under Settings → Notification access.
+         tools:ignore — this permission is protected (only granted to system
+         apps) but Android requires declaring it here so the platform binds
+         WatchBuddyNotificationListener with it as its service permission. -->
+    <uses-permission android:name="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
+        tools:ignore="ProtectedPermissions" />
 
     <!-- Play Store: TV app — no touchscreen, leanback required for correct
          multi-APK device targeting (prevents phone devices from receiving the
@@ -88,12 +92,17 @@
 
         <!-- TV app does not use WorkManager; disable its auto-init so the
              startup path does not build a Room-backed WorkDatabase for
-             nothing (which can crash under R8 if any keep rule is off). -->
+             nothing (which can crash under R8 if any keep rule is off).
+             tools:ignore="MissingClass" — the TV module excludes the
+             androidx.work group entirely, so the InitializationProvider
+             class isn't on the classpath at lint time; the merge directive
+             only needs the name to match a transitive manifest entry. -->
         <provider
             android:name="androidx.startup.InitializationProvider"
             android:authorities="${applicationId}.androidx-startup"
             android:exported="false"
-            tools:node="merge">
+            tools:node="merge"
+            tools:ignore="MissingClass">
             <meta-data
                 android:name="androidx.work.WorkManagerInitializer"
                 android:value="androidx.startup"

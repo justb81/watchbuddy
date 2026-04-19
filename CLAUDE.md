@@ -127,6 +127,14 @@ The only exceptions are **localization string resources** (`values-de/`, `values
 - `./gradlew :app-tv:assembleDebug` — TV only
 - Secrets via `local.properties` (not checked in) or environment variables for CI
 
+### Static analysis
+- `./gradlew detektAll` — runs detekt (Kotlin static analysis) on every module. Config: `config/detekt/detekt.yml`. Baselines: `<module>/detekt-baseline.xml`.
+- `./gradlew detektBaselineAll` — regenerates detekt baselines (only when you intentionally want to accept new findings; the goal is normally to **fix** them).
+- `./gradlew :app-phone:lintDebug :app-tv:lintDebug` — Android Lint. Baselines: `<app>/lint-baseline.xml`.
+- `./gradlew :app-phone:updateLintBaseline :app-tv:updateLintBaseline` — regenerates Android Lint baselines.
+- Backend: `npm --prefix backend run lint && npm --prefix backend run format:check` (ESLint 9 flat config + Prettier 3).
+- CI gates every PR: any **new** finding beyond the baselines fails the `Build Android APKs` or `Backend Tests` workflow. SARIF reports are uploaded to GitHub code scanning and a summary comment with the per-module finding counts is posted on each PR (`<!-- watchbuddy-lint-report -->`).
+
 ### Git Workflow — IMPORTANT
 
 **Never push directly to `main`.** All changes must go through a Pull Request — no exceptions, including for agents.

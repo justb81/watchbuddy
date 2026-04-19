@@ -1,0 +1,143 @@
+# WatchBuddy detekt configuration.
+#
+# This file overrides only the subset of rules that differ from the built-in
+# defaults. `buildUponDefaultConfig = true` in the root build.gradle.kts means
+# every rule not listed here falls back to the upstream default.
+#
+# Rationale for overrides lives inline.
+#
+# Docs: https://detekt.dev/docs/rules/complexity
+
+complexity:
+  active: true
+  LongMethod:
+    active: true
+    threshold: 80
+  LongParameterList:
+    active: true
+    functionThreshold: 8
+    constructorThreshold: 8
+    ignoreDefaultParameters: true
+    ignoreDataClasses: true
+    ignoreAnnotatedParameter:
+      - "Composable"
+  TooManyFunctions:
+    active: false
+  LargeClass:
+    active: true
+    threshold: 600
+  CyclomaticComplexMethod:
+    active: true
+    threshold: 20
+    ignoreSingleWhenExpression: true
+
+style:
+  active: true
+  MagicNumber:
+    active: true
+    ignoreNumbers: ['-1', '0', '1', '2', '100']
+    ignoreHashCodeFunction: true
+    ignoreAnnotation: true
+    ignoreNamedArgument: true
+    ignoreEnums: true
+    ignoreRanges: true
+    ignoreCompanionObjectPropertyDeclaration: true
+    ignorePropertyDeclaration: true
+  MaxLineLength:
+    active: true
+    maxLineLength: 140
+    excludeCommentStatements: true
+  ReturnCount:
+    active: true
+    max: 4
+  ForbiddenComment:
+    # TODO/FIXME are part of normal workflow; blocking them on PR churn is noise.
+    active: false
+  UnusedPrivateMember:
+    active: true
+    # Composable preview functions frequently appear unused to static analysis.
+    ignoreAnnotated:
+      - "Preview"
+      - "PreviewParameter"
+  WildcardImport:
+    active: true
+    excludeImports:
+      - java.util.*
+      - kotlinx.android.synthetic.*
+  NewLineAtEndOfFile:
+    active: true
+
+naming:
+  active: true
+  FunctionNaming:
+    # Compose functions use PascalCase.
+    ignoreAnnotated:
+      - "Composable"
+  TopLevelPropertyNaming:
+    active: true
+  ObjectPropertyNaming:
+    active: true
+
+empty-blocks:
+  active: true
+  EmptyFunctionBlock:
+    active: true
+    ignoreOverridden: true
+
+exceptions:
+  active: true
+  TooGenericExceptionCaught:
+    active: true
+    exceptionNames:
+      - ArrayIndexOutOfBoundsException
+      - Error
+      - IndexOutOfBoundsException
+      - NullPointerException
+      - RuntimeException
+  SwallowedException:
+    active: true
+    ignoredExceptionTypes:
+      - InterruptedException
+      - NumberFormatException
+      - ParseException
+      - MalformedURLException
+  InstanceOfCheckForException:
+    active: true
+
+performance:
+  active: true
+
+potential-bugs:
+  active: true
+  UnsafeCallOnNullableType:
+    active: true
+  ImplicitDefaultLocale:
+    active: true
+
+coroutines:
+  active: true
+  GlobalCoroutineUsage:
+    active: true
+  SuspendFunWithFlowReturnType:
+    active: true
+
+# Formatting rules from detekt-formatting plugin (ktlint-derived).
+# Kept lean — Kotlin-official style is already enforced by the IDE formatter.
+formatting:
+  active: true
+  android: true
+  autoCorrect: false
+  MaximumLineLength:
+    active: false          # Handled by style.MaxLineLength above.
+  FinalNewline:
+    active: true
+  NoWildcardImports:
+    active: true
+  Indentation:
+    active: false          # Too noisy on mixed-indent legacy files; trust IDE.
+  ArgumentListWrapping:
+    active: false
+  ParameterListWrapping:
+    active: false
+  Wrapping:
+    active: false

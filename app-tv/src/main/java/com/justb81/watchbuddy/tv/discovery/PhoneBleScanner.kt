@@ -1,6 +1,7 @@
 package com.justb81.watchbuddy.tv.discovery
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.bluetooth.BluetoothManager
 import android.bluetooth.le.BluetoothLeScanner
 import android.bluetooth.le.ScanCallback
@@ -52,6 +53,7 @@ class PhoneBleScanner @Inject constructor(
     private var scanner: BluetoothLeScanner? = null
     private var activeCallback: ScanCallback? = null
 
+    @SuppressLint("MissingPermission") // Guarded by hasScanPermission() below.
     fun start(
         listener: Listener,
         onFailure: (Int) -> Unit = {},
@@ -138,6 +140,7 @@ class PhoneBleScanner @Inject constructor(
         stopInternal(sc, cb)
     }
 
+    @SuppressLint("MissingPermission") // Guarded by hasScanPermission() below.
     private fun stopInternal(
         sc: BluetoothLeScanner? = scanner,
         cb: ScanCallback? = activeCallback,

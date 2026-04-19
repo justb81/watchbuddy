@@ -1,6 +1,7 @@
 package com.justb81.watchbuddy.service
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.bluetooth.BluetoothManager
 import android.bluetooth.le.AdvertiseCallback
 import android.bluetooth.le.AdvertiseData
@@ -50,6 +51,7 @@ class CompanionBleAdvertiser @Inject constructor(
      * @return true if the advertisement was handed off to the system BLE stack
      *   (the system may still reject it asynchronously via `onStartFailure`).
      */
+    @SuppressLint("MissingPermission") // Guarded by hasAdvertisePermission() below.
     fun start(
         ipv4: Inet4Address,
         port: Int,
@@ -165,6 +167,7 @@ class CompanionBleAdvertiser @Inject constructor(
         stopInternal(adv, cb)
     }
 
+    @SuppressLint("MissingPermission") // Guarded by hasAdvertisePermission() below.
     private fun stopInternal(
         adv: BluetoothLeAdvertiser? = advertiser,
         cb: AdvertiseCallback? = activeCallback,

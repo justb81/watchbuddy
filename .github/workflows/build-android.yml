@@ -7,6 +7,12 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: read
+  pull-requests: write
+  security-events: write
+  actions: read
+
 jobs:
   changes:
     name: Detect Changes
@@ -30,6 +36,7 @@ jobs:
               - 'gradle/**'
               - 'gradle.properties'
               - '.github/actions/**'
+              - 'config/detekt/**'
 
   test-and-build:
     name: Test & Build
@@ -55,6 +62,133 @@ jobs:
 
       - name: Run unit tests
         run: ./gradlew test
+
+      # Static analysis — detekt runs on every subproject; baselines commit the
+      # accepted legacy findings. Any new finding fails the build.
+      - name: Run detekt
+        run: ./gradlew detektAll
+
+      # Android Lint — abortOnError is set on both app modules. Debug variant is
+      # sufficient for PR feedback; release-variant lint runs as part of release.yml.
+      - name: Run Android Lint
+        run: ./gradlew :app-phone:lintDebug :app-tv:lintDebug
+
+      # Always gather SARIF so PRs that failed lint/detekt still get inline
+      # annotations in the Files-changed tab. Flatten to unique names because
+      # upload-sarif rejects duplicate basenames across subdirectories.
+      - name: Collect SARIF reports
+        if: always()
+        run: |
+          mkdir -p sarif-reports
+          while IFS= read -r f; do
+            mod=$(echo "$f" | cut -d/ -f1)
+            name=$(basename "$f")
+            cp "$f" "sarif-reports/${mod}-${name}"
+          done < <(find app-phone app-tv core -type f -name "*.sarif" 2>/dev/null)
+          ls -la sarif-reports/
+
+      - name: Upload SARIF to GitHub code scanning
+        if: always()
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: sarif-reports
+          category: watchbuddy-static-analysis
+
+      - name: Archive analysis reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: static-analysis-reports
+          path: |
+            app-phone/build/reports/detekt/
+            app-tv/build/reports/detekt/
+            core/build/reports/detekt/
+            app-phone/build/reports/lint-results-debug.*
+            app-tv/build/reports/lint-results-debug.*
+          if-no-files-found: ignore
+
+      - name: Post PR lint summary
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            // Count findings in each detekt XML report (Checkstyle-style).
+            const countDetekt = (file) => {
+              if (!fs.existsSync(file)) return 0;
+              const xml = fs.readFileSync(file, 'utf8');
+              return (xml.match(/<error /g) || []).length;
+            };
+
+            // Count findings in an Android Lint SARIF by severity.
+            const countSarif = (file) => {
+              if (!fs.existsSync(file)) return { error: 0, warning: 0, note: 0 };
+              const sarif = JSON.parse(fs.readFileSync(file, 'utf8'));
+              const counts = { error: 0, warning: 0, note: 0 };
+              for (const run of sarif.runs || []) {
+                for (const result of run.results || []) {
+                  const level = result.level || 'warning';
+                  if (counts[level] !== undefined) counts[level]++;
+                }
+              }
+              return counts;
+            };
+
+            const modules = ['app-phone', 'app-tv', 'core'];
+            const detekt = modules.map((m) => ({
+              module: m,
+              count: countDetekt(path.join(m, 'build/reports/detekt/detekt.xml')),
+            }));
+            const lint = ['app-phone', 'app-tv'].map((m) => ({
+              module: m,
+              counts: countSarif(path.join(m, 'build/reports/lint-results-debug.sarif')),
+            }));
+
+            const totalDetekt = detekt.reduce((a, b) => a + b.count, 0);
+            const totalLintError = lint.reduce((a, b) => a + b.counts.error, 0);
+            const totalLintWarn = lint.reduce((a, b) => a + b.counts.warning, 0);
+
+            const body = [
+              '<!-- watchbuddy-lint-report -->',
+              '### Static analysis summary',
+              '',
+              '> Baseline-covered legacy findings are suppressed. Numbers below are **new** findings on this PR.',
+              '',
+              '**detekt (Kotlin)**',
+              '',
+              '| Module | New findings |',
+              '|---|---|',
+              ...detekt.map((d) => `| \`${d.module}\` | ${d.count} |`),
+              `| **Total** | **${totalDetekt}** |`,
+              '',
+              '**Android Lint**',
+              '',
+              '| Module | Errors | Warnings | Notes |',
+              '|---|---|---|---|',
+              ...lint.map((l) => `| \`${l.module}\` | ${l.counts.error} | ${l.counts.warning} | ${l.counts.note} |`),
+              `| **Total** | **${totalLintError}** | **${totalLintWarn}** | — |`,
+              '',
+              'Inline annotations are posted to the **Files changed** tab via GitHub code scanning. Full HTML reports are attached as the `static-analysis-reports` workflow artifact.',
+            ].join('\n');
+
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const marker = '<!-- watchbuddy-lint-report -->';
+
+            const existing = await github.paginate(
+              github.rest.issues.listComments,
+              { owner, repo, issue_number, per_page: 100 },
+            );
+            const found = existing.find((c) => c.body && c.body.includes(marker));
+
+            if (found) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: found.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body });
+            }
 
       - name: Build Phone and TV debug APKs (signed)
         if: steps.keystore.outputs.available == 'true'

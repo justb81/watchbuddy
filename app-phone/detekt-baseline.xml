@@ -1,0 +1,293 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>CyclomaticComplexMethod:CompanionHttpServer.kt$internal fun Application.configureCompanionRoutes( recapGenerator: RecapGenerator, capabilityProvider: DeviceCapabilityProvider, showRepository: ShowRepository, tokenRepository: TokenRepository, tokenRefreshManager: TokenRefreshManager, traktApiService: TraktApiService, tmdbApiService: TmdbApiService, tmdbCache: TmdbCache, settingsRepository: SettingsRepository, avatarImageStore: AvatarImageStore, stateManager: CompanionStateManager )</ID>
+    <ID>CyclomaticComplexMethod:SettingsScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun SettingsScreen( onBack: () -&gt; Unit, onDisconnected: () -&gt; Unit, onConnectClick: () -&gt; Unit, onDiagnosticsClick: () -&gt; Unit = {}, viewModel: SettingsViewModel = hiltViewModel() )</ID>
+    <ID>ImportOrdering:CompanionHttpServer.kt$import com.justb81.watchbuddy.core.locale.LocaleHelper import com.justb81.watchbuddy.core.logging.DiagnosticLog import com.justb81.watchbuddy.core.model.ScrobbleAction import com.justb81.watchbuddy.core.model.ScrobbleDisplayEvent import com.justb81.watchbuddy.core.model.TraktEpisode import com.justb81.watchbuddy.core.model.TraktShow import com.justb81.watchbuddy.core.tmdb.TmdbApiService import com.justb81.watchbuddy.core.tmdb.TmdbCache import com.justb81.watchbuddy.core.trakt.ScrobbleBody import com.justb81.watchbuddy.core.trakt.TraktApiService import com.justb81.watchbuddy.phone.auth.TokenRefreshManager import com.justb81.watchbuddy.phone.auth.TokenRepository import com.justb81.watchbuddy.phone.llm.RecapGenerator import com.justb81.watchbuddy.phone.settings.AvatarImageStore import com.justb81.watchbuddy.phone.settings.SettingsRepository import com.justb81.watchbuddy.service.CompanionStateManager import kotlinx.coroutines.async import kotlinx.coroutines.awaitAll import kotlinx.coroutines.coroutineScope import kotlinx.coroutines.flow.first import io.ktor.http.* import io.ktor.server.application.* import io.ktor.server.engine.* import io.ktor.server.netty.* import io.ktor.server.plugins.contentnegotiation.* import io.ktor.server.request.* import io.ktor.server.response.* import io.ktor.server.routing.* import com.justb81.watchbuddy.core.network.WatchBuddyJson import io.ktor.serialization.kotlinx.json.* import kotlinx.serialization.Serializable import javax.inject.Inject import javax.inject.Singleton</ID>
+    <ID>ImportOrdering:CompanionHttpServerTest.kt$import com.justb81.watchbuddy.core.model.EnrichedShowEntry import com.justb81.watchbuddy.core.model.LlmBackend import com.justb81.watchbuddy.core.model.ScrobbleAction import com.justb81.watchbuddy.core.model.DeviceCapability import com.justb81.watchbuddy.core.model.TmdbEpisode import com.justb81.watchbuddy.core.model.TmdbShow import com.justb81.watchbuddy.core.model.TraktEpisode import com.justb81.watchbuddy.core.model.TraktIds import com.justb81.watchbuddy.core.model.TraktShow import com.justb81.watchbuddy.core.model.TraktWatchedEntry import com.justb81.watchbuddy.core.model.TraktWatchedEpisode import com.justb81.watchbuddy.core.model.TraktWatchedSeason import com.justb81.watchbuddy.core.tmdb.TmdbApiService import com.justb81.watchbuddy.core.tmdb.TmdbCache import com.justb81.watchbuddy.core.trakt.ScrobbleResponse import com.justb81.watchbuddy.core.trakt.TraktApiService import com.justb81.watchbuddy.phone.auth.TokenRefreshManager import com.justb81.watchbuddy.phone.auth.TokenRepository import com.justb81.watchbuddy.phone.llm.RecapGenerator import com.justb81.watchbuddy.phone.settings.AvatarImageStore import com.justb81.watchbuddy.phone.settings.SettingsRepository import com.justb81.watchbuddy.service.CompanionStateManager import io.ktor.client.request.* import io.ktor.client.statement.* import io.ktor.http.* import io.ktor.server.testing.* import io.mockk.* import kotlinx.coroutines.flow.flowOf import org.junit.jupiter.api.Assertions.* import org.junit.jupiter.api.BeforeEach import org.junit.jupiter.api.DisplayName import org.junit.jupiter.api.Nested import org.junit.jupiter.api.Test</ID>
+    <ID>ImportOrdering:HomeViewModelTest.kt$import android.app.Application import com.justb81.watchbuddy.core.model.EnrichedShowEntry import com.justb81.watchbuddy.phone.MainDispatcherRule import com.justb81.watchbuddy.phone.TestFixtures import com.justb81.watchbuddy.phone.auth.TokenRepository import com.justb81.watchbuddy.phone.network.WifiStateProvider import com.justb81.watchbuddy.phone.server.ShowRepository import com.justb81.watchbuddy.phone.settings.AppSettings import com.justb81.watchbuddy.phone.settings.SettingsRepository import com.justb81.watchbuddy.service.CompanionStateManager import io.mockk.coEvery import io.mockk.coVerify import io.mockk.every import io.mockk.mockk import okhttp3.ResponseBody import retrofit2.HttpException import kotlinx.coroutines.ExperimentalCoroutinesApi import kotlinx.coroutines.flow.MutableStateFlow import kotlinx.coroutines.flow.flow import kotlinx.coroutines.flow.flowOf import kotlinx.coroutines.test.advanceUntilIdle import kotlinx.coroutines.test.runTest import org.junit.jupiter.api.Assertions.* import org.junit.jupiter.api.BeforeEach import org.junit.jupiter.api.DisplayName import org.junit.jupiter.api.Nested import org.junit.jupiter.api.Test import org.junit.jupiter.api.extension.RegisterExtension</ID>
+    <ID>ImportOrdering:InitialsAvatar.kt$import androidx.compose.foundation.background import androidx.compose.foundation.layout.Box import androidx.compose.foundation.layout.size import androidx.compose.foundation.shape.CircleShape import androidx.compose.runtime.Composable import androidx.compose.ui.Alignment import androidx.compose.ui.Modifier import androidx.compose.ui.draw.clip import androidx.compose.ui.graphics.Color import androidx.compose.ui.text.font.FontWeight import androidx.compose.ui.unit.Dp import androidx.compose.ui.unit.TextUnit import androidx.compose.ui.unit.sp import androidx.compose.material3.MaterialTheme import androidx.compose.material3.Text</ID>
+    <ID>ImportOrdering:ModelDownloadWorkerTest.kt$import android.content.Context import androidx.work.Data import androidx.work.ListenableWorker.Result import androidx.work.WorkerParameters import com.justb81.watchbuddy.phone.settings.SettingsRepository import io.mockk.coEvery import io.mockk.every import io.mockk.just import io.mockk.Runs import io.mockk.mockk import io.mockk.spyk import io.mockk.verify import kotlinx.coroutines.test.runTest import okhttp3.OkHttpClient import okhttp3.mockwebserver.MockResponse import okhttp3.mockwebserver.MockWebServer import okhttp3.mockwebserver.SocketPolicy import org.junit.jupiter.api.AfterEach import org.junit.jupiter.api.Assertions.* import org.junit.jupiter.api.BeforeEach import org.junit.jupiter.api.DisplayName import org.junit.jupiter.api.Nested import org.junit.jupiter.api.Test import org.junit.jupiter.api.io.TempDir import java.io.File</ID>
+    <ID>ImportOrdering:OnboardingScreen.kt$import android.content.ClipData import android.widget.Toast import kotlinx.coroutines.launch import androidx.compose.animation.* import androidx.compose.foundation.background import androidx.compose.foundation.border import androidx.compose.foundation.clickable import androidx.compose.foundation.layout.* import androidx.compose.foundation.shape.RoundedCornerShape import androidx.compose.material.icons.Icons import androidx.compose.material.icons.filled.Warning import androidx.compose.material3.* import androidx.compose.runtime.* import androidx.compose.runtime.rememberCoroutineScope import androidx.compose.ui.Alignment import androidx.compose.ui.Modifier import androidx.compose.ui.graphics.Color import androidx.compose.ui.platform.LocalClipboard import androidx.compose.ui.platform.LocalContext import androidx.compose.ui.platform.LocalUriHandler import androidx.compose.ui.platform.ClipEntry import androidx.compose.ui.res.stringResource import androidx.compose.ui.text.font.FontFamily import androidx.compose.ui.text.font.FontWeight import androidx.compose.ui.text.style.TextAlign import androidx.compose.ui.text.style.TextDecoration import androidx.compose.ui.unit.dp import androidx.compose.ui.unit.sp import androidx.hilt.navigation.compose.hiltViewModel import com.justb81.watchbuddy.R</ID>
+    <ID>ImportOrdering:OnboardingViewModel.kt$import android.app.Application import androidx.lifecycle.AndroidViewModel import androidx.lifecycle.viewModelScope import com.justb81.watchbuddy.R import com.justb81.watchbuddy.core.network.TokenProxyServiceFactory import com.justb81.watchbuddy.core.trakt.DeviceCodeRequest import com.justb81.watchbuddy.core.trakt.DeviceCodeResponse import com.justb81.watchbuddy.core.trakt.DeviceTokenRequest import com.justb81.watchbuddy.core.trakt.ProxyTokenRequest import com.justb81.watchbuddy.core.trakt.TokenProxyService import com.justb81.watchbuddy.core.trakt.TraktApiService import com.justb81.watchbuddy.phone.auth.TokenRepository import com.justb81.watchbuddy.phone.settings.SettingsRepository import com.justb81.watchbuddy.phone.ui.settings.AuthMode import dagger.hilt.android.lifecycle.HiltViewModel import kotlinx.coroutines.Job import kotlinx.coroutines.cancelAndJoin import kotlinx.coroutines.delay import kotlinx.coroutines.flow.MutableStateFlow import kotlinx.coroutines.flow.StateFlow import kotlinx.coroutines.flow.asStateFlow import kotlinx.coroutines.flow.first import kotlinx.coroutines.isActive import kotlinx.coroutines.launch import com.justb81.watchbuddy.core.trakt.isServerMisconfigured import retrofit2.HttpException import javax.inject.Inject import javax.inject.Named</ID>
+    <ID>ImportOrdering:OnboardingViewModelTest.kt$import android.app.Application import com.justb81.watchbuddy.core.network.TokenProxyServiceFactory import com.justb81.watchbuddy.core.trakt.DeviceCodeResponse import com.justb81.watchbuddy.core.trakt.DeviceTokenResponse import com.justb81.watchbuddy.core.trakt.ProxyTokenResponse import com.justb81.watchbuddy.core.trakt.TokenProxyService import com.justb81.watchbuddy.core.trakt.TraktApiService import com.justb81.watchbuddy.core.trakt.TraktUserProfile import com.justb81.watchbuddy.phone.MainDispatcherRule import com.justb81.watchbuddy.phone.auth.TokenRepository import com.justb81.watchbuddy.phone.settings.AppSettings import com.justb81.watchbuddy.phone.settings.SettingsRepository import com.justb81.watchbuddy.phone.ui.settings.AuthMode import io.mockk.coEvery import io.mockk.coVerify import io.mockk.every import io.mockk.mockk import kotlinx.coroutines.ExperimentalCoroutinesApi import kotlinx.coroutines.flow.flowOf import kotlinx.coroutines.test.advanceUntilIdle import kotlinx.coroutines.test.runTest import org.junit.jupiter.api.Assertions.* import org.junit.jupiter.api.BeforeEach import org.junit.jupiter.api.DisplayName import org.junit.jupiter.api.Nested import org.junit.jupiter.api.Test import org.junit.jupiter.api.extension.RegisterExtension import okhttp3.ResponseBody.Companion.toResponseBody import retrofit2.HttpException import retrofit2.Response</ID>
+    <ID>ImportOrdering:SettingsViewModel.kt$import android.app.Application import android.net.Uri import android.util.Log import androidx.lifecycle.AndroidViewModel import androidx.lifecycle.viewModelScope import androidx.work.Constraints import androidx.work.ExistingWorkPolicy import androidx.work.NetworkType import androidx.work.OneTimeWorkRequestBuilder import androidx.work.WorkInfo import androidx.work.WorkManager import androidx.work.workDataOf import com.justb81.watchbuddy.R import com.justb81.watchbuddy.core.logging.DiagnosticLog import com.justb81.watchbuddy.core.model.AvatarSource import com.justb81.watchbuddy.core.trakt.TraktApiService import com.justb81.watchbuddy.phone.auth.TokenRepository import com.justb81.watchbuddy.service.CompanionService import com.justb81.watchbuddy.phone.llm.LlmOrchestrator import com.justb81.watchbuddy.phone.llm.ModelDownloadWorker import com.justb81.watchbuddy.phone.server.DeviceCapabilityProvider import com.justb81.watchbuddy.phone.settings.AppSettings import com.justb81.watchbuddy.phone.settings.AvatarImageStore import com.justb81.watchbuddy.phone.settings.SettingsRepository import dagger.hilt.android.lifecycle.HiltViewModel import kotlinx.coroutines.CoroutineExceptionHandler import kotlinx.coroutines.CoroutineScope import kotlinx.coroutines.Job import kotlinx.coroutines.flow.MutableStateFlow import kotlinx.coroutines.flow.StateFlow import kotlinx.coroutines.flow.asStateFlow import kotlinx.coroutines.flow.catch import kotlinx.coroutines.flow.first import kotlinx.coroutines.launch import javax.inject.Inject import javax.inject.Named</ID>
+    <ID>LongMethod:CompanionHttpServer.kt$internal fun Application.configureCompanionRoutes( recapGenerator: RecapGenerator, capabilityProvider: DeviceCapabilityProvider, showRepository: ShowRepository, tokenRepository: TokenRepository, tokenRefreshManager: TokenRefreshManager, traktApiService: TraktApiService, tmdbApiService: TmdbApiService, tmdbCache: TmdbCache, settingsRepository: SettingsRepository, avatarImageStore: AvatarImageStore, stateManager: CompanionStateManager )</ID>
+    <ID>LongMethod:DiagnosticsScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun DiagnosticsScreen( onBack: () -&gt; Unit, viewModel: DiagnosticsViewModel = hiltViewModel(), )</ID>
+    <ID>LongMethod:HomeScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun HomeScreen( onSettingsClick: () -&gt; Unit, onConnectClick: () -&gt; Unit, onShowClick: (traktShowId: Int) -&gt; Unit = {}, viewModel: HomeViewModel = hiltViewModel() )</ID>
+    <ID>LongMethod:HomeScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable private fun HomeContent( state: HomeUiState, onShowClick: (Int) -&gt; Unit, onToggleWatchingTv: (Boolean) -&gt; Unit, isRefreshing: Boolean, onRefresh: () -&gt; Unit )</ID>
+    <ID>LongMethod:OnboardingScreen.kt$@Composable fun OnboardingScreen( onSuccess: () -&gt; Unit, onSkip: () -&gt; Unit, onOpenSettings: () -&gt; Unit = {}, isReconnect: Boolean = false, viewModel: OnboardingViewModel = hiltViewModel() )</ID>
+    <ID>LongMethod:OnboardingScreen.kt$@Composable private fun PinCard(userCode: String, verificationUrl: String, expiresIn: Int)</ID>
+    <ID>LongMethod:OnboardingViewModel.kt$OnboardingViewModel$private suspend fun startPolling( response: DeviceCodeResponse, authMode: AuthMode, backendUrl: String, clientId: String )</ID>
+    <ID>LongMethod:SettingsScreen.kt$@Composable private fun AdvancedAuthSettings(uiState: SettingsUiState, viewModel: SettingsViewModel)</ID>
+    <ID>LongMethod:SettingsScreen.kt$@Composable private fun IdentitySection( state: SettingsUiState, onDisplayNameChange: (String) -&gt; Unit, onAvatarSourceChange: (AvatarSource) -&gt; Unit, onChoosePhotoClick: () -&gt; Unit )</ID>
+    <ID>LongMethod:SettingsScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun SettingsScreen( onBack: () -&gt; Unit, onDisconnected: () -&gt; Unit, onConnectClick: () -&gt; Unit, onDiagnosticsClick: () -&gt; Unit = {}, viewModel: SettingsViewModel = hiltViewModel() )</ID>
+    <ID>LongMethod:ShowDetailScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun ShowDetailScreen( onBack: () -&gt; Unit, viewModel: ShowDetailViewModel = hiltViewModel() )</ID>
+    <ID>LongParameterList:CompanionHttpServer.kt$( recapGenerator: RecapGenerator, capabilityProvider: DeviceCapabilityProvider, showRepository: ShowRepository, tokenRepository: TokenRepository, tokenRefreshManager: TokenRefreshManager, traktApiService: TraktApiService, tmdbApiService: TmdbApiService, tmdbCache: TmdbCache, settingsRepository: SettingsRepository, avatarImageStore: AvatarImageStore, stateManager: CompanionStateManager )</ID>
+    <ID>LongParameterList:CompanionHttpServer.kt$CompanionHttpServer$( private val recapGenerator: RecapGenerator, private val capabilityProvider: DeviceCapabilityProvider, private val showRepository: ShowRepository, private val tokenRepository: TokenRepository, private val tokenRefreshManager: TokenRefreshManager, private val traktApiService: TraktApiService, private val tmdbApiService: TmdbApiService, private val tmdbCache: TmdbCache, private val settingsRepository: SettingsRepository, private val avatarImageStore: AvatarImageStore, private val stateManager: CompanionStateManager )</ID>
+    <ID>LongParameterList:OnboardingViewModel.kt$OnboardingViewModel$( application: Application, private val traktApi: TraktApiService, private val tokenProxy: TokenProxyService, @param:Named("traktClientId") private val buildConfigClientId: String, private val tokenRepository: TokenRepository, private val settingsRepository: SettingsRepository, private val tokenProxyServiceFactory: TokenProxyServiceFactory, @Named("managedBackendAvailable") private val managedBackendAvailable: Boolean )</ID>
+    <ID>LongParameterList:SettingsViewModel.kt$SettingsViewModel$( application: Application, private val workManager: WorkManager, private val llmOrchestrator: LlmOrchestrator, private val traktApi: TraktApiService, private val tokenRepository: TokenRepository, private val deviceCapabilityProvider: DeviceCapabilityProvider, private val settingsRepository: SettingsRepository, private val avatarImageStore: AvatarImageStore, @Named("managedBackendAvailable") private val managedBackendAvailable: Boolean )</ID>
+    <ID>MagicNumber:CompanionBleAdvertiser.kt$CompanionBleAdvertiser$255</ID>
+    <ID>MagicNumber:CompanionHttpServer.kt$8</ID>
+    <ID>MagicNumber:CompanionService.kt$CompanionService$1000</ID>
+    <ID>MagicNumber:DeviceCapabilityProvider.kt$DeviceCapabilityProvider$1_048_576</ID>
+    <ID>MagicNumber:DiagnosticsScreen.kt$0xFF2E7D32</ID>
+    <ID>MagicNumber:DiagnosticsScreen.kt$0xFFF9A825</ID>
+    <ID>MagicNumber:DiagnosticsScreen.kt$1000</ID>
+    <ID>MagicNumber:DiagnosticsScreen.kt$3_600</ID>
+    <ID>MagicNumber:DiagnosticsScreen.kt$5</ID>
+    <ID>MagicNumber:DiagnosticsScreen.kt$60</ID>
+    <ID>MagicNumber:DiagnosticsScreen.kt$60_000</ID>
+    <ID>MagicNumber:FallbackProvider.kt$FallbackProvider$4</ID>
+    <ID>MagicNumber:FallbackProvider.kt$FallbackProvider$6</ID>
+    <ID>MagicNumber:HomeScreen.kt$1000L</ID>
+    <ID>MagicNumber:HomeScreen.kt$180f</ID>
+    <ID>MagicNumber:HomeScreen.kt$2</ID>
+    <ID>MagicNumber:HomeScreen.kt$24</ID>
+    <ID>MagicNumber:HomeScreen.kt$300</ID>
+    <ID>MagicNumber:HomeScreen.kt$3f</ID>
+    <ID>MagicNumber:HomeScreen.kt$500</ID>
+    <ID>MagicNumber:HomeScreen.kt$60</ID>
+    <ID>MagicNumber:HomeViewModel.kt$HomeViewModel$401</ID>
+    <ID>MagicNumber:HomeViewModel.kt$HomeViewModel$403</ID>
+    <ID>MagicNumber:InitialsAvatar.kt$0xFF26A69A</ID>
+    <ID>MagicNumber:InitialsAvatar.kt$0xFF5B8DEF</ID>
+    <ID>MagicNumber:InitialsAvatar.kt$0xFF66BB6A</ID>
+    <ID>MagicNumber:InitialsAvatar.kt$0xFFAB47BC</ID>
+    <ID>MagicNumber:InitialsAvatar.kt$0xFFEC407A</ID>
+    <ID>MagicNumber:InitialsAvatar.kt$0xFFEF5350</ID>
+    <ID>MagicNumber:InitialsAvatar.kt$0xFFFFA726</ID>
+    <ID>MagicNumber:InitialsAvatar.kt$0xFFFFCA28</ID>
+    <ID>MagicNumber:InitialsAvatar.kt$2.5f</ID>
+    <ID>MagicNumber:InitialsAvatar.kt$31</ID>
+    <ID>MagicNumber:LlmOrchestrator.kt$LlmOrchestrator$1_048_576</ID>
+    <ID>MagicNumber:LlmOrchestrator.kt$LlmOrchestrator$34</ID>
+    <ID>MagicNumber:ModelDownloadWorker.kt$ModelDownloadWorker$99</ID>
+    <ID>MagicNumber:OnboardingScreen.kt$0.6f</ID>
+    <ID>MagicNumber:OnboardingViewModel.kt$OnboardingViewModel$1_000</ID>
+    <ID>MagicNumber:OnboardingViewModel.kt$OnboardingViewModel$1_000L</ID>
+    <ID>MagicNumber:OnboardingViewModel.kt$OnboardingViewModel$3</ID>
+    <ID>MagicNumber:OnboardingViewModel.kt$OnboardingViewModel$400</ID>
+    <ID>MagicNumber:OnboardingViewModel.kt$OnboardingViewModel$429</ID>
+    <ID>MagicNumber:OnboardingViewModel.kt$OnboardingViewModel$503</ID>
+    <ID>MagicNumber:RecapGenerator.kt$RecapGenerator$8</ID>
+    <ID>MagicNumber:ShowDetailViewModel.kt$ShowDetailViewModel$300</ID>
+    <ID>MagicNumber:TokenRepository.kt$TokenRepository$1_000L</ID>
+    <ID>MatchingDeclarationName:BluetoothAdvertisePermissionHandler.kt$BluetoothAdvertisePermission</ID>
+    <ID>MatchingDeclarationName:NotificationPermissionHandler.kt$NotificationPermission</ID>
+    <ID>MatchingDeclarationName:PhoneNavGraph.kt$PhoneRoute</ID>
+    <ID>MaxLineLength:CompanionHttpServerTest.kt$CompanionHttpServerTest.ScrobbleEndpoints$private val scrobbleBody = """{"show":{"title":"Breaking Bad","year":2008,"ids":{"trakt":1}},"episode":{"season":1,"number":1,"ids":{}},"progress":0.0}"""</ID>
+    <ID>MaxLineLength:CompanionHttpServerTest.kt$CompanionHttpServerTest.ScrobbleEndpoints$val pauseBody = """{"show":{"title":"Breaking Bad","year":2008,"ids":{"trakt":1}},"episode":{"season":1,"number":1,"ids":{}},"progress":50.0}"""</ID>
+    <ID>MaxLineLength:CompanionHttpServerTest.kt$CompanionHttpServerTest.ScrobbleEndpoints$val stopBody = """{"show":{"title":"Breaking Bad","year":2008,"ids":{"trakt":1}},"episode":{"season":1,"number":1,"ids":{}},"progress":100.0}"""</ID>
+    <ID>MultiLineIfElse:DiagnosticsScreen.kt$Status.OK</ID>
+    <ID>MultiLineIfElse:DiagnosticsScreen.kt$stringResource(R.string.diagnostics_value_no)</ID>
+    <ID>MultiLineIfElse:DiagnosticsScreen.kt$stringResource(R.string.diagnostics_value_yes)</ID>
+    <ID>MultiLineIfElse:HomeScreen.kt$Color.White.copy(alpha = 0.85f)</ID>
+    <ID>MultiLineIfElse:HomeScreen.kt$MaterialTheme.colorScheme.onPrimaryContainer</ID>
+    <ID>MultiLineIfElse:HomeScreen.kt$MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)</ID>
+    <ID>MultiLineIfElse:HomeScreen.kt$MaterialTheme.colorScheme.onSurface</ID>
+    <ID>MultiLineIfElse:HomeScreen.kt$MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)</ID>
+    <ID>MultiLineIfElse:HomeScreen.kt$MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)</ID>
+    <ID>MultiLineIfElse:HomeScreen.kt$MaterialTheme.colorScheme.onSurfaceVariant</ID>
+    <ID>MultiLineIfElse:HomeScreen.kt$MaterialTheme.colorScheme.primaryContainer</ID>
+    <ID>MultiLineIfElse:HomeScreen.kt$MaterialTheme.colorScheme.surfaceVariant</ID>
+    <ID>MultiLineIfElse:HomeViewModel.kt$HomeViewModel$event</ID>
+    <ID>MultiLineIfElse:HomeViewModel.kt$HomeViewModel$null</ID>
+    <ID>MultiLineIfElse:OnboardingScreen.kt$MaterialTheme.colorScheme.error</ID>
+    <ID>MultiLineIfElse:OnboardingScreen.kt$MaterialTheme.colorScheme.primary</ID>
+    <ID>MultiLineIfElse:OnboardingScreen.kt$R.string.onboarding_skip</ID>
+    <ID>MultiLineIfElse:OnboardingScreen.kt$R.string.settings_cancel</ID>
+    <ID>MultiLineIfElse:OnboardingScreen.kt$stringResource(R.string.app_name)</ID>
+    <ID>MultiLineIfElse:OnboardingScreen.kt$stringResource(R.string.onboarding_reconnect_title)</ID>
+    <ID>MultiLineIfElse:SettingsScreen.kt$MaterialTheme.colorScheme.onSurface</ID>
+    <ID>MultiLineIfElse:SettingsScreen.kt$MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)</ID>
+    <ID>MultiLineIfElse:SettingsScreen.kt$MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)</ID>
+    <ID>MultiLineIfElse:SettingsScreen.kt$MaterialTheme.colorScheme.primary</ID>
+    <ID>MultiLineIfElse:SettingsScreen.kt$null</ID>
+    <ID>MultiLineIfElse:SettingsScreen.kt$stringResource(R.string.settings_advanced_hide)</ID>
+    <ID>MultiLineIfElse:SettingsScreen.kt$stringResource(R.string.settings_advanced_show)</ID>
+    <ID>MultiLineIfElse:SettingsScreen.kt$stringResource(R.string.settings_companion_running)</ID>
+    <ID>MultiLineIfElse:SettingsScreen.kt$stringResource(R.string.settings_companion_stopped)</ID>
+    <ID>MultiLineIfElse:ShowDetailScreen.kt$"$prefix — ${episode.title}"</ID>
+    <ID>MultiLineIfElse:ShowDetailScreen.kt$R.string.show_detail_cd_collapse_season</ID>
+    <ID>MultiLineIfElse:ShowDetailScreen.kt$R.string.show_detail_cd_expand_season</ID>
+    <ID>MultiLineIfElse:ShowDetailScreen.kt$prefix</ID>
+    <ID>MultiLineIfElse:ShowRepository.kt$ShowRepository$s</ID>
+    <ID>MultiLineIfElse:ShowRepository.kt$ShowRepository$s.copy( episodes = (s.episodes + TraktWatchedEpisode(number = episode, last_watched_at = now)) .sortedBy { it.number } )</ID>
+    <ID>MultiLineIfElse:ShowRepositoryTest.kt$ShowRepositoryTest$emptyList()</ID>
+    <ID>MultiLineIfElse:ShowRepositoryTest.kt$ShowRepositoryTest$listOf( TraktWatchedSeason( number = 1, episodes = listOf(TraktWatchedEpisode(number = 1, last_watched_at = lastWatchedAt)) ) )</ID>
+    <ID>NoMultipleSpaces:CompanionStateManagerTest.kt$CompanionStateManagerTest$ </ID>
+    <ID>NoMultipleSpaces:HomeScreen.kt$ </ID>
+    <ID>NoMultipleSpaces:LlmOrchestrator.kt$LlmOrchestrator.LlmConfig$ </ID>
+    <ID>NoMultipleSpaces:OnboardingScreen.kt$ </ID>
+    <ID>NoMultipleSpaces:OnboardingViewModel.kt$OnboardingViewModel$ </ID>
+    <ID>NoMultipleSpaces:OnboardingViewModelTest.kt$OnboardingViewModelTest.PollingErrorHandling$ </ID>
+    <ID>NoMultipleSpaces:PhoneNavGraph.kt$ </ID>
+    <ID>NoMultipleSpaces:PhoneNavGraph.kt$PhoneRoute.Connect$ </ID>
+    <ID>NoMultipleSpaces:PhoneNavGraph.kt$PhoneRoute.Home$ </ID>
+    <ID>NoMultipleSpaces:PhoneNavGraph.kt$PhoneRoute.Onboarding$ </ID>
+    <ID>NoMultipleSpaces:PhoneNavGraph.kt$PhoneRoute.Settings$ </ID>
+    <ID>NoMultipleSpaces:PhoneNavGraph.kt$PhoneRoute.ShowDetail$ </ID>
+    <ID>NoMultipleSpaces:RecapGenerator.kt$RecapGenerator$ </ID>
+    <ID>NoMultipleSpaces:SettingsScreen.kt$ </ID>
+    <ID>NoMultipleSpaces:SettingsViewModel.kt$SettingsUiState$ </ID>
+    <ID>NoMultipleSpaces:SettingsViewModel.kt$SettingsViewModel$ </ID>
+    <ID>NoMultipleSpaces:Theme.kt$ </ID>
+    <ID>NoUnusedImports:LlmOrchestratorTest.kt$com.justb81.watchbuddy.phone.llm.LlmOrchestratorTest.kt</ID>
+    <ID>NoUnusedImports:OnboardingScreen.kt$com.justb81.watchbuddy.phone.ui.onboarding.OnboardingScreen.kt</ID>
+    <ID>NoUnusedImports:OnboardingViewModelTest.kt$com.justb81.watchbuddy.phone.ui.onboarding.OnboardingViewModelTest.kt</ID>
+    <ID>NoUnusedImports:SettingsScreen.kt$com.justb81.watchbuddy.phone.ui.settings.SettingsScreen.kt</ID>
+    <ID>NoUnusedImports:SettingsViewModel.kt$com.justb81.watchbuddy.phone.ui.settings.SettingsViewModel.kt</ID>
+    <ID>NoWildcardImports:AiCoreLlmProviderTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>NoWildcardImports:AppSettingsTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>NoWildcardImports:CompanionHttpServer.kt$import io.ktor.http.*</ID>
+    <ID>NoWildcardImports:CompanionHttpServer.kt$import io.ktor.serialization.kotlinx.json.*</ID>
+    <ID>NoWildcardImports:CompanionHttpServer.kt$import io.ktor.server.application.*</ID>
+    <ID>NoWildcardImports:CompanionHttpServer.kt$import io.ktor.server.engine.*</ID>
+    <ID>NoWildcardImports:CompanionHttpServer.kt$import io.ktor.server.netty.*</ID>
+    <ID>NoWildcardImports:CompanionHttpServer.kt$import io.ktor.server.plugins.contentnegotiation.*</ID>
+    <ID>NoWildcardImports:CompanionHttpServer.kt$import io.ktor.server.request.*</ID>
+    <ID>NoWildcardImports:CompanionHttpServer.kt$import io.ktor.server.response.*</ID>
+    <ID>NoWildcardImports:CompanionHttpServer.kt$import io.ktor.server.routing.*</ID>
+    <ID>NoWildcardImports:CompanionHttpServerTest.kt$import io.ktor.client.request.*</ID>
+    <ID>NoWildcardImports:CompanionHttpServerTest.kt$import io.ktor.client.statement.*</ID>
+    <ID>NoWildcardImports:CompanionHttpServerTest.kt$import io.ktor.http.*</ID>
+    <ID>NoWildcardImports:CompanionHttpServerTest.kt$import io.ktor.server.testing.*</ID>
+    <ID>NoWildcardImports:CompanionHttpServerTest.kt$import io.mockk.*</ID>
+    <ID>NoWildcardImports:CompanionHttpServerTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>NoWildcardImports:DeviceCapabilityProviderTest.kt$import io.mockk.*</ID>
+    <ID>NoWildcardImports:DeviceCapabilityProviderTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>NoWildcardImports:DiagnosticsScreen.kt$import androidx.compose.foundation.layout.*</ID>
+    <ID>NoWildcardImports:DiagnosticsScreen.kt$import androidx.compose.material3.*</ID>
+    <ID>NoWildcardImports:DiagnosticsScreen.kt$import androidx.compose.runtime.*</ID>
+    <ID>NoWildcardImports:EpisodeRepositoryTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>NoWildcardImports:FallbackProviderTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>NoWildcardImports:HomeScreen.kt$import androidx.compose.foundation.layout.*</ID>
+    <ID>NoWildcardImports:HomeScreen.kt$import androidx.compose.material3.*</ID>
+    <ID>NoWildcardImports:HomeScreen.kt$import androidx.compose.runtime.*</ID>
+    <ID>NoWildcardImports:HomeViewModelTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>NoWildcardImports:LlmOrchestratorTest.kt$import io.mockk.*</ID>
+    <ID>NoWildcardImports:LlmOrchestratorTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>NoWildcardImports:LlmProviderFactoryTest.kt$import io.mockk.*</ID>
+    <ID>NoWildcardImports:LlmProviderFactoryTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>NoWildcardImports:ModelDownloadWorkerTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>NoWildcardImports:OnboardingScreen.kt$import androidx.compose.animation.*</ID>
+    <ID>NoWildcardImports:OnboardingScreen.kt$import androidx.compose.foundation.layout.*</ID>
+    <ID>NoWildcardImports:OnboardingScreen.kt$import androidx.compose.material3.*</ID>
+    <ID>NoWildcardImports:OnboardingScreen.kt$import androidx.compose.runtime.*</ID>
+    <ID>NoWildcardImports:OnboardingViewModelTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>NoWildcardImports:RecapGeneratorTest.kt$import io.mockk.*</ID>
+    <ID>NoWildcardImports:RecapGeneratorTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>NoWildcardImports:SettingsScreen.kt$import androidx.compose.foundation.layout.*</ID>
+    <ID>NoWildcardImports:SettingsScreen.kt$import androidx.compose.material3.*</ID>
+    <ID>NoWildcardImports:SettingsScreen.kt$import androidx.compose.runtime.*</ID>
+    <ID>NoWildcardImports:SettingsViewModelTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>NoWildcardImports:ShowDetailScreen.kt$import androidx.compose.foundation.layout.*</ID>
+    <ID>NoWildcardImports:ShowDetailScreen.kt$import androidx.compose.material3.*</ID>
+    <ID>NoWildcardImports:ShowDetailScreen.kt$import androidx.compose.runtime.*</ID>
+    <ID>NoWildcardImports:ShowDetailViewModelTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>NoWildcardImports:ShowRepositoryTest.kt$import io.mockk.*</ID>
+    <ID>NoWildcardImports:ShowRepositoryTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>NoWildcardImports:TestFixtures.kt$import com.justb81.watchbuddy.core.model.*</ID>
+    <ID>ReturnCount:CompanionBleAdvertiser.kt$CompanionBleAdvertiser$@SuppressLint("MissingPermission") // Guarded by hasAdvertisePermission() below. fun start( ipv4: Inet4Address, port: Int, modelQuality: Int, llmBackendOrdinal: Int, ): Boolean</ID>
+    <ID>ReturnCount:CompanionService.kt$CompanionService$private fun wifiIpv4Address(): InetAddress?</ID>
+    <ID>SpacingBetweenDeclarationsWithAnnotations:CompanionService.kt$CompanionService$/** * Last IPv4 address published in the NSD TXT record / pinned as * [NsdServiceInfo.host]. Used by [registerNetworkCallback] to skip the * full `unregister → 300 ms → register` dance when Wi-Fi re-announces a * network whose IPv4 didn't actually change (#345 Opt D): on many OEM * stacks `NetworkCallback.onAvailable` fires repeatedly during captive * portal / DNS retries without any real handoff, and each churn briefly * removes our advertisement from the network. */ @Volatile private var lastRegisteredIpv4: String? = null</ID>
+    <ID>SpacingBetweenDeclarationsWithAnnotations:CompanionService.kt$CompanionService$@Inject lateinit var bleAdvertiser: CompanionBleAdvertiser</ID>
+    <ID>SpacingBetweenDeclarationsWithAnnotations:CompanionService.kt$CompanionService$@Inject lateinit var llmOrchestrator: LlmOrchestrator</ID>
+    <ID>SpacingBetweenDeclarationsWithAnnotations:CompanionService.kt$CompanionService$@Inject lateinit var settingsRepository: SettingsRepository</ID>
+    <ID>SpacingBetweenDeclarationsWithAnnotations:CompanionService.kt$CompanionService$@Inject lateinit var stateManager: CompanionStateManager</ID>
+    <ID>SpacingBetweenDeclarationsWithAnnotations:CompanionService.kt$CompanionService$@Volatile private var nsdState: NsdState = NsdState.IDLE</ID>
+    <ID>SpacingBetweenDeclarationsWithAnnotations:CompanionStateManager.kt$CompanionStateManager$@Volatile private var lastMissAtMs: Long = 0L</ID>
+    <ID>SpacingBetweenDeclarationsWithComments:CompanionService.kt$CompanionService$/** * Last IPv4 address published in the NSD TXT record / pinned as * [NsdServiceInfo.host]. Used by [registerNetworkCallback] to skip the * full `unregister → 300 ms → register` dance when Wi-Fi re-announces a * network whose IPv4 didn't actually change (#345 Opt D): on many OEM * stacks `NetworkCallback.onAvailable` fires repeatedly during captive * portal / DNS retries without any real handoff, and each churn briefly * removes our advertisement from the network. */</ID>
+    <ID>SpacingBetweenDeclarationsWithComments:CompanionService.kt$CompanionService.Companion$/** Auto-deactivate if no TV has polled /capability for this long. */</ID>
+    <ID>SpacingBetweenDeclarationsWithComments:CompanionStateManager.kt$CompanionStateManager$/** * True once the phone has received [STEADY_STATE_STREAK] consecutive * `/capability` polls from TVs within the expected cadence and no miss * has invalidated the streak. Consumers (notably [CompanionBleAdvertiser]) * can demote to a lower-power BLE advertise mode while this is true, * because a TV that's polling us over Wi-Fi doesn't need a fast-cadence * BLE beacon to rediscover us (#345 Opt B). * * Reverts to false on any heartbeat miss (poll gap &gt; [MISS_THRESHOLD_MS]). * After a miss, the [HYSTERESIS_MS] window guards re-entry so a flaky TV * that drops Wi-Fi every 90s doesn't make us oscillate. */</ID>
+    <ID>SpacingBetweenDeclarationsWithComments:CompanionStateManager.kt$CompanionStateManager$/** Bound listen address of [CompanionHttpServer] (e.g. `0.0.0.0:8765`), or null when stopped. */</ID>
+    <ID>SpacingBetweenDeclarationsWithComments:CompanionStateManager.kt$CompanionStateManager$/** Current state of the BLE fallback advertiser. */</ID>
+    <ID>SpacingBetweenDeclarationsWithComments:CompanionStateManager.kt$CompanionStateManager$/** Epoch millis of the most recent `/capability` request from a TV. */</ID>
+    <ID>SpacingBetweenDeclarationsWithComments:CompanionStateManager.kt$CompanionStateManager$/** Last BLE `onStartFailure` error code, or null. */</ID>
+    <ID>SpacingBetweenDeclarationsWithComments:CompanionStateManager.kt$CompanionStateManager$/** Last NSD registration failure code reported by the system, or null. */</ID>
+    <ID>SpacingBetweenDeclarationsWithComments:CompanionStateManager.kt$CompanionStateManager$/** Latest resolved Wi-Fi IPv4 address seen by [CompanionService], or null off Wi-Fi. */</ID>
+    <ID>SpacingBetweenDeclarationsWithComments:CompanionStateManager.kt$CompanionStateManager$/** Mirror of the NSD state machine inside [CompanionService]. */</ID>
+    <ID>SpacingBetweenDeclarationsWithComments:CompanionStateManager.kt$CompanionStateManager$/** Most recent scrobble event received via the companion HTTP server. */</ID>
+    <ID>SpacingBetweenDeclarationsWithComments:CompanionStateManager.kt$CompanionStateManager$/** Whether [CompanionService] currently holds a Wi-Fi multicast lock. */</ID>
+    <ID>SpacingBetweenDeclarationsWithComments:CompanionStateManager.kt$CompanionStateManager$/** Whether the [CompanionService] foreground service is currently active. */</ID>
+    <ID>SpacingBetweenDeclarationsWithComments:ModelDownloadWorkerTest.kt$ModelDownloadWorkerTest.Companion$// 1 MB + 1 byte — just over the validation threshold so successful downloads pass</ID>
+    <ID>SpacingBetweenDeclarationsWithComments:OnboardingViewModel.kt$NotConfiguredReason.DIRECT_MISSING_CREDENTIALS$/** DIRECT mode: either the Client ID or Client Secret is missing. */</ID>
+    <ID>SpacingBetweenDeclarationsWithComments:OnboardingViewModel.kt$NotConfiguredReason.MANAGED_MISSING_BACKEND$/** MANAGED mode: the compiled-in token proxy is not available. */</ID>
+    <ID>SpacingBetweenDeclarationsWithComments:OnboardingViewModel.kt$NotConfiguredReason.SELF_HOSTED_MISSING_CLIENT_ID$/** SELF_HOSTED mode: the build-time TRAKT_CLIENT_ID is empty. */</ID>
+    <ID>SpacingBetweenDeclarationsWithComments:OnboardingViewModel.kt$NotConfiguredReason.SELF_HOSTED_MISSING_URL$/** SELF_HOSTED mode: the user has not entered a backend URL. */</ID>
+    <ID>SpacingBetweenDeclarationsWithComments:RecapGenerator.kt$RecapGenerator.Companion$// TMDB still placeholder pattern: data-tmdb-still="S{season}E{episode}"</ID>
+    <ID>StringTemplate:CompanionHttpServer.kt$${episode}</ID>
+    <ID>StringTemplate:EpisodeRepository.kt$EpisodeRepository$${episode}</ID>
+    <ID>StringTemplate:ShowDetailViewModelTest.kt$ShowDetailViewModelTest$${e}</ID>
+    <ID>SwallowedException:LlmOrchestrator.kt$LlmOrchestrator$e: Exception</ID>
+    <ID>SwallowedException:ShowDetailViewModel.kt$ShowDetailViewModel$e: Exception</ID>
+    <ID>TooGenericExceptionThrown:HomeViewModelTest.kt$HomeViewModelTest.CompanionStateErrorTest$throw RuntimeException("DataStore corrupted")</ID>
+    <ID>TooGenericExceptionThrown:ModelDownloadWorker.kt$ModelDownloadWorker$throw RuntimeException( "Incomplete download: expected $contentLength bytes, got $bytesRead" )</ID>
+    <ID>TooGenericExceptionThrown:ModelDownloadWorker.kt$ModelDownloadWorker$throw RuntimeException("Empty response body")</ID>
+    <ID>TooGenericExceptionThrown:ModelDownloadWorker.kt$ModelDownloadWorker$throw RuntimeException("Failed to rename downloaded model to final path")</ID>
+    <ID>TooGenericExceptionThrown:ModelDownloadWorker.kt$ModelDownloadWorker$throw RuntimeException("HTTP ${response.code}: ${response.message}")</ID>
+    <ID>TooGenericExceptionThrown:OnboardingViewModelTest.kt$OnboardingViewModelTest.PollingErrorHandling$throw RuntimeException("network blip")</ID>
+    <ID>UnusedParameter:OnboardingScreen.kt$verificationUrl: String</ID>
+    <ID>UnusedParameter:RecapGenerator.kt$RecapGenerator$apiKey: String</ID>
+    <ID>UnusedPrivateProperty:HomeViewModel.kt$HomeViewModel$val token = tokenRepository.getAccessToken() ?: throw IllegalStateException("No access token available")</ID>
+    <ID>UseCheckOrError:AiCoreLlmProvider.kt$AiCoreLlmProvider$throw IllegalStateException("AICore returned empty response")</ID>
+    <ID>UseCheckOrError:EpisodeRepository.kt$EpisodeRepository$throw IllegalStateException("No access token available")</ID>
+    <ID>UseCheckOrError:HomeViewModel.kt$HomeViewModel$throw IllegalStateException("No access token available")</ID>
+    <ID>UseCheckOrError:LiteRtLlmProvider.kt$LiteRtLlmProvider$throw IllegalStateException( "Model file not found: ${modelVariant.fileName}. Download it first via Settings." )</ID>
+    <ID>UseCheckOrError:LiteRtLlmProvider.kt$LiteRtLlmProvider$throw IllegalStateException("LiteRT-LM returned empty response")</ID>
+    <ID>UseCheckOrError:ShowDetailViewModel.kt$ShowDetailViewModel$throw IllegalStateException("Show not found in library")</ID>
+    <ID>WildcardImport:AiCoreLlmProviderTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>WildcardImport:AppSettingsTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>WildcardImport:CompanionHttpServer.kt$import io.ktor.http.*</ID>
+    <ID>WildcardImport:CompanionHttpServer.kt$import io.ktor.serialization.kotlinx.json.*</ID>
+    <ID>WildcardImport:CompanionHttpServer.kt$import io.ktor.server.application.*</ID>
+    <ID>WildcardImport:CompanionHttpServer.kt$import io.ktor.server.engine.*</ID>
+    <ID>WildcardImport:CompanionHttpServer.kt$import io.ktor.server.netty.*</ID>
+    <ID>WildcardImport:CompanionHttpServer.kt$import io.ktor.server.plugins.contentnegotiation.*</ID>
+    <ID>WildcardImport:CompanionHttpServer.kt$import io.ktor.server.request.*</ID>
+    <ID>WildcardImport:CompanionHttpServer.kt$import io.ktor.server.response.*</ID>
+    <ID>WildcardImport:CompanionHttpServer.kt$import io.ktor.server.routing.*</ID>
+    <ID>WildcardImport:CompanionHttpServerTest.kt$import io.ktor.client.request.*</ID>
+    <ID>WildcardImport:CompanionHttpServerTest.kt$import io.ktor.client.statement.*</ID>
+    <ID>WildcardImport:CompanionHttpServerTest.kt$import io.ktor.http.*</ID>
+    <ID>WildcardImport:CompanionHttpServerTest.kt$import io.ktor.server.testing.*</ID>
+    <ID>WildcardImport:CompanionHttpServerTest.kt$import io.mockk.*</ID>
+    <ID>WildcardImport:CompanionHttpServerTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>WildcardImport:DeviceCapabilityProviderTest.kt$import io.mockk.*</ID>
+    <ID>WildcardImport:DeviceCapabilityProviderTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>WildcardImport:DiagnosticsScreen.kt$import androidx.compose.foundation.layout.*</ID>
+    <ID>WildcardImport:DiagnosticsScreen.kt$import androidx.compose.material3.*</ID>
+    <ID>WildcardImport:DiagnosticsScreen.kt$import androidx.compose.runtime.*</ID>
+    <ID>WildcardImport:EpisodeRepositoryTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>WildcardImport:FallbackProviderTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>WildcardImport:HomeScreen.kt$import androidx.compose.foundation.layout.*</ID>
+    <ID>WildcardImport:HomeScreen.kt$import androidx.compose.material3.*</ID>
+    <ID>WildcardImport:HomeScreen.kt$import androidx.compose.runtime.*</ID>
+    <ID>WildcardImport:HomeViewModelTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>WildcardImport:LlmOrchestratorTest.kt$import io.mockk.*</ID>
+    <ID>WildcardImport:LlmOrchestratorTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>WildcardImport:LlmProviderFactoryTest.kt$import io.mockk.*</ID>
+    <ID>WildcardImport:LlmProviderFactoryTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>WildcardImport:ModelDownloadWorkerTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>WildcardImport:OnboardingScreen.kt$import androidx.compose.animation.*</ID>
+    <ID>WildcardImport:OnboardingScreen.kt$import androidx.compose.foundation.layout.*</ID>
+    <ID>WildcardImport:OnboardingScreen.kt$import androidx.compose.material3.*</ID>
+    <ID>WildcardImport:OnboardingScreen.kt$import androidx.compose.runtime.*</ID>
+    <ID>WildcardImport:OnboardingViewModelTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>WildcardImport:RecapGeneratorTest.kt$import io.mockk.*</ID>
+    <ID>WildcardImport:RecapGeneratorTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>WildcardImport:SettingsScreen.kt$import androidx.compose.foundation.layout.*</ID>
+    <ID>WildcardImport:SettingsScreen.kt$import androidx.compose.material3.*</ID>
+    <ID>WildcardImport:SettingsScreen.kt$import androidx.compose.runtime.*</ID>
+    <ID>WildcardImport:SettingsViewModelTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>WildcardImport:ShowDetailScreen.kt$import androidx.compose.foundation.layout.*</ID>
+    <ID>WildcardImport:ShowDetailScreen.kt$import androidx.compose.material3.*</ID>
+    <ID>WildcardImport:ShowDetailScreen.kt$import androidx.compose.runtime.*</ID>
+    <ID>WildcardImport:ShowDetailViewModelTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>WildcardImport:ShowRepositoryTest.kt$import io.mockk.*</ID>
+    <ID>WildcardImport:ShowRepositoryTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>WildcardImport:TestFixtures.kt$import com.justb81.watchbuddy.core.model.*</ID>
+  </CurrentIssues>
+</SmellBaseline>

@@ -1,0 +1,197 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>FunctionOnlyReturningConstant:AppModule.kt$AppModule.Companion$@Provides @Singleton @Named("traktClientId") fun provideTraktClientId(): String</ID>
+    <ID>FunctionOnlyReturningConstant:AppModule.kt$AppModule.Companion$@Provides @Singleton fun provideTokenBackendUrl(): String</ID>
+    <ID>ImportOrdering:RecapScreen.kt$import android.webkit.WebView import android.webkit.WebViewClient import androidx.compose.foundation.background import androidx.compose.foundation.layout.* import androidx.compose.foundation.shape.RoundedCornerShape import androidx.compose.runtime.* import androidx.compose.ui.Alignment import androidx.compose.ui.Modifier import androidx.compose.ui.res.stringResource import androidx.compose.ui.semantics.contentDescription import androidx.compose.ui.semantics.semantics import androidx.compose.ui.text.font.FontWeight import androidx.compose.ui.text.style.TextAlign import androidx.compose.ui.unit.dp import androidx.compose.ui.unit.sp import androidx.compose.ui.viewinterop.AndroidView import androidx.compose.material3.CircularProgressIndicator import androidx.hilt.navigation.compose.hiltViewModel import androidx.compose.ui.graphics.Color import androidx.tv.material3.* import com.justb81.watchbuddy.R import com.justb81.watchbuddy.tv.ui.theme.extendedColors import com.justb81.watchbuddy.tv.ui.theme.toCssHex</ID>
+    <ID>ImportOrdering:ScrobbleViewModelTest.kt$import com.justb81.watchbuddy.core.model.ScrobbleCandidate import com.justb81.watchbuddy.core.model.TraktEpisode import com.justb81.watchbuddy.core.model.TraktIds import com.justb81.watchbuddy.core.model.TraktShow import com.justb81.watchbuddy.tv.MainDispatcherRule import com.justb81.watchbuddy.core.scrobbler.MediaSessionScrobbler import io.mockk.* import kotlinx.coroutines.ExperimentalCoroutinesApi import kotlinx.coroutines.flow.MutableSharedFlow import kotlinx.coroutines.flow.SharedFlow import kotlinx.coroutines.test.runTest import org.junit.jupiter.api.Assertions.* import org.junit.jupiter.api.BeforeEach import org.junit.jupiter.api.DisplayName import org.junit.jupiter.api.Nested import org.junit.jupiter.api.Test import org.junit.jupiter.api.extension.RegisterExtension</ID>
+    <ID>ImportOrdering:ShowDetailScreen.kt$import android.content.Intent import android.net.Uri import androidx.compose.foundation.background import androidx.compose.foundation.layout.* import androidx.compose.foundation.shape.RoundedCornerShape import androidx.compose.ui.draw.clip import androidx.compose.runtime.* import androidx.compose.ui.Alignment import androidx.compose.ui.Modifier import androidx.compose.ui.focus.FocusRequester import androidx.compose.ui.focus.focusRequester import androidx.compose.ui.platform.LocalContext import androidx.compose.ui.res.stringResource import androidx.compose.ui.text.font.FontWeight import androidx.compose.ui.text.style.TextOverflow import androidx.compose.ui.unit.dp import androidx.compose.ui.unit.sp import androidx.hilt.navigation.compose.hiltViewModel import androidx.compose.ui.graphics.Color import androidx.tv.material3.* import com.justb81.watchbuddy.R import com.justb81.watchbuddy.core.model.TraktWatchedEntry</ID>
+    <ID>LongMethod:RecapScreen.kt$@Composable private fun RecapWebView(html: String, showTitle: String)</ID>
+    <ID>LongMethod:RecapScreen.kt$@OptIn(ExperimentalTvMaterial3Api::class) @Composable fun RecapScreen( traktShowId: Int, showTitle: String, fallbackSynopsis: String, onClose: () -&gt; Unit, onWatchNow: () -&gt; Unit, viewModel: RecapViewModel = hiltViewModel() )</ID>
+    <ID>LongMethod:ScrobbleOverlay.kt$@OptIn(ExperimentalTvMaterial3Api::class) @Composable fun ScrobbleOverlay( candidate: ScrobbleCandidate, onConfirm: () -&gt; Unit, onDismiss: () -&gt; Unit )</ID>
+    <ID>LongMethod:ShowDetailScreen.kt$@OptIn(ExperimentalTvMaterial3Api::class) @Composable fun ShowDetailScreen( entry: TraktWatchedEntry, onRecapClick: () -&gt; Unit, onBack: () -&gt; Unit, viewModel: ShowDetailViewModel = hiltViewModel() )</ID>
+    <ID>LongMethod:StreamingSettingsScreen.kt$@OptIn(ExperimentalTvMaterial3Api::class) @Composable private fun ServiceRow( service: StreamingService, isSubscribed: Boolean, priority: Int?, canMoveUp: Boolean, canMoveDown: Boolean, onToggle: () -&gt; Unit, onMoveUp: () -&gt; Unit, onMoveDown: () -&gt; Unit )</ID>
+    <ID>LongMethod:TvDiagnosticsScreen.kt$@OptIn(ExperimentalTvMaterial3Api::class) @Composable fun TvDiagnosticsScreen( onBack: () -&gt; Unit, viewModel: TvDiagnosticsViewModel = hiltViewModel(), )</ID>
+    <ID>LongMethod:TvSettingsScreen.kt$@OptIn(ExperimentalTvMaterial3Api::class) @Composable fun TvSettingsScreen( onBack: () -&gt; Unit, onStreamingServicesClick: () -&gt; Unit, onDiagnosticsClick: () -&gt; Unit, viewModel: TvSettingsViewModel = hiltViewModel(), )</ID>
+    <ID>LongParameterList:StreamingSettingsScreen.kt$( service: StreamingService, isSubscribed: Boolean, priority: Int?, canMoveUp: Boolean, canMoveDown: Boolean, onToggle: () -&gt; Unit, onMoveUp: () -&gt; Unit, onMoveDown: () -&gt; Unit )</ID>
+    <ID>MagicNumber:InitialsAvatar.kt$0xFF26A69A</ID>
+    <ID>MagicNumber:InitialsAvatar.kt$0xFF5B8DEF</ID>
+    <ID>MagicNumber:InitialsAvatar.kt$0xFF66BB6A</ID>
+    <ID>MagicNumber:InitialsAvatar.kt$0xFFAB47BC</ID>
+    <ID>MagicNumber:InitialsAvatar.kt$0xFFEC407A</ID>
+    <ID>MagicNumber:InitialsAvatar.kt$0xFFEF5350</ID>
+    <ID>MagicNumber:InitialsAvatar.kt$0xFFFFA726</ID>
+    <ID>MagicNumber:InitialsAvatar.kt$0xFFFFCA28</ID>
+    <ID>MagicNumber:InitialsAvatar.kt$2.5f</ID>
+    <ID>MagicNumber:InitialsAvatar.kt$31</ID>
+    <ID>MagicNumber:PhoneDiscoveryManager.kt$PhoneDiscoveryManager$10</ID>
+    <ID>MagicNumber:PhoneDiscoveryManager.kt$PhoneDiscoveryManager$3</ID>
+    <ID>MagicNumber:PhoneDiscoveryManager.kt$PhoneDiscoveryManager$3_000</ID>
+    <ID>MagicNumber:PhoneDiscoveryManager.kt$PhoneDiscoveryManager$4_000</ID>
+    <ID>MagicNumber:PhoneDiscoveryManager.kt$PhoneDiscoveryManager$6</ID>
+    <ID>MagicNumber:PhoneDiscoveryManager.kt$PhoneDiscoveryManager$6_000</ID>
+    <ID>MagicNumber:RecapScreen.kt$0.7f</ID>
+    <ID>MagicNumber:ScrobbleOverlay.kt$15</ID>
+    <ID>MagicNumber:ScrobbleOverlay.kt$1_000</ID>
+    <ID>MagicNumber:ShowDetailScreen.kt$0.4f</ID>
+    <ID>MagicNumber:ShowDetailScreen.kt$0.55f</ID>
+    <ID>MagicNumber:ShowDetailScreen.kt$4</ID>
+    <ID>MagicNumber:TvDiagnosticsScreen.kt$0xFF2E7D32</ID>
+    <ID>MagicNumber:TvDiagnosticsScreen.kt$0xFFC62828</ID>
+    <ID>MagicNumber:TvDiagnosticsScreen.kt$0xFFF9A825</ID>
+    <ID>MagicNumber:TvDiagnosticsScreen.kt$1000</ID>
+    <ID>MagicNumber:TvDiagnosticsScreen.kt$3_600</ID>
+    <ID>MagicNumber:TvDiagnosticsScreen.kt$5</ID>
+    <ID>MagicNumber:TvDiagnosticsScreen.kt$60</ID>
+    <ID>MagicNumber:TvDiagnosticsScreen.kt$60_000</ID>
+    <ID>MagicNumber:TvHomeScreen.kt$1000L</ID>
+    <ID>MagicNumber:TvHomeScreen.kt$180f</ID>
+    <ID>MagicNumber:TvHomeScreen.kt$2</ID>
+    <ID>MagicNumber:TvHomeScreen.kt$24</ID>
+    <ID>MagicNumber:TvHomeScreen.kt$3f</ID>
+    <ID>MagicNumber:TvHomeScreen.kt$4</ID>
+    <ID>MagicNumber:TvHomeScreen.kt$500</ID>
+    <ID>MagicNumber:TvHomeScreen.kt$60</ID>
+    <ID>MagicNumber:TvHomeViewModel.kt$TvHomeViewModel$1000L</ID>
+    <ID>MagicNumber:TvHomeViewModel.kt$TvHomeViewModel$5</ID>
+    <ID>MagicNumber:TvHomeViewModel.kt$TvHomeViewModel$60</ID>
+    <ID>MagicNumber:TvSettingsScreen.kt$0xFF2E7D32</ID>
+    <ID>MagicNumber:TvSettingsScreen.kt$0xFFF9A825</ID>
+    <ID>MagicNumber:TvTheme.kt$255</ID>
+    <ID>MagicNumber:TvTheme.kt$TvExtendedColors$0xEE0D0D1A</ID>
+    <ID>MagicNumber:TvTheme.kt$TvExtendedColors$0xFF2196F3</ID>
+    <ID>MagicNumber:TvTheme.kt$TvExtendedColors$0xFF2A2A2C</ID>
+    <ID>MagicNumber:TvTheme.kt$TvExtendedColors$0xFF3A3A3C</ID>
+    <ID>MagicNumber:TvTheme.kt$TvExtendedColors$0xFF4CAF50</ID>
+    <ID>MagicNumber:TvTheme.kt$TvExtendedColors$0xFF757575</ID>
+    <ID>MagicNumber:TvTheme.kt$TvExtendedColors$0xFFE53935</ID>
+    <ID>MatchingDeclarationName:TvNavGraph.kt$TvRoute</ID>
+    <ID>MultiLineIfElse:RecapScreen.kt$R.string.tv_recap_fallback</ID>
+    <ID>MultiLineIfElse:RecapScreen.kt$R.string.tv_recap_fallback_phones_failed</ID>
+    <ID>MultiLineIfElse:TvDiagnosticsScreen.kt$Status.OK</ID>
+    <ID>MultiLineIfElse:TvDiagnosticsScreen.kt$stringResource(R.string.tv_diagnostics_value_no)</ID>
+    <ID>MultiLineIfElse:TvDiagnosticsScreen.kt$stringResource(R.string.tv_diagnostics_value_yes)</ID>
+    <ID>NoBlankLineBeforeRbrace:StreamingSettingsViewModel.kt$StreamingSettingsViewModel$ </ID>
+    <ID>NoBlankLineBeforeRbrace:TvHomeViewModel.kt$TvHomeViewModel$ </ID>
+    <ID>NoEmptyFirstLineInMethodBlock:ShowDetailScreen.kt$ </ID>
+    <ID>NoEmptyFirstLineInMethodBlock:TvHomeScreen.kt$ </ID>
+    <ID>NoMultipleSpaces:RecapScreen.kt$ </ID>
+    <ID>NoMultipleSpaces:ScrobbleOverlay.kt$ </ID>
+    <ID>NoMultipleSpaces:ShowDetailScreen.kt$ </ID>
+    <ID>NoMultipleSpaces:ShowDetailViewModel.kt$ShowDetailViewModel$ </ID>
+    <ID>NoMultipleSpaces:ShowDetailViewModelTest.kt$ShowDetailViewModelTest.ResolveDeepLinkTest$ </ID>
+    <ID>NoMultipleSpaces:StreamingSettingsScreen.kt$ </ID>
+    <ID>NoMultipleSpaces:TvHomeScreen.kt$ </ID>
+    <ID>NoMultipleSpaces:TvNavGraph.kt$ </ID>
+    <ID>NoMultipleSpaces:TvNavGraph.kt$TvRoute.Diagnostics$ </ID>
+    <ID>NoMultipleSpaces:TvNavGraph.kt$TvRoute.Home$ </ID>
+    <ID>NoMultipleSpaces:TvNavGraph.kt$TvRoute.Recap$ </ID>
+    <ID>NoMultipleSpaces:TvNavGraph.kt$TvRoute.Settings$ </ID>
+    <ID>NoMultipleSpaces:TvNavGraph.kt$TvRoute.StreamingSettings$ </ID>
+    <ID>NoMultipleSpaces:TvTheme.kt$ </ID>
+    <ID>NoMultipleSpaces:TvTheme.kt$TvExtendedColors$ </ID>
+    <ID>NoUnusedImports:ScrobbleViewModelTest.kt$com.justb81.watchbuddy.tv.ui.scrobble.ScrobbleViewModelTest.kt</ID>
+    <ID>NoUnusedImports:TvHomeScreen.kt$com.justb81.watchbuddy.tv.ui.home.TvHomeScreen.kt</ID>
+    <ID>NoUnusedImports:TvScrobbleDispatcher.kt$com.justb81.watchbuddy.tv.scrobbler.TvScrobbleDispatcher.kt</ID>
+    <ID>NoWildcardImports:MediaSessionScrobblerTest.kt$import io.mockk.*</ID>
+    <ID>NoWildcardImports:MediaSessionScrobblerTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>NoWildcardImports:PhoneApiClientFactoryTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>NoWildcardImports:PhoneDiscoveryManagerTest.kt$import io.mockk.*</ID>
+    <ID>NoWildcardImports:PhoneDiscoveryManagerTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>NoWildcardImports:RecapScreen.kt$import androidx.compose.foundation.layout.*</ID>
+    <ID>NoWildcardImports:RecapScreen.kt$import androidx.compose.runtime.*</ID>
+    <ID>NoWildcardImports:RecapScreen.kt$import androidx.tv.material3.*</ID>
+    <ID>NoWildcardImports:RecapViewModel.kt$import kotlinx.coroutines.flow.*</ID>
+    <ID>NoWildcardImports:RecapViewModelTest.kt$import io.mockk.*</ID>
+    <ID>NoWildcardImports:RecapViewModelTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>NoWildcardImports:ScrobbleOverlay.kt$import androidx.compose.animation.*</ID>
+    <ID>NoWildcardImports:ScrobbleOverlay.kt$import androidx.compose.foundation.layout.*</ID>
+    <ID>NoWildcardImports:ScrobbleOverlay.kt$import androidx.compose.runtime.*</ID>
+    <ID>NoWildcardImports:ScrobbleOverlay.kt$import androidx.tv.material3.*</ID>
+    <ID>NoWildcardImports:ScrobbleViewModelTest.kt$import io.mockk.*</ID>
+    <ID>NoWildcardImports:ScrobbleViewModelTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>NoWildcardImports:ShowDetailScreen.kt$import androidx.compose.foundation.layout.*</ID>
+    <ID>NoWildcardImports:ShowDetailScreen.kt$import androidx.compose.runtime.*</ID>
+    <ID>NoWildcardImports:ShowDetailScreen.kt$import androidx.tv.material3.*</ID>
+    <ID>NoWildcardImports:ShowDetailViewModelTest.kt$import com.justb81.watchbuddy.core.model.*</ID>
+    <ID>NoWildcardImports:ShowDetailViewModelTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>NoWildcardImports:StreamingSettingsScreen.kt$import androidx.compose.foundation.layout.*</ID>
+    <ID>NoWildcardImports:StreamingSettingsScreen.kt$import androidx.compose.runtime.*</ID>
+    <ID>NoWildcardImports:StreamingSettingsScreen.kt$import androidx.tv.material3.*</ID>
+    <ID>NoWildcardImports:StreamingSettingsViewModel.kt$import kotlinx.coroutines.flow.*</ID>
+    <ID>NoWildcardImports:StreamingSettingsViewModelTest.kt$import io.mockk.*</ID>
+    <ID>NoWildcardImports:StreamingSettingsViewModelTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>NoWildcardImports:TestFixtures.kt$import com.justb81.watchbuddy.core.model.*</ID>
+    <ID>NoWildcardImports:TvDiagnosticsScreen.kt$import androidx.compose.foundation.layout.*</ID>
+    <ID>NoWildcardImports:TvDiagnosticsScreen.kt$import androidx.compose.runtime.*</ID>
+    <ID>NoWildcardImports:TvDiagnosticsScreen.kt$import androidx.tv.material3.*</ID>
+    <ID>NoWildcardImports:TvHomeScreen.kt$import androidx.compose.foundation.layout.*</ID>
+    <ID>NoWildcardImports:TvHomeScreen.kt$import androidx.compose.runtime.*</ID>
+    <ID>NoWildcardImports:TvHomeScreen.kt$import androidx.tv.material3.*</ID>
+    <ID>NoWildcardImports:TvHomeViewModel.kt$import kotlinx.coroutines.flow.*</ID>
+    <ID>NoWildcardImports:TvHomeViewModelTest.kt$import io.mockk.*</ID>
+    <ID>NoWildcardImports:TvHomeViewModelTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>NoWildcardImports:TvNavGraph.kt$import androidx.compose.runtime.*</ID>
+    <ID>NoWildcardImports:TvScrobbleDispatcherTest.kt$import io.mockk.*</ID>
+    <ID>NoWildcardImports:TvScrobbleDispatcherTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>NoWildcardImports:TvShowCacheTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>ReturnCount:PhoneBleScanner.kt$PhoneBleScanner$@SuppressLint("MissingPermission") // Guarded by hasScanPermission() below. fun start( listener: Listener, onFailure: (Int) -&gt; Unit = {}, ): Boolean</ID>
+    <ID>ReturnCount:PhoneDiscoveryManager.kt$PhoneDiscoveryManager$@VisibleForTesting internal fun parseTxtRecord(serviceInfo: NsdServiceInfo): PhoneTxtRecord?</ID>
+    <ID>SpacingBetweenDeclarationsWithAnnotations:PhoneDiscoveryManager.kt$PhoneDiscoveryManager$@Volatile private var isDiscovering: Boolean = false</ID>
+    <ID>SpacingBetweenDeclarationsWithAnnotations:TvDiscoveryService.kt$TvDiscoveryService$@Inject lateinit var preferences: StreamingPreferencesRepository</ID>
+    <ID>SpacingBetweenDeclarationsWithAnnotations:TvDiscoveryService.kt$TvDiscoveryService$@Inject lateinit var scrobbler: MediaSessionScrobbler</ID>
+    <ID>SpacingBetweenDeclarationsWithComments:PhoneDiscoveryManager.kt$PhoneDiscoveryManager$/** Current state of the BLE fallback scanner. */</ID>
+    <ID>SpacingBetweenDeclarationsWithComments:PhoneDiscoveryManager.kt$PhoneDiscoveryManager$/** Epoch millis of the last heartbeat loop pass, or 0 before the first tick. */</ID>
+    <ID>SpacingBetweenDeclarationsWithComments:PhoneDiscoveryManager.kt$PhoneDiscoveryManager$/** Last `onScanFailed` error code reported by the BLE scanner, or null. */</ID>
+    <ID>SpacingBetweenDeclarationsWithComments:PhoneDiscoveryManager.kt$PhoneDiscoveryManager$/** True between [startDiscovery] and [stopDiscovery]. */</ID>
+    <ID>SpacingBetweenDeclarationsWithComments:PhoneDiscoveryManager.kt$PhoneDiscoveryManager$/** Whether this manager currently holds a Wi-Fi multicast lock. */</ID>
+    <ID>SpacingBetweenDeclarationsWithComments:PhoneDiscoveryManager.kt$PhoneDiscoveryManager.Companion$/** Back-off before retrying a stop+start cycle after FAILURE_ALREADY_ACTIVE. */</ID>
+    <ID>StringTemplate:TvDiagnosticsScreen.kt$${pct}</ID>
+    <ID>SwallowedException:PhoneDiscoveryManager.kt$PhoneDiscoveryManager$e: Exception</ID>
+    <ID>SwallowedException:RecapViewModel.kt$RecapViewModel$e: Exception</ID>
+    <ID>TooGenericExceptionThrown:TvSettingsViewModelTest.kt$TvSettingsViewModelTest$throw RuntimeException("boom")</ID>
+    <ID>WildcardImport:MediaSessionScrobblerTest.kt$import io.mockk.*</ID>
+    <ID>WildcardImport:MediaSessionScrobblerTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>WildcardImport:PhoneApiClientFactoryTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>WildcardImport:PhoneDiscoveryManagerTest.kt$import io.mockk.*</ID>
+    <ID>WildcardImport:PhoneDiscoveryManagerTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>WildcardImport:RecapScreen.kt$import androidx.compose.foundation.layout.*</ID>
+    <ID>WildcardImport:RecapScreen.kt$import androidx.compose.runtime.*</ID>
+    <ID>WildcardImport:RecapScreen.kt$import androidx.tv.material3.*</ID>
+    <ID>WildcardImport:RecapViewModel.kt$import kotlinx.coroutines.flow.*</ID>
+    <ID>WildcardImport:RecapViewModelTest.kt$import io.mockk.*</ID>
+    <ID>WildcardImport:RecapViewModelTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>WildcardImport:ScrobbleOverlay.kt$import androidx.compose.animation.*</ID>
+    <ID>WildcardImport:ScrobbleOverlay.kt$import androidx.compose.foundation.layout.*</ID>
+    <ID>WildcardImport:ScrobbleOverlay.kt$import androidx.compose.runtime.*</ID>
+    <ID>WildcardImport:ScrobbleOverlay.kt$import androidx.tv.material3.*</ID>
+    <ID>WildcardImport:ScrobbleViewModelTest.kt$import io.mockk.*</ID>
+    <ID>WildcardImport:ScrobbleViewModelTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>WildcardImport:ShowDetailScreen.kt$import androidx.compose.foundation.layout.*</ID>
+    <ID>WildcardImport:ShowDetailScreen.kt$import androidx.compose.runtime.*</ID>
+    <ID>WildcardImport:ShowDetailScreen.kt$import androidx.tv.material3.*</ID>
+    <ID>WildcardImport:ShowDetailViewModelTest.kt$import com.justb81.watchbuddy.core.model.*</ID>
+    <ID>WildcardImport:ShowDetailViewModelTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>WildcardImport:StreamingSettingsScreen.kt$import androidx.compose.foundation.layout.*</ID>
+    <ID>WildcardImport:StreamingSettingsScreen.kt$import androidx.compose.runtime.*</ID>
+    <ID>WildcardImport:StreamingSettingsScreen.kt$import androidx.tv.material3.*</ID>
+    <ID>WildcardImport:StreamingSettingsViewModel.kt$import kotlinx.coroutines.flow.*</ID>
+    <ID>WildcardImport:StreamingSettingsViewModelTest.kt$import io.mockk.*</ID>
+    <ID>WildcardImport:StreamingSettingsViewModelTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>WildcardImport:TestFixtures.kt$import com.justb81.watchbuddy.core.model.*</ID>
+    <ID>WildcardImport:TvDiagnosticsScreen.kt$import androidx.compose.foundation.layout.*</ID>
+    <ID>WildcardImport:TvDiagnosticsScreen.kt$import androidx.compose.runtime.*</ID>
+    <ID>WildcardImport:TvDiagnosticsScreen.kt$import androidx.tv.material3.*</ID>
+    <ID>WildcardImport:TvHomeScreen.kt$import androidx.compose.foundation.layout.*</ID>
+    <ID>WildcardImport:TvHomeScreen.kt$import androidx.compose.runtime.*</ID>
+    <ID>WildcardImport:TvHomeScreen.kt$import androidx.tv.material3.*</ID>
+    <ID>WildcardImport:TvHomeViewModel.kt$import kotlinx.coroutines.flow.*</ID>
+    <ID>WildcardImport:TvHomeViewModelTest.kt$import io.mockk.*</ID>
+    <ID>WildcardImport:TvHomeViewModelTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>WildcardImport:TvNavGraph.kt$import androidx.compose.runtime.*</ID>
+    <ID>WildcardImport:TvScrobbleDispatcherTest.kt$import io.mockk.*</ID>
+    <ID>WildcardImport:TvScrobbleDispatcherTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>WildcardImport:TvShowCacheTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+  </CurrentIssues>
+</SmellBaseline>
