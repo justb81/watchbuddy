@@ -399,6 +399,47 @@ class SettingsViewModelTest {
     }
 
     @Nested
+    @DisplayName("initSafely helper")
+    inner class InitSafelyHelper {
+
+        @Test
+        fun `initSafely returns default and logs when hasDefaultTmdbApiKey throws`() = runTest {
+            every { settingsRepository.hasDefaultTmdbApiKey() } throws SecurityException("Keystore unavailable")
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            // hasBundledTmdb defaults to false — ViewModel still initializes
+            assertFalse(vm.uiState.value.buildHasBundledTmdbKey)
+            assertFalse(vm.uiState.value.useBundledTmdbKey)
+        }
+
+        @Test
+        fun `initSafely returns default and logs when modelReady property access throws`() = runTest {
+            every { settingsRepository.modelReady } throws RuntimeException("StateFlow initialization failed")
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            // initialModelReady defaults to false; ViewModel still initializes without crashing
+            assertFalse(vm.uiState.value.llmReady)
+        }
+
+        @Test
+        fun `initSafely still returns correct value when no exception is thrown`() = runTest {
+            every { settingsRepository.hasDefaultTmdbApiKey() } returns true
+            every { settingsRepository.settings } returns flowOf(
+                AppSettings(tmdbApiKey = "", defaultTmdbApiKeyAvailable = true)
+            )
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            assertTrue(vm.uiState.value.buildHasBundledTmdbKey)
+        }
+    }
+
+    @Nested
     @DisplayName("Init resilience — no force close on settings screen open")
     inner class InitResilience {
 

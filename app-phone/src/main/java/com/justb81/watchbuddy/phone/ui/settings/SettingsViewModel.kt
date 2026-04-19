@@ -81,17 +81,16 @@ class SettingsViewModel @Inject constructor(
     @Named("managedBackendAvailable") private val managedBackendAvailable: Boolean
 ) : AndroidViewModel(application) {
 
-    init {
-        DiagnosticLog.event(TAG, "constructor:enter")
+    private inline fun <T> initSafely(label: String, default: T, block: () -> T): T =
+        runCatching(block).onFailure { DiagnosticLog.error(TAG, "$label threw", it) }.getOrDefault(default)
+
+    private val hasBundledTmdb = initSafely("hasDefaultTmdbApiKey", false) {
+        settingsRepository.hasDefaultTmdbApiKey()
     }
 
-    private val hasBundledTmdb = runCatching { settingsRepository.hasDefaultTmdbApiKey() }
-        .onFailure { DiagnosticLog.error(TAG, "hasDefaultTmdbApiKey threw", it) }
-        .getOrDefault(false)
-
-    private val initialModelReady = runCatching { settingsRepository.modelReady.value }
-        .onFailure { DiagnosticLog.error(TAG, "modelReady.value threw", it) }
-        .getOrDefault(false)
+    private val initialModelReady = initSafely("modelReady.value", false) {
+        settingsRepository.modelReady.value
+    }
 
     private val _uiState = MutableStateFlow(SettingsUiState(
         llmBackend = application.getString(R.string.settings_llm_detecting),
@@ -129,25 +128,18 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch(coroutineExceptionHandler, block = block)
 
     init {
-        DiagnosticLog.event(
-            TAG,
-            "init: managedBackend=$managedBackendAvailable hasBundledTmdb=$hasBundledTmdb " +
-                "initialModelReady=$initialModelReady"
-        )
         loadPersistedSettings()
         loadTraktUsername()
         detectLlm()
         observeModelReadyState()
         observeDownloadProgress()
-        DiagnosticLog.event(TAG, "constructor:exit (init blocks launched)")
     }
 
     private fun loadTraktUsername() {
         launchSafe {
-            DiagnosticLog.event(TAG, "loadTraktUsername:start")
             try {
                 val accessToken = tokenRepository.getAccessToken() ?: run {
-                    DiagnosticLog.event(TAG, "loadTraktUsername: no token, skipping")
+                    Log.d(TAG, "loadTraktUsername: no token, skipping")
                     return@launchSafe
                 }
                 val profile = traktApi.getProfile("Bearer $accessToken")
@@ -162,12 +154,9 @@ class SettingsViewModel @Inject constructor(
 
     private fun loadPersistedSettings() {
         launchSafe {
-            DiagnosticLog.event(TAG, "loadPersistedSettings:start")
             try {
                 val saved = settingsRepository.settings.first()
-                DiagnosticLog.event(TAG, "loadPersistedSettings: settings.first() returned")
                 val clientSecret = settingsRepository.getClientSecret()
-                DiagnosticLog.event(TAG, "loadPersistedSettings: getClientSecret() returned")
                 // If managed backend is unavailable in this build but was previously stored,
                 // fall back to DIRECT so the user is not stuck on a non-functional mode.
                 val resolvedAuthMode = if (!managedBackendAvailable && saved.authMode == AuthMode.MANAGED) {
@@ -190,7 +179,7 @@ class SettingsViewModel @Inject constructor(
                     useBundledTmdbKey = saved.tmdbApiKey.isBlank() && buildHasBundled,
                     forceShowAdvanced = !managedBackendAvailable || !buildHasBundled
                 )
-                DiagnosticLog.event(TAG, "loadPersistedSettings:ok authMode=$resolvedAuthMode tmdbConnected=${saved.tmdbApiKey.isNotBlank()}")
+                Log.d(TAG, "loadPersistedSettings: authMode=$resolvedAuthMode tmdbConnected=${saved.tmdbApiKey.isNotBlank()}")
             } catch (e: Exception) {
                 // Settings failed to load (e.g. Keystore unavailable) — keep defaults.
                 // App remains usable; user can still configure settings manually.
@@ -201,7 +190,6 @@ class SettingsViewModel @Inject constructor(
 
     private fun detectLlm() {
         launchSafe {
-            DiagnosticLog.event(TAG, "detectLlm:start")
             try {
                 val config = llmOrchestrator.selectConfig()
                 _uiState.value = _uiState.value.copy(
@@ -209,7 +197,7 @@ class SettingsViewModel @Inject constructor(
                     llmModelName = config.modelVariant?.fileName,
                     llmReady    = settingsRepository.modelReady.value
                 )
-                DiagnosticLog.event(TAG, "detectLlm:ok backend=${config.backend.name} model=${config.modelVariant?.fileName}")
+                Log.d(TAG, "detectLlm: backend=${config.backend.name} model=${config.modelVariant?.fileName}")
             } catch (e: Exception) {
                 // LLM detection failed (e.g. system service unavailable) — keep default state.
                 DiagnosticLog.error(TAG, "detectLlm:failed", e)
@@ -219,7 +207,6 @@ class SettingsViewModel @Inject constructor(
 
     private fun observeModelReadyState() {
         launchSafe {
-            DiagnosticLog.event(TAG, "observeModelReadyState:subscribe")
             settingsRepository.modelReady
                 .catch { e ->
                     DiagnosticLog.error(TAG, "observeModelReadyState:flow-error", e)
@@ -232,7 +219,6 @@ class SettingsViewModel @Inject constructor(
 
     private fun observeDownloadProgress() {
         launchSafe {
-            DiagnosticLog.event(TAG, "observeDownloadProgress:subscribe")
             // WorkManager's flow can throw at subscription (WM not yet initialized,
             // SQLite IO error) or mid-stream.  .catch {} contains the failure so the
             // Settings screen still opens even when the WorkManager backend is broken.
@@ -405,7 +391,6 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun disconnectTrakt() {
-        DiagnosticLog.event(TAG, "disconnectTrakt:start")
         try {
             tokenRepository.clearTokens()
         } catch (e: Exception) {
