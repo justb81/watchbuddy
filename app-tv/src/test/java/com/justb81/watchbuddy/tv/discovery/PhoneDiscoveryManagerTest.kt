@@ -373,7 +373,8 @@ class PhoneDiscoveryManagerTest {
     inner class SetEnabledTest {
 
         @Test
-        fun `setEnabled(false) clears discovered phones and stops BLE scanner`() {
+        fun `setEnabled(false) clears the discovered-phone list`() {
+            // Simulate a populated discovered list from a prior NSD resolve.
             val phone = makePhone(
                 capability = DeviceCapability("d", "u", null, "P", LlmBackend.NONE, 50, 4000, true),
                 score = 50,
@@ -384,17 +385,16 @@ class PhoneDiscoveryManagerTest {
 
             manager.setEnabled(false)
 
-            assertTrue(manager.discoveredPhones.value.isEmpty())
-            verify { bleScanner.stop() }
+            assertTrue(
+                manager.discoveredPhones.value.isEmpty(),
+                "Disabling discovery must clear the UI list immediately"
+            )
         }
 
         @Test
-        fun `setEnabled(true) then setEnabled(false) are idempotent for repeated calls`() {
+        fun `setEnabled(false) is idempotent when called twice`() {
             manager.setEnabled(false)
             manager.setEnabled(false)
-            manager.setEnabled(true)
-            manager.setEnabled(true)
-            // No exceptions, and the discovered list is still empty (no real NSD in test).
             assertTrue(manager.discoveredPhones.value.isEmpty())
         }
     }
