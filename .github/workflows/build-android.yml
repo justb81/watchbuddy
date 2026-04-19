@@ -29,6 +29,7 @@ jobs:
               - '*.gradle.kts'
               - 'gradle/**'
               - 'gradle.properties'
+              - '.github/actions/**'
 
   test-and-build:
     name: Test & Build
