@@ -1,0 +1,30 @@
+name: Setup Android Build
+description: >
+  Composite action shared by build-android.yml and release.yml.
+  Configures JDK 17 (Temurin), sets up Gradle with caching, and warms
+  the Gradle configuration cache.  The calling workflow must check out
+  the repository before invoking this action (local composite actions
+  require the workspace to already be populated).
+
+runs:
+  using: composite
+  steps:
+    - name: Set up JDK 17
+      uses: actions/setup-java@v5
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v6
+
+    # The Gradle configuration cache serialises the task graph so subsequent
+    # runs with identical inputs skip the configuration phase entirely.
+    # Key on all build scripts + properties so any structural change
+    # invalidates and rebuilds the cache rather than serving a stale one.
+    - name: Cache Gradle configuration cache
+      uses: actions/cache@v4
+      with:
+        path: .gradle/configuration-cache
+        key: config-cache-${{ hashFiles('**/*.gradle.kts', 'gradle.properties', 'gradle/libs.versions.toml') }}
+        restore-keys: config-cache-
