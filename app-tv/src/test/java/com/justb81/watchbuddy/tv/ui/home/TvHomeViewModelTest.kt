@@ -11,6 +11,7 @@ import com.justb81.watchbuddy.tv.discovery.PhoneApiClientFactory
 import com.justb81.watchbuddy.tv.discovery.PhoneApiService
 import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
 import io.mockk.*
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
@@ -176,6 +177,24 @@ class TvHomeViewModelTest {
     fun `init starts discovery`() = runTest {
         createViewModel()
         verify { phoneDiscovery.startDiscovery() }
+    }
+
+    @Test
+    fun `CancellationException propagates and is not treated as a load failure`() = runTest {
+        val phone = mockk<PhoneDiscoveryManager.DiscoveredPhone>()
+        every { phone.baseUrl } returns "http://192.168.1.1:8765/"
+        every { phoneDiscovery.getBestPhone() } returns phone
+        every { phoneApiClientFactory.createClient(any()) } returns phoneApiService
+        coEvery { phoneApiService.getShows(any(), any()) } throws CancellationException("cancelled")
+
+        val viewModel = createViewModel()
+        // CancellationException is rethrown, so viewModelScope catches it gracefully;
+        // the UI state must NOT show phoneApiError or noPhoneConnected.
+        advanceUntilIdle()
+
+        val state = viewModel.uiState.value
+        assertFalse(state.phoneApiError)
+        assertFalse(state.noPhoneConnected)
     }
 
     // ── Pagination ─────────────────────────────────────────────────────────────

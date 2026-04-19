@@ -11,6 +11,7 @@ import com.justb81.watchbuddy.tv.discovery.PhoneApiClientFactory
 import com.justb81.watchbuddy.tv.discovery.PhoneApiService
 import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -33,6 +34,11 @@ data class TvHomeUiState(
     val canLoadMore: Boolean = false
 )
 
+private sealed interface FailureReason {
+    data object NoPhone : FailureReason
+    data class ApiError(val phoneFound: Boolean, val message: String?) : FailureReason
+}
+
 @HiltViewModel
 class TvHomeViewModel @Inject constructor(
     private val phoneDiscovery: PhoneDiscoveryManager,
@@ -48,8 +54,10 @@ class TvHomeViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(TvHomeUiState())
     val uiState: StateFlow<TvHomeUiState> = _uiState.asStateFlow()
 
-    private var cachedShows: List<EnrichedShowEntry>? = null
-    private var cacheTimestamp: Long = 0L
+    // TTL-aware resilience cache: retains EnrichedShowEntry (with TMDB data) for offline fallback.
+    // Separate from TvShowCache which stores raw TraktWatchedEntry for scrobble fuzzy-matching.
+    private var fallbackCache: List<EnrichedShowEntry>? = null
+    private var fallbackCacheTimestamp: Long = 0L
     private var loadedOffset: Int = 0
 
     init {
@@ -122,8 +130,8 @@ class TvHomeViewModel @Inject constructor(
 
                 val allShows = if (append) _uiState.value.shows + newShows else newShows
 
-                cachedShows = allShows
-                cacheTimestamp = System.currentTimeMillis()
+                fallbackCache = allShows
+                fallbackCacheTimestamp = System.currentTimeMillis()
                 tvShowCache.updateShows(allShows.map { it.entry })
 
                 _uiState.update {
@@ -136,52 +144,51 @@ class TvHomeViewModel @Inject constructor(
                     )
                 }
             } else {
-                val cached = getCachedShows()
-                if (cached != null) {
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            isLoadingMore = false,
-                            shows = cached,
-                            progress = computeProgress(cached),
-                            noPhoneConnected = true,
-                            canLoadMore = false
-                        )
-                    }
-                } else {
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            isLoadingMore = false,
-                            noPhoneConnected = true,
-                            canLoadMore = false
-                        )
-                    }
-                }
+                handleLoadFailure(FailureReason.NoPhone)
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
-            val phoneFound = bestPhone != null
-            val cached = getCachedShows()
-            if (cached != null) {
-                _uiState.update {
-                    it.copy(
+            handleLoadFailure(FailureReason.ApiError(phoneFound = bestPhone != null, message = e.message))
+        }
+    }
+
+    private fun handleLoadFailure(reason: FailureReason) {
+        val cached = getFallbackCache()
+        _uiState.update {
+            when (reason) {
+                is FailureReason.NoPhone -> when {
+                    cached != null -> it.copy(
                         isLoading = false,
                         isLoadingMore = false,
                         shows = cached,
                         progress = computeProgress(cached),
-                        phoneApiError = phoneFound,
-                        error = e.message,
+                        noPhoneConnected = true,
+                        canLoadMore = false
+                    )
+                    else -> it.copy(
+                        isLoading = false,
+                        isLoadingMore = false,
+                        noPhoneConnected = true,
                         canLoadMore = false
                     )
                 }
-            } else {
-                _uiState.update {
-                    it.copy(
+                is FailureReason.ApiError -> when {
+                    cached != null -> it.copy(
                         isLoading = false,
                         isLoadingMore = false,
-                        phoneApiError = phoneFound,
-                        noPhoneConnected = !phoneFound,
-                        error = e.message,
+                        shows = cached,
+                        progress = computeProgress(cached),
+                        phoneApiError = reason.phoneFound,
+                        error = reason.message,
+                        canLoadMore = false
+                    )
+                    else -> it.copy(
+                        isLoading = false,
+                        isLoadingMore = false,
+                        phoneApiError = reason.phoneFound,
+                        noPhoneConnected = !reason.phoneFound,
+                        error = reason.message,
                         canLoadMore = false
                     )
                 }
@@ -196,10 +203,10 @@ class TvHomeViewModel @Inject constructor(
             }
         }.toMap()
 
-    private fun getCachedShows(): List<EnrichedShowEntry>? {
+    private fun getFallbackCache(): List<EnrichedShowEntry>? {
         val ttl = 5 * 60 * 1000L // 5 minutes
-        val cached = cachedShows
-        return if (cached != null && System.currentTimeMillis() - cacheTimestamp < ttl) cached else null
+        val cached = fallbackCache
+        return if (cached != null && System.currentTimeMillis() - fallbackCacheTimestamp < ttl) cached else null
     }
 
     override fun onCleared() {
