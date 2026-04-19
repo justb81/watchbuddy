@@ -3,7 +3,9 @@ package com.justb81.watchbuddy.tv.data
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -24,13 +26,15 @@ class StreamingPreferencesRepository @Inject constructor(
 ) {
     private val subscribedKey = stringSetPreferencesKey("subscribed_service_ids")
     private val orderKey = stringPreferencesKey("service_order")
+    private val phoneDiscoveryKey = booleanPreferencesKey("phone_discovery_enabled")
+    private val autostartKey = booleanPreferencesKey("autostart_enabled")
 
     /**
      * Emits the ordered list of subscribed service IDs.
      * Empty list means no preference has been set (show all as fallback).
      */
     val subscribedServiceIds: Flow<List<String>> = context.streamingDataStore.data
-        .catch { emit(androidx.datastore.preferences.core.emptyPreferences()) }
+        .catch { emit(emptyPreferences()) }
         .map { prefs ->
             val ids = prefs[subscribedKey] ?: emptySet()
             val order = prefs[orderKey]?.split(",") ?: emptyList()
@@ -42,10 +46,28 @@ class StreamingPreferencesRepository @Inject constructor(
             }
         }
 
+    /** Whether phone discovery (NSD + BLE) should be active. Defaults to true. */
+    val isPhoneDiscoveryEnabled: Flow<Boolean> = context.streamingDataStore.data
+        .catch { emit(emptyPreferences()) }
+        .map { prefs -> prefs[phoneDiscoveryKey] ?: true }
+
+    /** Whether the TV should start discovery on boot via [BootReceiver]. Defaults to false. */
+    val isAutostartEnabled: Flow<Boolean> = context.streamingDataStore.data
+        .catch { emit(emptyPreferences()) }
+        .map { prefs -> prefs[autostartKey] ?: false }
+
     suspend fun setSubscribedServices(orderedIds: List<String>) {
         context.streamingDataStore.edit { prefs ->
             prefs[subscribedKey] = orderedIds.toSet()
             prefs[orderKey] = orderedIds.joinToString(",")
         }
+    }
+
+    suspend fun setPhoneDiscoveryEnabled(enabled: Boolean) {
+        context.streamingDataStore.edit { prefs -> prefs[phoneDiscoveryKey] = enabled }
+    }
+
+    suspend fun setAutostartEnabled(enabled: Boolean) {
+        context.streamingDataStore.edit { prefs -> prefs[autostartKey] = enabled }
     }
 }

@@ -229,6 +229,21 @@ class PhoneDiscoveryManager @Inject constructor(
     }
 
     /**
+     * Idempotent lifecycle switch driven by the user's "Phone discovery" setting
+     * and by [TvDiscoveryService]. Re-entrant: safe to call repeatedly with the
+     * same value. On disable the discovered-phone list is cleared immediately so
+     * the UI reflects the change without waiting for NSD timeouts.
+     */
+    fun setEnabled(enabled: Boolean) {
+        if (enabled) {
+            if (!isDiscovering) startDiscovery()
+        } else {
+            if (isDiscovering) stopDiscovery()
+            _discoveredPhones.value = emptyList()
+        }
+    }
+
+    /**
      * Tear down and restart NSD discovery. Safe to call while discovery is
      * already running: the underlying stop/start is wrapped in runCatching so
      * a stale listener registration cannot abort the cycle. Intended for

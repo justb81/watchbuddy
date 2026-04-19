@@ -69,6 +69,17 @@
     <string name="tv_streaming_settings_title">Streamingdienste</string>
     <string name="tv_streaming_settings_subtitle">Wähle deine abonnierten Dienste aus. Die Reihenfolge bestimmt die Priorität für Jetzt ansehen.</string>
 
+    <!-- TV Settings hub (#344) -->
+    <string name="tv_settings_title">Einstellungen</string>
+    <string name="tv_settings_phone_discovery_title">Telefonsuche</string>
+    <string name="tv_settings_phone_discovery_subtitle">Netzwerk nach WatchBuddy-Telefonen durchsuchen</string>
+    <string name="tv_settings_autostart_title">Autostart beim TV-Start</string>
+    <string name="tv_settings_autostart_subtitle">Suche automatisch starten, wenn der Fernseher eingeschaltet wird</string>
+    <string name="tv_settings_streaming_services">Streamingdienste</string>
+    <string name="tv_settings_diagnostics">Diagnose</string>
+    <string name="tv_discovery_notification_channel_name">Telefonsuche</string>
+    <string name="tv_discovery_notification_text">Suche im Netzwerk nach WatchBuddy-Telefonen</string>
+
     <!-- Scrobble overlay -->
     <string name="tv_scrobble_question">Schaust du gerade %1$s?</string>
     <string name="tv_scrobble_episode">S%1$02dE%2$02d</string>

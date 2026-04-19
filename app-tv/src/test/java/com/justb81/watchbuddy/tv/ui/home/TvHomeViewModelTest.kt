@@ -5,6 +5,7 @@ import com.justb81.watchbuddy.core.model.TraktIds
 import com.justb81.watchbuddy.core.model.TraktShow
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
 import com.justb81.watchbuddy.tv.MainDispatcherRule
+import com.justb81.watchbuddy.tv.data.StreamingPreferencesRepository
 import com.justb81.watchbuddy.tv.data.TvShowCache
 import com.justb81.watchbuddy.tv.data.UserSessionRepository
 import com.justb81.watchbuddy.tv.discovery.PhoneApiClientFactory
@@ -38,6 +39,7 @@ class TvHomeViewModelTest {
     private val phoneApiClientFactory: PhoneApiClientFactory = mockk()
     private val userSessionRepository: UserSessionRepository = mockk()
     private val tvShowCache: TvShowCache = mockk(relaxed = true)
+    private val preferencesRepository: StreamingPreferencesRepository = mockk()
     private val phonesFlow = MutableStateFlow<List<PhoneDiscoveryManager.DiscoveredPhone>>(emptyList())
     private val phoneApiService: PhoneApiService = mockk()
 
@@ -53,11 +55,19 @@ class TvHomeViewModelTest {
         every { userSessionRepository.selectedUserIds } returns flowOf(emptySet())
         every { phoneDiscovery.startDiscovery() } just runs
         every { phoneDiscovery.stopDiscovery() } just runs
+        every { phoneDiscovery.setEnabled(any()) } just runs
         every { phoneDiscovery.getBestPhone() } returns null
+        every { preferencesRepository.isPhoneDiscoveryEnabled } returns flowOf(true)
     }
 
     private fun createViewModel(): TvHomeViewModel {
-        return TvHomeViewModel(phoneDiscovery, phoneApiClientFactory, userSessionRepository, tvShowCache)
+        return TvHomeViewModel(
+            phoneDiscovery,
+            phoneApiClientFactory,
+            userSessionRepository,
+            tvShowCache,
+            preferencesRepository,
+        )
     }
 
     // ── Basic load behaviour ───────────────────────────────────────────────────
@@ -161,22 +171,24 @@ class TvHomeViewModelTest {
     }
 
     @Test
-    fun `onCleared stops discovery`() = runTest {
-        val viewModel = createViewModel()
+    fun `init forwards the discovery preference to the manager`() = runTest {
+        createViewModel()
         advanceUntilIdle()
-
-        // Trigger onCleared via reflection
-        val method = viewModel.javaClass.getDeclaredMethod("onCleared")
-        method.isAccessible = true
-        method.invoke(viewModel)
-
-        verify { phoneDiscovery.stopDiscovery() }
+        verify { phoneDiscovery.setEnabled(true) }
     }
 
     @Test
-    fun `init starts discovery`() = runTest {
+    fun `discovery preference flipping off calls setEnabled(false)`() = runTest {
+        val prefFlow = MutableStateFlow(true)
+        every { preferencesRepository.isPhoneDiscoveryEnabled } returns prefFlow
+
         createViewModel()
-        verify { phoneDiscovery.startDiscovery() }
+        advanceUntilIdle()
+
+        prefFlow.value = false
+        advanceUntilIdle()
+
+        verify { phoneDiscovery.setEnabled(false) }
     }
 
     @Test

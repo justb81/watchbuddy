@@ -19,6 +19,15 @@
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
         android:usesPermissionFlags="neverForLocation" />
 
+    <!-- Boot autostart — BootReceiver fires on BOOT_COMPLETED when the user
+         has enabled "Autostart at TV boot" in Settings; it spawns
+         TvDiscoveryService so discovery keeps running even when the launcher
+         activity hasn't been opened yet. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <!-- Play Store: TV app — no touchscreen, leanback required for correct
          multi-APK device targeting (prevents phone devices from receiving the
          TV AAB which has a higher versionCode). -->
@@ -83,6 +92,30 @@
                 android:value="androidx.startup"
                 tools:node="remove" />
         </provider>
+
+        <!-- Background phone discovery service. Runs NSD + BLE scanning when
+             "Autostart at TV boot" is enabled so new phones are picked up
+             without the user opening the launcher first. Uses `dataSync`
+             foreground service type to match the phone-side CompanionService. -->
+        <service
+            android:name=".tv.discovery.TvDiscoveryService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <!-- BOOT_COMPLETED receiver — gated on `isAutostartEnabled` preference.
+             Must be exported=true: system broadcasts originate from the
+             platform and Android 12+ rejects exported=false receivers for
+             implicit system actions. -->
+        <receiver
+            android:name=".tv.boot.BootReceiver"
+            android:enabled="true"
+            android:exported="true"
+            android:directBootAware="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
 
     </application>
 </manifest>

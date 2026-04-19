@@ -368,6 +368,37 @@ class PhoneDiscoveryManagerTest {
         manager.stopDiscovery()
     }
 
+    @Nested
+    @DisplayName("setEnabled")
+    inner class SetEnabledTest {
+
+        @Test
+        fun `setEnabled(false) clears the discovered-phone list`() {
+            // Simulate a populated discovered list from a prior NSD resolve.
+            val phone = makePhone(
+                capability = DeviceCapability("d", "u", null, "P", LlmBackend.NONE, 50, 4000, true),
+                score = 50,
+                name = "preload"
+            )
+            manager.setDiscoveredPhonesForTest(listOf(phone))
+            assertEquals(1, manager.discoveredPhones.value.size)
+
+            manager.setEnabled(false)
+
+            assertTrue(
+                manager.discoveredPhones.value.isEmpty(),
+                "Disabling discovery must clear the UI list immediately"
+            )
+        }
+
+        @Test
+        fun `setEnabled(false) is idempotent when called twice`() {
+            manager.setEnabled(false)
+            manager.setEnabled(false)
+            assertTrue(manager.discoveredPhones.value.isEmpty())
+        }
+    }
+
     // ── DiscoveryConstants ─────────────────────────────────────────────────────
 
     @Nested

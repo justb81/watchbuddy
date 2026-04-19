@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.justb81.watchbuddy.core.model.EnrichedShowEntry
 import com.justb81.watchbuddy.core.progress.ShowProgress
 import com.justb81.watchbuddy.core.progress.ShowProgressCalculator
+import com.justb81.watchbuddy.tv.data.StreamingPreferencesRepository
 import com.justb81.watchbuddy.tv.data.TvShowCache
 import com.justb81.watchbuddy.tv.data.UserSessionRepository
 import com.justb81.watchbuddy.tv.discovery.PhoneApiClientFactory
@@ -44,7 +45,8 @@ class TvHomeViewModel @Inject constructor(
     private val phoneDiscovery: PhoneDiscoveryManager,
     private val phoneApiClientFactory: PhoneApiClientFactory,
     private val userSessionRepository: UserSessionRepository,
-    private val tvShowCache: TvShowCache
+    private val tvShowCache: TvShowCache,
+    private val preferencesRepository: StreamingPreferencesRepository
 ) : ViewModel() {
 
     companion object {
@@ -61,9 +63,23 @@ class TvHomeViewModel @Inject constructor(
     private var loadedOffset: Int = 0
 
     init {
-        runCatching { phoneDiscovery.startDiscovery() }
+        observeDiscoveryPreference()
         observePhones()
         observeSelectedUsers()
+    }
+
+    /**
+     * Drive [PhoneDiscoveryManager] from the user's "Phone discovery" toggle.
+     * Discovery lifecycle is now owned by the preference (and, when autostart
+     * is on, by [TvDiscoveryService]) — not by this ViewModel's activity
+     * scope — so we intentionally do NOT call stopDiscovery in onCleared.
+     */
+    private fun observeDiscoveryPreference() {
+        viewModelScope.launch {
+            preferencesRepository.isPhoneDiscoveryEnabled.collect { enabled ->
+                runCatching { phoneDiscovery.setEnabled(enabled) }
+            }
+        }
     }
 
     private fun observePhones() {
@@ -213,10 +229,6 @@ class TvHomeViewModel @Inject constructor(
         return if (cached != null && System.currentTimeMillis() - fallbackCacheTimestamp < ttl) cached else null
     }
 
-    override fun onCleared() {
-        super.onCleared()
-        phoneDiscovery.stopDiscovery()
-    }
 }
 
 /**
