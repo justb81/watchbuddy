@@ -53,6 +53,20 @@ class PhoneDiscoveryManager @Inject constructor(
         private const val TAG = "PhoneDiscoveryManager"
         /** Back-off before retrying a stop+start cycle after FAILURE_ALREADY_ACTIVE. */
         private const val RESTART_BACKOFF_MS = 500L
+
+        /**
+         * Consecutive successful heartbeats a single phone needs before the
+         * TV stops its BLE scanner (#345 Opt B). Three matches the phone-
+         * side `STEADY_STATE_STREAK` so the two sides throttle in lock-step.
+         */
+        internal const val BLE_THROTTLE_STREAK = 3
+
+        /**
+         * Quiet-window guard before the scanner is allowed to enter the
+         * throttled (stopped) state again after a heartbeat miss. Stops
+         * SCANNING / IDLE oscillation when a TV briefly drops Wi-Fi.
+         */
+        internal const val BLE_THROTTLE_HYSTERESIS_MS = 2 * 60_000L
     }
 
     enum class BleScanState { IDLE, SCANNING, FAILED }
@@ -113,6 +127,12 @@ class PhoneDiscoveryManager @Inject constructor(
         val score: Int,
         val baseUrl: String,
         val failCount: Int = 0,
+        /**
+         * Count of back-to-back heartbeat successes for this phone. Drives
+         * BLE scanner throttling (#345 Opt B): once any phone crosses
+         * [BLE_THROTTLE_STREAK], the scanner is stopped until the next miss.
+         */
+        val consecutiveSuccesses: Int = 0,
         val lastSuccessfulCheck: Long = System.currentTimeMillis()
     )
 
@@ -363,6 +383,7 @@ class PhoneDiscoveryManager @Inject constructor(
             return
         }
 
+        var anyFailure = false
         val updated = phones.mapNotNull { phone ->
             val url = capabilityUrl(phone.baseUrl)
             try {
@@ -375,20 +396,56 @@ class PhoneDiscoveryManager @Inject constructor(
                     capability = capability ?: phone.capability,
                     score = newScore,
                     failCount = 0,
+                    consecutiveSuccesses = phone.consecutiveSuccesses + 1,
                     lastSuccessfulCheck = System.currentTimeMillis()
                 )
             } catch (e: Exception) {
+                anyFailure = true
                 val newFailCount = phone.failCount + 1
                 if (newFailCount >= DiscoveryConstants.MAX_CONSECUTIVE_FAILURES) {
                     Log.i(TAG, "Removing phone ${phone.baseUrl} after ${DiscoveryConstants.MAX_CONSECUTIVE_FAILURES} failed heartbeats")
                     null
                 } else {
-                    phone.copy(failCount = newFailCount)
+                    phone.copy(failCount = newFailCount, consecutiveSuccesses = 0)
                 }
             }
         }
         _discoveredPhones.value = updated.sortedByDescending { it.score }
+        applyBleScannerThrottle(updated, anyFailure)
     }
+
+    /**
+     * BLE scanner throttling (#345 Opt B). Once any phone has responded to
+     * [BLE_THROTTLE_STREAK] consecutive heartbeats, the TV already has a
+     * reliable Wi-Fi route to that phone and a BLE scan adds no signal —
+     * stop the scanner to cut radio cost. On any heartbeat failure the
+     * scanner comes back immediately so recovery (phone Wi-Fi hiccup,
+     * roaming) still finds the phone promptly. A [BLE_THROTTLE_HYSTERESIS_MS]
+     * quiet window guards the stop transition so a TV that briefly drops
+     * Wi-Fi every ~90 s doesn't flap us between SCANNING and IDLE.
+     */
+    private fun applyBleScannerThrottle(phones: List<DiscoveredPhone>, anyFailure: Boolean) {
+        if (!isDiscovering) return
+        val now = System.currentTimeMillis()
+        if (anyFailure) {
+            lastBleMissAtMs = now
+            if (_bleScanState.value != BleScanState.SCANNING) {
+                Log.i(TAG, "heartbeat miss — restarting BLE scanner")
+                startBleScan()
+            }
+            return
+        }
+        val anySteady = phones.any { it.consecutiveSuccesses >= BLE_THROTTLE_STREAK }
+        val hysteresisOk = now - lastBleMissAtMs >= BLE_THROTTLE_HYSTERESIS_MS
+        if (anySteady && hysteresisOk && _bleScanState.value == BleScanState.SCANNING) {
+            Log.i(TAG, "paired steady-state — stopping BLE scanner to save radio")
+            bleScanner.stop()
+            _bleScanState.value = BleScanState.IDLE
+            _bleScanErrorCode.value = null
+        }
+    }
+
+    @Volatile private var lastBleMissAtMs: Long = 0L
 
     /**
      * Returns the best available phone for recap generation, or null if none available.

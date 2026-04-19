@@ -251,6 +251,24 @@ network callback restarts discovery when Wi-Fi returns, and an empty phone list 
 60 s heartbeat tick cycles discovery so the TV recovers from silent NSD failures without
 requiring an app relaunch.
 
+**Paired steady-state BLE throttling (#345 Opt B):** once a phone has responded to
+`BLE_THROTTLE_STREAK = 3` consecutive heartbeats in a row, the TV has a reliable Wi-Fi
+route to it and a BLE scan adds no signal — `PhoneDiscoveryManager.applyBleScannerThrottle`
+calls `PhoneBleScanner.stop()` to cut radio cost. Symmetrically, the phone's
+`CompanionStateManager` counts in-cadence `/capability` polls and flips `pairedSteadyState`
+true; `CompanionService` observes that flow and re-advertises via `CompanionBleAdvertiser`
+in `ADVERTISE_MODE_LOW_POWER` (~1 s interval) instead of `ADVERTISE_MODE_BALANCED` (~250
+ms). A heartbeat miss on either side — gap &gt; 90 s or any fetch failure — reverts to the
+high-rate mode; a 2-minute hysteresis window guards re-entry to the throttled mode so a
+flaky TV that briefly drops Wi-Fi every ~90 s cannot oscillate both radios.
+
+**Skip NSD re-register on unchanged IPv4 (#345 Opt D):** `CompanionService.onAvailable`
+can fire repeatedly on OEM stacks during captive-portal probes and DNS retries without a
+real network handoff. Each churn briefly yanks the NSD advertisement off the network for
+~300 ms. `CompanionService` now caches `lastRegisteredIpv4` inside the registration
+callback and skips the full `unregister → 300 ms → register` dance when the new IPv4
+matches the cached one.
+
 ## Diagnostics View
 
 Both apps expose a **Diagnostics** screen under Settings → Diagnostics. It renders the

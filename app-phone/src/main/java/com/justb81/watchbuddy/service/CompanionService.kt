@@ -30,6 +30,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import java.net.Inet4Address
 import java.net.InetAddress
@@ -111,6 +112,16 @@ class CompanionService : Service() {
     @Volatile private var nsdState: NsdState = NsdState.IDLE
     private var nsdManager: NsdManager? = null
     private var nsdRegistrationListener: NsdManager.RegistrationListener? = null
+    /**
+     * Last IPv4 address published in the NSD TXT record / pinned as
+     * [NsdServiceInfo.host]. Used by [registerNetworkCallback] to skip the
+     * full `unregister → 300 ms → register` dance when Wi-Fi re-announces a
+     * network whose IPv4 didn't actually change (#345 Opt D): on many OEM
+     * stacks `NetworkCallback.onAvailable` fires repeatedly during captive
+     * portal / DNS retries without any real handoff, and each churn briefly
+     * removes our advertisement from the network.
+     */
+    @Volatile private var lastRegisteredIpv4: String? = null
     private var multicastLock: WifiManager.MulticastLock? = null
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var presenceJob: Job? = null
@@ -152,12 +163,14 @@ class CompanionService : Service() {
         stateManager.setServiceRunning(true)
         registerNetworkCallback()
         startPresenceMonitor()
+        observeSteadyState()
         return START_STICKY
     }
 
     override fun onDestroy() {
         DiagnosticLog.event(TAG, "onDestroy")
         presenceJob?.cancel()
+        steadyStateJob?.cancel()
         unregisterNetworkCallback()
         unregisterNsd()
         bleAdvertiser.stop()
@@ -180,6 +193,33 @@ class CompanionService : Service() {
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    // ── BLE mode switching on steady pairing ────────────────────────────────
+
+    private var steadyStateJob: Job? = null
+
+    /**
+     * Re-advertises over BLE whenever [CompanionStateManager.pairedSteadyState]
+     * flips. Each flip replaces the active advertisement with one that uses
+     * the appropriate `ADVERTISE_MODE_*` for the new state (#345 Opt B).
+     * The initial emission (startup, not-yet-paired) is skipped because
+     * `startBleAdvertising()` in [onStartCommand] already primed BLE.
+     */
+    private fun observeSteadyState() {
+        steadyStateJob?.cancel()
+        steadyStateJob = serviceScope.launch {
+            stateManager.pairedSteadyState
+                .drop(1)
+                .collect { steady ->
+                    DiagnosticLog.event(
+                        TAG,
+                        "pairedSteadyState=$steady — re-advertising BLE in " +
+                            if (steady) "LOW_POWER" else "BALANCED",
+                    )
+                    startBleAdvertising()
+                }
+        }
+    }
 
     // ── Presence timeout ─────────────────────────────────────────────────────
 
@@ -237,7 +277,26 @@ class CompanionService : Service() {
                     return
                 }
                 lastAvailable = now
-                DiagnosticLog.event(TAG, "Wi-Fi onAvailable — restarting NSD")
+                val currentIpv4 = wifiIpv4Address()?.hostAddress
+                // Skip the full re-register dance when the IPv4 address hasn't
+                // actually changed — `onAvailable` fires repeatedly on some
+                // OEM stacks during captive portal / DNS retries without any
+                // real network handoff, and each unregister + register removes
+                // our advertisement from the network for ~300ms (#345 Opt D).
+                if (currentIpv4 != null &&
+                    currentIpv4 == lastRegisteredIpv4 &&
+                    nsdState == NsdState.REGISTERED
+                ) {
+                    DiagnosticLog.debug(
+                        TAG,
+                        "Wi-Fi onAvailable skipped NSD re-register: IPv4 unchanged=$currentIpv4",
+                    )
+                    return
+                }
+                DiagnosticLog.event(
+                    TAG,
+                    "Wi-Fi onAvailable — restarting NSD (ipv4 was=$lastRegisteredIpv4 now=$currentIpv4)",
+                )
                 // Force a clean slate: unregister first, let NsdManager complete
                 // its teardown, then register the new advertisement. Calling
                 // registerService before unregisterService finishes is what
@@ -349,6 +408,7 @@ class CompanionService : Service() {
 
         val llmConfig = llmOrchestrator.selectConfig()
         val txtAttributes = buildTxtAttributes(BuildConfig.VERSION_NAME, llmConfig)
+        val pinnedIpv4 = wifiIpv4Address()
         val serviceInfo = NsdServiceInfo().apply {
             serviceName = NSD_SERVICE_NAME
             serviceType = NSD_SERVICE_TYPE
@@ -357,7 +417,7 @@ class CompanionService : Service() {
             // NsdManager picking a wrong interface on devices with multiple
             // active networks (Wi-Fi + cellular, Wi-Fi + Ethernet) — a common
             // cause of "visible on the phone, invisible to peers" (#265).
-            wifiIpv4Address()?.let { host = it }
+            pinnedIpv4?.let { host = it }
             txtAttributes.forEach { (key, value) -> setAttribute(key, value) }
         }
 
@@ -365,6 +425,10 @@ class CompanionService : Service() {
             override fun onServiceRegistered(info: NsdServiceInfo) {
                 DiagnosticLog.event(TAG, "NSD REGISTERING→REGISTERED service=${info.serviceName} TXT=$txtAttributes")
                 synchronized(nsdLock) { nsdState = NsdState.REGISTERED }
+                // Remember the IPv4 we just pinned so onAvailable can skip
+                // the full re-register dance when it fires for the same
+                // network (#345 Opt D).
+                lastRegisteredIpv4 = pinnedIpv4?.hostAddress
                 stateManager.setNsdRegistrationState(CompanionStateManager.NsdRegistrationState.REGISTERED)
             }
             override fun onRegistrationFailed(info: NsdServiceInfo, errorCode: Int) {
@@ -374,6 +438,7 @@ class CompanionService : Service() {
                     nsdManager = null
                     nsdState = NsdState.IDLE
                 }
+                lastRegisteredIpv4 = null
                 stateManager.setNsdRegistrationState(
                     CompanionStateManager.NsdRegistrationState.FAILED,
                     errorCode = errorCode,
@@ -386,6 +451,7 @@ class CompanionService : Service() {
                     nsdManager = null
                     nsdState = NsdState.IDLE
                 }
+                lastRegisteredIpv4 = null
                 stateManager.setNsdRegistrationState(CompanionStateManager.NsdRegistrationState.IDLE)
             }
             override fun onUnregistrationFailed(info: NsdServiceInfo, errorCode: Int) {
@@ -395,6 +461,7 @@ class CompanionService : Service() {
                     nsdManager = null
                     nsdState = NsdState.IDLE
                 }
+                lastRegisteredIpv4 = null
                 stateManager.setNsdRegistrationState(
                     CompanionStateManager.NsdRegistrationState.FAILED,
                     errorCode = errorCode,
