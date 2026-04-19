@@ -18,6 +18,7 @@ import okhttp3.ResponseBody
 import retrofit2.HttpException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
@@ -291,6 +292,33 @@ class HomeViewModelTest {
             advanceUntilIdle()
 
             assertNotNull(vm)
+        }
+    }
+
+    @Nested
+    @DisplayName("observeCompanionState error handling")
+    inner class CompanionStateErrorTest {
+
+        @Test
+        fun `sets error when settings property throws on access`() = runTest {
+            every { settingsRepository.settings } throws RuntimeException("Settings unavailable")
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            assertNotNull(vm.uiState.value.error)
+        }
+
+        @Test
+        fun `sets error when settings flow emits error during collection`() = runTest {
+            every { settingsRepository.settings } returns flow {
+                throw RuntimeException("DataStore corrupted")
+            }
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            assertNotNull(vm.uiState.value.error)
         }
     }
 

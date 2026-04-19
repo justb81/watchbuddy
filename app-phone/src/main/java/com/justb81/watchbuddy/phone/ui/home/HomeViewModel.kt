@@ -18,8 +18,10 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -61,12 +63,25 @@ class HomeViewModel @Inject constructor(
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
     init {
+        assertTokenAccessible()
         observeShows()
         loadShows()
         checkServiceConnections()
         observeCompanionState()
         observeScrobbleEvents()
         observeWifiState()
+    }
+
+    private fun assertTokenAccessible() {
+        runCatching { tokenRepository.getAccessToken() }
+            .onFailure { e ->
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        error = getApplication<Application>().getString(R.string.home_sync_failed, e.message)
+                    )
+                }
+            }
     }
 
     private fun observeShows() {
@@ -96,18 +111,19 @@ class HomeViewModel @Inject constructor(
 
     private fun observeCompanionState() {
         viewModelScope.launch {
-            val settingsFlow = try {
-                settingsRepository.settings
-            } catch (_: Exception) {
-                flowOf()
-            }
-            settingsFlow.collect { settings ->
-                val wasWatching = _uiState.value.isWatchingTv
-                _uiState.update { it.copy(isWatchingTv = settings.companionEnabled) }
-                if (settings.companionEnabled && !wasWatching) {
-                    CompanionService.start(getApplication<Application>())
+            flow { emitAll(settingsRepository.settings) }
+                .catch { e ->
+                    _uiState.update {
+                        it.copy(error = getApplication<Application>().getString(R.string.home_sync_failed, e.message))
+                    }
                 }
-            }
+                .collect { settings ->
+                    val wasWatching = _uiState.value.isWatchingTv
+                    _uiState.update { it.copy(isWatchingTv = settings.companionEnabled) }
+                    if (settings.companionEnabled && !wasWatching) {
+                        CompanionService.start(getApplication<Application>())
+                    }
+                }
         }
     }
 
@@ -158,8 +174,6 @@ class HomeViewModel @Inject constructor(
             try {
                 val token = tokenRepository.getAccessToken()
                     ?: throw IllegalStateException("No access token available")
-                // Touch token to surface keystore exceptions here so catch translates them into UI error.
-                @Suppress("UNUSED_VARIABLE") val _t = token
                 showRepository.getShows() // Result flows into observeShows() via StateFlow.
                 _uiState.update {
                     it.copy(
