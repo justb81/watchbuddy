@@ -4,16 +4,11 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.justb81.watchbuddy.R
-import com.justb81.watchbuddy.core.network.WatchBuddyJson
+import com.justb81.watchbuddy.tv.discovery.PhoneApiClientFactory
 import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
-import com.justb81.watchbuddy.tv.discovery.RecapResponse
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.RequestBody.Companion.toRequestBody
 import javax.inject.Inject
 
 sealed class RecapUiState {
@@ -32,7 +27,7 @@ sealed class RecapUiState {
 class RecapViewModel @Inject constructor(
     application: Application,
     private val phoneDiscovery: PhoneDiscoveryManager,
-    private val httpClient: OkHttpClient
+    private val phoneApiClientFactory: PhoneApiClientFactory
 ) : AndroidViewModel(application) {
 
     private val _state = MutableStateFlow<RecapUiState>(RecapUiState.Idle)
@@ -54,27 +49,13 @@ class RecapViewModel @Inject constructor(
             }
 
             for (phone in phones) {
-                val deviceName = phone.capability?.deviceName ?: getApplication<Application>().getString(R.string.tv_default_device_name)
+                val deviceName = phone.capability?.deviceName
+                    ?: getApplication<Application>().getString(R.string.tv_default_device_name)
                 _state.value = RecapUiState.Generating(deviceName)
                 try {
-                    @Suppress("DEPRECATION")
-                    val host = phone.serviceInfo.host?.hostAddress ?: continue
-                    val port = phone.serviceInfo.port
-                    val url  = "http://$host:$port/recap/$traktShowId"
-
-                    val response = httpClient.newCall(
-                        Request.Builder()
-                            .url(url)
-                            .post("{}".toRequestBody("application/json".toMediaType()))
-                            .build()
-                    ).execute()
-
-                    if (response.isSuccessful) {
-                        val body = response.body?.string() ?: ""
-                        val recap = WatchBuddyJson.decodeFromString<RecapResponse>(body)
-                        _state.value = RecapUiState.Ready(recap.html)
-                        return@launch
-                    }
+                    val recap = phoneApiClientFactory.createClient(phone.baseUrl).getRecap(traktShowId)
+                    _state.value = RecapUiState.Ready(recap.html)
+                    return@launch
                 } catch (e: Exception) {
                     // Failover to next phone
                     continue
