@@ -521,8 +521,10 @@ class TvHomeViewModelTest {
         @Test
         fun `completed show is excluded from both sections`() {
             val vm = createViewModel()
-            val recentCompleted = completedShow("Finished", id = 1, lastWatchedAt = now.minus(5, ChronoUnit.DAYS).toString())
-            val oldCompleted = completedShow("OldFinished", id = 2, lastWatchedAt = now.minus(40, ChronoUnit.DAYS).toString())
+            val recentCompleted =
+                completedShow("Finished", id = 1, lastWatchedAt = now.minus(5, ChronoUnit.DAYS).toString())
+            val oldCompleted =
+                completedShow("OldFinished", id = 2, lastWatchedAt = now.minus(40, ChronoUnit.DAYS).toString())
 
             val (cw, others) = vm.partitionShows(listOf(recentCompleted, oldCompleted), now)
 
@@ -533,7 +535,8 @@ class TvHomeViewModelTest {
         @Test
         fun `incomplete show is still shown in the expected section`() {
             val vm = createViewModel()
-            val recentIncomplete = incompleteShow("InProgress", id = 3, lastWatchedAt = now.minus(5, ChronoUnit.DAYS).toString())
+            val recentIncomplete =
+                incompleteShow("InProgress", id = 3, lastWatchedAt = now.minus(5, ChronoUnit.DAYS).toString())
 
             val (cw, others) = vm.partitionShows(listOf(recentIncomplete), now)
 
@@ -597,8 +600,10 @@ class TvHomeViewModelTest {
             every { phoneDiscovery.getBestPhone() } returns phone
             every { phoneApiClientFactory.createClient(any()) } returns phoneApiService
 
-            val completed = completedShow("Done", id = 1, lastWatchedAt = Instant.now().minus(5, ChronoUnit.DAYS).toString())
-            val ongoing = incompleteShow("Ongoing", id = 2, lastWatchedAt = Instant.now().minus(5, ChronoUnit.DAYS).toString())
+            val completed =
+                completedShow("Done", id = 1, lastWatchedAt = Instant.now().minus(5, ChronoUnit.DAYS).toString())
+            val ongoing =
+                incompleteShow("Ongoing", id = 2, lastWatchedAt = Instant.now().minus(5, ChronoUnit.DAYS).toString())
             coEvery { phoneApiService.getShows(any(), any()) } returns listOf(completed, ongoing)
 
             val viewModel = createViewModel()
