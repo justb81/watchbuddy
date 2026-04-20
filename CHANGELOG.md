@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.23.0](https://github.com/justb81/watchbuddy/compare/v0.22.0...v0.23.0) (2026-04-20)
+
+
+### Features
+
+* **ci:** add detekt, Android Lint SARIF and backend ESLint/Prettier with PR statistics ([#379](https://github.com/justb81/watchbuddy/issues/379)) ([7944a68](https://github.com/justb81/watchbuddy/commit/7944a68277079d4f93ae4579adef69faef06fd13))
+* **home:** highlight shows with a new season available ([#363](https://github.com/justb81/watchbuddy/issues/363)) ([#383](https://github.com/justb81/watchbuddy/issues/383)) ([1c58701](https://github.com/justb81/watchbuddy/commit/1c587016d2acd7a59fd4bce46b34bf4936e83296))
+* **home:** split HomeScreen into Continue Watching / All Shows by 30-day window ([#380](https://github.com/justb81/watchbuddy/issues/380)) ([c952510](https://github.com/justb81/watchbuddy/commit/c95251070af828ee0d8be7252fe4f8a48f1e8c1e))
+* **phone:** multi-line layout for last-watched / last-aired on HomeScreen ([#359](https://github.com/justb81/watchbuddy/issues/359)) ([#384](https://github.com/justb81/watchbuddy/issues/384)) ([74bd7e9](https://github.com/justb81/watchbuddy/commit/74bd7e9da51c1c1b2c3f9d48fdc3b59d9fd99a4d))
+* **tv:** hide fully-watched shows from TV HomeScreen ([#362](https://github.com/justb81/watchbuddy/issues/362)) ([#382](https://github.com/justb81/watchbuddy/issues/382)) ([d2ce611](https://github.com/justb81/watchbuddy/commit/d2ce611e3e4a26228d8dc0afcbc8d716aa56b07f))
+
 ## [0.22.0](https://github.com/justb81/watchbuddy/compare/v0.21.0...v0.22.0) (2026-04-19)
 
 
