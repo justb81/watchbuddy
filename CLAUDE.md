@@ -137,6 +137,26 @@ The only exceptions are **localization string resources** (`values-de/`, `values
 - Backend: `npm --prefix backend run lint && npm --prefix backend run format:check` (ESLint 9 flat config + Prettier 3).
 - CI gates every PR: any **new** finding beyond the baselines fails the `Build Android APKs` or `Backend Tests` workflow. SARIF reports are uploaded to GitHub code scanning and a summary comment with the per-module finding counts is posted on each PR (`<!-- watchbuddy-lint-report -->`).
 
+### Local pre-commit checks
+
+`scripts/precommit.sh` runs the same test / detekt / Android Lint / backend-lint / workflow-YAML checks CI runs, scoped to whatever is currently staged (mirrors the `paths-filter` in `build-android.yml` and `test-backend.yml`). Both human contributors and agents MUST run it before every commit — CI's path filter means a workflow-only or docs-only PR is never actually exercised, so bugs that don't touch Kotlin / Gradle / backend files land on main unchecked. The script is the only place that catches those.
+
+**Enable the shared git hook once per clone** (agents should do this at session start if it isn't already set):
+
+```sh
+git config core.hooksPath .githooks
+```
+
+Once enabled, `.githooks/pre-commit` delegates to `scripts/precommit.sh` on every `git commit`. Without the hook, run the script manually: `./scripts/precommit.sh`. Either path fails the commit if any check fails. Do **not** pass `--no-verify` to bypass — follow the guidance in "Executing actions with care" and fix the underlying failure.
+
+**Scoping rules** (must match the CI `paths-filter` sets exactly):
+
+- `app-phone/**`, `app-tv/**`, `core/**`, `*.gradle.kts`, `gradle/**`, `gradle.properties`, `config/detekt/**`, `.github/actions/**` → `./gradlew test detektAll :app-phone:lintDebug :app-tv:lintDebug`
+- `backend/**` → `npm --prefix backend run lint && npm --prefix backend run format:check && npm --prefix backend test`
+- `.github/workflows/*.y?ml` → `python3 yaml.safe_load` on each changed file + `actionlint` when installed
+
+If you change either workflow's `paths-filter`, update `scripts/precommit.sh` in the same commit.
+
 ### Git Workflow — IMPORTANT
 
 **Never push directly to `main`.** All changes must go through a Pull Request — no exceptions, including for agents.
@@ -149,7 +169,7 @@ The only exceptions are **localization string resources** (`values-de/`, `values
    - If any open PR matches, post a single comment on the issue via `mcp__github__add_issue_comment` — e.g. *"Another Claude Code session is already working on this issue — see #\<PR-number\>. Aborting this session to avoid parallel work."* — and stop immediately. Do not create a branch, do not edit files, do not commit.
    - Exception: skip this check when the session is explicitly invoked to continue work on a specific existing PR (e.g. responding to review comments on that PR).
 2. Create a feature branch from `main`
-3. Make changes and commit using Conventional Commits (see below)
+3. Make changes. Before **every** commit run `./scripts/precommit.sh` (or enable `git config core.hooksPath .githooks` once so the shared hook runs automatically) — see "Local pre-commit checks" above. Commit using Conventional Commits (see below)
 4. Push the branch and open a PR against `main`
 5. **Wait for a green CI build** (`build-android.yml`) — do not continue if the build is red; fix the issue first (see "Monitoring PR checks & accessing build logs" below)
 6. **Auto-merge when green.** Once every required build step on the PR has completed successfully, the agent may merge the PR into `main` automatically (e.g. via `enable_pr_auto_merge` or by merging directly after CI passes). Use a squash merge and delete the branch after merge.
