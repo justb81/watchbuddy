@@ -1,5 +1,6 @@
 package com.justb81.watchbuddy.core.model
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 // ── Trakt Models ─────────────────────────────────────────────────────────────
@@ -177,10 +178,10 @@ data class ScrobbleDisplayEvent(
 
 @Serializable
 data class WatchProviderEntry(
-    val provider_id: Int,
-    val provider_name: String,
-    val logo_path: String? = null,
-    val display_priority: Int = 0,
+    @SerialName("provider_id") val providerId: Int,
+    @SerialName("provider_name") val providerName: String,
+    @SerialName("logo_path") val logoPath: String? = null,
+    @SerialName("display_priority") val displayPriority: Int = 0,
 )
 
 @Serializable

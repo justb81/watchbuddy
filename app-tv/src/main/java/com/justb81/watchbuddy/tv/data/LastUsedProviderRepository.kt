@@ -53,9 +53,13 @@ class LastUsedProviderRepository @Inject constructor(
         if (s.isBlank()) return emptyMap()
         return s.split(";").mapNotNull { entry ->
             val parts = entry.split("|")
-            if (parts.size == 2) parts[0].toIntOrNull()?.let { k ->
-                parts[1].toIntOrNull()?.let { v -> k to v }
-            } else null
+            if (parts.size == 2) {
+                parts[0].toIntOrNull()?.let { k ->
+                    parts[1].toIntOrNull()?.let { v -> k to v }
+                }
+            } else {
+                null
+            }
         }.toMap()
     }
 }

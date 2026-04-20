@@ -33,8 +33,10 @@ data class NextEpisodeUiState(
 sealed interface ProviderListUiState {
     object Loading : ProviderListUiState
     data class Success(val providers: List<ResolvedProvider>) : ProviderListUiState
+
     /** TMDB returned zero providers for this region. */
     data class Empty(val tmdbPageUrl: String?) : ProviderListUiState
+
     /** Network or API error — the user can retry. */
     object Error : ProviderListUiState
 }

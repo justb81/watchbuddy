@@ -73,8 +73,8 @@ class WatchProvidersRepository @Inject constructor(
 
     private fun mergeAndDedup(vararg lists: List<WatchProviderEntry>): List<WatchProviderEntry> {
         val seen = mutableSetOf<Int>()
-        return lists.flatMap { it }.filter { seen.add(it.provider_id) }
-            .sortedBy { it.display_priority }
+        return lists.flatMap { it }.filter { seen.add(it.providerId) }
+            .sortedBy { it.displayPriority }
     }
 
     private fun resolve(
@@ -85,13 +85,13 @@ class WatchProvidersRepository @Inject constructor(
         pageUrl: String?,
     ): List<ResolvedProvider> {
         val resolved = raw.map { entry ->
-            val catalog = ProviderCatalog.byId[entry.provider_id]
+            val catalog = ProviderCatalog.byId[entry.providerId]
             val pkgName = catalog?.packageName
             val isInstalled = pkgName != null && pkgName in installed
             ResolvedProvider(
-                providerId = entry.provider_id,
-                name = entry.provider_name,
-                logoPath = TmdbImageHelper.logo(entry.logo_path),
+                providerId = entry.providerId,
+                name = entry.providerName,
+                logoPath = TmdbImageHelper.logo(entry.logoPath),
                 packageName = pkgName,
                 deepLinkTemplate = catalog?.deepLinkTemplate,
                 isInstalled = isInstalled,

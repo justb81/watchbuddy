@@ -130,6 +130,15 @@ fun TvSettingsScreen(
         ),
     )
 
+    TvSettingsBodyContent(rows = rows, onBack = onBack)
+}
+
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+private fun TvSettingsBodyContent(
+    rows: List<SettingsRow>,
+    onBack: () -> Unit,
+) {
     Box(
         modifier = Modifier
             .fillMaxSize()

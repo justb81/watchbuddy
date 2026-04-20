@@ -24,17 +24,17 @@ data class ProviderEntry(
 object ProviderCatalog {
 
     val entries: List<ProviderEntry> = listOf(
-        ProviderEntry(8,    "Netflix",        "com.netflix.ninja",                    "https://www.netflix.com/title/{tmdb_id}"),
-        ProviderEntry(9,    "Amazon Prime",   "com.amazon.amazonvideo.livingroom",     "https://www.primevideo.com/search?phrase={slug}"),
-        ProviderEntry(119,  "Prime Video",    "com.amazon.amazonvideo.livingroom",     "https://www.primevideo.com/search?phrase={slug}"),
-        ProviderEntry(337,  "Disney+",        "com.disney.disneyplus",                "https://www.disneyplus.com/series/{slug}/{tmdb_id}"),
-        ProviderEntry(350,  "Apple TV+",      "com.apple.atve.androidtv.appletv",     "https://tv.apple.com/show/{tmdb_id}"),
-        ProviderEntry(531,  "Paramount+",     "com.cbs.app",                          "https://www.paramountplus.com/shows/{slug}/"),
-        ProviderEntry(1899, "Max",            "com.hbo.hbonow",                       "https://play.max.com/show/{tmdb_id}"),
-        ProviderEntry(2187, "WaipuTV",        "tv.waipu.app",                         "waipu://tv"),
-        ProviderEntry(2184, "Joyn",           "de.prosiebensat1digital.android.joyn", "https://www.joyn.de/serien/{slug}"),
-        ProviderEntry(195,  "ARD Mediathek",  "de.swr.avp.ard.phone",                 "https://www.ardmediathek.de/video/{id}"),
-        ProviderEntry(231,  "ZDF Mediathek",  "de.zdf.android.app",                   "https://www.zdf.de/serien/{slug}"),
+        ProviderEntry(8, "Netflix", "com.netflix.ninja", "https://www.netflix.com/title/{tmdb_id}"),
+        ProviderEntry(9, "Amazon Prime", "com.amazon.amazonvideo.livingroom", "https://www.primevideo.com/search?phrase={slug}"),
+        ProviderEntry(119, "Prime Video", "com.amazon.amazonvideo.livingroom", "https://www.primevideo.com/search?phrase={slug}"),
+        ProviderEntry(337, "Disney+", "com.disney.disneyplus", "https://www.disneyplus.com/series/{slug}/{tmdb_id}"),
+        ProviderEntry(350, "Apple TV+", "com.apple.atve.androidtv.appletv", "https://tv.apple.com/show/{tmdb_id}"),
+        ProviderEntry(531, "Paramount+", "com.cbs.app", "https://www.paramountplus.com/shows/{slug}/"),
+        ProviderEntry(1899, "Max", "com.hbo.hbonow", "https://play.max.com/show/{tmdb_id}"),
+        ProviderEntry(2187, "WaipuTV", "tv.waipu.app", "waipu://tv"),
+        ProviderEntry(2184, "Joyn", "de.prosiebensat1digital.android.joyn", "https://www.joyn.de/serien/{slug}"),
+        ProviderEntry(195, "ARD Mediathek", "de.swr.avp.ard.phone", "https://www.ardmediathek.de/video/{id}"),
+        ProviderEntry(231, "ZDF Mediathek", "de.zdf.android.app", "https://www.zdf.de/serien/{slug}"),
     )
 
     /** Fast lookup by provider_id. */

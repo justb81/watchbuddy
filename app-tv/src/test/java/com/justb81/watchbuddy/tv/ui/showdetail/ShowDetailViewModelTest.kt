@@ -301,7 +301,10 @@ class ShowDetailViewModelTest {
         @Test
         fun `Joyn generates slug link without tmdb_id`() {
             val entry = TraktWatchedEntry(TraktShow("Test Show", 2024, TraktIds(tmdb = null, slug = "test-show")))
-            val provider = makeProvider(deepLinkTemplate = "https://joyn.de/serien/{slug}", tmdbPageUrl = "https://tmdb.org")
+            val provider = makeProvider(
+                deepLinkTemplate = "https://joyn.de/serien/{slug}",
+                tmdbPageUrl = "https://tmdb.org",
+            )
             assertEquals("https://joyn.de/serien/test-show", viewModel.onProviderSelected(provider, entry))
         }
 

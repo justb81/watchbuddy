@@ -33,6 +33,13 @@ import com.justb81.watchbuddy.core.tmdb.TmdbImageHelper
 
 private const val TMDB_POSTER_WIDTH = 500
 
+private data class ShowDetailActions(
+    val onWatchNow: () -> Unit,
+    val onProviderClick: (ResolvedProvider) -> Unit,
+    val onRetryProviders: () -> Unit,
+    val onRecapClick: () -> Unit,
+)
+
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun ShowDetailScreen(
@@ -71,26 +78,28 @@ fun ShowDetailScreen(
             episodeCode = episodeCode,
             providerState = providerState,
             watchNowFocus = watchNowFocus,
-            onWatchNow = {
-                val deepLink = viewModel.resolveDeepLink(entry)
-                if (deepLink != null) {
-                    context.startActivity(
-                        Intent(Intent.ACTION_VIEW, Uri.parse(deepLink))
-                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    )
-                }
-            },
-            onProviderClick = { provider ->
-                val link = viewModel.onProviderSelected(provider, entry)
-                if (link != null) {
-                    context.startActivity(
-                        Intent(Intent.ACTION_VIEW, Uri.parse(link))
-                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    )
-                }
-            },
-            onRetryProviders = { viewModel.loadProviders(enriched) },
-            onRecapClick = onRecapClick,
+            actions = ShowDetailActions(
+                onWatchNow = {
+                    val deepLink = viewModel.resolveDeepLink(entry)
+                    if (deepLink != null) {
+                        context.startActivity(
+                            Intent(Intent.ACTION_VIEW, Uri.parse(deepLink))
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        )
+                    }
+                },
+                onProviderClick = { provider ->
+                    val link = viewModel.onProviderSelected(provider, entry)
+                    if (link != null) {
+                        context.startActivity(
+                            Intent(Intent.ACTION_VIEW, Uri.parse(link))
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        )
+                    }
+                },
+                onRetryProviders = { viewModel.loadProviders(enriched) },
+                onRecapClick = onRecapClick,
+            ),
             modifier = Modifier.align(Alignment.CenterEnd),
         )
         OutlinedButton(
@@ -141,10 +150,7 @@ private fun ShowDetailContent(
     episodeCode: String,
     providerState: ProviderListUiState,
     watchNowFocus: FocusRequester,
-    onWatchNow: () -> Unit,
-    onProviderClick: (ResolvedProvider) -> Unit,
-    onRetryProviders: () -> Unit,
-    onRecapClick: () -> Unit,
+    actions: ShowDetailActions,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -178,19 +184,19 @@ private fun ShowDetailContent(
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             Button(
-                onClick = onWatchNow,
+                onClick = actions.onWatchNow,
                 modifier = Modifier.focusRequester(watchNowFocus),
                 colors = ButtonDefaults.colors(containerColor = MaterialTheme.colorScheme.primary)
             ) {
                 Text(text = stringResource(R.string.tv_watch_now), fontWeight = FontWeight.Bold)
             }
-            OutlinedButton(onClick = onRecapClick) { Text(stringResource(R.string.tv_recap)) }
+            OutlinedButton(onClick = actions.onRecapClick) { Text(stringResource(R.string.tv_recap)) }
         }
 
         AvailableOnSection(
             state = providerState,
-            onProviderClick = onProviderClick,
-            onRetry = onRetryProviders,
+            onProviderClick = actions.onProviderClick,
+            onRetry = actions.onRetryProviders,
         )
     }
 }
