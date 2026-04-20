@@ -13,7 +13,7 @@ import kotlin.math.abs
 internal const val DAY_MS = 24L * 60 * 60 * 1000
 internal const val WEEK_MS = 7 * DAY_MS
 
-private val SHORT_DATE_FORMATTER get() = DateTimeFormatter.ofPattern("d MMM", Locale.getDefault())
+private val shortDateFormatter get() = DateTimeFormatter.ofPattern("d MMM", Locale.getDefault())
 
 /**
  * Pure branching logic for [relativeTime], extracted to allow unit testing without an Android
@@ -41,7 +41,7 @@ internal fun formatRelativeTime(
         abs(delta) > WEEK_MS -> Instant.ofEpochMilli(momentMs)
             .atZone(ZoneId.systemDefault())
             .toLocalDate()
-            .format(SHORT_DATE_FORMATTER)
+            .format(shortDateFormatter)
         else -> relativeSpanFn(momentMs, now)
     }
 }
@@ -68,7 +68,7 @@ internal fun formatRelativeDate(
         day.isEqual(today) -> todayStr
         day.isEqual(today.minusDays(1)) -> yesterdayStr
         day.isEqual(today.plusDays(1)) -> tomorrowStr
-        abs(delta) > WEEK_MS -> day.format(SHORT_DATE_FORMATTER)
+        abs(delta) > WEEK_MS -> day.format(shortDateFormatter)
         else -> relativeSpanFn(moment.toEpochMilli(), now)
     }
 }
