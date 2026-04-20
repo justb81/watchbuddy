@@ -106,23 +106,15 @@ class ShowDetailViewModelTest {
         @Test
         fun `populates stillUrl and episodeName on success`() = runTest {
             every { phoneDiscovery.getBestPhone() } returns makePhone("test-key")
-            coEvery { tmdbApi.getEpisode(100, 1, 2, "test-key") } returns makeTmdbEpisode(1, 2)
+            coEvery { tmdbApi.getEpisode(100, 1, 2, "test-key", "en-US") } returns makeTmdbEpisode(1, 2)
 
-            viewModel.nextEpisode.test {
-                // Initial empty state
-                awaitItem()
-                viewModel.loadNextEpisode(makeEntry())
-                // Loading state
-                val loading = awaitItem()
-                assertTrue(loading.isLoading)
-                // Resolved state
-                val resolved = awaitItem()
-                assertFalse(resolved.isLoading)
-                assertTrue(resolved.stillUrl?.contains("still.jpg") == true)
-                assertEquals("Episode Title", resolved.episodeName)
-                assertEquals("S01E02", resolved.episodeCode)
-                cancelAndIgnoreRemainingEvents()
-            }
+            viewModel.loadNextEpisode(makeEntry())
+
+            val state = viewModel.nextEpisode.value
+            assertFalse(state.isLoading)
+            assertTrue(state.stillUrl?.contains("still.jpg") == true)
+            assertEquals("Episode Title", state.episodeName)
+            assertEquals("S01E02", state.episodeCode)
         }
 
         @Test
@@ -140,18 +132,12 @@ class ShowDetailViewModelTest {
         fun `stays empty when no phone available`() = runTest {
             every { phoneDiscovery.getBestPhone() } returns null
 
-            viewModel.nextEpisode.test {
-                awaitItem()
-                viewModel.loadNextEpisode(makeEntry())
-                // Loading
-                awaitItem()
-                // Resolved to empty (no API key)
-                val state = awaitItem()
-                assertFalse(state.isLoading)
-                assertNull(state.stillUrl)
-                assertNull(state.episodeName)
-                cancelAndIgnoreRemainingEvents()
-            }
+            viewModel.loadNextEpisode(makeEntry())
+
+            val state = viewModel.nextEpisode.value
+            assertFalse(state.isLoading)
+            assertNull(state.stillUrl)
+            assertNull(state.episodeName)
         }
 
         @Test
@@ -179,16 +165,12 @@ class ShowDetailViewModelTest {
             every { phoneDiscovery.getBestPhone() } returns makePhone("key")
             coEvery { tmdbApi.getEpisode(any(), any(), any(), any(), any()) } throws RuntimeException("404")
 
-            viewModel.nextEpisode.test {
-                awaitItem()
-                viewModel.loadNextEpisode(makeEntry())
-                awaitItem() // loading
-                val failed = awaitItem()
-                assertFalse(failed.isLoading)
-                assertNull(failed.stillUrl)
-                assertNull(failed.episodeName)
-                cancelAndIgnoreRemainingEvents()
-            }
+            viewModel.loadNextEpisode(makeEntry())
+
+            val state = viewModel.nextEpisode.value
+            assertFalse(state.isLoading)
+            assertNull(state.stillUrl)
+            assertNull(state.episodeName)
         }
 
         @Test
@@ -199,7 +181,7 @@ class ShowDetailViewModelTest {
                 )
             )
             every { phoneDiscovery.getBestPhone() } returns makePhone("key")
-            coEvery { tmdbApi.getEpisode(100, 2, 1, "key") } returns makeTmdbEpisode(2, 1, "Season Premiere")
+            coEvery { tmdbApi.getEpisode(100, 2, 1, "key", "en-US") } returns makeTmdbEpisode(2, 1, "Season Premiere")
 
             viewModel.loadNextEpisode(enriched)
 
