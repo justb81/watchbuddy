@@ -1,6 +1,8 @@
 package com.justb81.watchbuddy.tv.ui.home
 
 import com.justb81.watchbuddy.core.model.EnrichedShowEntry
+import com.justb81.watchbuddy.core.model.TmdbProgressHint
+import com.justb81.watchbuddy.core.model.TmdbSeasonSummary
 import com.justb81.watchbuddy.core.model.TraktIds
 import com.justb81.watchbuddy.core.model.TraktShow
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
@@ -468,6 +470,150 @@ class TvHomeViewModelTest {
             assertEquals(1, state.allShows.size)
             assertEquals("Recent", state.continueWatching[0].entry.show.title)
             assertEquals("Old Show", state.allShows[0].entry.show.title)
+        }
+    }
+
+    @Nested
+    @DisplayName("completed-show filter (#362)")
+    inner class CompletedShowFilterTest {
+
+        private val now = Instant.parse("2026-04-19T12:00:00Z")
+
+        private fun completedShow(title: String, id: Int, lastWatchedAt: String) =
+            EnrichedShowEntry(
+                entry = TraktWatchedEntry(
+                    show = TraktShow(title, 2020, TraktIds(trakt = id)),
+                    seasons = listOf(
+                        TraktWatchedSeason(
+                            number = 1,
+                            episodes = listOf(
+                                TraktWatchedEpisode(number = 1, last_watched_at = lastWatchedAt),
+                                TraktWatchedEpisode(number = 2, last_watched_at = lastWatchedAt)
+                            )
+                        )
+                    )
+                ),
+                tmdb = TmdbProgressHint(
+                    status = "Ended",
+                    seasons = listOf(TmdbSeasonSummary(season_number = 1, episode_count = 2))
+                )
+            )
+
+        private fun incompleteShow(title: String, id: Int, lastWatchedAt: String) =
+            EnrichedShowEntry(
+                entry = TraktWatchedEntry(
+                    show = TraktShow(title, 2020, TraktIds(trakt = id)),
+                    seasons = listOf(
+                        TraktWatchedSeason(
+                            number = 1,
+                            episodes = listOf(
+                                TraktWatchedEpisode(number = 1, last_watched_at = lastWatchedAt)
+                            )
+                        )
+                    )
+                ),
+                tmdb = TmdbProgressHint(
+                    status = "Returning Series",
+                    seasons = listOf(TmdbSeasonSummary(season_number = 1, episode_count = 5))
+                )
+            )
+
+        @Test
+        fun `completed show is excluded from both sections`() {
+            val vm = createViewModel()
+            val recentCompleted =
+                completedShow("Finished", id = 1, lastWatchedAt = now.minus(5, ChronoUnit.DAYS).toString())
+            val oldCompleted =
+                completedShow("OldFinished", id = 2, lastWatchedAt = now.minus(40, ChronoUnit.DAYS).toString())
+
+            val (cw, others) = vm.partitionShows(listOf(recentCompleted, oldCompleted), now)
+
+            assertTrue(cw.isEmpty(), "completed shows must not appear in continueWatching")
+            assertTrue(others.isEmpty(), "completed shows must not appear in allShows")
+        }
+
+        @Test
+        fun `incomplete show is still shown in the expected section`() {
+            val vm = createViewModel()
+            val recentIncomplete =
+                incompleteShow("InProgress", id = 3, lastWatchedAt = now.minus(5, ChronoUnit.DAYS).toString())
+
+            val (cw, others) = vm.partitionShows(listOf(recentIncomplete), now)
+
+            assertEquals(1, cw.size)
+            assertTrue(others.isEmpty())
+        }
+
+        @Test
+        fun `completed show removed while incomplete show remains`() {
+            val vm = createViewModel()
+            val completed = completedShow("Done", id = 1, lastWatchedAt = now.minus(5, ChronoUnit.DAYS).toString())
+            val incomplete = incompleteShow("Ongoing", id = 2, lastWatchedAt = now.minus(5, ChronoUnit.DAYS).toString())
+
+            val (cw, _) = vm.partitionShows(listOf(completed, incomplete), now)
+
+            assertEquals(1, cw.size)
+            assertEquals("Ongoing", cw[0].entry.show.title)
+        }
+
+        @Test
+        fun `show with no TMDB hint is not considered completed and remains visible`() {
+            val vm = createViewModel()
+            val noHint = EnrichedShowEntry(
+                entry = TraktWatchedEntry(
+                    show = TraktShow("NoHint", 2020, TraktIds(trakt = 5)),
+                    seasons = listOf(
+                        TraktWatchedSeason(1, listOf(TraktWatchedEpisode(1, last_watched_at = now.minus(5, ChronoUnit.DAYS).toString())))
+                    )
+                ),
+                tmdb = null
+            )
+
+            val (cw, _) = vm.partitionShows(listOf(noHint), now)
+
+            assertEquals(1, cw.size)
+        }
+
+        @Test
+        fun `show with zero aired episodes (upcoming) is not considered completed`() {
+            val vm = createViewModel()
+            val upcoming = EnrichedShowEntry(
+                entry = TraktWatchedEntry(
+                    show = TraktShow("Upcoming", 2020, TraktIds(trakt = 6)),
+                    seasons = emptyList()
+                ),
+                tmdb = TmdbProgressHint(
+                    status = "Planned",
+                    seasons = listOf(TmdbSeasonSummary(season_number = 1, episode_count = 0))
+                )
+            )
+
+            val (_, others) = vm.partitionShows(listOf(upcoming), now)
+
+            assertEquals(1, others.size)
+        }
+
+        @Test
+        fun `completed show is excluded from uiState sections after API load`() = runTest {
+            val phone = mockk<PhoneDiscoveryManager.DiscoveredPhone>()
+            every { phone.baseUrl } returns "http://192.168.1.1:8765/"
+            every { phoneDiscovery.getBestPhone() } returns phone
+            every { phoneApiClientFactory.createClient(any()) } returns phoneApiService
+
+            val completed =
+                completedShow("Done", id = 1, lastWatchedAt = Instant.now().minus(5, ChronoUnit.DAYS).toString())
+            val ongoing =
+                incompleteShow("Ongoing", id = 2, lastWatchedAt = Instant.now().minus(5, ChronoUnit.DAYS).toString())
+            coEvery { phoneApiService.getShows(any(), any()) } returns listOf(completed, ongoing)
+
+            val viewModel = createViewModel()
+            advanceUntilIdle()
+
+            val state = viewModel.uiState.value
+            // completed show must not appear in either section
+            val allVisible = state.continueWatching + state.allShows
+            assertTrue(allVisible.none { it.entry.show.ids.trakt == 1 }, "completed show must be hidden")
+            assertTrue(allVisible.any { it.entry.show.ids.trakt == 2 }, "incomplete show must be visible")
         }
     }
 
