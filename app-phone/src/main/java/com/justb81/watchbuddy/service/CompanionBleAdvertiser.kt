@@ -20,13 +20,12 @@ import javax.inject.Singleton
 
 /**
  * Advertises the companion's reachable LAN endpoint over BLE so the TV can
- * discover us without mDNS/multicast. This is the fallback path for networks
- * that block peer-to-peer traffic (AP/client isolation, VLAN-segmented mesh
- * Wi-Fi, aggressive IGMP snooping). See [BleDiscoveryContract] for the wire
- * format.
+ * discover us. BLE is the sole discovery channel — no mDNS/multicast fallback.
+ * See [BleDiscoveryContract] for the wire format.
  *
  * Fails softly on every branch: no BLE adapter, adapter off, permission
- * denied, advertiser unavailable — all log and no-op so NSD keeps working.
+ * denied, advertiser unavailable — all log and no-op so the phone degrades
+ * gracefully when BLE is unavailable.
  */
 @Singleton
 class CompanionBleAdvertiser @Inject constructor(
@@ -89,19 +88,11 @@ class CompanionBleAdvertiser @Inject constructor(
             .onFailure { DiagnosticLog.warn(TAG, "payload encode failed", it) }
             .getOrNull() ?: return false
 
-        // Pick the advertise mode based on whether a TV is already polling us
-        // steadily over HTTP. BALANCED (~250 ms interval) is only useful while
-        // the TV doesn't yet have a Wi-Fi route to us; once a TV is polling
-        // `/capability` reliably, LOW_POWER (~1 s interval) carries the same
-        // fallback signal at a fraction of the radio cost (#345 Opt B).
-        val steady = stateManager.pairedSteadyState.value
-        val advertiseMode = if (steady) {
-            AdvertiseSettings.ADVERTISE_MODE_LOW_POWER
-        } else {
-            AdvertiseSettings.ADVERTISE_MODE_BALANCED
-        }
+        // BALANCED (~250 ms interval) + MEDIUM TX power (~10 m) matches the
+        // couch-to-TV use case: fast enough rediscovery after a phone wake,
+        // short enough range to avoid cross-room neighbor detections.
         val settings = AdvertiseSettings.Builder()
-            .setAdvertiseMode(advertiseMode)
+            .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_BALANCED)
             .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_MEDIUM)
             // We only need the advertisement itself; we never accept inbound
             // BLE connections. Making the advert non-connectable also keeps it

@@ -11,12 +11,8 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
-import android.net.nsd.NsdManager
-import android.net.nsd.NsdServiceInfo
-import android.net.wifi.WifiManager
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
-import com.justb81.watchbuddy.BuildConfig
 import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.phone.llm.LlmOrchestrator
@@ -30,7 +26,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import java.net.Inet4Address
 import java.net.InetAddress
@@ -43,29 +38,11 @@ class CompanionService : Service() {
         private const val TAG = "CompanionService"
         const val CHANNEL_ID = "companion_service"
         private const val NOTIFICATION_ID = 1
-        private const val NSD_SERVICE_TYPE = "_watchbuddy._tcp."
-        private const val NSD_SERVICE_NAME = "watchbuddy-companion"
 
         /** How often to check whether the TV is still polling us. */
         private const val PRESENCE_CHECK_INTERVAL_MS = 60_000L
         /** Auto-deactivate if no TV has polled /capability for this long. */
         private const val PRESENCE_TIMEOUT_MS = 5 * 60_000L
-
-        /**
-         * Debounce interval for `NetworkCallback.onAvailable`. The callback can
-         * fire repeatedly during Wi-Fi transitions (captive-portal exit, SSID
-         * change); without this guard each fire would trigger an unregister +
-         * register cycle and leak a ghost NSD entry (#264).
-         */
-        private const val WIFI_AVAILABLE_DEBOUNCE_MS = 2_000L
-
-        /**
-         * Delay between `unregisterService` and the follow-up `registerService`
-         * on Wi-Fi reconnect. `NsdManager.unregisterService` is async; calling
-         * `registerService` before it completes leaves a duplicate advertisement
-         * on the network (#264).
-         */
-        private const val NSD_REREGISTER_DELAY_MS = 300L
 
         /**
          * Grace period after a Wi-Fi network is lost before the service
@@ -83,21 +60,6 @@ class CompanionService : Service() {
         fun stop(context: Context) {
             context.stopService(Intent(context, CompanionService::class.java))
         }
-
-        /**
-         * Builds the NSD TXT record attributes for the WatchBuddy companion service.
-         *
-         * `version` carries the phone app's `versionName` (e.g. `0.15.1`), not a
-         * protocol version. The HTTP contract is versioned by endpoint.
-         */
-        fun buildTxtAttributes(
-            versionName: String,
-            llmConfig: LlmOrchestrator.LlmConfig
-        ): Map<String, String> = mapOf(
-            "version" to versionName,
-            "modelQuality" to llmConfig.qualityScore.toString(),
-            "llmBackend" to llmConfig.backend.name
-        )
     }
 
     @Inject lateinit var companionHttpServer: CompanionHttpServer
@@ -106,23 +68,6 @@ class CompanionService : Service() {
     @Inject lateinit var settingsRepository: SettingsRepository
     @Inject lateinit var bleAdvertiser: CompanionBleAdvertiser
 
-    private enum class NsdState { IDLE, REGISTERING, REGISTERED, UNREGISTERING }
-
-    private val nsdLock = Any()
-    @Volatile private var nsdState: NsdState = NsdState.IDLE
-    private var nsdManager: NsdManager? = null
-    private var nsdRegistrationListener: NsdManager.RegistrationListener? = null
-    /**
-     * Last IPv4 address published in the NSD TXT record / pinned as
-     * [NsdServiceInfo.host]. Used by [registerNetworkCallback] to skip the
-     * full `unregister → 300 ms → register` dance when Wi-Fi re-announces a
-     * network whose IPv4 didn't actually change (#345 Opt D): on many OEM
-     * stacks `NetworkCallback.onAvailable` fires repeatedly during captive
-     * portal / DNS retries without any real handoff, and each churn briefly
-     * removes our advertisement from the network.
-     */
-    @Volatile private var lastRegisteredIpv4: String? = null
-    private var multicastLock: WifiManager.MulticastLock? = null
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var presenceJob: Job? = null
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
@@ -137,9 +82,9 @@ class CompanionService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val ipv4 = wifiIpv4Address()
         DiagnosticLog.event(TAG, "onStartCommand ipv4=${ipv4?.hostAddress ?: "null"} running=${stateManager.isServiceRunning.value}")
-        // Wi-Fi gate: without TRANSPORT_WIFI, wifiIpv4Address() returns null,
-        // NSD advertises on no useful interface, and the TV can never discover
-        // us — refuse to start and clear the persisted toggle (#278).
+        // Wi-Fi gate: the BLE advert carries the phone's LAN endpoint, so
+        // without Wi-Fi the TV has nothing to connect to even if it receives
+        // our advertisement (#278).
         if (ipv4 == null) {
             DiagnosticLog.warn(TAG, "onStartCommand refused; phone is not on Wi-Fi")
             serviceScope.launch { settingsRepository.setCompanionEnabled(false) }
@@ -147,34 +92,27 @@ class CompanionService : Service() {
             return START_NOT_STICKY
         }
         // Idempotent: onStartCommand can fire multiple times (ViewModel re-starts,
-        // system re-delivery of START_STICKY) and each repeat would otherwise
-        // race the NSD registration.
+        // system re-delivery of START_STICKY).
         if (stateManager.isServiceRunning.value) {
             DiagnosticLog.debug(TAG, "onStartCommand skipped; service already running")
             return START_STICKY
         }
-        acquireMulticastLock()
         companionHttpServer.start()
         stateManager.setHttpServerBinding("0.0.0.0:${CompanionHttpServer.PORT}")
         stateManager.setWifiIpv4(ipv4.hostAddress)
         DiagnosticLog.event(TAG, "HTTP server bound 0.0.0.0:${CompanionHttpServer.PORT}")
-        registerNsd()
         startBleAdvertising()
         stateManager.setServiceRunning(true)
         registerNetworkCallback()
         startPresenceMonitor()
-        observeSteadyState()
         return START_STICKY
     }
 
     override fun onDestroy() {
         DiagnosticLog.event(TAG, "onDestroy")
         presenceJob?.cancel()
-        steadyStateJob?.cancel()
         unregisterNetworkCallback()
-        unregisterNsd()
         bleAdvertiser.stop()
-        releaseMulticastLock()
         companionHttpServer.stop()
         stateManager.setHttpServerBinding(null)
         stateManager.setWifiIpv4(null)
@@ -193,33 +131,6 @@ class CompanionService : Service() {
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
-
-    // ── BLE mode switching on steady pairing ────────────────────────────────
-
-    private var steadyStateJob: Job? = null
-
-    /**
-     * Re-advertises over BLE whenever [CompanionStateManager.pairedSteadyState]
-     * flips. Each flip replaces the active advertisement with one that uses
-     * the appropriate `ADVERTISE_MODE_*` for the new state (#345 Opt B).
-     * The initial emission (startup, not-yet-paired) is skipped because
-     * `startBleAdvertising()` in [onStartCommand] already primed BLE.
-     */
-    private fun observeSteadyState() {
-        steadyStateJob?.cancel()
-        steadyStateJob = serviceScope.launch {
-            stateManager.pairedSteadyState
-                .drop(1)
-                .collect { steady ->
-                    DiagnosticLog.event(
-                        TAG,
-                        "pairedSteadyState=$steady — re-advertising BLE in " +
-                            if (steady) "LOW_POWER" else "BALANCED",
-                    )
-                    startBleAdvertising()
-                }
-        }
-    }
 
     // ── Presence timeout ─────────────────────────────────────────────────────
 
@@ -249,15 +160,12 @@ class CompanionService : Service() {
             .build()
 
         val callback = object : ConnectivityManager.NetworkCallback() {
-            private var lastAvailable = 0L
-
             override fun onLost(network: Network) {
-                DiagnosticLog.event(TAG, "Wi-Fi onLost — unregistering NSD, awaiting grace period")
-                unregisterNsd()
+                DiagnosticLog.event(TAG, "Wi-Fi onLost — stopping BLE, awaiting grace period")
                 bleAdvertiser.stop()
                 // Grace period for SSID handoffs: if a fresh Wi-Fi network
                 // arrives before the timer expires, `onAvailable` restarts
-                // NSD and we stay alive. If not, the phone is truly off Wi-Fi
+                // BLE and we stay alive. If not, the phone is truly off Wi-Fi
                 // and we self-stop so the FG notification doesn't linger on
                 // a dead state (#278).
                 serviceScope.launch {
@@ -271,43 +179,8 @@ class CompanionService : Service() {
             }
 
             override fun onAvailable(network: Network) {
-                val now = System.currentTimeMillis()
-                if (now - lastAvailable < WIFI_AVAILABLE_DEBOUNCE_MS) {
-                    DiagnosticLog.debug(TAG, "Wi-Fi onAvailable debounced; last fire ${now - lastAvailable}ms ago")
-                    return
-                }
-                lastAvailable = now
-                val currentIpv4 = wifiIpv4Address()?.hostAddress
-                // Skip the full re-register dance when the IPv4 address hasn't
-                // actually changed — `onAvailable` fires repeatedly on some
-                // OEM stacks during captive portal / DNS retries without any
-                // real network handoff, and each unregister + register removes
-                // our advertisement from the network for ~300ms (#345 Opt D).
-                if (currentIpv4 != null &&
-                    currentIpv4 == lastRegisteredIpv4 &&
-                    nsdState == NsdState.REGISTERED
-                ) {
-                    DiagnosticLog.debug(
-                        TAG,
-                        "Wi-Fi onAvailable skipped NSD re-register: IPv4 unchanged=$currentIpv4",
-                    )
-                    return
-                }
-                DiagnosticLog.event(
-                    TAG,
-                    "Wi-Fi onAvailable — restarting NSD (ipv4 was=$lastRegisteredIpv4 now=$currentIpv4)",
-                )
-                // Force a clean slate: unregister first, let NsdManager complete
-                // its teardown, then register the new advertisement. Calling
-                // registerService before unregisterService finishes is what
-                // leaves ghost entries on the network (#264).
-                unregisterNsd()
-                bleAdvertiser.stop()
-                serviceScope.launch {
-                    delay(NSD_REREGISTER_DELAY_MS)
-                    registerNsd()
-                    startBleAdvertising()
-                }
+                DiagnosticLog.event(TAG, "Wi-Fi onAvailable — restarting BLE advertiser")
+                startBleAdvertising()
             }
         }
         networkCallback = callback
@@ -365,167 +238,8 @@ class CompanionService : Service() {
             .build()
     }
 
-    // ── Multicast lock ───────────────────────────────────────────────────────
+    // ── BLE advertising (sole discovery channel) ─────────────────────────────
 
-    private fun acquireMulticastLock() {
-        if (multicastLock?.isHeld == true) return
-        // Many phone OEMs (OxygenOS, OneUI, MIUI) filter outgoing multicast
-        // packets for battery reasons when no app is holding a MulticastLock.
-        // Without this lock the phone's NSD registration succeeds locally but
-        // no mDNS traffic leaves the radio, so peers can't discover us (#265).
-        val wifi = applicationContext.getSystemService(WifiManager::class.java) ?: return
-        multicastLock = wifi.createMulticastLock("watchbuddy-nsd").apply {
-            setReferenceCounted(false)
-            acquire()
-        }
-        stateManager.setMulticastLockHeld(true)
-        DiagnosticLog.event(TAG, "multicast lock acquired")
-    }
-
-    private fun releaseMulticastLock() {
-        multicastLock?.takeIf { it.isHeld }?.let {
-            runCatching { it.release() }
-        }
-        multicastLock = null
-        stateManager.setMulticastLockHeld(false)
-    }
-
-    // ── NSD ──────────────────────────────────────────────────────────────────
-
-    private fun registerNsd() {
-        // Atomic guard: transition IDLE → REGISTERING before any I/O so
-        // concurrent callers (onStartCommand, Wi-Fi onAvailable) can't both
-        // pass the check and double-register (#264).
-        synchronized(nsdLock) {
-            if (nsdState != NsdState.IDLE) {
-                DiagnosticLog.debug(TAG, "registerNsd skipped; state=$nsdState")
-                return
-            }
-            nsdState = NsdState.REGISTERING
-        }
-        DiagnosticLog.event(TAG, "NSD state IDLE→REGISTERING service=$NSD_SERVICE_NAME port=${CompanionHttpServer.PORT}")
-        stateManager.setNsdRegistrationState(CompanionStateManager.NsdRegistrationState.REGISTERING)
-
-        val llmConfig = llmOrchestrator.selectConfig()
-        val txtAttributes = buildTxtAttributes(BuildConfig.VERSION_NAME, llmConfig)
-        val pinnedIpv4 = wifiIpv4Address()
-        val serviceInfo = NsdServiceInfo().apply {
-            serviceName = NSD_SERVICE_NAME
-            serviceType = NSD_SERVICE_TYPE
-            port = CompanionHttpServer.PORT
-            // Pin the advertised host to the Wi-Fi IPv4 address to avoid
-            // NsdManager picking a wrong interface on devices with multiple
-            // active networks (Wi-Fi + cellular, Wi-Fi + Ethernet) — a common
-            // cause of "visible on the phone, invisible to peers" (#265).
-            pinnedIpv4?.let { host = it }
-            txtAttributes.forEach { (key, value) -> setAttribute(key, value) }
-        }
-
-        val listener = object : NsdManager.RegistrationListener {
-            override fun onServiceRegistered(info: NsdServiceInfo) {
-                DiagnosticLog.event(TAG, "NSD REGISTERING→REGISTERED service=${info.serviceName} TXT=$txtAttributes")
-                synchronized(nsdLock) { nsdState = NsdState.REGISTERED }
-                // Remember the IPv4 we just pinned so onAvailable can skip
-                // the full re-register dance when it fires for the same
-                // network (#345 Opt D).
-                lastRegisteredIpv4 = pinnedIpv4?.hostAddress
-                stateManager.setNsdRegistrationState(CompanionStateManager.NsdRegistrationState.REGISTERED)
-            }
-            override fun onRegistrationFailed(info: NsdServiceInfo, errorCode: Int) {
-                DiagnosticLog.error(TAG, "NSD registration failed error=$errorCode service=${info.serviceName}")
-                synchronized(nsdLock) {
-                    nsdRegistrationListener = null
-                    nsdManager = null
-                    nsdState = NsdState.IDLE
-                }
-                lastRegisteredIpv4 = null
-                stateManager.setNsdRegistrationState(
-                    CompanionStateManager.NsdRegistrationState.FAILED,
-                    errorCode = errorCode,
-                )
-            }
-            override fun onServiceUnregistered(info: NsdServiceInfo) {
-                DiagnosticLog.event(TAG, "NSD UNREGISTERING→IDLE service=${info.serviceName}")
-                synchronized(nsdLock) {
-                    nsdRegistrationListener = null
-                    nsdManager = null
-                    nsdState = NsdState.IDLE
-                }
-                lastRegisteredIpv4 = null
-                stateManager.setNsdRegistrationState(CompanionStateManager.NsdRegistrationState.IDLE)
-            }
-            override fun onUnregistrationFailed(info: NsdServiceInfo, errorCode: Int) {
-                DiagnosticLog.error(TAG, "NSD unregistration failed error=$errorCode service=${info.serviceName}")
-                synchronized(nsdLock) {
-                    nsdRegistrationListener = null
-                    nsdManager = null
-                    nsdState = NsdState.IDLE
-                }
-                lastRegisteredIpv4 = null
-                stateManager.setNsdRegistrationState(
-                    CompanionStateManager.NsdRegistrationState.FAILED,
-                    errorCode = errorCode,
-                )
-            }
-        }
-
-        synchronized(nsdLock) {
-            nsdRegistrationListener = listener
-            nsdManager = getSystemService(Context.NSD_SERVICE) as NsdManager
-        }
-        runCatching {
-            nsdManager?.registerService(serviceInfo, NsdManager.PROTOCOL_DNS_SD, listener)
-        }.onFailure {
-            DiagnosticLog.error(TAG, "registerService threw", it)
-            synchronized(nsdLock) {
-                nsdRegistrationListener = null
-                nsdManager = null
-                nsdState = NsdState.IDLE
-            }
-            stateManager.setNsdRegistrationState(CompanionStateManager.NsdRegistrationState.FAILED)
-        }
-    }
-
-    private fun unregisterNsd() {
-        val (mgr, listener) = synchronized(nsdLock) {
-            if (nsdState != NsdState.REGISTERED && nsdState != NsdState.REGISTERING) {
-                return
-            }
-            nsdState = NsdState.UNREGISTERING
-            nsdManager to nsdRegistrationListener
-        }
-        DiagnosticLog.event(TAG, "NSD → UNREGISTERING")
-        stateManager.setNsdRegistrationState(CompanionStateManager.NsdRegistrationState.UNREGISTERING)
-        if (mgr != null && listener != null) {
-            runCatching { mgr.unregisterService(listener) }
-                .onFailure {
-                    DiagnosticLog.error(TAG, "unregisterService threw", it)
-                    synchronized(nsdLock) {
-                        nsdRegistrationListener = null
-                        nsdManager = null
-                        nsdState = NsdState.IDLE
-                    }
-                    stateManager.setNsdRegistrationState(CompanionStateManager.NsdRegistrationState.IDLE)
-                }
-        } else {
-            synchronized(nsdLock) {
-                nsdRegistrationListener = null
-                nsdManager = null
-                nsdState = NsdState.IDLE
-            }
-            stateManager.setNsdRegistrationState(CompanionStateManager.NsdRegistrationState.IDLE)
-        }
-    }
-
-    // ── BLE advertising (mDNS fallback channel) ──────────────────────────────
-
-    /**
-     * Starts BLE advertising of our LAN endpoint for TVs that can't receive
-     * our NSD packets (AP/client isolation, VLAN-segmented mesh Wi-Fi,
-     * aggressive multicast filtering). This is additive to NSD — if BLE is
-     * off, permission-denied, or unsupported, the advertiser no-ops and we
-     * continue with NSD only.
-     */
     private fun startBleAdvertising() {
         val ipv4 = wifiIpv4Address() as? Inet4Address ?: run {
             DiagnosticLog.debug(TAG, "startBleAdvertising skipped: no IPv4 address")
@@ -542,8 +256,8 @@ class CompanionService : Service() {
 
     /**
      * Returns the phone's Wi-Fi IPv4 address, or null if Wi-Fi is not the
-     * active network. Used to pin the NSD advertisement to the correct
-     * interface on multi-homed devices.
+     * active network. The BLE advert carries this address so the TV can reach
+     * the HTTP server directly.
      */
     private fun wifiIpv4Address(): InetAddress? {
         val cm = getSystemService(ConnectivityManager::class.java) ?: return null

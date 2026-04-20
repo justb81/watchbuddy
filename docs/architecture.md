@@ -5,9 +5,9 @@
 ```mermaid
 graph TB
     subgraph WIFI["LOCAL WIFI NETWORK"]
-        TV["Google TV (app-tv)\n─────────────\nUI · Display\nNSD Client\nWebView\nMediaSession Scrobbler"]
-        Phone["Android Phone(s) (app-phone)\n─────────────\nLLM (Gemma / AICore)\nNSD Server · HTTP API\nTrakt Auth"]
-        TV <-->|"NSD/mDNS + HTTP (port 8765)"| Phone
+        TV["Google TV (app-tv)\n─────────────\nUI · Display\nBLE Scanner\nWebView\nMediaSession Scrobbler"]
+        Phone["Android Phone(s) (app-phone)\n─────────────\nLLM (Gemma / AICore)\nBLE Advertiser · HTTP API\nTrakt Auth"]
+        TV <-->|"BLE beacon + HTTP (port 8765)"| Phone
     end
 
     Phone -->|"OAuth · sync · scrobble"| Trakt["Trakt API\ntrakt.tv/api\nRate: 1 000 / 5 min"]
@@ -20,25 +20,25 @@ graph TB
 
 ## Communication Protocol (TV ↔ Phone)
 
-### NSD Service Registration (Phone side)
+### BLE Advertisement (Phone side)
+
+The phone broadcasts a single BLE service-data beacon carrying its LAN endpoint
+so the TV can connect over HTTP without relying on mDNS/multicast (which is
+blocked by many home APs with client isolation, VLAN segmentation, or
+aggressive multicast filtering).
+
 ```
-Service name:  watchbuddy-{username}
-Service type:  _watchbuddy._tcp.
-Port:          8765
-TXT records:   version=X.Y.Z, modelQuality=70, llmBackend=LITERT
+Service UUID:    5e4b4d3a-9f7c-4b7e-8e6b-6c0e5f27e4a0
+Service data:    [schemaVersion (1B) | ipv4 (4B) | port (2B) | modelQuality (1B) | llmBackend ordinal (1B)]
+Advertise mode:  ADVERTISE_MODE_BALANCED (~250 ms interval)
+TX power:        ADVERTISE_TX_POWER_MEDIUM (~10 m, couch-to-TV)
+Connectable:     false (pure beacon, never accepts GATT connections)
 ```
 
-**TXT record contract:**
-- `version` — the phone app's `versionName` (e.g. `0.15.1`), sourced from
-  `BuildConfig.VERSION_NAME`. This is **not** a protocol version; the HTTP
-  contract is versioned by endpoint. If a protocol version is ever needed, a
-  new TXT key (`proto`) will be added — `version` will not be reused.
-- `modelQuality` — integer 0–150, matches `LlmOrchestrator.LlmConfig.qualityScore`.
-- `llmBackend` — one of the `LlmBackend` enum names. The TV parses this
-  leniently: unknown values fall back to `LlmBackend.NONE` so a new phone-side
-  enum value does not make the phone silently invisible to older TVs. Missing
-  or unparseable `version` / `modelQuality`, however, cause the entry to be
-  rejected outright.
+The 9-byte payload is the authoritative wire contract — see
+`core/discovery/BleDiscoveryContract.kt`. The rest of the phone's metadata
+(avatar URL, username, TMDB API key, free RAM) is fetched over HTTP from
+`GET /capability` once the TV has the IPv4 + port.
 
 ### HTTP API (Phone exposes, TV calls)
 
@@ -165,62 +165,34 @@ the `CompanionService`, `CompanionHttpServer`, and `HomeViewModel`. It tracks:
 `wifiIpv4Address()` before doing any work. If the phone is not on Wi-Fi, the service clears
 `companionEnabled` in settings, calls `stopSelf(startId)`, and returns `START_NOT_STICKY`
 so the system does not re-deliver the start intent. While running, the service registers a
-`ConnectivityManager.NetworkCallback` for Wi-Fi. When Wi-Fi is lost, NSD is unregistered
-immediately and a 3 s grace timer runs; if Wi-Fi has not returned by then, the service
-self-stops and clears `companionEnabled` so the foreground notification is dismissed. The
-grace period tolerates brief SSID handoffs where `onLost(oldNet)` fires just before
-`onAvailable(newNet)`. When Wi-Fi returns within the grace period, `onAvailable` is debounced
-for 2 s, the existing registration is torn down, and a fresh one is registered 300 ms later.
-The unregister-then-register sequence is required because `NsdManager.unregisterService` is
-asynchronous — calling `registerService` before the teardown completes leaves duplicate
-advertisements on the network (#264, #278).
-
-**NSD registration state machine:** `registerNsd` / `unregisterNsd` transition states
-under a single lock. The state is flipped before calling the async `NsdManager` API so
-concurrent callers (`onStartCommand` + Wi-Fi `onAvailable`) cannot race past the guard
-while a prior registration is still in flight.
-
-```
-IDLE → REGISTERING → REGISTERED
- ↑                       ↓
- └──── UNREGISTERING ←───┘
-```
-
-**Multicast lock (phone side):** The service acquires a `WifiManager.MulticastLock` for
-its entire lifetime. Many phone OEM skins (OxygenOS, OneUI, MIUI) filter outgoing
-multicast packets at the Wi-Fi driver unless an app holds this lock — without it, the
-phone's NSD registration succeeds locally but no mDNS packets leave the radio, so peers
-cannot discover it (TV-side discovery requires the same lock for the inbound path).
-
-**NSD host pin:** The `NsdServiceInfo.host` is pinned to the phone's Wi-Fi IPv4 address
-at registration time (resolved via `ConnectivityManager.getLinkProperties`). This prevents
-`NsdManager` from advertising a wrong interface's address on multi-homed devices
-(Wi-Fi + cellular, Wi-Fi + Ethernet dongle).
+`ConnectivityManager.NetworkCallback` for Wi-Fi. When Wi-Fi is lost, the BLE advertiser is
+stopped immediately and a 3 s grace timer runs; if Wi-Fi has not returned by then, the
+service self-stops and clears `companionEnabled` so the foreground notification is
+dismissed. The grace period tolerates brief SSID handoffs where `onLost(oldNet)` fires just
+before `onAvailable(newNet)`. When Wi-Fi returns, `onAvailable` re-starts the advertiser
+with the current IPv4 embedded in the payload (#278).
 
 **HTTP server bind:** `CompanionHttpServer` binds Netty explicitly to `0.0.0.0` so the
-listener accepts connections on the same Wi-Fi interface advertised via NSD.
+listener accepts connections on the Wi-Fi interface whose address is embedded in the
+BLE payload.
 
-**Cross-device discoverability note:** None of the code-level fixes above can overcome a
-Wi-Fi access point that enforces client isolation (peer-to-peer traffic blocked at the
-AP). If the TV cannot reach the phone even with both on the same SSID, verify that client
-isolation / "AP isolation" / "Wi-Fi guest network" is disabled on the router.
-
-**BLE fallback discovery:** Because client isolation, VLAN-segmented mesh Wi-Fi, and
-aggressive multicast filtering block mDNS entirely at the network layer, a parallel BLE
-advertising channel ships alongside NSD. The phone's `CompanionBleAdvertiser`
-(see `service/CompanionBleAdvertiser.kt`) broadcasts a 9-byte service-data payload under
-the custom UUID `5e4b4d3a-9f7c-4b7e-8e6b-6c0e5f27e4a0` containing the phone's IPv4
-address, port, `modelQuality`, and `llmBackend` ordinal (schema defined in
-`core/discovery/BleDiscoveryContract.kt`). The TV's `PhoneBleScanner` listens for the
-same UUID; discovered endpoints flow into the same capability-fetch and heartbeat
-pipeline as NSD-discovered ones, deduped by `baseUrl`. BLE and NSD run **in parallel**
-from the moment the companion service starts. Graceful degradation is the default: on
-Bluetooth-off, permission-denied, or BLE-unsupported hardware the advertiser/scanner
-no-ops and NSD keeps working. Permissions: `BLUETOOTH_ADVERTISE` (phone, runtime prompt
-from HomeScreen when the "I am watching TV" toggle flips on) and `BLUETOOTH_SCAN` with
-`neverForLocation` (TV, requested on `TvMainActivity.onCreate`). BLE advertising starts
-and stops in lockstep with NSD under the same `NetworkCallback` so a Wi-Fi drop or IP
-change rebroadcasts with the new endpoint.
+**BLE discovery (sole channel):** Discovery is BLE-only — no mDNS/NSD fallback. The
+phone's `CompanionBleAdvertiser` (see `service/CompanionBleAdvertiser.kt`) broadcasts a
+9-byte service-data payload under the custom UUID `5e4b4d3a-9f7c-4b7e-8e6b-6c0e5f27e4a0`
+containing the phone's IPv4 address, port, `modelQuality`, and `llmBackend` ordinal
+(schema defined in `core/discovery/BleDiscoveryContract.kt`). The advertisement is pinned
+to `ADVERTISE_MODE_BALANCED` + `ADVERTISE_TX_POWER_MEDIUM` (~10 m range, the couch-to-TV
+use case) and is not connectable — the TV never opens a GATT connection, it just reads
+the advert. The TV's `PhoneBleScanner` listens for the same UUID in
+`SCAN_MODE_BALANCED` whenever discovery is enabled; each match feeds the existing
+`/capability` fetch + heartbeat pipeline, deduped by `baseUrl`. BLE range can exceed the
+LAN's reach — a phone that's out of Wi-Fi range but still within BLE range will fail
+`/capability` and be evicted after `MAX_CONSECUTIVE_FAILURES = 3` heartbeat misses
+(~3 min). Graceful degradation is the default: on Bluetooth-off, permission-denied, or
+BLE-unsupported hardware the advertiser/scanner no-ops and the pair simply cannot
+connect until BLE is available again. Permissions: `BLUETOOTH_ADVERTISE` (phone, runtime
+prompt from HomeScreen when the "I am watching TV" toggle flips on) and `BLUETOOTH_SCAN`
+with `neverForLocation` (TV, requested on `TvMainActivity.onCreate`).
 
 **Presence timeout:** A coroutine checks `lastCapabilityCheck` every 60 seconds. If no TV
 has polled `/capability` for 5 minutes, the service auto-deactivates and sets `companionEnabled = false`.
@@ -245,34 +217,20 @@ The `MediaSessionScrobbler` additionally checks each phone's `lastSuccessfulChec
 before sending scrobble requests. Phones with stale presence (> 2 minutes) are skipped to
 avoid network timeouts during playback.
 
-**mDNS reliability on TV hardware:** `PhoneDiscoveryManager` holds a
-`WifiManager.MulticastLock` for the entire lifetime of active discovery. Many Android TV
-ROMs (Google TV, Chromecast with Google TV, Shield, several Sony/TCL images) silently
-drop inbound multicast packets at the Wi-Fi driver unless an app holds this lock, which
-would otherwise make the phone undiscoverable even though the `CHANGE_WIFI_MULTICAST_STATE`
-permission is granted. Discovery is also self-healing: `onStartDiscoveryFailed` with
-`FAILURE_ALREADY_ACTIVE` triggers a delayed stop+start cycle, a `ConnectivityManager`
-network callback restarts discovery when Wi-Fi returns, and an empty phone list at the
-60 s heartbeat tick cycles discovery so the TV recovers from silent NSD failures without
-requiring an app relaunch.
+**TV BLE scanner lifecycle:** `PhoneBleScanner` runs continuously in
+`SCAN_MODE_BALANCED` while discovery is enabled (`isPhoneDiscoveryEnabled`
+setting on; `TvDiscoveryService` foreground service alive). A
+`ConnectivityManager.NetworkCallback` restarts the scanner on `onAvailable` in
+case the BLE stack was silently reset by the Wi-Fi transition — no mDNS
+re-register dance is needed since there is no mDNS.
 
-**Paired steady-state BLE throttling (#345 Opt B):** once a phone has responded to
-`BLE_THROTTLE_STREAK = 3` consecutive heartbeats in a row, the TV has a reliable Wi-Fi
-route to it and a BLE scan adds no signal — `PhoneDiscoveryManager.applyBleScannerThrottle`
-calls `PhoneBleScanner.stop()` to cut radio cost. Symmetrically, the phone's
-`CompanionStateManager` counts in-cadence `/capability` polls and flips `pairedSteadyState`
-true; `CompanionService` observes that flow and re-advertises via `CompanionBleAdvertiser`
-in `ADVERTISE_MODE_LOW_POWER` (~1 s interval) instead of `ADVERTISE_MODE_BALANCED` (~250
-ms). A heartbeat miss on either side — gap &gt; 90 s or any fetch failure — reverts to the
-high-rate mode; a 2-minute hysteresis window guards re-entry to the throttled mode so a
-flaky TV that briefly drops Wi-Fi every ~90 s cannot oscillate both radios.
-
-**Skip NSD re-register on unchanged IPv4 (#345 Opt D):** `CompanionService.onAvailable`
-can fire repeatedly on OEM stacks during captive-portal probes and DNS retries without a
-real network handoff. Each churn briefly yanks the NSD advertisement off the network for
-~300 ms. `CompanionService` now caches `lastRegisteredIpv4` inside the registration
-callback and skips the full `unregister → 300 ms → register` dance when the new IPv4
-matches the cached one.
+**RSSI surfacing:** Every BLE scan result carries an RSSI in dBm. `PhoneBleScanner`
+plumbs it through to `PhoneDiscoveryManager.onBleAdvertisement(…, rssi)`, which stores
+the most recent value in `DiscoveredPhone.rssi` and refreshes it in place on repeat
+adverts (heartbeat ticks don't carry a fresh RSSI, so the field only changes when the
+BLE stack sees a new packet). The value is rendered read-only on TV Settings →
+Diagnostics, per phone. RSSI is not yet used for filtering — that is tracked as a
+potential follow-up once we have real-world distributions.
 
 ## Diagnostics View
 
@@ -281,20 +239,19 @@ live connection state from the shared singletons — `CompanionStateManager` on 
 `PhoneDiscoveryManager` on the TV — so end users (and agents triaging bug reports) can
 distinguish the common causes of "TV can't see the phone":
 
-- **Phone** — Wi-Fi on/off + IPv4, multicast lock, NSD registration state (IDLE /
-  REGISTERING / REGISTERED / UNREGISTERING / FAILED + error code), HTTP listen address,
-  age of the most recent TV `/capability` poll, BLE advertiser state + error code, last
-  scrobble event, build info.
-- **TV** — multicast lock held, discovery active, heartbeat age, BLE scanner state +
-  error code, one card per discovered phone (name, `baseUrl`, score, `modelQuality`,
-  `llmBackend`, `failCount`, age of `lastSuccessfulCheck`), build info.
+- **Phone** — Wi-Fi on/off + IPv4, service running, HTTP listen address, age of the most
+  recent TV `/capability` poll, BLE advertiser state + error code, last scrobble event,
+  build info.
+- **TV** — discovery active, heartbeat age, BLE scanner state + error code, one card per
+  discovered phone (name, `baseUrl`, score, `modelQuality`, `llmBackend`, `failCount`,
+  RSSI, age of `lastSuccessfulCheck`), build info.
 
-Each row is colour-coded green / yellow / red so users can tell "AP isolation" (no phones
-at all, BLE scanning, multicast lock held) apart from "`/capability` 500" (phone
-discovered, non-zero `failCount`). A "Share diagnostics" button delegates to
-`DiagnosticShare.launchShare()`, which bundles the current `DiagnosticLog` snapshot and
-any pending crash reports through the system share sheet. The view is available in
-release builds; no new build variant was introduced (#331).
+Each row is colour-coded green / yellow / red so users can tell "no phones in BLE range"
+apart from "`/capability` 500" (phone discovered, non-zero `failCount`). A "Share
+diagnostics" button delegates to `DiagnosticShare.launchShare()`, which bundles the
+current `DiagnosticLog` snapshot and any pending crash reports through the system share
+sheet. The view is available in release builds; no new build variant was introduced
+(#331).
 
 ## Scrobble Event Display (Phone)
 

@@ -5,9 +5,7 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
-import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
-import android.net.wifi.WifiManager
 import android.util.Log
 import androidx.annotation.VisibleForTesting
 import com.justb81.watchbuddy.core.model.DeviceCapability
@@ -29,14 +27,15 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Discovers WatchBuddy companion phones on the local network via NSD (mDNS).
- *
- * Service pattern: watchbuddy-companion._watchbuddy._tcp.local (port 8765)
+ * Discovers WatchBuddy companion phones via BLE — the sole discovery channel.
  *
  * Discovery flow:
- *   1. NSD resolves a service → TXT records are parsed immediately for fast scoring.
- *   2. /capability is fetched for full data (tmdbApiKey, freeRamMb, userAvatarUrl).
- *   3. If /capability fails, the phone is still added using TXT record data alone.
+ *   1. [PhoneBleScanner] decodes an advertisement → (ipv4, port, modelQuality,
+ *      llmBackend, rssi).
+ *   2. `/capability` is fetched over LAN for full data (tmdbApiKey, freeRamMb,
+ *      userAvatarUrl).
+ *   3. If `/capability` fails, the phone is still added using the BLE payload
+ *      alone so it shows up in the ranked list.
  *
  * Ranking formula:
  *   Score = modelQuality (0–150) + ramBonus (0–10, only when capability is available)
@@ -48,25 +47,8 @@ class PhoneDiscoveryManager @Inject constructor(
     private val bleScanner: PhoneBleScanner,
 ) {
     companion object {
-        const val SERVICE_TYPE = "_watchbuddy._tcp."
         const val CAPABILITY_PATH = "/capability"
         private const val TAG = "PhoneDiscoveryManager"
-        /** Back-off before retrying a stop+start cycle after FAILURE_ALREADY_ACTIVE. */
-        private const val RESTART_BACKOFF_MS = 500L
-
-        /**
-         * Consecutive successful heartbeats a single phone needs before the
-         * TV stops its BLE scanner (#345 Opt B). Three matches the phone-
-         * side `STEADY_STATE_STREAK` so the two sides throttle in lock-step.
-         */
-        internal const val BLE_THROTTLE_STREAK = 3
-
-        /**
-         * Quiet-window guard before the scanner is allowed to enter the
-         * throttled (stopped) state again after a heartbeat miss. Stops
-         * SCANNING / IDLE oscillation when a TV briefly drops Wi-Fi.
-         */
-        internal const val BLE_THROTTLE_HYSTERESIS_MS = 2 * 60_000L
     }
 
     enum class BleScanState { IDLE, SCANNING, FAILED }
@@ -78,12 +60,9 @@ class PhoneDiscoveryManager @Inject constructor(
     /** True between [startDiscovery] and [stopDiscovery]. */
     val discoveryActive: StateFlow<Boolean> = _discoveryActive
 
-    private val _multicastLockHeld = MutableStateFlow(false)
-    /** Whether this manager currently holds a Wi-Fi multicast lock. */
-    val multicastLockHeld: StateFlow<Boolean> = _multicastLockHeld
-
     private val _bleScanState = MutableStateFlow(BleScanState.IDLE)
-    /** Current state of the BLE fallback scanner. */
+
+    /** Current state of the BLE scanner. */
     val bleScanState: StateFlow<BleScanState> = _bleScanState
 
     private val _bleScanErrorCode = MutableStateFlow<Int?>(null)
@@ -94,25 +73,15 @@ class PhoneDiscoveryManager @Inject constructor(
     /** Epoch millis of the last heartbeat loop pass, or 0 before the first tick. */
     val lastHeartbeatTick: StateFlow<Long> = _lastHeartbeatTick
 
-    // Nullable + runCatching so that a missing NSD system service on unusual
-    // TV ROMs cannot throw during Hilt singleton construction, which would
-    // otherwise blow up the first hiltViewModel() call and prevent the app
-    // from ever drawing a frame.
-    private val nsdManager: NsdManager? = runCatching {
-        context.getSystemService(Context.NSD_SERVICE) as? NsdManager
-    }.getOrNull()
-    private val wifiManager: WifiManager? = runCatching {
-        context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
-    }.getOrNull()
-    private var multicastLock: WifiManager.MulticastLock? = null
     private val heartbeatScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var heartbeatJob: Job? = null
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
     @Volatile private var isDiscovering: Boolean = false
 
     /**
-     * Lightweight device info extracted from NSD TXT records.
-     * Available immediately after service resolution without any HTTP round-trip.
+     * Lightweight device info reconstructed from the BLE payload (or the
+     * TXT record of a legacy NSD resolve). Available immediately, before
+     * any `/capability` round-trip.
      */
     data class PhoneTxtRecord(
         val version: String,
@@ -128,85 +97,19 @@ class PhoneDiscoveryManager @Inject constructor(
         val baseUrl: String,
         val failCount: Int = 0,
         /**
-         * Count of back-to-back heartbeat successes for this phone. Drives
-         * BLE scanner throttling (#345 Opt B): once any phone crosses
-         * [BLE_THROTTLE_STREAK], the scanner is stopped until the next miss.
+         * RSSI of the most recent BLE advertisement for this phone, in dBm.
+         * Null for phones that have not been seen via BLE this session
+         * (heartbeats do not carry a fresh RSSI). Surfaced read-only in
+         * TV Diagnostics — no automatic filtering yet.
          */
-        val consecutiveSuccesses: Int = 0,
+        val rssi: Int? = null,
         val lastSuccessfulCheck: Long = System.currentTimeMillis()
     )
 
-    private val discoveryListener = object : NsdManager.DiscoveryListener {
-        override fun onDiscoveryStarted(serviceType: String) {
-            Log.i(TAG, "discovery started: $serviceType")
-        }
-
-        override fun onDiscoveryStopped(serviceType: String) {
-            Log.i(TAG, "discovery stopped: $serviceType")
-        }
-
-        override fun onStartDiscoveryFailed(serviceType: String, errorCode: Int) {
-            Log.e(TAG, "start discovery failed: $serviceType, error=${nsdErrorName(errorCode)}")
-            // A prior listener (possibly leaked across a process restart) is
-            // still registered in the system NSD service. Schedule a single
-            // stop+start cycle so we self-heal without an app relaunch.
-            if (errorCode == NsdManager.FAILURE_ALREADY_ACTIVE && isDiscovering) {
-                heartbeatScope.launch {
-                    delay(RESTART_BACKOFF_MS)
-                    Log.i(
-                        TAG,
-                        "self-heal: retrying discovery after FAILURE_ALREADY_ACTIVE " +
-                            "(stale listener registration in system NSD service)"
-                    )
-                    restartDiscoveryInternal()
-                }
-            }
-        }
-
-        override fun onStopDiscoveryFailed(serviceType: String, errorCode: Int) {
-            Log.w(TAG, "stop discovery failed: $serviceType, error=${nsdErrorName(errorCode)}")
-        }
-
-        override fun onServiceFound(service: NsdServiceInfo) {
-            // "found" and "resolved" carry the same semantic signal for our UX —
-            // keep the resolve line as the single visible state change (#281).
-            Log.v(TAG, "service found: ${service.serviceName}")
-            val mgr = nsdManager ?: return
-            @Suppress("DEPRECATION")
-            mgr.resolveService(service, object : NsdManager.ResolveListener {
-                override fun onResolveFailed(serviceInfo: NsdServiceInfo, errorCode: Int) {
-                    Log.w(
-                        TAG,
-                        "resolve failed: ${serviceInfo.serviceName}, error=${nsdErrorName(errorCode)}"
-                    )
-                }
-
-                override fun onServiceResolved(serviceInfo: NsdServiceInfo) {
-                    @Suppress("DEPRECATION")
-                    val host = serviceInfo.host?.hostAddress
-                    Log.i(
-                        TAG,
-                        "service resolved: name=${serviceInfo.serviceName} " +
-                            "host=$host port=${serviceInfo.port}"
-                    )
-                    fetchCapabilityAndAdd(serviceInfo)
-                }
-            })
-        }
-
-        override fun onServiceLost(service: NsdServiceInfo) {
-            Log.i(TAG, "service lost: ${service.serviceName}")
-            _discoveredPhones.value = _discoveredPhones.value
-                .filter { it.serviceInfo.serviceName != service.serviceName }
-        }
-    }
-
     fun startDiscovery() {
-        Log.i(TAG, "startDiscovery: type=$SERVICE_TYPE")
+        Log.i(TAG, "startDiscovery (BLE-only)")
         isDiscovering = true
         _discoveryActive.value = true
-        acquireMulticastLock()
-        performDiscovery()
         startBleScan()
         startHeartbeat()
         registerNetworkCallback()
@@ -218,21 +121,16 @@ class PhoneDiscoveryManager @Inject constructor(
         _discoveryActive.value = false
         heartbeatJob?.cancel()
         unregisterNetworkCallback()
-        val mgr = nsdManager
-        if (mgr != null) {
-            runCatching { mgr.stopServiceDiscovery(discoveryListener) }
-        }
         bleScanner.stop()
         _bleScanState.value = BleScanState.IDLE
         _bleScanErrorCode.value = null
-        releaseMulticastLock()
     }
 
     /**
      * Idempotent lifecycle switch driven by the user's "Phone discovery" setting
      * and by [TvDiscoveryService]. Re-entrant: safe to call repeatedly with the
      * same value. On disable the discovered-phone list is cleared immediately so
-     * the UI reflects the change without waiting for NSD timeouts.
+     * the UI reflects the change without waiting for heartbeat timeouts.
      */
     fun setEnabled(enabled: Boolean) {
         if (enabled) {
@@ -243,47 +141,9 @@ class PhoneDiscoveryManager @Inject constructor(
         }
     }
 
-    /**
-     * Tear down and restart NSD discovery. Safe to call while discovery is
-     * already running: the underlying stop/start is wrapped in runCatching so
-     * a stale listener registration cannot abort the cycle. Intended for
-     * external callers (UI retry, post-reconnect recovery).
-     */
-    fun restartDiscovery() {
-        if (!isDiscovering) {
-            Log.i(TAG, "restartDiscovery skipped: discovery not active")
-            return
-        }
-        heartbeatScope.launch { restartDiscoveryInternal() }
-    }
-
-    private suspend fun restartDiscoveryInternal() {
-        val mgr = nsdManager ?: return
-        runCatching { mgr.stopServiceDiscovery(discoveryListener) }
-        delay(RESTART_BACKOFF_MS)
-        performDiscovery()
-    }
-
-    /**
-     * Shared entry point for [startDiscovery] and [restartDiscoveryInternal].
-     * Wrapped in `runCatching` because NSD can reject the call synchronously
-     * (OEM bugs, already-active stale listener) and we must not crash the
-     * singleton's initializer or the restart loop.
-     */
-    private fun performDiscovery() {
-        val mgr = nsdManager
-        if (mgr == null) {
-            Log.w(TAG, "NSD unavailable on this device; relying on BLE channel only")
-            return
-        }
-        runCatching {
-            mgr.discoverServices(SERVICE_TYPE, NsdManager.PROTOCOL_DNS_SD, discoveryListener)
-        }.onFailure { Log.e(TAG, "discoverServices failed", it) }
-    }
-
     // Mirrors the phone's CompanionService network callback: if the TV's Wi-Fi
-    // flickers, our NSD listener can silently go dead on the new network.
-    // Cycle discovery when Wi-Fi becomes available again.
+    // flickers, the BLE stack can silently go dead. Restart the scanner when
+    // Wi-Fi becomes available again.
     private fun registerNetworkCallback() {
         if (networkCallback != null) return
         val cm = runCatching {
@@ -294,15 +154,9 @@ class PhoneDiscoveryManager @Inject constructor(
             .build()
         val callback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
-                Log.i(TAG, "Wi-Fi available — cycling discovery (NSD + BLE)")
-                if (isDiscovering) {
-                    heartbeatScope.launch { restartDiscoveryInternal() }
-                    // Wi-Fi reconnects often coincide with the phone's IP
-                    // flipping; restart the BLE scanner so a fresh advert
-                    // (with the new IP) is captured promptly rather than
-                    // waiting for the next LOW_POWER scan window.
-                    startBleScan()
-                }
+                if (!isDiscovering) return
+                Log.i(TAG, "Wi-Fi available — restarting BLE scanner")
+                startBleScan()
             }
         }
         runCatching { cm.registerNetworkCallback(request, callback) }
@@ -320,55 +174,6 @@ class PhoneDiscoveryManager @Inject constructor(
         networkCallback = null
     }
 
-    // Many Android TV ROMs (Google TV, Chromecast with Google TV, Shield, several
-    // Sony/TCL images) drop inbound multicast packets at the Wi-Fi driver unless
-    // an app holds a multicast lock, so NsdManager runs but never receives the
-    // phone's mDNS announcements. Hold the lock only while discovery is active.
-    private fun acquireMulticastLock() {
-        if (multicastLock?.isHeld == true) {
-            Log.i(TAG, "multicast lock already held; skipping acquire")
-            return
-        }
-        val wifi = wifiManager ?: run {
-            Log.w(TAG, "WifiManager unavailable; skipping multicast lock")
-            return
-        }
-        runCatching {
-            val lock = wifi.createMulticastLock("watchbuddy-nsd").apply {
-                setReferenceCounted(false)
-                acquire()
-            }
-            multicastLock = lock
-            _multicastLockHeld.value = lock.isHeld
-            Log.i(TAG, "multicast lock acquired (held=${lock.isHeld})")
-        }.onFailure { Log.e(TAG, "multicast lock acquire failed", it) }
-    }
-
-    private fun releaseMulticastLock() {
-        val lock = multicastLock ?: run {
-            Log.i(TAG, "multicast lock release skipped: no lock held")
-            _multicastLockHeld.value = false
-            return
-        }
-        runCatching {
-            if (lock.isHeld) {
-                lock.release()
-                Log.i(TAG, "multicast lock released")
-            } else {
-                Log.i(TAG, "multicast lock already released")
-            }
-        }.onFailure { Log.w(TAG, "multicast lock release failed", it) }
-        multicastLock = null
-        _multicastLockHeld.value = false
-    }
-
-    private fun nsdErrorName(errorCode: Int): String = when (errorCode) {
-        NsdManager.FAILURE_INTERNAL_ERROR -> "FAILURE_INTERNAL_ERROR($errorCode)"
-        NsdManager.FAILURE_ALREADY_ACTIVE -> "FAILURE_ALREADY_ACTIVE($errorCode)"
-        NsdManager.FAILURE_MAX_LIMIT -> "FAILURE_MAX_LIMIT($errorCode)"
-        else -> "UNKNOWN($errorCode)"
-    }
-
     private fun startHeartbeat() {
         heartbeatJob = heartbeatScope.launch {
             while (true) {
@@ -381,24 +186,8 @@ class PhoneDiscoveryManager @Inject constructor(
 
     private suspend fun checkAllPhones() {
         val phones = _discoveredPhones.value
-        if (phones.isEmpty()) {
-            // If we have no phones after a full heartbeat interval, the system
-            // NSD service may have silently dropped our listener (seen on some
-            // Google TV ROMs). Cycle discovery so we recover without relaunch.
-            if (isDiscovering) {
-                Log.i(
-                    TAG,
-                    "heartbeat self-heal: no phones discovered → restarting NSD discovery " +
-                        "(multicastLockHeld=${multicastLock?.isHeld == true})"
-                )
-                restartDiscoveryInternal()
-            } else {
-                Log.d(TAG, "heartbeat tick: no phones and discovery inactive; nothing to do")
-            }
-            return
-        }
+        if (phones.isEmpty()) return
 
-        var anyFailure = false
         val updated = phones.mapNotNull { phone ->
             val url = capabilityUrl(phone.baseUrl)
             try {
@@ -411,56 +200,20 @@ class PhoneDiscoveryManager @Inject constructor(
                     capability = capability ?: phone.capability,
                     score = newScore,
                     failCount = 0,
-                    consecutiveSuccesses = phone.consecutiveSuccesses + 1,
                     lastSuccessfulCheck = System.currentTimeMillis()
                 )
             } catch (e: Exception) {
-                anyFailure = true
                 val newFailCount = phone.failCount + 1
                 if (newFailCount >= DiscoveryConstants.MAX_CONSECUTIVE_FAILURES) {
                     Log.i(TAG, "Removing phone ${phone.baseUrl} after ${DiscoveryConstants.MAX_CONSECUTIVE_FAILURES} failed heartbeats")
                     null
                 } else {
-                    phone.copy(failCount = newFailCount, consecutiveSuccesses = 0)
+                    phone.copy(failCount = newFailCount)
                 }
             }
         }
         _discoveredPhones.value = updated.sortedByDescending { it.score }
-        applyBleScannerThrottle(updated, anyFailure)
     }
-
-    /**
-     * BLE scanner throttling (#345 Opt B). Once any phone has responded to
-     * [BLE_THROTTLE_STREAK] consecutive heartbeats, the TV already has a
-     * reliable Wi-Fi route to that phone and a BLE scan adds no signal —
-     * stop the scanner to cut radio cost. On any heartbeat failure the
-     * scanner comes back immediately so recovery (phone Wi-Fi hiccup,
-     * roaming) still finds the phone promptly. A [BLE_THROTTLE_HYSTERESIS_MS]
-     * quiet window guards the stop transition so a TV that briefly drops
-     * Wi-Fi every ~90 s doesn't flap us between SCANNING and IDLE.
-     */
-    private fun applyBleScannerThrottle(phones: List<DiscoveredPhone>, anyFailure: Boolean) {
-        if (!isDiscovering) return
-        val now = System.currentTimeMillis()
-        if (anyFailure) {
-            lastBleMissAtMs = now
-            if (_bleScanState.value != BleScanState.SCANNING) {
-                Log.i(TAG, "heartbeat miss — restarting BLE scanner")
-                startBleScan()
-            }
-            return
-        }
-        val anySteady = phones.any { it.consecutiveSuccesses >= BLE_THROTTLE_STREAK }
-        val hysteresisOk = now - lastBleMissAtMs >= BLE_THROTTLE_HYSTERESIS_MS
-        if (anySteady && hysteresisOk && _bleScanState.value == BleScanState.SCANNING) {
-            Log.i(TAG, "paired steady-state — stopping BLE scanner to save radio")
-            bleScanner.stop()
-            _bleScanState.value = BleScanState.IDLE
-            _bleScanErrorCode.value = null
-        }
-    }
-
-    @Volatile private var lastBleMissAtMs: Long = 0L
 
     /**
      * Returns the best available phone for recap generation, or null if none available.
@@ -474,128 +227,22 @@ class PhoneDiscoveryManager @Inject constructor(
             .filter { it.capability?.isAvailable != false }
             .maxByOrNull { it.score }
 
-    private fun fetchCapabilityAndAdd(serviceInfo: NsdServiceInfo) {
-        @Suppress("DEPRECATION")
-        val hostAddress = serviceInfo.host?.hostAddress ?: return
-        val baseUrl = phoneBaseUrl(hostAddress, serviceInfo.port)
-        val txtRecord = parseTxtRecord(serviceInfo)
-        fetchCapabilityAndAdd(serviceInfo, txtRecord, baseUrl)
-    }
-
-    /**
-     * Shared implementation for both NSD and BLE discovery channels. Callers
-     * are responsible for constructing a [NsdServiceInfo] (real or synthetic
-     * for BLE) and a [PhoneTxtRecord] (parsed from NSD TXT attributes or
-     * reconstructed from BLE payload); this method fetches `/capability`,
-     * ranks the phone, and adds it to the shared list via [addOrUpdatePhone].
-     */
-    private fun fetchCapabilityAndAdd(
-        serviceInfo: NsdServiceInfo,
-        txtRecord: PhoneTxtRecord?,
-        baseUrl: String,
-    ) {
-        val url = capabilityUrl(baseUrl)
-        try {
-            val response = httpClient.newCall(Request.Builder().url(url).build()).execute()
-            val capability = response.body?.string()?.let {
-                Json.decodeFromString<DeviceCapability>(it)
-            }
-            val score = calculateScore(txtRecord, capability)
-            addOrUpdatePhone(DiscoveredPhone(serviceInfo, txtRecord, capability, score, baseUrl))
-        } catch (e: Exception) {
-            Log.w(TAG, "Phone discovered at $url but capability fetch failed: ${e.message}")
-            if (txtRecord != null) {
-                // Still add the phone using TXT record data so it appears in the ranked list
-                val score = calculateScore(txtRecord, null)
-                addOrUpdatePhone(DiscoveredPhone(serviceInfo, txtRecord, null, score, baseUrl))
-            }
-        }
-    }
-
-    /**
-     * Parses WatchBuddy TXT records from a resolved NsdServiceInfo.
-     *
-     * Returns null if `version` or `modelQuality` is missing / unparseable.
-     * `llmBackend` parsing is lenient: unknown values fall back to
-     * [LlmBackend.NONE] so a new phone-side enum value does not make the
-     * phone silently invisible to older TV builds.
-     *
-     * Every failure path logs a structured reason — this code path is the
-     * primary suspect when a phone is emitting mDNS but the TV does not list
-     * it, and silent returns were observed to mask the root cause in the
-     * field (see #259).
-     */
-    @VisibleForTesting
-    internal fun parseTxtRecord(serviceInfo: NsdServiceInfo): PhoneTxtRecord? {
-        return try {
-            val attrs = serviceInfo.attributes ?: emptyMap()
-            val decoded = attrs.mapValues { (_, v) -> v.utf8() ?: "<null>" }
-
-            val version = attrs["version"].utf8()
-            if (version == null) {
-                Log.w(TAG, "parseTxtRecord: missing 'version' attribute; attrs=$decoded")
-                return null
-            }
-            val modelQualityRaw = attrs["modelQuality"].utf8()
-            if (modelQualityRaw == null) {
-                Log.w(TAG, "parseTxtRecord: missing 'modelQuality' attribute; attrs=$decoded")
-                return null
-            }
-            val modelQuality = modelQualityRaw.toIntOrNull()
-            if (modelQuality == null) {
-                Log.w(
-                    TAG,
-                    "parseTxtRecord: unparseable 'modelQuality'='$modelQualityRaw'; attrs=$decoded"
-                )
-                return null
-            }
-            val llmBackendStr = attrs["llmBackend"].utf8()
-            if (llmBackendStr == null) {
-                Log.w(TAG, "parseTxtRecord: missing 'llmBackend' attribute; attrs=$decoded")
-                return null
-            }
-            val llmBackend = runCatching { LlmBackend.valueOf(llmBackendStr) }
-                .getOrElse {
-                    Log.w(
-                        TAG,
-                        "parseTxtRecord: unknown llmBackend='$llmBackendStr' → falling back to NONE"
-                    )
-                    LlmBackend.NONE
-                }
-            PhoneTxtRecord(version = version, modelQuality = modelQuality, llmBackend = llmBackend)
-        } catch (e: Exception) {
-            Log.w(TAG, "parseTxtRecord: unexpected error", e)
-            null
-        }
-    }
-
-    /**
-     * Decodes a single NSD TXT attribute value (a raw `ByteArray?`) as UTF-8.
-     * Pulled out as a named extension because it's called five times inside
-     * [parseTxtRecord] and the original nested call sites were hard to read.
-     */
-    private fun ByteArray?.utf8(): String? = this?.toString(Charsets.UTF_8)
-
     @VisibleForTesting
     internal fun setDiscoveredPhonesForTest(phones: List<DiscoveredPhone>) {
         _discoveredPhones.value = phones
     }
 
     private fun addOrUpdatePhone(phone: DiscoveredPhone) {
-        // Dedup by baseUrl so NSD and BLE — the two independent discovery
-        // channels — converge into a single entry when they surface the same
-        // phone. baseUrl embeds host:port, which is the authoritative address
-        // of the HTTP server; the NSD serviceName is per-channel and would
-        // allow duplicates.
+        // Dedup by baseUrl. baseUrl embeds host:port, which is the
+        // authoritative address of the HTTP server.
         _discoveredPhones.value = (_discoveredPhones.value
             .filter { it.baseUrl != phone.baseUrl } + phone)
             .sortedByDescending { it.score }
     }
 
     /**
-     * Canonical phone base-URL construction. Used wherever an HTTP endpoint is
-     * built — guarantees a single trailing slash so concatenating
-     * [CAPABILITY_PATH] can't yield `//capability`.
+     * Canonical phone base-URL construction. Guarantees a single trailing slash
+     * so concatenating [CAPABILITY_PATH] can't yield `//capability`.
      */
     private fun phoneBaseUrl(host: String, port: Int): String = "http://$host:$port/"
 
@@ -607,32 +254,35 @@ class PhoneDiscoveryManager @Inject constructor(
         "${baseUrl.trimEnd('/')}$CAPABILITY_PATH"
 
     /**
-     * Entry point for advertisements surfaced by [PhoneBleScanner]. Dedups
-     * against phones already discovered via NSD (same host:port) and,
-     * otherwise, feeds the endpoint into the existing capability-fetch
-     * pipeline so heartbeating and ranking are identical across channels.
+     * Entry point for advertisements surfaced by [PhoneBleScanner]. When the
+     * baseUrl is already known we refresh the cached RSSI in place; otherwise
+     * we kick off a `/capability` fetch and add the phone to the discovered
+     * list on success (or as a TXT-only entry on failure).
      *
-     * BLE adverts fire every ~250 ms, so this method must not kick off an
-     * HTTP request on every tick — we short-circuit when the same baseUrl is
-     * already in the list.
+     * BLE adverts fire every ~250 ms, so the hot path (phone already known)
+     * must avoid HTTP work.
      */
     internal fun onBleAdvertisement(
         ipv4: Inet4Address,
         port: Int,
         modelQuality: Int,
         llmBackendOrdinal: Int,
+        rssi: Int,
     ) {
         val hostAddress = ipv4.hostAddress ?: return
         val baseUrl = phoneBaseUrl(hostAddress, port)
-        if (_discoveredPhones.value.any { it.baseUrl == baseUrl }) {
-            // Already known via NSD or a prior BLE tick — heartbeat handles
-            // aliveness from here.
+        val existing = _discoveredPhones.value.firstOrNull { it.baseUrl == baseUrl }
+        if (existing != null) {
+            // Refresh the cached RSSI without re-ranking — score is driven
+            // by heartbeat results, not BLE signal strength.
+            _discoveredPhones.value = _discoveredPhones.value.map {
+                if (it.baseUrl == baseUrl) it.copy(rssi = rssi) else it
+            }
             return
         }
 
         val synthInfo = NsdServiceInfo().apply {
             serviceName = "watchbuddy-ble-$hostAddress-$port"
-            serviceType = SERVICE_TYPE
             this.port = port
             host = ipv4
         }
@@ -642,16 +292,42 @@ class PhoneDiscoveryManager @Inject constructor(
             llmBackend = runCatching { LlmBackend.entries[llmBackendOrdinal] }
                 .getOrDefault(LlmBackend.NONE),
         )
-        Log.i(TAG, "BLE advertisement → resolving phone at $baseUrl")
+        Log.i(TAG, "BLE advertisement → resolving phone at $baseUrl (rssi=$rssi dBm)")
         heartbeatScope.launch {
-            fetchCapabilityAndAdd(synthInfo, txtRecord, baseUrl)
+            fetchCapabilityAndAdd(synthInfo, txtRecord, baseUrl, rssi)
+        }
+    }
+
+    /**
+     * Fetches `/capability`, ranks the phone, and adds it to the shared list
+     * via [addOrUpdatePhone]. Falls back to a TXT-only entry on HTTP failure
+     * so the phone still shows up for ranking.
+     */
+    private fun fetchCapabilityAndAdd(
+        serviceInfo: NsdServiceInfo,
+        txtRecord: PhoneTxtRecord,
+        baseUrl: String,
+        rssi: Int,
+    ) {
+        val url = capabilityUrl(baseUrl)
+        try {
+            val response = httpClient.newCall(Request.Builder().url(url).build()).execute()
+            val capability = response.body?.string()?.let {
+                Json.decodeFromString<DeviceCapability>(it)
+            }
+            val score = calculateScore(txtRecord, capability)
+            addOrUpdatePhone(DiscoveredPhone(serviceInfo, txtRecord, capability, score, baseUrl, rssi = rssi))
+        } catch (e: Exception) {
+            Log.w(TAG, "Phone discovered at $url but capability fetch failed: ${e.message}")
+            val score = calculateScore(txtRecord, null)
+            addOrUpdatePhone(DiscoveredPhone(serviceInfo, txtRecord, null, score, baseUrl, rssi = rssi))
         }
     }
 
     private fun startBleScan() {
         val started = bleScanner.start(
-            listener = { ipv4, port, quality, backend ->
-                onBleAdvertisement(ipv4, port, quality, backend)
+            listener = { ipv4, port, quality, backend, rssi ->
+                onBleAdvertisement(ipv4, port, quality, backend, rssi)
             },
             onFailure = { errorCode ->
                 _bleScanState.value = BleScanState.FAILED
@@ -671,8 +347,8 @@ class PhoneDiscoveryManager @Inject constructor(
      * Device ranking formula:
      *   Score = modelQuality (0–150) + RAM bonus (0–10, only when capability is available)
      *
-     * When only TXT records are available (capability fetch failed), modelQuality from
-     * TXT records is used directly with no RAM bonus.
+     * When only the BLE payload is available (capability fetch failed), modelQuality
+     * from the payload is used directly with no RAM bonus.
      */
     @VisibleForTesting
     internal fun calculateScore(txt: PhoneTxtRecord?, cap: DeviceCapability?): Int {

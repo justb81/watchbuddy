@@ -1,13 +1,16 @@
 package com.justb81.watchbuddy.tv.discovery
 
 import android.content.Context
-import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import com.justb81.watchbuddy.core.model.DeviceCapability
 import com.justb81.watchbuddy.core.model.LlmBackend
-import io.mockk.*
+import io.mockk.every
+import io.mockk.mockk
 import okhttp3.OkHttpClient
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
@@ -18,23 +21,21 @@ class PhoneDiscoveryManagerTest {
 
     private val context: Context = mockk(relaxed = true)
     private val httpClient: OkHttpClient = mockk(relaxed = true)
-    private val nsdManager: NsdManager = mockk(relaxed = true)
     private val bleScanner: PhoneBleScanner = mockk(relaxed = true)
     private lateinit var manager: PhoneDiscoveryManager
 
     @BeforeEach
     fun setUp() {
-        every { context.getSystemService(Context.NSD_SERVICE) } returns nsdManager
         manager = PhoneDiscoveryManager(context, httpClient, bleScanner)
     }
-
-    // ── DiscoveredPhone construction helpers ───────────────────────────────────
 
     private fun makePhone(
         capability: DeviceCapability?,
         txtRecord: PhoneDiscoveryManager.PhoneTxtRecord? = null,
         score: Int = 0,
-        name: String = "test"
+        name: String = "test",
+        baseUrl: String = "http://test/",
+        rssi: Int? = null,
     ): PhoneDiscoveryManager.DiscoveredPhone {
         val serviceInfo = mockk<NsdServiceInfo>()
         every { serviceInfo.serviceName } returns name
@@ -43,7 +44,8 @@ class PhoneDiscoveryManagerTest {
             txtRecord = txtRecord,
             capability = capability,
             score = score,
-            baseUrl = "http://test/"
+            baseUrl = baseUrl,
+            rssi = rssi,
         )
     }
 
@@ -56,8 +58,6 @@ class PhoneDiscoveryManagerTest {
         modelQuality = modelQuality,
         llmBackend = llmBackend
     )
-
-    // ── getBestPhone ───────────────────────────────────────────────────────────
 
     @Nested
     @DisplayName("getBestPhone")
@@ -77,8 +77,8 @@ class PhoneDiscoveryManagerTest {
             val cap1 = DeviceCapability("d1", "u1", null, "P1", LlmBackend.NONE, 0, 1000, true)
             val cap2 = DeviceCapability("d2", "u2", null, "P2", LlmBackend.AICORE, 150, 8000, true)
 
-            val phone1 = makePhone(cap1, score = 0, name = "phone1")
-            val phone2 = makePhone(cap2, score = 160, name = "phone2")
+            val phone1 = makePhone(cap1, score = 0, name = "phone1", baseUrl = "http://phone1/")
+            val phone2 = makePhone(cap2, score = 160, name = "phone2", baseUrl = "http://phone2/")
 
             setPhones(phone1, phone2)
 
@@ -110,13 +110,15 @@ class PhoneDiscoveryManagerTest {
             val capPhone = makePhone(
                 capability = DeviceCapability("d1", "u1", null, "P1", LlmBackend.AICORE, 150, 8000, true),
                 score = 160,
-                name = "cap-phone"
+                name = "cap-phone",
+                baseUrl = "http://cap/",
             )
             val txtPhone = makePhone(
                 capability = null,
                 txtRecord = makeTxtRecord(modelQuality = 90),
                 score = 90,
-                name = "txt-phone"
+                name = "txt-phone",
+                baseUrl = "http://txt/",
             )
             setPhones(txtPhone, capPhone)
 
@@ -124,8 +126,6 @@ class PhoneDiscoveryManagerTest {
             assertEquals("cap-phone", best?.serviceInfo?.serviceName)
         }
     }
-
-    // ── calculateScore ─────────────────────────────────────────────────────────
 
     @Nested
     @DisplayName("calculateScore")
@@ -148,11 +148,6 @@ class PhoneDiscoveryManagerTest {
         }
 
         @Test
-        fun `returns 0 when txt is null and capability is null`() {
-            assertEquals(0, calculateScore(null, null))
-        }
-
-        @Test
         fun `uses capability score when capability is present (ignores txt)`() {
             val txt = makeTxtRecord(modelQuality = 70)
             val cap = DeviceCapability("d", "u", null, "P", LlmBackend.AICORE, 150, 8000, true)
@@ -163,209 +158,63 @@ class PhoneDiscoveryManagerTest {
         @Test
         fun `adds ramBonus 10 for at least 6000 MB`() {
             val cap = DeviceCapability("d", "u", null, "P", LlmBackend.NONE, 50, 6000, true)
-            assertEquals(60, calculateScore(null, cap)) // 50 + 10
+            assertEquals(60, calculateScore(null, cap))
         }
 
         @Test
         fun `adds ramBonus 6 for at least 4000 MB`() {
             val cap = DeviceCapability("d", "u", null, "P", LlmBackend.NONE, 50, 4500, true)
-            assertEquals(56, calculateScore(null, cap)) // 50 + 6
+            assertEquals(56, calculateScore(null, cap))
         }
 
         @Test
         fun `adds ramBonus 3 for at least 3000 MB`() {
             val cap = DeviceCapability("d", "u", null, "P", LlmBackend.NONE, 50, 3500, true)
-            assertEquals(53, calculateScore(null, cap)) // 50 + 3
+            assertEquals(53, calculateScore(null, cap))
         }
 
         @Test
         fun `adds ramBonus 0 for less than 3000 MB`() {
             val cap = DeviceCapability("d", "u", null, "P", LlmBackend.NONE, 50, 2000, true)
-            assertEquals(50, calculateScore(null, cap)) // 50 + 0
-        }
-
-        @Test
-        fun `adds modelQuality to ramBonus for AICore with large RAM`() {
-            val cap = DeviceCapability("d", "u", null, "P", LlmBackend.AICORE, 150, 8000, true)
-            assertEquals(160, calculateScore(null, cap)) // 150 + 10
+            assertEquals(50, calculateScore(null, cap))
         }
     }
-
-    // ── parseTxtRecord ─────────────────────────────────────────────────────────
 
     @Nested
-    @DisplayName("parseTxtRecord")
-    inner class ParseTxtRecordTest {
+    @DisplayName("BLE advertisements")
+    inner class BleAdvertisementTest {
 
-        private fun parseTxtRecord(serviceInfo: NsdServiceInfo): PhoneDiscoveryManager.PhoneTxtRecord? =
-            manager.parseTxtRecord(serviceInfo)
-
-        private fun mockServiceInfo(attrs: Map<String, ByteArray>): NsdServiceInfo {
-            val info = mockk<NsdServiceInfo>()
-            every { info.attributes } returns attrs
-            return info
-        }
+        private fun ipv4(host: String): java.net.Inet4Address =
+            java.net.InetAddress.getByName(host) as java.net.Inet4Address
 
         @Test
-        fun `parses valid TXT records`() {
-            val info = mockServiceInfo(
-                mapOf(
-                    "version" to "1".toByteArray(),
-                    "modelQuality" to "90".toByteArray(),
-                    "llmBackend" to "LITERT".toByteArray()
-                )
+        fun `RSSI is refreshed on repeat advertisements for the same phone`() {
+            val baseUrl = "http://192.168.1.42:8765/"
+            val phone = makePhone(
+                capability = DeviceCapability(
+                    "d", "u", null, "P", LlmBackend.NONE, 70, 4000, true
+                ),
+                txtRecord = makeTxtRecord(),
+                score = 76,
+                name = "phone-42",
+                baseUrl = baseUrl,
+                rssi = -80,
             )
-            val result = parseTxtRecord(info)
-            assertNotNull(result)
-            assertEquals("1", result!!.version)
-            assertEquals(90, result.modelQuality)
-            assertEquals(LlmBackend.LITERT, result.llmBackend)
+            manager.setDiscoveredPhonesForTest(listOf(phone))
+
+            manager.onBleAdvertisement(
+                ipv4 = ipv4("192.168.1.42"),
+                port = 8765,
+                modelQuality = 70,
+                llmBackendOrdinal = LlmBackend.NONE.ordinal,
+                rssi = -55,
+            )
+
+            val updated = manager.discoveredPhones.value.single { it.baseUrl == baseUrl }
+            assertEquals(-55, updated.rssi, "RSSI must update in place on repeat advert")
+            // Score unchanged — RSSI does not re-rank.
+            assertEquals(76, updated.score)
         }
-
-        @Test
-        fun `parses AICORE backend`() {
-            val info = mockServiceInfo(
-                mapOf(
-                    "version" to "1".toByteArray(),
-                    "modelQuality" to "150".toByteArray(),
-                    "llmBackend" to "AICORE".toByteArray()
-                )
-            )
-            val result = parseTxtRecord(info)
-            assertNotNull(result)
-            assertEquals(LlmBackend.AICORE, result!!.llmBackend)
-            assertEquals(150, result.modelQuality)
-        }
-
-        @Test
-        fun `parses NONE backend`() {
-            val info = mockServiceInfo(
-                mapOf(
-                    "version" to "1".toByteArray(),
-                    "modelQuality" to "0".toByteArray(),
-                    "llmBackend" to "NONE".toByteArray()
-                )
-            )
-            val result = parseTxtRecord(info)
-            assertNotNull(result)
-            assertEquals(LlmBackend.NONE, result!!.llmBackend)
-        }
-
-        @Test
-        fun `returns null when version attribute is missing`() {
-            val info = mockServiceInfo(
-                mapOf(
-                    "modelQuality" to "70".toByteArray(),
-                    "llmBackend" to "LITERT".toByteArray()
-                )
-            )
-            assertNull(
-                parseTxtRecord(info),
-                "Missing 'version' must hard-fail parsing; do not mask as NONE fallback"
-            )
-        }
-
-        @Test
-        fun `returns null when modelQuality attribute is missing`() {
-            val info = mockServiceInfo(
-                mapOf(
-                    "version" to "0.15.1".toByteArray(),
-                    "llmBackend" to "LITERT".toByteArray()
-                )
-            )
-            assertNull(
-                parseTxtRecord(info),
-                "Missing 'modelQuality' must hard-fail parsing; do not fall back to 0"
-            )
-        }
-
-        @Test
-        fun `returns null when llmBackend attribute is missing`() {
-            val info = mockServiceInfo(
-                mapOf(
-                    "version" to "0.15.1".toByteArray(),
-                    "modelQuality" to "70".toByteArray()
-                )
-            )
-            assertNull(
-                parseTxtRecord(info),
-                "Missing 'llmBackend' (distinct from unknown value) must hard-fail parsing"
-            )
-        }
-
-        @Test
-        fun `returns null when modelQuality is not a valid integer`() {
-            val info = mockServiceInfo(
-                mapOf(
-                    "version" to "0.15.1".toByteArray(),
-                    "modelQuality" to "not-a-number".toByteArray(),
-                    "llmBackend" to "LITERT".toByteArray()
-                )
-            )
-            assertNull(
-                parseTxtRecord(info),
-                "Unparseable 'modelQuality' must hard-fail parsing; do not fall back to 0"
-            )
-        }
-
-        @Test
-        fun `falls back to NONE when llmBackend is an unknown value`() {
-            // A phone running a newer build may advertise an enum value this TV
-            // build does not know about yet. We must not make the phone silently
-            // invisible — fall back to LlmBackend.NONE instead.
-            val info = mockServiceInfo(
-                mapOf(
-                    "version" to "0.15.1".toByteArray(),
-                    "modelQuality" to "70".toByteArray(),
-                    "llmBackend" to "UNKNOWN_BACKEND".toByteArray()
-                )
-            )
-            val result = parseTxtRecord(info)
-            assertNotNull(result)
-            assertEquals(LlmBackend.NONE, result!!.llmBackend)
-            // Other fields must be preserved so the phone still ranks correctly.
-            assertEquals("0.15.1", result.version)
-            assertEquals(70, result.modelQuality)
-        }
-
-        @Test
-        fun `preserves semver version string verbatim`() {
-            // The phone now advertises its real versionName (e.g. "0.15.1") in
-            // the TXT `version` field, not a hardcoded protocol placeholder.
-            val info = mockServiceInfo(
-                mapOf(
-                    "version" to "0.15.1".toByteArray(),
-                    "modelQuality" to "90".toByteArray(),
-                    "llmBackend" to "LITERT".toByteArray()
-                )
-            )
-            val result = parseTxtRecord(info)
-            assertNotNull(result)
-            assertEquals("0.15.1", result!!.version)
-        }
-
-        @Test
-        fun `returns null when all attributes map is empty`() {
-            val info = mockServiceInfo(emptyMap())
-            assertNull(parseTxtRecord(info))
-        }
-    }
-
-    // ── constants ──────────────────────────────────────────────────────────────
-
-    @Test
-    fun `SERVICE_TYPE constant is correct`() {
-        assertEquals("_watchbuddy._tcp.", PhoneDiscoveryManager.SERVICE_TYPE)
-    }
-
-    @Test
-    fun `CAPABILITY_PATH constant is correct`() {
-        assertEquals("/capability", PhoneDiscoveryManager.CAPABILITY_PATH)
-    }
-
-    @Test
-    fun `stopDiscovery does not throw`() {
-        manager.stopDiscovery()
     }
 
     @Nested
@@ -374,7 +223,6 @@ class PhoneDiscoveryManagerTest {
 
         @Test
         fun `setEnabled(false) clears the discovered-phone list`() {
-            // Simulate a populated discovered list from a prior NSD resolve.
             val phone = makePhone(
                 capability = DeviceCapability("d", "u", null, "P", LlmBackend.NONE, 50, 4000, true),
                 score = 50,
@@ -399,7 +247,15 @@ class PhoneDiscoveryManagerTest {
         }
     }
 
-    // ── DiscoveryConstants ─────────────────────────────────────────────────────
+    @Test
+    fun `CAPABILITY_PATH constant is correct`() {
+        assertEquals("/capability", PhoneDiscoveryManager.CAPABILITY_PATH)
+    }
+
+    @Test
+    fun `stopDiscovery does not throw`() {
+        manager.stopDiscovery()
+    }
 
     @Nested
     @DisplayName("DiscoveryConstants")

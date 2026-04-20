@@ -141,7 +141,6 @@
     <ID>SpacingBetweenDeclarationsWithAnnotations:PhoneDiscoveryManager.kt$PhoneDiscoveryManager$@Volatile private var isDiscovering: Boolean = false</ID>
     <ID>SpacingBetweenDeclarationsWithAnnotations:TvDiscoveryService.kt$TvDiscoveryService$@Inject lateinit var preferences: StreamingPreferencesRepository</ID>
     <ID>SpacingBetweenDeclarationsWithAnnotations:TvDiscoveryService.kt$TvDiscoveryService$@Inject lateinit var scrobbler: MediaSessionScrobbler</ID>
-    <ID>SpacingBetweenDeclarationsWithComments:PhoneDiscoveryManager.kt$PhoneDiscoveryManager$/** Current state of the BLE fallback scanner. */</ID>
     <ID>SpacingBetweenDeclarationsWithComments:PhoneDiscoveryManager.kt$PhoneDiscoveryManager$/** Epoch millis of the last heartbeat loop pass, or 0 before the first tick. */</ID>
     <ID>SpacingBetweenDeclarationsWithComments:PhoneDiscoveryManager.kt$PhoneDiscoveryManager$/** Last `onScanFailed` error code reported by the BLE scanner, or null. */</ID>
     <ID>SpacingBetweenDeclarationsWithComments:PhoneDiscoveryManager.kt$PhoneDiscoveryManager$/** True between [startDiscovery] and [stopDiscovery]. */</ID>
