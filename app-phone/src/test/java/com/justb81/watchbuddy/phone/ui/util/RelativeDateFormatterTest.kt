@@ -21,6 +21,7 @@ class RelativeDateFormatterTest {
     private fun fakeSpan(ms: Long, @Suppress("UNUSED_PARAMETER") n: Long) = "relative:$ms"
 
     @Nested
+    @Suppress("MagicNumber")
     @DisplayName("formatRelativeTime")
     inner class FormatRelativeTimeTest {
 
@@ -119,6 +120,7 @@ class RelativeDateFormatterTest {
     }
 
     @Nested
+    @Suppress("MagicNumber")
     @DisplayName("formatRelativeDate")
     inner class FormatRelativeDateTest {
 

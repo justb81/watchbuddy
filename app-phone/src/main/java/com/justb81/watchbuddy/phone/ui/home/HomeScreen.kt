@@ -675,66 +675,70 @@ private fun ShelfCard(
 }
 
 @Composable
-private fun ProgressLines(progress: ShowProgress?, compact: Boolean = false) {
+private fun InProgressLines(progress: ShowProgress.InProgress, compact: Boolean, now: Long) {
     val context = LocalContext.current
-    val now = System.currentTimeMillis()
     val labelColor = if (compact) Color.White.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurfaceVariant
     val valueColor = if (compact) Color.White.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSurface
     val labelStyle = MaterialTheme.typography.labelSmall
     val valueStyle = if (compact) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodyMedium
+    if (compact) {
+        Text(
+            text = "${progress.latestWatchedLabel} · ${relativeTime(context, progress.latestWatched, now)}",
+            style = labelStyle, color = valueColor, maxLines = 1, overflow = TextOverflow.Ellipsis
+        )
+        Text(
+            text = "${progress.lastAiredLabel} · ${relativeDate(context, progress.lastAired, now)}",
+            style = labelStyle, color = valueColor, maxLines = 1, overflow = TextOverflow.Ellipsis
+        )
+    } else {
+        Row(horizontalArrangement = Arrangement.spacedBy(space = 8.dp)) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                Text(
+                    text = stringResource(R.string.home_label_last_watched),
+                    style = labelStyle,
+                    color = labelColor
+                )
+                Text(
+                    text = "${progress.latestWatchedLabel} · ${relativeTime(context, progress.latestWatched, now)}",
+                    style = valueStyle,
+                    color = valueColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                Text(
+                    text = stringResource(R.string.home_label_last_aired),
+                    style = labelStyle,
+                    color = labelColor
+                )
+                Text(
+                    text = "${progress.lastAiredLabel} · ${relativeDate(context, progress.lastAired, now)}",
+                    style = valueStyle,
+                    color = valueColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProgressLines(progress: ShowProgress?, compact: Boolean = false) {
+    val context = LocalContext.current
+    val now = System.currentTimeMillis()
     val singleLineStyle = if (compact) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodySmall
     val singleLineColor = if (compact) Color.White.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
 
     when (progress) {
-        is ShowProgress.InProgress -> {
-            if (compact) {
-                Text(
-                    text = "${progress.latestWatchedLabel} · ${relativeTime(context, progress.latestWatched, now)}",
-                    style = labelStyle, color = valueColor, maxLines = 1, overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = "${progress.lastAiredLabel} · ${relativeDate(context, progress.lastAired, now)}",
-                    style = labelStyle, color = valueColor, maxLines = 1, overflow = TextOverflow.Ellipsis
-                )
-            } else {
-                Row(horizontalArrangement = Arrangement.spacedBy(space = 8.dp)) {
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(2.dp)
-                    ) {
-                        Text(
-                            text = stringResource(R.string.home_label_last_watched),
-                            style = labelStyle,
-                            color = labelColor
-                        )
-                        Text(
-                            text = "${progress.latestWatchedLabel} · ${relativeTime(context, progress.latestWatched, now)}",
-                            style = valueStyle,
-                            color = valueColor,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(2.dp)
-                    ) {
-                        Text(
-                            text = stringResource(R.string.home_label_last_aired),
-                            style = labelStyle,
-                            color = labelColor
-                        )
-                        Text(
-                            text = "${progress.lastAiredLabel} · ${relativeDate(context, progress.lastAired, now)}",
-                            style = valueStyle,
-                            color = valueColor,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-            }
-        }
+        is ShowProgress.InProgress -> InProgressLines(progress, compact, now)
         is ShowProgress.CaughtUpAiring -> {
             if (progress.latestWatchedLabel != null && progress.latestWatched != null) {
                 Text(
