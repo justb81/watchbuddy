@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.26.0](https://github.com/justb81/watchbuddy/compare/v0.25.0...v0.26.0) (2026-04-20)
+
+
+### Features
+
+* **readme:** add auto-updated code statistics section ([#393](https://github.com/justb81/watchbuddy/issues/393)) ([4c6ae83](https://github.com/justb81/watchbuddy/commit/4c6ae83852732287360c4c46242b808da8bd1b2d))
+
 ## [0.25.0](https://github.com/justb81/watchbuddy/compare/v0.24.0...v0.25.0) (2026-04-20)
 
 
