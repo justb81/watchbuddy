@@ -544,4 +544,67 @@ class ShowProgressCalculatorTest {
             assertFalse(ShowProgressCalculator.hasNewSeasonAvailable(e, h))
         }
     }
+
+    @Nested
+    @DisplayName("nextEpisodeNumbers")
+    inner class NextEpisodeNumbersTest {
+
+        @Test
+        fun `returns hint nextAired when available`() {
+            val e = entry(Triple(1, 3, "2024-01-01T10:00:00Z"))
+            val h = hint(nextAired = TmdbEpisodeSummary(2, 1, air_date = "2024-06-01"))
+            assertEquals(2 to 1, ShowProgressCalculator.nextEpisodeNumbers(e, h))
+        }
+
+        @Test
+        fun `skips season-0 nextAired and falls back to Trakt +1`() {
+            val e = entry(Triple(1, 3, "2024-01-01T10:00:00Z"))
+            val h = hint(nextAired = TmdbEpisodeSummary(0, 5, air_date = "2024-06-01"))
+            assertEquals(1 to 4, ShowProgressCalculator.nextEpisodeNumbers(e, h))
+        }
+
+        @Test
+        fun `no hint returns Trakt latestWatched + 1`() {
+            val e = entry(Triple(2, 5, "2024-01-01T10:00:00Z"))
+            assertEquals(2 to 6, ShowProgressCalculator.nextEpisodeNumbers(e, null))
+        }
+
+        @Test
+        fun `no watched episodes and no hint returns S01E01`() {
+            val e = entry()
+            assertEquals(1 to 1, ShowProgressCalculator.nextEpisodeNumbers(e, null))
+        }
+
+        @Test
+        fun `no watched episodes with hint nextAired returns hint values`() {
+            val e = entry()
+            val h = hint(nextAired = TmdbEpisodeSummary(1, 3, air_date = "2024-06-01"))
+            assertEquals(1 to 3, ShowProgressCalculator.nextEpisodeNumbers(e, h))
+        }
+
+        @Test
+        fun `hint with null nextAired falls back to Trakt +1`() {
+            val e = entry(Triple(1, 7, "2024-01-01T10:00:00Z"))
+            val h = hint(nextAired = null)
+            assertEquals(1 to 8, ShowProgressCalculator.nextEpisodeNumbers(e, h))
+        }
+
+        @Test
+        fun `picks highest S×E pair from Trakt data (not latest timestamp)`() {
+            val e = entry(
+                Triple(1, 5, "2024-01-05T10:00:00Z"),
+                Triple(1, 3, "2024-02-01T10:00:00Z") // later timestamp but lower episode
+            )
+            assertEquals(1 to 6, ShowProgressCalculator.nextEpisodeNumbers(e, null))
+        }
+
+        @Test
+        fun `specials are excluded from Trakt fallback calculation`() {
+            val e = entry(
+                Triple(0, 10, "2024-03-01T10:00:00Z"), // season 0 special
+                Triple(1, 4, "2024-01-01T10:00:00Z")
+            )
+            assertEquals(1 to 5, ShowProgressCalculator.nextEpisodeNumbers(e, null))
+        }
+    }
 }

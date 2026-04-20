@@ -7,7 +7,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.justb81.watchbuddy.R
-import com.justb81.watchbuddy.core.model.TraktWatchedEntry
+import com.justb81.watchbuddy.core.model.EnrichedShowEntry
 import com.justb81.watchbuddy.tv.ui.diagnostics.TvDiagnosticsScreen
 import com.justb81.watchbuddy.tv.ui.home.TvHomeScreen
 import com.justb81.watchbuddy.tv.ui.recap.RecapScreen
@@ -31,7 +31,7 @@ fun TvNavGraph() {
     val navController = rememberNavController()
 
     // Shared state: currently selected show (passed between Home → Detail → Recap)
-    var selectedEntry by remember { mutableStateOf<TraktWatchedEntry?>(null) }
+    var selectedEntry by remember { mutableStateOf<EnrichedShowEntry?>(null) }
 
     NavHost(
         navController    = navController,
@@ -39,8 +39,8 @@ fun TvNavGraph() {
     ) {
         composable(TvRoute.Home.route) {
             TvHomeScreen(
-                onShowClick = { entry ->
-                    selectedEntry = entry
+                onShowClick = { enriched ->
+                    selectedEntry = enriched
                     navController.navigate(TvRoute.ShowDetail.route)
                 },
                 onSettingsClick = {
@@ -62,10 +62,10 @@ fun TvNavGraph() {
         }
 
         composable(TvRoute.ShowDetail.route) {
-            val entry = selectedEntry
-            if (entry != null) {
+            val enriched = selectedEntry
+            if (enriched != null) {
                 ShowDetailScreen(
-                    entry        = entry,
+                    enriched     = enriched,
                     onRecapClick = { navController.navigate(TvRoute.Recap.route) },
                     onBack       = { navController.popBackStack() }
                 )
@@ -73,11 +73,11 @@ fun TvNavGraph() {
         }
 
         composable(TvRoute.Recap.route) {
-            val entry = selectedEntry
-            if (entry != null) {
+            val enriched = selectedEntry
+            if (enriched != null) {
                 RecapScreen(
-                    traktShowId      = entry.show.ids.trakt ?: 0,
-                    showTitle        = entry.show.title,
+                    traktShowId      = enriched.entry.show.ids.trakt ?: 0,
+                    showTitle        = enriched.entry.show.title,
                     fallbackSynopsis = stringResource(R.string.tv_no_description),
                     onClose          = { navController.popBackStack() },
                     onWatchNow       = {

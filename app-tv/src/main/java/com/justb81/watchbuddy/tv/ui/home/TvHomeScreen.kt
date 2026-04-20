@@ -38,7 +38,6 @@ import coil.compose.SubcomposeAsyncImage
 import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.core.model.AvatarSource
 import com.justb81.watchbuddy.core.model.EnrichedShowEntry
-import com.justb81.watchbuddy.core.model.TraktWatchedEntry
 import com.justb81.watchbuddy.core.progress.ShowProgress
 import com.justb81.watchbuddy.core.tmdb.TmdbImageHelper
 import com.justb81.watchbuddy.tv.ui.components.InitialsAvatar
@@ -55,7 +54,7 @@ private val TvShowCardBadgeOffset = 6.dp
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun TvHomeScreen(
-    onShowClick: (TraktWatchedEntry) -> Unit,
+    onShowClick: (EnrichedShowEntry) -> Unit,
     onSettingsClick: () -> Unit = {},
     viewModel: TvHomeViewModel = hiltViewModel()
 ) {
@@ -147,7 +146,7 @@ fun TvHomeScreen(
 @Composable
 private fun TvHomeShelves(
     state: TvHomeUiState,
-    onShowClick: (TraktWatchedEntry) -> Unit,
+    onShowClick: (EnrichedShowEntry) -> Unit,
     onLoadMore: () -> Unit
 ) {
     val continueWatching = state.continueWatching
@@ -177,7 +176,7 @@ private fun TvHomeShelves(
                             enriched = enriched,
                             progress = enriched.entry.show.ids.trakt?.let { state.progress[it] },
                             hasNewSeason = enriched.entry.show.ids.trakt?.let { state.hasNewSeason[it] } == true,
-                            onClick = { onShowClick(enriched.entry) }
+                            onClick = { onShowClick(enriched) }
                         )
                     }
                 }
@@ -203,7 +202,7 @@ private fun TvHomeShelves(
                             enriched = enriched,
                             progress = enriched.entry.show.ids.trakt?.let { state.progress[it] },
                             hasNewSeason = enriched.entry.show.ids.trakt?.let { state.hasNewSeason[it] } == true,
-                            onClick = { onShowClick(enriched.entry) }
+                            onClick = { onShowClick(enriched) }
                         )
                     }
                 }

@@ -63,6 +63,24 @@ object ShowProgressCalculator {
     private const val STATUS_ENDED = "Ended"
     private const val STATUS_CANCELED = "Canceled"
 
+    /**
+     * Returns the (season, episode) pair of the next episode the user should watch.
+     *
+     * Priority:
+     * 1. [TmdbProgressHint.nextAired] — TMDB's globally scheduled next episode (precise).
+     * 2. Highest watched regular episode + 1 (naive; does not cross season boundaries).
+     * 3. S01E01 when no episodes are watched yet.
+     *
+     * Returns null when [entry] has no TMDB show ID (callers should skip the fetch).
+     */
+    fun nextEpisodeNumbers(entry: TraktWatchedEntry, hint: TmdbProgressHint?): Pair<Int, Int>? {
+        hint?.nextAired?.let { next ->
+            if (isRegularSeason(next.season_number)) return next.season_number to next.episode_number
+        }
+        val latest = latestWatched(entry)
+        return if (latest == null) 1 to 1 else latest.season to (latest.episode + 1)
+    }
+
     fun compute(
         entry: TraktWatchedEntry,
         hint: TmdbProgressHint?,
