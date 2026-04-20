@@ -1,4 +1,3 @@
-@file:Suppress("MagicNumber")
 package com.justb81.watchbuddy.phone.ui.util
 
 import org.junit.jupiter.api.Assertions.assertEquals
