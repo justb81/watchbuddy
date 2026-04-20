@@ -18,6 +18,7 @@
     <string name="tv_caught_up">Aktuell</string>
     <string name="tv_show_completed">Abgeschlossen</string>
     <string name="tv_not_started">Nicht gestartet</string>
+    <string name="tv_new_season_available_cd">Neue Staffel verfügbar</string>
     <string name="tv_section_expand">Abschnitt ausklappen</string>
     <string name="tv_section_collapse">Abschnitt einklappen</string>
     <plurals name="tv_episodes_behind">

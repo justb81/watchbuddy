@@ -423,4 +423,125 @@ class ShowProgressCalculatorTest {
             assertTrue(result is ShowProgress.CaughtUpEnded)
         }
     }
+
+    @Nested
+    @DisplayName("hasNewSeasonAvailable")
+    inner class HasNewSeasonAvailableTest {
+
+        @Test
+        fun `null hint returns false`() {
+            val e = entry(Triple(1, 10, "2024-01-01T10:00:00Z"))
+            assertFalse(ShowProgressCalculator.hasNewSeasonAvailable(e, null))
+        }
+
+        @Test
+        fun `no watched episodes returns false`() {
+            val e = entry()
+            val h = hint(
+                lastAired = TmdbEpisodeSummary(2, 1, air_date = "2024-06-01"),
+                seasons = listOf(TmdbSeasonSummary(1, 10), TmdbSeasonSummary(2, 8))
+            )
+            assertFalse(ShowProgressCalculator.hasNewSeasonAvailable(e, h))
+        }
+
+        @Test
+        fun `mid-season (episode below count) returns false`() {
+            val e = entry(Triple(1, 5, "2024-01-01T10:00:00Z"))
+            val h = hint(
+                lastAired = TmdbEpisodeSummary(2, 1, air_date = "2024-06-01"),
+                seasons = listOf(TmdbSeasonSummary(1, 10), TmdbSeasonSummary(2, 8))
+            )
+            assertFalse(ShowProgressCalculator.hasNewSeasonAvailable(e, h))
+        }
+
+        @Test
+        fun `finished season but next season not yet aired returns false`() {
+            val e = entry(Triple(1, 10, "2024-01-01T10:00:00Z"))
+            val h = hint(
+                lastAired = TmdbEpisodeSummary(1, 10, air_date = "2024-03-01"),
+                seasons = listOf(TmdbSeasonSummary(1, 10))
+            )
+            assertFalse(ShowProgressCalculator.hasNewSeasonAvailable(e, h))
+        }
+
+        @Test
+        fun `finished season and new season S2E01 aired returns true`() {
+            val e = entry(Triple(1, 10, "2024-01-01T10:00:00Z"))
+            val h = hint(
+                lastAired = TmdbEpisodeSummary(2, 1, air_date = "2024-06-01"),
+                seasons = listOf(TmdbSeasonSummary(1, 10), TmdbSeasonSummary(2, 8))
+            )
+            assertTrue(ShowProgressCalculator.hasNewSeasonAvailable(e, h))
+        }
+
+        @Test
+        fun `finished season and new season has multiple episodes aired returns true`() {
+            val e = entry(Triple(1, 10, "2024-01-01T10:00:00Z"))
+            val h = hint(
+                lastAired = TmdbEpisodeSummary(2, 4, air_date = "2024-07-01"),
+                seasons = listOf(TmdbSeasonSummary(1, 10), TmdbSeasonSummary(2, 8))
+            )
+            assertTrue(ShowProgressCalculator.hasNewSeasonAvailable(e, h))
+        }
+
+        @Test
+        fun `watching mid-season-2 does not show new season available`() {
+            val e = entry(
+                Triple(1, 10, "2024-01-01T10:00:00Z"),
+                Triple(2, 3, "2024-06-15T10:00:00Z")
+            )
+            val h = hint(
+                lastAired = TmdbEpisodeSummary(3, 1, air_date = "2024-12-01"),
+                seasons = listOf(
+                    TmdbSeasonSummary(1, 10),
+                    TmdbSeasonSummary(2, 8),
+                    TmdbSeasonSummary(3, 6)
+                )
+            )
+            // latestWatched = S02E03, season 2 has 8 eps, ep 3 < 8 → mid-season → false
+            assertFalse(ShowProgressCalculator.hasNewSeasonAvailable(e, h))
+        }
+
+        @Test
+        fun `specials only (season 0) do not trigger new season`() {
+            val e = entry(Triple(0, 5, "2024-01-01T10:00:00Z"))
+            val h = hint(
+                lastAired = TmdbEpisodeSummary(1, 1, air_date = "2024-06-01"),
+                seasons = listOf(TmdbSeasonSummary(0, 5), TmdbSeasonSummary(1, 8))
+            )
+            // no regular episodes watched → latestWatched = null → false
+            assertFalse(ShowProgressCalculator.hasNewSeasonAvailable(e, h))
+        }
+
+        @Test
+        fun `last watched season not found in TMDB seasons returns false`() {
+            val e = entry(Triple(3, 5, "2024-01-01T10:00:00Z"))
+            val h = hint(
+                lastAired = TmdbEpisodeSummary(4, 1, air_date = "2024-06-01"),
+                seasons = listOf(TmdbSeasonSummary(1, 10), TmdbSeasonSummary(2, 8))
+                // Season 3 missing from TMDB data
+            )
+            assertFalse(ShowProgressCalculator.hasNewSeasonAvailable(e, h))
+        }
+
+        @Test
+        fun `episode count zero in season returns false`() {
+            val e = entry(Triple(1, 1, "2024-01-01T10:00:00Z"))
+            val h = hint(
+                lastAired = TmdbEpisodeSummary(2, 1, air_date = "2024-06-01"),
+                seasons = listOf(TmdbSeasonSummary(1, 0))
+            )
+            assertFalse(ShowProgressCalculator.hasNewSeasonAvailable(e, h))
+        }
+
+        @Test
+        fun `no lastAired in hint returns false`() {
+            val e = entry(Triple(1, 10, "2024-01-01T10:00:00Z"))
+            val h = hint(
+                lastAired = null,
+                seasons = listOf(TmdbSeasonSummary(1, 10))
+            )
+            assertFalse(ShowProgressCalculator.hasNewSeasonAvailable(e, h))
+        }
+    }
 }

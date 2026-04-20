@@ -51,6 +51,7 @@
     <string name="home_caught_up">Auf dem neuesten Stand</string>
     <string name="home_show_completed">Abgeschlossen</string>
     <string name="home_not_started">Noch nicht gestartet</string>
+    <string name="home_new_season_available_cd">Neue Staffel verfügbar</string>
     <string name="home_show_ended_caught_up">Abgeschlossen %1$s</string>
     <string name="home_section_expand">Abschnitt ausklappen</string>
     <string name="home_section_collapse">Abschnitt einklappen</string>

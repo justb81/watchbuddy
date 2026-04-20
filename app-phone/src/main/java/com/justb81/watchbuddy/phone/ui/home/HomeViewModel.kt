@@ -39,6 +39,8 @@ data class HomeUiState(
     val allShows: List<EnrichedShowEntry> = emptyList(),
     /** Progress keyed by Trakt id. */
     val progress: Map<Int, ShowProgress> = emptyMap(),
+    /** True for shows where the next unwatched episode is S(n+1)E01, keyed by Trakt id. */
+    val hasNewSeason: Map<Int, Boolean> = emptyMap(),
     val lastSyncTime: String? = null,
     val error: String? = null,
     val canWatch: Boolean = false,
@@ -104,11 +106,17 @@ class HomeViewModel @Inject constructor(
                         traktId to ShowProgressCalculator.compute(enriched.entry, enriched.tmdb)
                     }
                 }.toMap()
+                val hasNewSeasonMap = shows.mapNotNull { enriched ->
+                    enriched.entry.show.ids.trakt?.let { traktId ->
+                        traktId to ShowProgressCalculator.hasNewSeasonAvailable(enriched.entry, enriched.tmdb)
+                    }
+                }.toMap()
                 val (continueWatching, allShows) = partitionShows(shows)
                 _uiState.update {
                     it.copy(
                         shows = shows,
                         progress = progressMap,
+                        hasNewSeason = hasNewSeasonMap,
                         continueWatching = continueWatching,
                         allShows = allShows
                     )

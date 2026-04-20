@@ -51,6 +51,7 @@
     <string name="home_caught_up">Caught up</string>
     <string name="home_show_completed">Completed</string>
     <string name="home_not_started">Not started</string>
+    <string name="home_new_season_available_cd">New season available</string>
     <string name="home_show_ended_caught_up">Completed %1$s</string>
     <string name="home_section_expand">Expand section</string>
     <string name="home_section_collapse">Collapse section</string>

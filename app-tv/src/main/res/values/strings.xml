@@ -18,6 +18,7 @@
     <string name="tv_caught_up">Caught up</string>
     <string name="tv_show_completed">Completed</string>
     <string name="tv_not_started">Not started</string>
+    <string name="tv_new_season_available_cd">New season available</string>
     <string name="tv_section_expand">Expand section</string>
     <string name="tv_section_collapse">Collapse section</string>
     <plurals name="tv_episodes_behind">
