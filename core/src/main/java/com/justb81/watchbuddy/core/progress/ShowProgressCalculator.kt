@@ -140,17 +140,17 @@ object ShowProgressCalculator {
      * new season has not aired yet. Specials (season 0) are never considered.
      */
     fun hasNewSeasonAvailable(entry: TraktWatchedEntry, hint: TmdbProgressHint?): Boolean {
-        hint ?: return false
+        val lastAired = hint?.lastAired ?: return false
         val watched = latestWatched(entry) ?: return false
-        val lastSeasonInfo = hint.seasons
+        val lastSeasonEpisodes = hint.seasons
             .filter { isRegularSeason(it.season_number) }
             .find { it.season_number == watched.season }
+            ?.episode_count
+            ?.takeIf { it > 0 }
             ?: return false
-        if (lastSeasonInfo.episode_count == 0) return false
-        if (watched.episode < lastSeasonInfo.episode_count) return false
-        val nextSeason = watched.season + 1
-        val lastAired = hint.lastAired ?: return false
-        return isRegularSeason(lastAired.season_number) && lastAired.season_number >= nextSeason
+        return watched.episode >= lastSeasonEpisodes
+            && isRegularSeason(lastAired.season_number)
+            && lastAired.season_number > watched.season
     }
 
     private data class WatchedRef(val season: Int, val episode: Int, val instant: Instant) {

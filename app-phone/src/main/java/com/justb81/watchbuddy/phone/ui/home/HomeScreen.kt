@@ -54,6 +54,12 @@ import com.justb81.watchbuddy.phone.permissions.rememberNotificationPermissionRe
 import com.justb81.watchbuddy.phone.ui.util.relativeDate
 import com.justb81.watchbuddy.phone.ui.util.relativeTime
 
+private val NewSeasonBorderWidth = 1.5.dp
+private val NewSeasonBadgeCorner = 10.dp
+private val NewSeasonBadgePadding = 4.dp
+private val NewSeasonBadgeIconSize = 12.dp
+private val ShowCardCorner = 12.dp
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
@@ -595,13 +601,13 @@ private fun ShowRowCard(
 ) {
     val entry = enriched.entry
     val posterUrl = TmdbImageHelper.poster(enriched.posterPath, 300)
-    val cardShape = RoundedCornerShape(12.dp)
+    val cardShape = RoundedCornerShape(ShowCardCorner)
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .then(
-                if (hasNewSeason) Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, cardShape)
+                if (hasNewSeason) Modifier.border(NewSeasonBorderWidth, MaterialTheme.colorScheme.primary, cardShape)
                 else Modifier
             )
             .clickable { entry.show.ids.trakt?.let(onShowClick) },
@@ -674,7 +680,7 @@ private fun ShelfCard(
             .aspectRatio(2f / 3f)
             .clip(RoundedCornerShape(12.dp))
             .then(
-                if (hasNewSeason) Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp))
+                if (hasNewSeason) Modifier.border(NewSeasonBorderWidth, MaterialTheme.colorScheme.primary, RoundedCornerShape(ShowCardCorner))
                 else Modifier
             )
             .clickable { entry.show.ids.trakt?.let(onShowClick) }
@@ -865,16 +871,16 @@ private fun NewSeasonBadge() {
     val description = stringResource(R.string.home_new_season_available_cd)
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(10.dp))
+            .clip(RoundedCornerShape(NewSeasonBadgeCorner))
             .background(MaterialTheme.colorScheme.primary)
-            .padding(4.dp)
+            .padding(NewSeasonBadgePadding)
             .semantics { contentDescription = description }
     ) {
         Icon(
             imageVector = Icons.Filled.Star,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onPrimary,
-            modifier = Modifier.size(12.dp)
+            modifier = Modifier.size(NewSeasonBadgeIconSize)
         )
     }
 }
