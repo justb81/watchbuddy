@@ -678,14 +678,8 @@ private fun ShelfCard(
 private fun ProgressLines(progress: ShowProgress?, compact: Boolean = false) {
     val context = LocalContext.current
     val now = System.currentTimeMillis()
-    val labelColor = if (compact)
-        Color.White.copy(alpha = 0.6f)
-    else
-        MaterialTheme.colorScheme.onSurfaceVariant
-    val valueColor = if (compact)
-        Color.White.copy(alpha = 0.85f)
-    else
-        MaterialTheme.colorScheme.onSurface
+    val labelColor = if (compact) Color.White.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurfaceVariant
+    val valueColor = if (compact) Color.White.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSurface
     val labelStyle = MaterialTheme.typography.labelSmall
     val valueStyle = if (compact) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodyMedium
     val singleLineStyle = if (compact) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodySmall
@@ -703,7 +697,7 @@ private fun ProgressLines(progress: ShowProgress?, compact: Boolean = false) {
                     style = labelStyle, color = valueColor, maxLines = 1, overflow = TextOverflow.Ellipsis
                 )
             } else {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(space = 8.dp)) {
                     Column(
                         modifier = Modifier.weight(1f),
                         verticalArrangement = Arrangement.spacedBy(2.dp)

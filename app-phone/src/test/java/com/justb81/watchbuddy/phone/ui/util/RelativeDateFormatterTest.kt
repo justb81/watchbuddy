@@ -11,6 +11,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
+@Suppress("MagicNumber")
 @DisplayName("RelativeDateFormatter")
 class RelativeDateFormatterTest {
 
