@@ -61,6 +61,7 @@ class PhoneDiscoveryManager @Inject constructor(
     val discoveryActive: StateFlow<Boolean> = _discoveryActive
 
     private val _bleScanState = MutableStateFlow(BleScanState.IDLE)
+
     /** Current state of the BLE scanner. */
     val bleScanState: StateFlow<BleScanState> = _bleScanState
 

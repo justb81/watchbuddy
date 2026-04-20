@@ -34,6 +34,7 @@ class CompanionStateManager @Inject constructor() {
     val httpServerBinding: StateFlow<String?> = _httpServerBinding.asStateFlow()
 
     private val _bleAdvertiseState = MutableStateFlow(BleAdvertiseState.IDLE)
+
     /** Current state of the BLE advertiser (the sole discovery channel). */
     val bleAdvertiseState: StateFlow<BleAdvertiseState> = _bleAdvertiseState.asStateFlow()
 
