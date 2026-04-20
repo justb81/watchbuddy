@@ -21,6 +21,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+private const val TMDB_STILL_WIDTH = 780
+
 data class NextEpisodeUiState(
     val isLoading: Boolean = false,
     val stillUrl: String? = null,
@@ -72,7 +74,7 @@ class ShowDetailViewModel @Inject constructor(
                 val ep = tmdbApi.getEpisode(tmdbId, nextSeason, nextEp, apiKey)
                 _nextEpisode.value = NextEpisodeUiState(
                     isLoading = false,
-                    stillUrl = TmdbImageHelper.still(ep.still_path, 780),
+                    stillUrl = TmdbImageHelper.still(ep.still_path, TMDB_STILL_WIDTH),
                     episodeName = ep.name.takeIf { it.isNotBlank() },
                     episodeCode = "S%02dE%02d".format(ep.season_number, ep.episode_number),
                 )
