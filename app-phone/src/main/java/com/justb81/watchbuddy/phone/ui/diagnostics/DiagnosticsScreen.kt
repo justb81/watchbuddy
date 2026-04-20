@@ -68,36 +68,10 @@ fun DiagnosticsScreen(
                     status = if (uiState.wifiIpv4 != null) Status.OK else Status.WARN,
                 )
                 DiagnosticsRow(
-                    label = stringResource(R.string.diagnostics_row_multicast_lock),
-                    value = yesNo(uiState.multicastLockHeld),
-                    status = if (uiState.multicastLockHeld) Status.OK
-                             else if (uiState.serviceRunning) Status.FAIL else Status.NEUTRAL,
-                )
-            }
-
-            DiagnosticsSection(stringResource(R.string.diagnostics_section_nsd)) {
-                DiagnosticsRow(
                     label = stringResource(R.string.diagnostics_row_service_running),
                     value = yesNo(uiState.serviceRunning),
                     status = if (uiState.serviceRunning) Status.OK else Status.NEUTRAL,
                 )
-                DiagnosticsRow(
-                    label = stringResource(R.string.diagnostics_row_nsd_state),
-                    value = uiState.nsdState.name,
-                    status = when (uiState.nsdState) {
-                        CompanionStateManager.NsdRegistrationState.REGISTERED -> Status.OK
-                        CompanionStateManager.NsdRegistrationState.FAILED -> Status.FAIL
-                        CompanionStateManager.NsdRegistrationState.IDLE -> Status.NEUTRAL
-                        else -> Status.WARN
-                    },
-                )
-                uiState.nsdErrorCode?.let { code ->
-                    DiagnosticsRow(
-                        label = stringResource(R.string.diagnostics_row_nsd_error),
-                        value = code.toString(),
-                        status = Status.FAIL,
-                    )
-                }
             }
 
             DiagnosticsSection(stringResource(R.string.diagnostics_section_http)) {

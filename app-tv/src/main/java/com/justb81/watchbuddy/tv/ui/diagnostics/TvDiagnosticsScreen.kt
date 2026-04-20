@@ -62,21 +62,7 @@ fun TvDiagnosticsScreen(
 
             item {
                 DiagnosticsSection(
-                    title = stringResource(R.string.tv_diagnostics_section_connectivity),
-                    rows = listOf(
-                        DiagRow(
-                            stringResource(R.string.tv_diagnostics_row_multicast_lock),
-                            yesNoStr(uiState.multicastLockHeld),
-                            if (uiState.multicastLockHeld) Status.OK
-                            else if (uiState.discoveryActive) Status.FAIL else Status.NEUTRAL,
-                        ),
-                    ),
-                )
-            }
-
-            item {
-                DiagnosticsSection(
-                    title = stringResource(R.string.tv_diagnostics_section_nsd),
+                    title = stringResource(R.string.tv_diagnostics_section_discovery),
                     rows = listOfNotNull(
                         DiagRow(
                             stringResource(R.string.tv_diagnostics_row_discovery_active),
@@ -239,6 +225,10 @@ private fun PhoneDiagnosticsCard(phone: PhoneDiscoveryManager.DiscoveredPhone) {
             PhoneRow(
                 stringResource(R.string.tv_diagnostics_row_phone_fail_count),
                 phone.failCount.toString(),
+            )
+            PhoneRow(
+                stringResource(R.string.tv_diagnostics_row_rssi),
+                phone.rssi?.let { "$it dBm" } ?: "—",
             )
             PhoneRow(
                 stringResource(R.string.tv_diagnostics_row_phone_last_success),

@@ -11,17 +11,13 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
-    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
 
-    <!-- NSD (mDNS) — phone registers itself as trakt-companion-{username}._tcp.local -->
-    <!-- No special permission needed for NsdManager, INTERNET covers it -->
-
-    <!-- BLE advertising — secondary discovery channel used when mDNS is
-         blocked by the router (AP/client isolation, VLAN-segmented mesh
-         Wi-Fi, aggressive multicast filtering). The phone advertises its
-         LAN endpoint; the TV scans for it and falls through to plain HTTP
-         on whatever LAN path exists. Degrades gracefully when Bluetooth is
-         off or the permission is denied — NSD keeps working. -->
+    <!-- BLE advertising — sole discovery channel. The phone advertises its
+         LAN endpoint (IPv4 + port) so the TV can reach the HTTP server
+         directly, even on networks that would block mDNS (AP/client
+         isolation, VLAN-segmented mesh Wi-Fi, aggressive multicast
+         filtering). Degrades gracefully when Bluetooth is off or the
+         permission is denied — the phone simply becomes undiscoverable. -->
     <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
 
@@ -80,7 +76,7 @@
                 android:resource="@xml/provider_paths" />
         </provider>
 
-        <!-- Companion HTTP server (NSD + Ktor) -->
+        <!-- Companion HTTP server (BLE advertiser + Ktor) -->
         <service
             android:name=".service.CompanionService"
             android:enabled="true"

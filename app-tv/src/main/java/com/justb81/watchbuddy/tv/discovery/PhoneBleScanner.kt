@@ -20,15 +20,14 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Non-mDNS discovery fallback: listens for WatchBuddy BLE advertisements
- * emitted by `CompanionBleAdvertiser` on the phone side. Each decoded
- * advertisement surfaces a `(ipv4, port, modelQuality, llmBackend)` tuple
- * via [listener]; [PhoneDiscoveryManager] feeds these into the existing
- * capability-fetch pipeline so BLE-discovered phones are ranked and
- * heartbeat-checked identically to NSD-discovered ones.
+ * Listens for WatchBuddy BLE advertisements emitted by `CompanionBleAdvertiser`
+ * on the phone side. Each decoded advertisement surfaces a
+ * `(ipv4, port, modelQuality, llmBackend, rssi)` tuple via [listener];
+ * [PhoneDiscoveryManager] feeds these into the capability-fetch pipeline.
  *
- * Fails softly on every branch: permission denied, adapter off, BLE
- * unsupported — all log and no-op so the NSD path keeps running.
+ * BLE is the sole discovery channel — if BLE is unavailable (permission
+ * denied, adapter off, unsupported hardware) the TV cannot discover phones
+ * at all.
  */
 @Singleton
 class PhoneBleScanner @Inject constructor(
@@ -44,6 +43,7 @@ class PhoneBleScanner @Inject constructor(
             port: Int,
             modelQuality: Int,
             llmBackendOrdinal: Int,
+            rssi: Int,
         )
     }
 
@@ -94,11 +94,12 @@ class PhoneBleScanner @Inject constructor(
             .build()
 
         val settings = ScanSettings.Builder()
-            // LOW_POWER (≈5 s window every 5 s) is plenty for discovery: a
-            // phone advertising in BALANCED mode emits every ~250 ms, so
-            // we'll see it within one window. BALANCED and LOW_LATENCY are
-            // only worth the battery cost during active pairing UI flows.
-            .setScanMode(ScanSettings.SCAN_MODE_LOW_POWER)
+            // BALANCED (~5 s interval, ~2 s window) catches a phone
+            // advertising in BALANCED mode promptly without the battery cost
+            // of continuous scanning. Runs for the entire lifetime of
+            // discovery — BLE is the sole channel, so the TV must keep
+            // listening while "Phone discovery" is enabled.
+            .setScanMode(ScanSettings.SCAN_MODE_BALANCED)
             .setCallbackType(ScanSettings.CALLBACK_TYPE_ALL_MATCHES)
             .build()
 
@@ -173,13 +174,15 @@ class PhoneBleScanner @Inject constructor(
         Log.d(
             TAG,
             "advertisement: ip=${payload.ipv4.hostAddress} port=${payload.port} " +
-                "quality=${payload.modelQuality} backend=${payload.llmBackendOrdinal}"
+                "quality=${payload.modelQuality} backend=${payload.llmBackendOrdinal} " +
+                "rssi=${result.rssi}"
         )
         listener.onAdvertisement(
             ipv4 = payload.ipv4,
             port = payload.port,
             modelQuality = payload.modelQuality,
             llmBackendOrdinal = payload.llmBackendOrdinal,
+            rssi = result.rssi,
         )
     }
 

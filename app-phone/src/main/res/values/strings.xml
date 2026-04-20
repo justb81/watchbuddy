@@ -201,17 +201,13 @@
     <string name="diagnostics_title">Diagnostics</string>
     <string name="diagnostics_share_button">Share diagnostics</string>
     <string name="diagnostics_section_connectivity">Connectivity</string>
-    <string name="diagnostics_section_nsd">NSD / companion service</string>
     <string name="diagnostics_section_http">HTTP server</string>
     <string name="diagnostics_section_ble">BLE advertiser</string>
     <string name="diagnostics_section_scrobble">Last scrobble</string>
     <string name="diagnostics_section_build">Build info</string>
     <string name="diagnostics_row_wifi">Wi-Fi</string>
     <string name="diagnostics_row_ipv4">IPv4 address</string>
-    <string name="diagnostics_row_multicast_lock">Multicast lock</string>
     <string name="diagnostics_row_service_running">Service running</string>
-    <string name="diagnostics_row_nsd_state">NSD state</string>
-    <string name="diagnostics_row_nsd_error">NSD error code</string>
     <string name="diagnostics_row_http_binding">Bound address</string>
     <string name="diagnostics_row_last_capability_poll">Last TV poll</string>
     <string name="diagnostics_row_ble_state">Advertiser state</string>

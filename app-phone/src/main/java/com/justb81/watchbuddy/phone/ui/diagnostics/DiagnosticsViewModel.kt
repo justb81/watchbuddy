@@ -12,17 +12,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class DiagnosticsUiState(
     val isOnWifi: Boolean = false,
     val wifiIpv4: String? = null,
-    val multicastLockHeld: Boolean = false,
     val serviceRunning: Boolean = false,
-    val nsdState: CompanionStateManager.NsdRegistrationState = CompanionStateManager.NsdRegistrationState.IDLE,
-    val nsdErrorCode: Int? = null,
     val httpServerBinding: String? = null,
     val lastCapabilityCheckMs: Long = 0L,
     val bleState: CompanionStateManager.BleAdvertiseState = CompanionStateManager.BleAdvertiseState.IDLE,
@@ -43,67 +39,51 @@ class DiagnosticsViewModel @Inject constructor(
     val uiState: StateFlow<DiagnosticsUiState> = _uiState.asStateFlow()
 
     init {
-        // Fan-in: eight independent flows from the shared state manager + Wi-Fi provider.
+        // Fan-in: independent flows from the shared state manager + Wi-Fi provider.
         // `combine` only fires after every flow has emitted once, which is fine because
         // each source is a StateFlow with a defined initial value.
         val partA = combine(
             wifiStateProvider.isOnWifi,
             stateManager.wifiIpv4,
-            stateManager.multicastLockHeld,
             stateManager.isServiceRunning,
-        ) { onWifi, ipv4, lockHeld, running ->
-            DiagnosticsPartA(onWifi, ipv4, lockHeld, running)
+            stateManager.httpServerBinding,
+        ) { onWifi, ipv4, running, http ->
+            DiagnosticsPartA(onWifi, ipv4, running, http)
         }
         val partB = combine(
-            stateManager.nsdRegistrationState,
-            stateManager.nsdErrorCode,
-            stateManager.httpServerBinding,
             stateManager.lastCapabilityCheck,
-        ) { nsd, nsdErr, http, lastCapCheck ->
-            DiagnosticsPartB(nsd, nsdErr, http, lastCapCheck)
-        }
-        val partC = combine(
             stateManager.bleAdvertiseState,
             stateManager.bleAdvertiseErrorCode,
             stateManager.lastScrobbleEvent,
-        ) { ble, bleErr, scrobble ->
-            DiagnosticsPartC(ble, bleErr, scrobble)
+        ) { lastCapCheck, ble, bleErr, scrobble ->
+            DiagnosticsPartB(lastCapCheck, ble, bleErr, scrobble)
         }
 
         viewModelScope.launch {
-            combine(partA, partB, partC) { a, b, c ->
+            combine(partA, partB) { a, b ->
                 DiagnosticsUiState(
                     isOnWifi = a.onWifi,
                     wifiIpv4 = a.ipv4,
-                    multicastLockHeld = a.lockHeld,
                     serviceRunning = a.running,
-                    nsdState = b.nsd,
-                    nsdErrorCode = b.nsdErrorCode,
-                    httpServerBinding = b.httpBinding,
+                    httpServerBinding = a.httpBinding,
                     lastCapabilityCheckMs = b.lastCapCheck,
-                    bleState = c.ble,
-                    bleErrorCode = c.bleErrorCode,
-                    lastScrobble = c.scrobble,
+                    bleState = b.ble,
+                    bleErrorCode = b.bleErrorCode,
+                    lastScrobble = b.scrobble,
                 )
-            }.map { it }.collect { _uiState.value = it }
+            }.collect { _uiState.value = it }
         }
     }
 
     private data class DiagnosticsPartA(
         val onWifi: Boolean,
         val ipv4: String?,
-        val lockHeld: Boolean,
         val running: Boolean,
+        val httpBinding: String?,
     )
 
     private data class DiagnosticsPartB(
-        val nsd: CompanionStateManager.NsdRegistrationState,
-        val nsdErrorCode: Int?,
-        val httpBinding: String?,
         val lastCapCheck: Long,
-    )
-
-    private data class DiagnosticsPartC(
         val ble: CompanionStateManager.BleAdvertiseState,
         val bleErrorCode: Int?,
         val scrobble: ScrobbleDisplayEvent?,

@@ -6,16 +6,13 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
-    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
 
-    <!-- BLE scanning — secondary discovery channel used when mDNS is blocked
-         by the router (AP/client isolation, VLAN-segmented mesh Wi-Fi,
-         aggressive multicast filtering). The TV scans for phones that
-         advertise their LAN endpoint over BLE and falls through to plain
-         HTTP. `neverForLocation` opts out of the location runtime prompt
-         since we never derive physical location from scan results.
+    <!-- BLE scanning — sole discovery channel. The TV scans for phones that
+         advertise their LAN endpoint over BLE and then reaches them over
+         plain HTTP. `neverForLocation` opts out of the location runtime
+         prompt since we never derive physical location from scan results.
          Degrades gracefully when Bluetooth is off or the permission is
-         denied — NSD keeps working. -->
+         denied — no phones are discovered until BLE is available again. -->
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
         android:usesPermissionFlags="neverForLocation" />
 
@@ -62,9 +59,9 @@
     <uses-feature android:name="android.hardware.usb.host" android:required="false" />
     <uses-feature android:name="android.hardware.wifi.direct" android:required="false" />
     <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
-    <!-- BLE receiver role — required for PhoneBleScanner fallback discovery,
-         but declared optional so TVs without BLE still get the APK and fall
-         back to NSD alone. -->
+    <!-- BLE receiver role — required for PhoneBleScanner (the sole discovery
+         channel), but declared optional so TVs without BLE still receive the
+         APK. They just won't be able to discover any phones. -->
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
 
     <!-- Visibility declarations for Android 11+ PackageManager queries.
@@ -125,7 +122,7 @@
                 tools:node="remove" />
         </provider>
 
-        <!-- Background phone discovery service. Runs NSD + BLE scanning when
+        <!-- Background phone discovery service. Runs the BLE scanner when
              "Autostart at TV boot" is enabled so new phones are picked up
              without the user opening the launcher first. Uses `dataSync`
              foreground service type to match the phone-side CompanionService. -->

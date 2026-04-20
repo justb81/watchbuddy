@@ -20,8 +20,8 @@
 
 ```
 watchbuddy/
-├── app-phone/      Android companion app (LLM brain, NSD server, Trakt auth)
-├── app-tv/         Google TV app (display, NSD client, recap WebView, deep links)
+├── app-phone/      Android companion app (LLM brain, BLE advertiser, HTTP server, Trakt auth)
+├── app-tv/         Google TV app (display, BLE scanner, recap WebView, deep links)
 ├── core/           Shared: Trakt API, TMDB API, data models, network
 ├── backend/        Node.js Trakt token proxy (Docker, runs on your own server)
 ├── .github/        CI/CD workflows (build, test + release-please)
@@ -39,16 +39,16 @@ watchbuddy/
 - **Multi-user** — multiple phones/users sync to one TV; active viewers are derived automatically from the phones connected to the TV, with no manual picker; shared watch mode avoids spoilers
 - **Editable identity** — override the display name and choose the avatar source (Trakt photo, generated from the name, or a custom photo from the phone) in Settings → Identity
 - **RAM-adaptive LLM** — AICore (Gemini Nano) if available, otherwise LiteRT-LM with auto-selected Gemma model based on free RAM
-- **Resilient pairing** — NSD/mDNS with a parallel BLE fallback so phone ↔ TV discovery keeps working on guest Wi-Fi, mesh routers, and other networks where multicast is blocked
-- **Toggleable phone discovery** — TV Settings → "Phone discovery" turns the NSD + BLE scanner off when you don't want it; TV Settings → "Autostart at TV boot" keeps discovery running in the background after a reboot so phones are already visible the next time you open the TV app
-- **In-app diagnostics** — Settings → Diagnostics on both apps shows live connection health (Wi-Fi / NSD / HTTP / BLE on the phone; discovery / heartbeat / discovered phones on the TV) with a one-tap "Share diagnostics" button that exports the `DiagnosticLog` and any pending crash reports for bug reports
+- **Resilient pairing** — BLE-based discovery so phone ↔ TV discovery keeps working on guest Wi-Fi, mesh routers, and other networks where multicast / peer-to-peer traffic is blocked
+- **Toggleable phone discovery** — TV Settings → "Phone discovery" turns the BLE scanner off when you don't want it; TV Settings → "Autostart at TV boot" keeps discovery running in the background after a reboot so phones are already visible the next time you open the TV app
+- **In-app diagnostics** — Settings → Diagnostics on both apps shows live connection health (Wi-Fi / HTTP / BLE on the phone; discovery / heartbeat / discovered phones with RSSI on the TV) with a one-tap "Share diagnostics" button that exports the `DiagnosticLog` and any pending crash reports for bug reports
 
 ## Module Structure
 
 | Module | Description |
 |---|---|
-| `app-phone` | Compose UI, NSD mDNS server (port 8765), LLM inference, HTTP API |
-| `app-tv` | Compose for TV, NSD discovery, WebView recap, MediaSession scrobbler |
+| `app-phone` | Compose UI, BLE advertiser + HTTP server (port 8765), LLM inference |
+| `app-tv` | Compose for TV, BLE scanner, WebView recap, MediaSession scrobbler |
 | `core` | Trakt & TMDB API clients, shared models, network utilities |
 | `backend` | Node.js proxy: exchanges Trakt auth_code for tokens server-side |
 

@@ -19,7 +19,6 @@ import javax.inject.Inject
 
 data class TvDiagnosticsUiState(
     val discoveryActive: Boolean = false,
-    val multicastLockHeld: Boolean = false,
     val bleScanState: PhoneDiscoveryManager.BleScanState = PhoneDiscoveryManager.BleScanState.IDLE,
     val bleScanErrorCode: Int? = null,
     val lastHeartbeatMs: Long = 0L,
@@ -44,30 +43,28 @@ class TvDiagnosticsViewModel @Inject constructor(
 
     init {
         refreshNotificationAccess()
-        val discoveryTriple = combine(
+        val discoveryState = combine(
             phoneDiscovery.discoveryActive,
-            phoneDiscovery.multicastLockHeld,
             phoneDiscovery.bleScanState,
-        ) { active, lock, ble -> Triple(active, lock, ble) }
-        val discoveryTail = combine(
             phoneDiscovery.bleScanErrorCode,
+        ) { active, ble, bleErr -> Triple(active, ble, bleErr) }
+        val discoveryTail = combine(
             phoneDiscovery.lastHeartbeatTick,
             phoneDiscovery.discoveredPhones,
-        ) { bleErr, tick, phones -> Triple(bleErr, tick, phones) }
+        ) { tick, phones -> tick to phones }
         val scrobbleState = combine(
             scrobbler.isListening,
             scrobbler.lastCandidate,
         ) { listening, last -> listening to last }
 
         viewModelScope.launch {
-            combine(discoveryTriple, discoveryTail, scrobbleState) { a, b, s ->
+            combine(discoveryState, discoveryTail, scrobbleState) { a, b, s ->
                 TvDiagnosticsUiState(
                     discoveryActive = a.first,
-                    multicastLockHeld = a.second,
-                    bleScanState = a.third,
-                    bleScanErrorCode = b.first,
-                    lastHeartbeatMs = b.second,
-                    phones = b.third,
+                    bleScanState = a.second,
+                    bleScanErrorCode = a.third,
+                    lastHeartbeatMs = b.first,
+                    phones = b.second,
                     notificationAccessGranted = _uiState.value.notificationAccessGranted,
                     scrobblerListening = s.first,
                     lastCandidate = s.second,

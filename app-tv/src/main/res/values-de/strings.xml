@@ -101,8 +101,7 @@
 
     <!-- Diagnostics -->
     <string name="tv_diagnostics_title">Diagnose</string>
-    <string name="tv_diagnostics_section_connectivity">Verbindung</string>
-    <string name="tv_diagnostics_section_nsd">Erkennung (NSD)</string>
+    <string name="tv_diagnostics_section_discovery">Erkennung</string>
     <string name="tv_diagnostics_section_ble">BLE-Scanner</string>
     <string name="tv_diagnostics_section_scrobble">Scrobble</string>
     <string name="tv_diagnostics_section_phones">Gefundene Telefone</string>
@@ -110,7 +109,6 @@
     <string name="tv_diagnostics_row_notification_access">Benachrichtigungszugriff</string>
     <string name="tv_diagnostics_row_scrobbler_listening">Scrobbler aktiv</string>
     <string name="tv_diagnostics_row_last_candidate">Letzter Treffer</string>
-    <string name="tv_diagnostics_row_multicast_lock">Multicast-Lock</string>
     <string name="tv_diagnostics_row_discovery_active">Erkennung aktiv</string>
     <string name="tv_diagnostics_row_last_heartbeat">Letzter Heartbeat</string>
     <string name="tv_diagnostics_row_ble_state">Scanner-Status</string>
@@ -119,6 +117,7 @@
     <string name="tv_diagnostics_row_phone_quality">Modellqualität</string>
     <string name="tv_diagnostics_row_phone_backend">LLM-Backend</string>
     <string name="tv_diagnostics_row_phone_fail_count">Aufeinanderfolgende Fehler</string>
+    <string name="tv_diagnostics_row_rssi">RSSI</string>
     <string name="tv_diagnostics_row_phone_last_success">Letzter Erfolg</string>
     <string name="tv_diagnostics_row_version_name">Versionsname</string>
     <string name="tv_diagnostics_row_version_code">Versionscode</string>

@@ -200,17 +200,13 @@
     <string name="diagnostics_title">Diagnostic</string>
     <string name="diagnostics_share_button">Partager le diagnostic</string>
     <string name="diagnostics_section_connectivity">Connectivité</string>
-    <string name="diagnostics_section_nsd">NSD / service compagnon</string>
     <string name="diagnostics_section_http">Serveur HTTP</string>
     <string name="diagnostics_section_ble">Diffusion BLE</string>
     <string name="diagnostics_section_scrobble">Dernier scrobble</string>
     <string name="diagnostics_section_build">Infos build</string>
     <string name="diagnostics_row_wifi">Wi-Fi</string>
     <string name="diagnostics_row_ipv4">Adresse IPv4</string>
-    <string name="diagnostics_row_multicast_lock">Verrou multicast</string>
     <string name="diagnostics_row_service_running">Service actif</string>
-    <string name="diagnostics_row_nsd_state">État NSD</string>
-    <string name="diagnostics_row_nsd_error">Code erreur NSD</string>
     <string name="diagnostics_row_http_binding">Adresse liée</string>
     <string name="diagnostics_row_last_capability_poll">Dernière interrogation TV</string>
     <string name="diagnostics_row_ble_state">État de diffusion</string>
