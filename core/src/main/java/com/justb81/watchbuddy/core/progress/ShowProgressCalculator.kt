@@ -148,9 +148,9 @@ object ShowProgressCalculator {
             ?.episode_count
             ?.takeIf { it > 0 }
             ?: return false
-        return watched.episode >= lastSeasonEpisodes
-            && isRegularSeason(lastAired.season_number)
-            && lastAired.season_number > watched.season
+        return watched.episode >= lastSeasonEpisodes &&
+            isRegularSeason(lastAired.season_number) &&
+            lastAired.season_number > watched.season
     }
 
     private data class WatchedRef(val season: Int, val episode: Int, val instant: Instant) {

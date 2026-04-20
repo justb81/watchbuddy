@@ -607,8 +607,11 @@ private fun ShowRowCard(
         modifier = Modifier
             .fillMaxWidth()
             .then(
-                if (hasNewSeason) Modifier.border(NewSeasonBorderWidth, MaterialTheme.colorScheme.primary, cardShape)
-                else Modifier
+                if (hasNewSeason) {
+                    Modifier.border(NewSeasonBorderWidth, MaterialTheme.colorScheme.primary, cardShape)
+                } else {
+                    Modifier
+                }
             )
             .clickable { entry.show.ids.trakt?.let(onShowClick) },
         shape    = cardShape,
@@ -680,8 +683,11 @@ private fun ShelfCard(
             .aspectRatio(2f / 3f)
             .clip(RoundedCornerShape(12.dp))
             .then(
-                if (hasNewSeason) Modifier.border(NewSeasonBorderWidth, MaterialTheme.colorScheme.primary, RoundedCornerShape(ShowCardCorner))
-                else Modifier
+                if (hasNewSeason) {
+                    Modifier.border(NewSeasonBorderWidth, MaterialTheme.colorScheme.primary, RoundedCornerShape(ShowCardCorner))
+                } else {
+                    Modifier
+                }
             )
             .clickable { entry.show.ids.trakt?.let(onShowClick) }
     ) {
