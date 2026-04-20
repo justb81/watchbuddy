@@ -95,7 +95,7 @@ class WatchProvidersRepository @Inject constructor(
                 packageName = pkgName,
                 deepLinkTemplate = catalog?.deepLinkTemplate,
                 isInstalled = isInstalled,
-                isLastUsed = entry.provider_id == lastUsedId,
+                isLastUsed = entry.providerId == lastUsedId,
                 tmdbPageUrl = pageUrl,
             )
         }
