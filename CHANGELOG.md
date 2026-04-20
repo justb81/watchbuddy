@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.24.0](https://github.com/justb81/watchbuddy/compare/v0.23.0...v0.24.0) (2026-04-20)
+
+
+### Features
+
+* **tv:** show next-episode still image and actual title on ShowDetail ([#366](https://github.com/justb81/watchbuddy/issues/366)) ([#385](https://github.com/justb81/watchbuddy/issues/385)) ([7fe5ee8](https://github.com/justb81/watchbuddy/commit/7fe5ee81eb148b53e89809305e9a52b395e98bc7))
+
 ## [0.23.0](https://github.com/justb81/watchbuddy/compare/v0.22.0...v0.23.0) (2026-04-20)
 
 
