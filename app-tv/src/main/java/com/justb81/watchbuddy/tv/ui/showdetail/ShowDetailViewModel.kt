@@ -3,22 +3,22 @@ package com.justb81.watchbuddy.tv.ui.showdetail
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.justb81.watchbuddy.core.model.EnrichedShowEntry
-import com.justb81.watchbuddy.core.model.KNOWN_STREAMING_SERVICES
-import com.justb81.watchbuddy.core.model.StreamingService
+import com.justb81.watchbuddy.core.model.ResolvedProvider
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
 import com.justb81.watchbuddy.core.progress.ShowProgressCalculator
 import com.justb81.watchbuddy.core.tmdb.TmdbApiService
 import com.justb81.watchbuddy.core.tmdb.TmdbImageHelper
+import com.justb81.watchbuddy.tv.data.LastUsedProviderRepository
 import com.justb81.watchbuddy.tv.data.StreamingPreferencesRepository
+import com.justb81.watchbuddy.tv.data.WatchProvidersRepository
 import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import java.util.Locale
 import javax.inject.Inject
 
 private const val TMDB_STILL_WIDTH = 780
@@ -30,32 +30,32 @@ data class NextEpisodeUiState(
     val episodeCode: String? = null,
 )
 
+sealed interface ProviderListUiState {
+    object Loading : ProviderListUiState
+    data class Success(val providers: List<ResolvedProvider>) : ProviderListUiState
+    /** TMDB returned zero providers for this region. */
+    data class Empty(val tmdbPageUrl: String?) : ProviderListUiState
+    /** Network or API error — the user can retry. */
+    object Error : ProviderListUiState
+}
+
 @HiltViewModel
 class ShowDetailViewModel @Inject constructor(
+    private val watchProviders: WatchProvidersRepository,
+    private val lastUsedRepo: LastUsedProviderRepository,
     private val streamingPrefs: StreamingPreferencesRepository,
     private val phoneDiscovery: PhoneDiscoveryManager,
     private val tmdbApi: TmdbApiService,
 ) : ViewModel() {
 
-    /**
-     * Returns the streaming services to display, filtered and ordered by user preferences.
-     * Falls back to all known services if no preference is set.
-     */
-    val availableServices: Flow<List<StreamingService>> = streamingPrefs.subscribedServiceIds.map { ids ->
-        if (ids.isEmpty()) {
-            KNOWN_STREAMING_SERVICES
-        } else {
-            ids.mapNotNull { id -> KNOWN_STREAMING_SERVICES.find { it.id == id } }
-        }
-    }
-
     private val _nextEpisode = MutableStateFlow(NextEpisodeUiState())
     val nextEpisode: StateFlow<NextEpisodeUiState> = _nextEpisode.asStateFlow()
 
+    private val _providers = MutableStateFlow<ProviderListUiState>(ProviderListUiState.Loading)
+    val providers: StateFlow<ProviderListUiState> = _providers.asStateFlow()
+
     /**
      * Fetches the next episode's still image and actual title from TMDB.
-     * Uses [ShowProgressCalculator.nextEpisodeNumbers] to determine which episode to fetch,
-     * preferring TMDB's [TmdbProgressHint.nextAired] over the naive Trakt +1 calculation.
      * Silently no-ops when the TMDB ID or the phone's API key is unavailable.
      */
     fun loadNextEpisode(enriched: EnrichedShowEntry) {
@@ -87,31 +87,75 @@ class ShowDetailViewModel @Inject constructor(
     }
 
     /**
-     * Resolves the best deep link for a show based on user's preferred streaming services.
-     * Iterates through subscribed services in priority order and returns the first link that
-     * can be generated with the available show IDs.  Services whose templates require a TMDB
-     * numeric ID are skipped when [TraktIds.tmdb] is null, allowing slug-only services
-     * (Joyn, Prime Video, ZDF) and no-variable services (WaipuTV) to work regardless.
-     * Returns null only when no subscribed service can produce a valid link.
+     * Fetches TMDB watch providers for [enriched], applies installed-app filter and
+     * last-used ordering, then updates [providers]. Safe to call multiple times (retry).
      */
-    fun resolveDeepLink(
-        entry: TraktWatchedEntry,
-        subscribedServices: List<StreamingService>
-    ): String? {
+    fun loadProviders(enriched: EnrichedShowEntry) {
+        val tmdbId = enriched.entry.show.ids.tmdb ?: run {
+            _providers.value = ProviderListUiState.Empty(null)
+            return
+        }
+        viewModelScope.launch {
+            _providers.value = ProviderListUiState.Loading
+            val apiKey = phoneDiscovery.getBestPhone()?.capability?.tmdbApiKey
+            if (apiKey == null) {
+                _providers.value = ProviderListUiState.Error
+                return@launch
+            }
+            try {
+                val countryCode = Locale.getDefault().country.takeIf { it.length == 2 } ?: "US"
+                val showNonInstalled = streamingPrefs.getShowNonInstalledProviders()
+                val (resolved, pageUrl) = watchProviders.getResolvedProviders(
+                    tmdbId, countryCode, apiKey, showNonInstalled
+                )
+                _providers.value = if (resolved.isEmpty()) {
+                    ProviderListUiState.Empty(pageUrl)
+                } else {
+                    ProviderListUiState.Success(resolved)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                _providers.value = ProviderListUiState.Error
+            }
+        }
+    }
+
+    /**
+     * Records [provider] as last-used for this show and returns the deep link URL.
+     * Falls back to [ResolvedProvider.tmdbPageUrl] if no template is available.
+     * Returns null only when both template and page URL are absent.
+     */
+    fun onProviderSelected(provider: ResolvedProvider, entry: TraktWatchedEntry): String? {
         val tmdbId = entry.show.ids.tmdb
-        val slug   = entry.show.ids.slug ?: entry.show.title.lowercase().replace(" ", "-")
+        if (tmdbId != null) {
+            viewModelScope.launch { lastUsedRepo.recordUsed(tmdbId, provider.providerId) }
+        }
+        return resolveProviderDeepLink(provider, entry)
+    }
 
-        val servicesToTry = subscribedServices.ifEmpty { KNOWN_STREAMING_SERVICES }
+    private fun resolveProviderDeepLink(provider: ResolvedProvider, entry: TraktWatchedEntry): String? {
+        val template = provider.deepLinkTemplate ?: return provider.tmdbPageUrl
+        val tmdbId = entry.show.ids.tmdb
+        val slug = entry.show.ids.slug ?: entry.show.title.lowercase().replace(" ", "-")
 
-        for (service in servicesToTry) {
-            val template = service.deepLinkTemplate
-            val needsId  = template.contains("{tmdb_id}") || template.contains("{id}")
-            if (needsId && tmdbId == null) continue
+        val needsId = template.contains("{tmdb_id}") || template.contains("{id}")
+        if (needsId && tmdbId == null) return provider.tmdbPageUrl
 
-            return template
-                .replace("{tmdb_id}", tmdbId?.toString() ?: "")
-                .replace("{slug}", slug)
-                .replace("{id}",     tmdbId?.toString() ?: "")
+        return template
+            .replace("{tmdb_id}", tmdbId?.toString() ?: "")
+            .replace("{slug}", slug)
+            .replace("{id}", tmdbId?.toString() ?: "")
+    }
+
+    /**
+     * Resolves the best deep link for the primary (first) provider.
+     * Used by the "Watch now" button which launches the top-ranked provider.
+     */
+    fun resolveDeepLink(entry: TraktWatchedEntry): String? {
+        val state = _providers.value
+        if (state is ProviderListUiState.Success) {
+            state.providers.firstOrNull()?.let { return resolveProviderDeepLink(it, entry) }
         }
         return null
     }

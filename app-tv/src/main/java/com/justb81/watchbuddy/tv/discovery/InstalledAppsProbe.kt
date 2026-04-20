@@ -1,0 +1,54 @@
+package com.justb81.watchbuddy.tv.discovery
+
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.content.pm.PackageManager
+import dagger.hilt.android.qualifiers.ApplicationContext
+import javax.inject.Inject
+import javax.inject.Singleton
+
+/**
+ * Queries [PackageManager] for installed streaming app packages and caches the result
+ * for the lifetime of the session. The cache is invalidated automatically when any app
+ * is installed or removed (via [Intent.ACTION_PACKAGE_ADDED] / [ACTION_PACKAGE_REMOVED]).
+ *
+ * On Android 11+ the set of visible packages is restricted. Each known streaming app's
+ * package name must appear in a `<queries>` block in the TV app's AndroidManifest.xml
+ * for PackageManager to report it.
+ */
+@Singleton
+class InstalledAppsProbe @Inject constructor(
+    @ApplicationContext private val context: Context,
+) {
+    @Volatile private var cachedPackages: Set<String>? = null
+
+    init {
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_PACKAGE_ADDED)
+            addAction(Intent.ACTION_PACKAGE_REMOVED)
+            addDataScheme("package")
+        }
+        context.registerReceiver(packageChangeReceiver, filter)
+    }
+
+    private val packageChangeReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            cachedPackages = null
+        }
+    }
+
+    fun isInstalled(packageName: String): Boolean = getInstalledPackages().contains(packageName)
+
+    fun getInstalledPackages(): Set<String> = cachedPackages ?: loadAndCache()
+
+    private fun loadAndCache(): Set<String> {
+        val packages = context.packageManager
+            .getInstalledApplications(PackageManager.GET_META_DATA)
+            .map { it.packageName }
+            .toSet()
+        cachedPackages = packages
+        return packages
+    }
+}

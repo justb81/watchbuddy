@@ -335,12 +335,30 @@ Release AABs likewise enable R8 (`isMinifyEnabled = true`), and AGP embeds the r
 
 ## Deep Links
 
-| Service | Package | Link Template |
-|---------|---------|---------------|
-| Netflix | `com.netflix.ninja` | `https://www.netflix.com/title/{tmdb_id}` |
-| Prime Video | `com.amazon.amazonvideo.livingroom` | `https://www.primevideo.com/search?phrase={slug}` |
-| Disney+ | `com.disney.disneyplus` | `https://www.disneyplus.com/series/{slug}/{tmdb_id}` |
-| WaipuTV | `tv.waipu.app` | `waipu://tv` |
-| Joyn | `de.prosiebensat1digital.android.joyn` | `https://www.joyn.de/serien/{slug}` |
-| ARD | `de.swr.avp.ard.phone` | `https://www.ardmediathek.de/video/{id}` |
-| ZDF | `de.zdf.android.app` | `https://www.zdf.de/serien/{slug}` |
+The available-provider list for each show is fetched from TMDB `/tv/{id}/watch/providers` (region-aware, keyed by device locale country code). No manual service selection is needed.
+
+`core/deeplink/ProviderCatalog.kt` maps TMDB `provider_id` integers to package names and deep-link templates. For providers not in the catalog, WatchBuddy still shows them from TMDB data but falls back to the TMDB watch-providers page URL (`results.{CC}.link`) on tap.
+
+| TMDB provider_id | Service | Package | Link Template |
+|-----------------|---------|---------|---------------|
+| 8 | Netflix | `com.netflix.ninja` | `https://www.netflix.com/title/{tmdb_id}` |
+| 9 / 119 | Prime Video | `com.amazon.amazonvideo.livingroom` | `https://www.primevideo.com/search?phrase={slug}` |
+| 337 | Disney+ | `com.disney.disneyplus` | `https://www.disneyplus.com/series/{slug}/{tmdb_id}` |
+| 350 | Apple TV+ | `com.apple.atve.androidtv.appletv` | `https://tv.apple.com/show/{tmdb_id}` |
+| 531 | Paramount+ | `com.cbs.app` | `https://www.paramountplus.com/shows/{slug}/` |
+| 1899 | Max | `com.hbo.hbonow` | `https://play.max.com/show/{tmdb_id}` |
+| 2187 | WaipuTV | `tv.waipu.app` | `waipu://tv` |
+| 2184 | Joyn | `de.prosiebensat1digital.android.joyn` | `https://www.joyn.de/serien/{slug}` |
+| 195 | ARD Mediathek | `de.swr.avp.ard.phone` | `https://www.ardmediathek.de/video/{id}` |
+| 231 | ZDF Mediathek | `de.zdf.android.app` | `https://www.zdf.de/serien/{slug}` |
+
+### Provider ordering on ShowDetail
+
+`WatchProvidersRepository.getResolvedProviders()` composes the final list in this order:
+1. **Last-used** provider for this show (from `LastUsedProviderRepository`, TV-local DataStore)
+2. **Installed** providers (cross-referenced with `InstalledAppsProbe` via `PackageManager`)
+3. **Not-installed** providers (only when "Show unavailable services" setting is on)
+
+The last-used entry is recorded when the user taps a provider chip or a confirmed scrobble is attributed to a known package. `InstalledAppsProbe` caches installed packages and invalidates on `ACTION_PACKAGE_ADDED`/`ACTION_PACKAGE_REMOVED`.
+
+All known streaming package names are declared in a `<queries>` block in `app-tv/AndroidManifest.xml` so PackageManager reports them on Android 11+.

@@ -3,6 +3,7 @@ package com.justb81.watchbuddy.core.tmdb
 import com.justb81.watchbuddy.core.model.TmdbEpisode
 import com.justb81.watchbuddy.core.model.TmdbShow
 import com.justb81.watchbuddy.core.model.TmdbTvSearchResponse
+import com.justb81.watchbuddy.core.model.WatchProviderResponse
 import retrofit2.http.*
 
 interface TmdbApiService {
@@ -35,6 +36,12 @@ interface TmdbApiService {
         @Query("api_key") apiKey: String,
         @Query("page") page: Int = 1
     ): TmdbTvSearchResponse
+
+    @GET("tv/{series_id}/watch/providers")
+    suspend fun getWatchProviders(
+        @Path("series_id") id: Int,
+        @Query("api_key") apiKey: String
+    ): WatchProviderResponse
 }
 
 // Image URL helper
@@ -43,4 +50,5 @@ object TmdbImageHelper {
     fun still(path: String?, width: Int = 300) = path?.let { "${BASE_URL}w${width}${it}" }
     fun poster(path: String?, width: Int = 500) = path?.let { "${BASE_URL}w${width}${it}" }
     fun backdrop(path: String?, width: Int = 1280) = path?.let { "${BASE_URL}w${width}${it}" }
+    fun logo(path: String?, width: Int = 154) = path?.let { "${BASE_URL}w${width}${it}" }
 }

@@ -3,7 +3,10 @@ package com.justb81.watchbuddy.tv.ui.showdetail
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -24,7 +27,7 @@ import androidx.tv.material3.*
 import coil.compose.AsyncImage
 import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.core.model.EnrichedShowEntry
-import com.justb81.watchbuddy.core.model.StreamingService
+import com.justb81.watchbuddy.core.model.ResolvedProvider
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
 import com.justb81.watchbuddy.core.tmdb.TmdbImageHelper
 
@@ -41,11 +44,12 @@ fun ShowDetailScreen(
     val context = LocalContext.current
     val entry = enriched.entry
     val nextEpisodeUi by viewModel.nextEpisode.collectAsState()
-    val services by viewModel.availableServices.collectAsState(initial = emptyList())
+    val providerState by viewModel.providers.collectAsState()
     val watchNowFocus = remember { FocusRequester() }
 
     LaunchedEffect(entry.show.ids.trakt) {
         viewModel.loadNextEpisode(enriched)
+        viewModel.loadProviders(enriched)
         watchNowFocus.requestFocus()
     }
 
@@ -65,10 +69,10 @@ fun ShowDetailScreen(
             entry = entry,
             episodeTitle = episodeTitle,
             episodeCode = episodeCode,
-            services = services,
+            providerState = providerState,
             watchNowFocus = watchNowFocus,
             onWatchNow = {
-                val deepLink = viewModel.resolveDeepLink(entry, services)
+                val deepLink = viewModel.resolveDeepLink(entry)
                 if (deepLink != null) {
                     context.startActivity(
                         Intent(Intent.ACTION_VIEW, Uri.parse(deepLink))
@@ -76,6 +80,16 @@ fun ShowDetailScreen(
                     )
                 }
             },
+            onProviderClick = { provider ->
+                val link = viewModel.onProviderSelected(provider, entry)
+                if (link != null) {
+                    context.startActivity(
+                        Intent(Intent.ACTION_VIEW, Uri.parse(link))
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    )
+                }
+            },
+            onRetryProviders = { viewModel.loadProviders(enriched) },
             onRecapClick = onRecapClick,
             modifier = Modifier.align(Alignment.CenterEnd),
         )
@@ -125,9 +139,11 @@ private fun ShowDetailContent(
     entry: TraktWatchedEntry,
     episodeTitle: String?,
     episodeCode: String,
-    services: List<StreamingService>,
+    providerState: ProviderListUiState,
     watchNowFocus: FocusRequester,
     onWatchNow: () -> Unit,
+    onProviderClick: (ResolvedProvider) -> Unit,
+    onRetryProviders: () -> Unit,
     onRecapClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -170,10 +186,131 @@ private fun ShowDetailContent(
             }
             OutlinedButton(onClick = onRecapClick) { Text(stringResource(R.string.tv_recap)) }
         }
-        if (services.isNotEmpty()) {
-            Text(text = stringResource(R.string.tv_available_at), fontSize = 12.sp, color = Color.White.copy(alpha = 0.4f))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                services.take(4).forEach { service -> MetaChip(service.name, color = MaterialTheme.colorScheme.surface) }
+
+        AvailableOnSection(
+            state = providerState,
+            onProviderClick = onProviderClick,
+            onRetry = onRetryProviders,
+        )
+    }
+}
+
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+private fun AvailableOnSection(
+    state: ProviderListUiState,
+    onProviderClick: (ResolvedProvider) -> Unit,
+    onRetry: () -> Unit,
+) {
+    when (state) {
+        is ProviderListUiState.Loading -> {
+            Text(
+                text = stringResource(R.string.tv_available_at),
+                fontSize = 12.sp,
+                color = Color.White.copy(alpha = 0.4f),
+            )
+        }
+
+        is ProviderListUiState.Success -> {
+            Text(
+                text = stringResource(R.string.tv_available_at),
+                fontSize = 12.sp,
+                color = Color.White.copy(alpha = 0.4f),
+            )
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(state.providers, key = { it.providerId }) { provider ->
+                    ProviderChip(provider = provider, onClick = { onProviderClick(provider) })
+                }
+            }
+        }
+
+        is ProviderListUiState.Empty -> {
+            Text(
+                text = stringResource(R.string.tv_not_available_region),
+                fontSize = 12.sp,
+                color = Color.White.copy(alpha = 0.4f),
+            )
+        }
+
+        is ProviderListUiState.Error -> {
+            OutlinedButton(onClick = onRetry) {
+                Text(
+                    text = stringResource(R.string.tv_providers_retry),
+                    fontSize = 12.sp,
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+private fun ProviderChip(
+    provider: ResolvedProvider,
+    onClick: () -> Unit,
+) {
+    val borderColor = when {
+        provider.isLastUsed -> MaterialTheme.colorScheme.primary
+        else -> Color.Transparent
+    }
+    val borderWidth = if (provider.isLastUsed) 2.dp else 0.dp
+
+    Card(
+        onClick = onClick,
+        modifier = Modifier
+            .width(88.dp)
+            .border(borderWidth, borderColor, RoundedCornerShape(8.dp)),
+        shape = CardDefaults.shape(RoundedCornerShape(8.dp)),
+        colors = CardDefaults.colors(
+            containerColor = MaterialTheme.colorScheme.surface,
+            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+        ),
+        scale = CardDefaults.scale(focusedScale = 1.06f),
+    ) {
+        Column(
+            modifier = Modifier.padding(8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            if (provider.logoPath != null) {
+                AsyncImage(
+                    model = provider.logoPath,
+                    contentDescription = provider.name,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(4.dp)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = provider.name.take(2).uppercase(),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                    )
+                }
+            }
+            Text(
+                text = provider.name,
+                fontSize = 10.sp,
+                color = Color.White.copy(alpha = 0.8f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (provider.isLastUsed) {
+                Text(
+                    text = stringResource(R.string.tv_provider_last_used_label),
+                    fontSize = 9.sp,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                )
             }
         }
     }

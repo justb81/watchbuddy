@@ -28,6 +28,7 @@ All TMDB calls go through a single Retrofit interface defined in `core/src/main/
 | `getShow` | `GET /tv/{series_id}` | `series_id`, `api_key`, `language` | `TmdbShow` | Fetch show metadata (name, overview, poster, backdrop, air date) |
 | `getEpisode` | `GET /tv/{series_id}/season/{season}/episode/{episode}` | `series_id`, `season_number`, `episode_number`, `api_key`, `language` | `TmdbEpisode` | Fetch single episode details (name, overview, still image, air date) |
 | `searchTv` | `GET /search/tv` | `query`, `api_key`, `page` | `TmdbTvSearchResponse` | Search shows by title (used by TV scrobbler as Trakt-search fallback) |
+| `getWatchProviders` | `GET /tv/{series_id}/watch/providers` | `series_id`, `api_key` | `WatchProviderResponse` | Fetch per-region streaming availability (flatrate, ads, free) for "Available on" row |
 
 `getShow` and `getEpisode` default to `language = "en-US"`. The language parameter follows TMDB's `xx-YY` format (ISO 639-1 language + ISO 3166-1 region). `searchTv` does not use a language parameter (search results are language-independent).
 
@@ -207,7 +208,45 @@ The TV uses `tmdbApiKey` for:
 - Title search (`searchTv`) in `MediaSessionScrobbler` when the fuzzy cache match is below threshold
 - Fetching the next-episode still image and title on `ShowDetailScreen` (see journey 4 below)
 
-### 4. TV ShowDetail — Next-Episode Still Image and Title (#366)
+### 4. TV ShowDetail — Watch Providers ("Available on") (#354 / #355 / #356 / #367)
+
+When the user opens a show on `ShowDetailScreen`, `ShowDetailViewModel.loadProviders()` fetches streaming availability directly from TMDB (using the phone's API key), cross-references with installed apps, applies last-used ranking, and surfaces the result as an `Available on` row.
+
+```mermaid
+sequenceDiagram
+    participant TV as ShowDetailScreen
+    participant VM as ShowDetailViewModel
+    participant WPR as WatchProvidersRepository
+    participant TMDB as TMDB API
+    participant PM as PackageManager
+    participant LUR as LastUsedProviderRepository
+
+    TV->>VM: loadProviders(EnrichedShowEntry)
+    VM->>VM: phoneDiscovery.getBestPhone()?.tmdbApiKey
+    VM->>WPR: getResolvedProviders(tmdbId, countryCode, apiKey, showNonInstalled)
+    WPR->>TMDB: GET /tv/{id}/watch/providers?api_key=...
+    TMDB-->>WPR: WatchProviderResponse { results: { "DE": { flatrate, ads, free } } }
+    WPR->>PM: getInstalledPackages() via InstalledAppsProbe
+    WPR->>LUR: getLastUsedProviderId(tmdbId)
+    WPR-->>VM: List<ResolvedProvider> [lastUsed?, ...installed, ...notInstalled?]
+    VM-->>TV: ProviderListUiState.Success(providers)
+    TV->>TV: LazyRow of ProviderChip cards
+    Note over TV: First entry has primary border + "Last used" badge
+```
+
+**Empty / error states:**
+- Zero providers for country → `ProviderListUiState.Empty` → "Not available in your region"
+- Network failure → `ProviderListUiState.Error` → retry chip
+- No TMDB ID on show → emit `Empty(null)` immediately (no fetch)
+
+**Key files:**
+- `app-tv/…/data/WatchProvidersRepository.kt` — fetch, 24 h in-memory cache, ordering
+- `app-tv/…/data/LastUsedProviderRepository.kt` — TV-local DataStore, `Map<tmdbId, providerId>`
+- `app-tv/…/discovery/InstalledAppsProbe.kt` — `PackageManager` cache, invalidated on install/remove
+- `core/…/deeplink/ProviderCatalog.kt` — TMDB `provider_id` → package + deep-link template
+- `app-tv/AndroidManifest.xml` — `<queries>` block for Android 11+ package visibility
+
+### 5. TV ShowDetail — Next-Episode Still Image and Title (#366)
 
 When the user opens a show on the TV `ShowDetailScreen`, `ShowDetailViewModel.loadNextEpisode()` fetches the next unwatched episode's still image and title directly from TMDB (using the phone's API key).
 
@@ -344,7 +383,11 @@ Separately, `LocaleHelper.getLlmResponseLanguage()` reads the device's system lo
 | **app-phone** | `settings/SettingsRepository.kt` | Stores and retrieves user's TMDB API key |
 | **app-phone** | `ui/home/HomeViewModel.kt` | Loads TMDB posters for each show in the library (parallel `getShow()` calls after sync) |
 | **app-phone** | `ui/showdetail/ShowDetailViewModel.kt` | Loads TMDB poster + overview for a single show's detail screen |
-| **app-tv** | `ui/showdetail/ShowDetailViewModel.kt` | Substitutes `{tmdb_id}` in streaming deep link templates |
+| **app-tv** | `ui/showdetail/ShowDetailViewModel.kt` | Loads providers via `WatchProvidersRepository`, records last-used on tap, resolves deep links via `ProviderCatalog` |
+| **app-tv** | `data/WatchProvidersRepository.kt` | Calls `getWatchProviders()`, caches 24 h, composes installed/last-used ordered list |
+| **app-tv** | `data/LastUsedProviderRepository.kt` | TV-local DataStore — tracks most-recently used `provider_id` per show |
+| **app-tv** | `discovery/InstalledAppsProbe.kt` | `PackageManager` cache — reports which streaming apps are installed |
+| **core** | `deeplink/ProviderCatalog.kt` | Maps TMDB `provider_id` → package name + deep-link template |
 | **app-tv** | `scrobbler/MediaSessionScrobbler.kt` | Uses `searchTv()` as fallback when fuzzy-matching media titles against the local show cache |
 
 ---

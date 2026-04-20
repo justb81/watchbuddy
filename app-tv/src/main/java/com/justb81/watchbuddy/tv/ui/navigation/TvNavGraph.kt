@@ -13,17 +13,15 @@ import com.justb81.watchbuddy.tv.ui.home.TvHomeScreen
 import com.justb81.watchbuddy.tv.ui.recap.RecapScreen
 import com.justb81.watchbuddy.tv.ui.scrobble.ScrobbleOverlay
 import com.justb81.watchbuddy.tv.ui.scrobble.ScrobbleViewModel
-import com.justb81.watchbuddy.tv.ui.settings.StreamingSettingsScreen
 import com.justb81.watchbuddy.tv.ui.settings.TvSettingsScreen
 import com.justb81.watchbuddy.tv.ui.showdetail.ShowDetailScreen
 
 sealed class TvRoute(val route: String) {
     object Home       : TvRoute("tv_home")
     object ShowDetail : TvRoute("tv_show_detail")
-    object Recap              : TvRoute("tv_recap")
-    object Settings           : TvRoute("tv_settings")
-    object StreamingSettings  : TvRoute("tv_streaming_settings")
-    object Diagnostics        : TvRoute("tv_diagnostics")
+    object Recap      : TvRoute("tv_recap")
+    object Settings   : TvRoute("tv_settings")
+    object Diagnostics : TvRoute("tv_diagnostics")
 }
 
 @Composable
@@ -52,9 +50,6 @@ fun TvNavGraph() {
         composable(TvRoute.Settings.route) {
             TvSettingsScreen(
                 onBack = { navController.popBackStack() },
-                onStreamingServicesClick = {
-                    navController.navigate(TvRoute.StreamingSettings.route)
-                },
                 onDiagnosticsClick = {
                     navController.navigate(TvRoute.Diagnostics.route)
                 }
@@ -86,12 +81,6 @@ fun TvNavGraph() {
                     }
                 )
             }
-        }
-
-        composable(TvRoute.StreamingSettings.route) {
-            StreamingSettingsScreen(
-                onBack = { navController.popBackStack() }
-            )
         }
 
         composable(TvRoute.Diagnostics.route) {

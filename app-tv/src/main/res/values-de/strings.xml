@@ -58,18 +58,20 @@
     <string name="tv_error_phone_unreachable">Begleit-App nicht erreichbar. Zwischengespeicherte Daten werden angezeigt.</string>
     <string name="tv_error_phone_unreachable_no_cache">Begleit-App nicht erreichbar. Stelle sicher, dass WatchBuddy auf deinem Handy läuft.</string>
 
-    <!-- Streaming settings -->
-    <string name="tv_streaming_settings_button">Dienste</string>
-    <string name="tv_streaming_settings_title">Streamingdienste</string>
-    <string name="tv_streaming_settings_subtitle">Wähle deine abonnierten Dienste aus. Die Reihenfolge bestimmt die Priorität für Jetzt ansehen.</string>
+    <!-- Show detail — provider availability (#367) -->
+    <string name="tv_not_available_region">In deiner Region nicht zum Streaming verfügbar.</string>
+    <string name="tv_providers_retry">Streaming-Infos konnten nicht geladen werden. Tippen zum Wiederholen.</string>
+    <string name="tv_provider_last_used_label">Zuletzt genutzt</string>
+    <string name="tv_provider_last_used_cd">Zuletzt genutzt: %1$s</string>
 
-    <!-- TV Settings hub (#344) -->
+    <!-- TV Settings hub (#344 / #367) -->
     <string name="tv_settings_title">Einstellungen</string>
     <string name="tv_settings_phone_discovery_title">Telefonsuche</string>
     <string name="tv_settings_phone_discovery_subtitle">Netzwerk nach WatchBuddy-Telefonen durchsuchen</string>
     <string name="tv_settings_autostart_title">Autostart beim TV-Start</string>
     <string name="tv_settings_autostart_subtitle">Suche automatisch starten, wenn der Fernseher eingeschaltet wird</string>
-    <string name="tv_settings_streaming_services">Streamingdienste</string>
+    <string name="tv_settings_show_non_installed_title">Nicht installierte Dienste anzeigen</string>
+    <string name="tv_settings_show_non_installed_subtitle">Auch Streamingdienste anzeigen, die nicht auf diesem Fernseher installiert sind</string>
     <string name="tv_settings_diagnostics">Diagnose</string>
     <string name="tv_settings_notification_access_title">Benachrichtigungszugriff</string>
     <string name="tv_settings_notification_access_subtitle">Erforderlich für Scrobbling – damit WatchBuddy erkennt, was am TV läuft</string>
@@ -96,8 +98,6 @@
 
     <!-- Barrierefreiheit -->
     <string name="cd_scrobble_countdown">Automatisch bestätigen in %1$d Sekunden</string>
-    <string name="cd_service_move_up">%1$s in der Priorität nach oben verschieben</string>
-    <string name="cd_service_move_down">%1$s in der Priorität nach unten verschieben</string>
 
     <!-- Diagnostics -->
     <string name="tv_diagnostics_title">Diagnose</string>
