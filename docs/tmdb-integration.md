@@ -205,7 +205,39 @@ sequenceDiagram
 
 The TV uses `tmdbApiKey` for:
 - Title search (`searchTv`) in `MediaSessionScrobbler` when the fuzzy cache match is below threshold
-- Any other direct TMDB lookups the TV performs (show details, images)
+- Fetching the next-episode still image and title on `ShowDetailScreen` (see journey 4 below)
+
+### 4. TV ShowDetail — Next-Episode Still Image and Title (#366)
+
+When the user opens a show on the TV `ShowDetailScreen`, `ShowDetailViewModel.loadNextEpisode()` fetches the next unwatched episode's still image and title directly from TMDB (using the phone's API key).
+
+```mermaid
+sequenceDiagram
+    participant TV as TV ShowDetailScreen
+    participant VM as ShowDetailViewModel
+    participant TMDB as TMDB API
+
+    TV->>VM: loadNextEpisode(EnrichedShowEntry)
+    VM->>VM: nextEpisodeNumbers(entry, hint)<br/>→ prefer hint.nextAired, fallback Trakt +1
+    VM->>VM: phoneDiscovery.getBestPhone()?.capability?.tmdbApiKey
+    alt no API key
+        VM-->>TV: NextEpisodeUiState(isLoading=false, stillUrl=null)
+    end
+    VM->>TMDB: getEpisode(tmdbId, season, episode, apiKey)
+    TMDB-->>VM: TmdbEpisode(name, still_path, …)
+    VM-->>TV: NextEpisodeUiState(stillUrl, episodeName, episodeCode)
+```
+
+**Image fallback chain in the UI:**
+1. `nextEpisodeUi.stillUrl` — episode still at 780 px width
+2. `TmdbImageHelper.poster(enriched.posterPath)` — series poster
+3. Plain `MaterialTheme.colorScheme.surface` box
+
+**Key files involved:**
+- `app-tv/…/ui/showdetail/ShowDetailViewModel.kt` — `loadNextEpisode()`, `NextEpisodeUiState`
+- `app-tv/…/ui/showdetail/ShowDetailScreen.kt` — Coil `AsyncImage` in left panel, title + code display
+- `core/…/progress/ShowProgressCalculator.kt` — `nextEpisodeNumbers()` helper
+- `core/…/tmdb/TmdbApiService.kt` — `getEpisode()` Retrofit endpoint
 
 ---
 

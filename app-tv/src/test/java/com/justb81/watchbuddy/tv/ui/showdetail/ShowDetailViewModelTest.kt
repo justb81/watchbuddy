@@ -2,8 +2,11 @@ package com.justb81.watchbuddy.tv.ui.showdetail
 
 import app.cash.turbine.test
 import com.justb81.watchbuddy.core.model.*
+import com.justb81.watchbuddy.core.tmdb.TmdbApiService
 import com.justb81.watchbuddy.tv.MainDispatcherRule
 import com.justb81.watchbuddy.tv.data.StreamingPreferencesRepository
+import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
+import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -27,7 +30,46 @@ class ShowDetailViewModelTest {
     }
 
     private val streamingPrefs: StreamingPreferencesRepository = mockk()
+    private val phoneDiscovery: PhoneDiscoveryManager = mockk()
+    private val tmdbApi: TmdbApiService = mockk()
     private lateinit var viewModel: ShowDetailViewModel
+
+    private fun makeCapability(apiKey: String?) = DeviceCapability(
+        deviceId = "dev1",
+        userName = "user",
+        deviceName = "Pixel",
+        llmBackend = LlmBackend.NONE,
+        modelQuality = 0,
+        freeRamMb = 0,
+        tmdbApiKey = apiKey,
+    )
+
+    private fun makePhone(apiKey: String?) = mockk<PhoneDiscoveryManager.DiscoveredPhone> {
+        every { capability } returns makeCapability(apiKey)
+    }
+
+    private fun makeEntry(
+        tmdbId: Int? = 100,
+        watchedSeasons: List<TraktWatchedSeason> = listOf(
+            TraktWatchedSeason(1, listOf(TraktWatchedEpisode(1, last_watched_at = "2024-01-01T10:00:00Z")))
+        )
+    ) = EnrichedShowEntry(
+        entry = TraktWatchedEntry(
+            show = TraktShow("Test Show", 2023, TraktIds(trakt = 1, tmdb = tmdbId)),
+            seasons = watchedSeasons
+        ),
+        tmdb = null,
+        posterPath = "/poster.jpg"
+    )
+
+    private fun makeTmdbEpisode(season: Int = 1, episode: Int = 2, name: String = "Episode Title", stillPath: String? = "/still.jpg") =
+        TmdbEpisode(id = 999, name = name, still_path = stillPath, season_number = season, episode_number = episode)
+
+    @BeforeEach
+    fun setUp() {
+        every { streamingPrefs.subscribedServiceIds } returns flowOf(emptyList())
+        viewModel = ShowDetailViewModel(streamingPrefs, phoneDiscovery, tmdbApi)
+    }
 
     @Nested
     @DisplayName("availableServices")
@@ -35,9 +77,6 @@ class ShowDetailViewModelTest {
 
         @Test
         fun `returns all known services when prefs empty`() = runTest {
-            every { streamingPrefs.subscribedServiceIds } returns flowOf(emptyList())
-            viewModel = ShowDetailViewModel(streamingPrefs)
-
             viewModel.availableServices.test {
                 val services = awaitItem()
                 assertEquals(KNOWN_STREAMING_SERVICES.size, services.size)
@@ -48,7 +87,7 @@ class ShowDetailViewModelTest {
         @Test
         fun `returns only subscribed services in order`() = runTest {
             every { streamingPrefs.subscribedServiceIds } returns flowOf(listOf("disney", "netflix"))
-            viewModel = ShowDetailViewModel(streamingPrefs)
+            viewModel = ShowDetailViewModel(streamingPrefs, phoneDiscovery, tmdbApi)
 
             viewModel.availableServices.test {
                 val services = awaitItem()
@@ -61,16 +100,118 @@ class ShowDetailViewModelTest {
     }
 
     @Nested
-    @DisplayName("resolveDeepLink")
-    inner class ResolveDeepLinkTest {
+    @DisplayName("loadNextEpisode")
+    inner class LoadNextEpisodeTest {
 
-        @BeforeEach
-        fun setUp() {
-            every { streamingPrefs.subscribedServiceIds } returns flowOf(emptyList())
-            viewModel = ShowDetailViewModel(streamingPrefs)
+        @Test
+        fun `populates stillUrl and episodeName on success`() = runTest {
+            every { phoneDiscovery.getBestPhone() } returns makePhone("test-key")
+            coEvery { tmdbApi.getEpisode(100, 1, 2, "test-key") } returns makeTmdbEpisode(1, 2)
+
+            viewModel.nextEpisode.test {
+                // Initial empty state
+                awaitItem()
+                viewModel.loadNextEpisode(makeEntry())
+                // Loading state
+                val loading = awaitItem()
+                assertTrue(loading.isLoading)
+                // Resolved state
+                val resolved = awaitItem()
+                assertFalse(resolved.isLoading)
+                assertTrue(resolved.stillUrl?.contains("still.jpg") == true)
+                assertEquals("Episode Title", resolved.episodeName)
+                assertEquals("S01E02", resolved.episodeCode)
+                cancelAndIgnoreRemainingEvents()
+            }
         }
 
-        // ── Services that require a TMDB ID ──────────────────────────────────
+        @Test
+        fun `produces null stillUrl when TMDB returns no still_path`() = runTest {
+            every { phoneDiscovery.getBestPhone() } returns makePhone("key")
+            coEvery { tmdbApi.getEpisode(any(), any(), any(), any()) } returns makeTmdbEpisode(stillPath = null)
+
+            viewModel.loadNextEpisode(makeEntry())
+
+            val state = viewModel.nextEpisode.value
+            assertNull(state.stillUrl)
+        }
+
+        @Test
+        fun `stays empty when no phone available`() = runTest {
+            every { phoneDiscovery.getBestPhone() } returns null
+
+            viewModel.nextEpisode.test {
+                awaitItem()
+                viewModel.loadNextEpisode(makeEntry())
+                // Loading
+                awaitItem()
+                // Resolved to empty (no API key)
+                val state = awaitItem()
+                assertFalse(state.isLoading)
+                assertNull(state.stillUrl)
+                assertNull(state.episodeName)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+        @Test
+        fun `stays empty when phone has no API key`() = runTest {
+            every { phoneDiscovery.getBestPhone() } returns makePhone(null)
+
+            viewModel.loadNextEpisode(makeEntry())
+
+            val state = viewModel.nextEpisode.value
+            assertNull(state.stillUrl)
+        }
+
+        @Test
+        fun `stays empty when show has no TMDB id`() = runTest {
+            viewModel.loadNextEpisode(makeEntry(tmdbId = null))
+
+            // loadNextEpisode returns early — state stays at initial default
+            val state = viewModel.nextEpisode.value
+            assertFalse(state.isLoading)
+            assertNull(state.stillUrl)
+        }
+
+        @Test
+        fun `clears episode data on TMDB API failure`() = runTest {
+            every { phoneDiscovery.getBestPhone() } returns makePhone("key")
+            coEvery { tmdbApi.getEpisode(any(), any(), any(), any()) } throws RuntimeException("404")
+
+            viewModel.nextEpisode.test {
+                awaitItem()
+                viewModel.loadNextEpisode(makeEntry())
+                awaitItem() // loading
+                val failed = awaitItem()
+                assertFalse(failed.isLoading)
+                assertNull(failed.stillUrl)
+                assertNull(failed.episodeName)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+        @Test
+        fun `uses TMDB hint nextAired for episode numbers when hint present`() = runTest {
+            val enriched = makeEntry().copy(
+                tmdb = TmdbProgressHint(
+                    nextAired = TmdbEpisodeSummary(season_number = 2, episode_number = 1)
+                )
+            )
+            every { phoneDiscovery.getBestPhone() } returns makePhone("key")
+            coEvery { tmdbApi.getEpisode(100, 2, 1, "key") } returns makeTmdbEpisode(2, 1, "Season Premiere")
+
+            viewModel.loadNextEpisode(enriched)
+
+            val state = viewModel.nextEpisode.value
+            assertEquals("S02E01", state.episodeCode)
+            assertEquals("Season Premiere", state.episodeName)
+        }
+    }
+
+    @Nested
+    @DisplayName("resolveDeepLink")
+    inner class ResolveDeepLinkTest {
 
         @Test
         fun `substitutes tmdb_id placeholder for Netflix`() {
@@ -227,7 +368,6 @@ class ShowDetailViewModelTest {
         fun `falls back to KNOWN_STREAMING_SERVICES when subscribed list is empty and tmdb_id present`() {
             val entry = TraktWatchedEntry(TraktShow("Test", 2024, TraktIds(tmdb = 1, slug = "test")))
             val result = viewModel.resolveDeepLink(entry, emptyList())
-            // Netflix is first in KNOWN_STREAMING_SERVICES and tmdb_id is available
             assertNotNull(result)
             assertTrue(result!!.contains("1"))
         }
@@ -236,7 +376,6 @@ class ShowDetailViewModelTest {
         fun `falls back to slug-only service in KNOWN_STREAMING_SERVICES when tmdb_id is null`() {
             val entry = TraktWatchedEntry(TraktShow("Test Show", 2024, TraktIds(tmdb = null, slug = "test-show")))
             val result = viewModel.resolveDeepLink(entry, emptyList())
-            // Netflix and Disney+ fail (need tmdb_id); Prime Video succeeds with slug
             assertNotNull(result)
             assertTrue(result!!.contains("test-show"))
         }

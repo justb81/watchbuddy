@@ -11,6 +11,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -20,45 +21,74 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.ui.graphics.Color
 import androidx.tv.material3.*
+import coil.compose.AsyncImage
 import com.justb81.watchbuddy.R
-import com.justb81.watchbuddy.core.model.TraktWatchedEntry
+import com.justb81.watchbuddy.core.model.EnrichedShowEntry
+import com.justb81.watchbuddy.core.tmdb.TmdbImageHelper
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun ShowDetailScreen(
-    entry: TraktWatchedEntry,
+    enriched: EnrichedShowEntry,
     onRecapClick: () -> Unit,
     onBack: () -> Unit,
     viewModel: ShowDetailViewModel = hiltViewModel()
 ) {
-    val context      = LocalContext.current
-    val lastSeason   = entry.seasons.maxByOrNull { it.number }
-    val lastEpisode  = lastSeason?.episodes?.maxByOrNull { it.number }
-    val nextSeason   = lastSeason?.number ?: 1
-    val nextEpisode  = (lastEpisode?.number ?: 0) + 1
-
-    val services by viewModel.availableServices.collectAsState(initial = emptyList())
+    val context       = LocalContext.current
+    val entry         = enriched.entry
+    val nextEpisodeUi by viewModel.nextEpisode.collectAsState()
+    val services      by viewModel.availableServices.collectAsState(initial = emptyList())
     val watchNowFocus = remember { FocusRequester() }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(entry.show.ids.trakt) {
+        viewModel.loadNextEpisode(enriched)
         watchNowFocus.requestFocus()
     }
+
+    // Fallback next-episode code derived from Trakt data when TMDB fetch is still loading or failed.
+    val fallbackCode = remember(entry) {
+        val lastSeason  = entry.seasons.maxByOrNull { it.number }
+        val lastEpisode = lastSeason?.episodes?.maxByOrNull { it.number }
+        val ns = lastSeason?.number ?: 1
+        val ne = (lastEpisode?.number ?: 0) + 1
+        "S%02dE%02d".format(ns, ne)
+    }
+    val episodeCode  = nextEpisodeUi.episodeCode ?: fallbackCode
+    val episodeTitle = nextEpisodeUi.episodeName
+
+    // Image: still → poster → placeholder
+    val imageUrl = nextEpisodeUi.stillUrl
+        ?: TmdbImageHelper.poster(enriched.posterPath, 500)
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        // Background poster area (left 40%)
+        // Left panel — still image with poster fallback
         Box(
             modifier = Modifier
                 .fillMaxHeight()
                 .fillMaxWidth(0.4f)
-                .background(MaterialTheme.colorScheme.surface)
                 .align(Alignment.CenterStart)
-        )
+        ) {
+            if (imageUrl != null) {
+                AsyncImage(
+                    model = imageUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.surface)
+                )
+            }
+        }
 
-        // Gradient overlay
+        // Gradient overlay (left-to-right fade into background)
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -105,22 +135,26 @@ fun ShowDetailScreen(
 
             Spacer(Modifier.height(8.dp))
 
-            // Next episode label
+            // Next episode section
             Text(
                 text     = stringResource(R.string.tv_next_episode),
                 fontSize = 14.sp,
                 color    = Color.White.copy(alpha = 0.5f)
             )
+            // Episode title (actual name or fallback label)
             Text(
-                text       = stringResource(
-                    R.string.tv_episode_label,
-                    nextSeason,
-                    nextEpisode,
-                    stringResource(R.string.tv_next_episode)
-                ),
+                text       = episodeTitle ?: stringResource(R.string.tv_next_episode),
                 fontSize   = 20.sp,
                 fontWeight = FontWeight.SemiBold,
-                color      = Color.White
+                color      = Color.White,
+                maxLines   = 2,
+                overflow   = TextOverflow.Ellipsis
+            )
+            // Episode code (SxxExx) as secondary line
+            Text(
+                text     = episodeCode,
+                fontSize = 14.sp,
+                color    = Color.White.copy(alpha = 0.6f)
             )
 
             Spacer(Modifier.height(8.dp))
