@@ -1,7 +1,6 @@
 package com.justb81.watchbuddy.phone.ui.home
 
 import android.content.res.Configuration
-import android.text.format.DateUtils
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -32,6 +31,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
@@ -47,9 +47,8 @@ import com.justb81.watchbuddy.phone.permissions.BluetoothAdvertisePermission
 import com.justb81.watchbuddy.phone.permissions.NotificationPermission
 import com.justb81.watchbuddy.phone.permissions.rememberBluetoothAdvertisePermissionRequest
 import com.justb81.watchbuddy.phone.permissions.rememberNotificationPermissionRequest
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneId
+import com.justb81.watchbuddy.phone.ui.util.relativeDate
+import com.justb81.watchbuddy.phone.ui.util.relativeTime
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -679,30 +678,68 @@ private fun ShelfCard(
 private fun ProgressLines(progress: ShowProgress?, compact: Boolean = false) {
     val context = LocalContext.current
     val now = System.currentTimeMillis()
-    val textColor = if (compact)
+    val labelColor = if (compact)
+        Color.White.copy(alpha = 0.6f)
+    else
+        MaterialTheme.colorScheme.onSurfaceVariant
+    val valueColor = if (compact)
         Color.White.copy(alpha = 0.85f)
     else
-        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-    val style = if (compact) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodySmall
+        MaterialTheme.colorScheme.onSurface
+    val labelStyle = MaterialTheme.typography.labelSmall
+    val valueStyle = if (compact) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodyMedium
+    val singleLineStyle = if (compact) MaterialTheme.typography.labelSmall else MaterialTheme.typography.bodySmall
+    val singleLineColor = if (compact) Color.White.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
 
     when (progress) {
         is ShowProgress.InProgress -> {
-            Text(
-                text = stringResource(
-                    R.string.home_last_watched,
-                    progress.latestWatchedLabel,
-                    relativeTime(context, progress.latestWatched, now)
-                ),
-                style = style, color = textColor, maxLines = 1
-            )
-            Text(
-                text = stringResource(
-                    R.string.home_last_aired_episode,
-                    progress.lastAiredLabel,
-                    relativeDate(context, progress.lastAired, now)
-                ),
-                style = style, color = textColor, maxLines = 1
-            )
+            if (compact) {
+                Text(
+                    text = "${progress.latestWatchedLabel} · ${relativeTime(context, progress.latestWatched, now)}",
+                    style = labelStyle, color = valueColor, maxLines = 1, overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = "${progress.lastAiredLabel} · ${relativeDate(context, progress.lastAired, now)}",
+                    style = labelStyle, color = valueColor, maxLines = 1, overflow = TextOverflow.Ellipsis
+                )
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        Text(
+                            text = stringResource(R.string.home_label_last_watched),
+                            style = labelStyle,
+                            color = labelColor
+                        )
+                        Text(
+                            text = "${progress.latestWatchedLabel} · ${relativeTime(context, progress.latestWatched, now)}",
+                            style = valueStyle,
+                            color = valueColor,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        Text(
+                            text = stringResource(R.string.home_label_last_aired),
+                            style = labelStyle,
+                            color = labelColor
+                        )
+                        Text(
+                            text = "${progress.lastAiredLabel} · ${relativeDate(context, progress.lastAired, now)}",
+                            style = valueStyle,
+                            color = valueColor,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
         }
         is ShowProgress.CaughtUpAiring -> {
             if (progress.latestWatchedLabel != null && progress.latestWatched != null) {
@@ -712,7 +749,7 @@ private fun ProgressLines(progress: ShowProgress?, compact: Boolean = false) {
                         progress.latestWatchedLabel!!,
                         relativeTime(context, progress.latestWatched!!, now)
                     ),
-                    style = style, color = textColor, maxLines = 1
+                    style = singleLineStyle, color = singleLineColor, maxLines = 1
                 )
             }
             Text(
@@ -721,14 +758,14 @@ private fun ProgressLines(progress: ShowProgress?, compact: Boolean = false) {
                     progress.nextAiredLabel.substringAfter('S').substringBefore('E').toIntOrNull() ?: 0,
                     progress.nextAiredLabel.substringAfter('E').toIntOrNull() ?: 0
                 ),
-                style = style, color = textColor, maxLines = 1
+                style = singleLineStyle, color = singleLineColor, maxLines = 1
             )
         }
         is ShowProgress.CaughtUpEnded -> {
             progress.latestWatched?.let {
                 Text(
                     text = stringResource(R.string.home_show_ended_caught_up, relativeTime(context, it, now)),
-                    style = style, color = textColor, maxLines = 1
+                    style = singleLineStyle, color = singleLineColor, maxLines = 1
                 )
             }
         }
@@ -738,7 +775,7 @@ private fun ProgressLines(progress: ShowProgress?, compact: Boolean = false) {
                 val e = label.substringAfter('E').toIntOrNull() ?: 0
                 Text(
                     text = stringResource(R.string.home_next_episode, s, e),
-                    style = style, color = textColor, maxLines = 1
+                    style = singleLineStyle, color = singleLineColor, maxLines = 1
                 )
             }
         }
@@ -805,37 +842,3 @@ private fun BadgePill(
     }
 }
 
-/**
- * Formats a moment in time relative to [now]. Uses [DateUtils.getRelativeTimeSpanString]
- * when more than a day has passed, otherwise returns a localized "today / yesterday / tomorrow" string.
- */
-private fun relativeTime(context: android.content.Context, moment: Instant, now: Long): String {
-    val momentMs = moment.toEpochMilli()
-    val delta = momentMs - now
-    val dayMs = 24 * 60 * 60 * 1000L
-    return when {
-        delta in -dayMs..dayMs -> context.getString(R.string.home_time_today)
-        delta in -2 * dayMs..-dayMs -> context.getString(R.string.home_time_yesterday)
-        delta in dayMs..2 * dayMs -> context.getString(R.string.home_time_tomorrow)
-        else -> DateUtils.getRelativeTimeSpanString(
-            momentMs, now, DateUtils.DAY_IN_MILLIS, DateUtils.FORMAT_ABBREV_RELATIVE
-        ).toString()
-    }
-}
-
-/**
- * Same as [relativeTime] but for TMDB `air_date` (day-precision) values interpreted as
- * local midnight to avoid "in 0 days" when the value is today.
- */
-private fun relativeDate(context: android.content.Context, moment: Instant, now: Long): String {
-    val today = LocalDate.now(ZoneId.systemDefault())
-    val day = moment.atZone(ZoneId.systemDefault()).toLocalDate()
-    return when {
-        day.isEqual(today) -> context.getString(R.string.home_time_today)
-        day.isEqual(today.minusDays(1)) -> context.getString(R.string.home_time_yesterday)
-        day.isEqual(today.plusDays(1)) -> context.getString(R.string.home_time_tomorrow)
-        else -> DateUtils.getRelativeTimeSpanString(
-            moment.toEpochMilli(), now, DateUtils.DAY_IN_MILLIS, DateUtils.FORMAT_ABBREV_RELATIVE
-        ).toString()
-    }
-}

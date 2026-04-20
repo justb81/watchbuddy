@@ -43,6 +43,8 @@
     <string name="home_just_now">Just now</string>
     <string name="home_last_watched">Last watched: %1$s, %2$s</string>
     <string name="home_last_aired_episode">Last aired: %1$s, %2$s</string>
+    <string name="home_label_last_watched">Last watched</string>
+    <string name="home_label_last_aired">Last aired</string>
     <string name="home_time_today">today</string>
     <string name="home_time_tomorrow">tomorrow</string>
     <string name="home_time_yesterday">yesterday</string>
