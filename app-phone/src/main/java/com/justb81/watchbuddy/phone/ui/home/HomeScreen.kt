@@ -3,6 +3,7 @@ package com.justb81.watchbuddy.phone.ui.home
 import android.content.res.Configuration
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -16,6 +17,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
@@ -30,6 +32,8 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -302,13 +306,23 @@ private fun HomeContent(
                         contentPadding = PaddingValues(horizontal = 4.dp)
                     ) {
                         items(continueWatching, key = { it.entry.show.ids.trakt ?: it.entry.show.title }) { enriched ->
-                            ShelfCard(enriched, state.progress[enriched.entry.show.ids.trakt], onShowClick)
+                            ShelfCard(
+                                enriched,
+                                state.progress[enriched.entry.show.ids.trakt],
+                                state.hasNewSeason[enriched.entry.show.ids.trakt] == true,
+                                onShowClick
+                            )
                         }
                     }
                 }
             } else {
                 items(continueWatching, key = { it.entry.show.ids.trakt ?: it.entry.show.title }) { enriched ->
-                    ShowRowCard(enriched, state.progress[enriched.entry.show.ids.trakt], onShowClick)
+                    ShowRowCard(
+                        enriched,
+                        state.progress[enriched.entry.show.ids.trakt],
+                        state.hasNewSeason[enriched.entry.show.ids.trakt] == true,
+                        onShowClick
+                    )
                 }
             }
         }
@@ -329,13 +343,23 @@ private fun HomeContent(
                         contentPadding = PaddingValues(horizontal = 4.dp)
                     ) {
                         items(allOthers, key = { it.entry.show.ids.trakt ?: it.entry.show.title }) { enriched ->
-                            ShelfCard(enriched, state.progress[enriched.entry.show.ids.trakt], onShowClick)
+                            ShelfCard(
+                                enriched,
+                                state.progress[enriched.entry.show.ids.trakt],
+                                state.hasNewSeason[enriched.entry.show.ids.trakt] == true,
+                                onShowClick
+                            )
                         }
                     }
                 }
             } else {
                 items(allOthers, key = { it.entry.show.ids.trakt ?: it.entry.show.title }) { enriched ->
-                    ShowRowCard(enriched, state.progress[enriched.entry.show.ids.trakt], onShowClick)
+                    ShowRowCard(
+                        enriched,
+                        state.progress[enriched.entry.show.ids.trakt],
+                        state.hasNewSeason[enriched.entry.show.ids.trakt] == true,
+                        onShowClick
+                    )
                 }
             }
         }
@@ -566,16 +590,22 @@ private fun NowWatchingCard(event: ScrobbleDisplayEvent) {
 private fun ShowRowCard(
     enriched: EnrichedShowEntry,
     progress: ShowProgress?,
+    hasNewSeason: Boolean,
     onShowClick: (Int) -> Unit
 ) {
     val entry = enriched.entry
     val posterUrl = TmdbImageHelper.poster(enriched.posterPath, 300)
+    val cardShape = RoundedCornerShape(12.dp)
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .then(
+                if (hasNewSeason) Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, cardShape)
+                else Modifier
+            )
             .clickable { entry.show.ids.trakt?.let(onShowClick) },
-        shape    = RoundedCornerShape(12.dp),
+        shape    = cardShape,
         colors   = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant
         )
@@ -607,12 +637,19 @@ private fun ShowRowCard(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Text(
-                    text       = entry.show.title,
-                    style      = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color      = MaterialTheme.colorScheme.onSurface
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text       = entry.show.title,
+                        style      = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color      = MaterialTheme.colorScheme.onSurface,
+                        modifier   = Modifier.weight(1f, fill = false)
+                    )
+                    if (hasNewSeason) NewSeasonBadge()
+                }
                 ProgressLines(progress)
             }
 
@@ -625,6 +662,7 @@ private fun ShowRowCard(
 private fun ShelfCard(
     enriched: EnrichedShowEntry,
     progress: ShowProgress?,
+    hasNewSeason: Boolean,
     onShowClick: (Int) -> Unit
 ) {
     val entry = enriched.entry
@@ -635,6 +673,10 @@ private fun ShelfCard(
             .width(180.dp)
             .aspectRatio(2f / 3f)
             .clip(RoundedCornerShape(12.dp))
+            .then(
+                if (hasNewSeason) Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp))
+                else Modifier
+            )
             .clickable { entry.show.ids.trakt?.let(onShowClick) }
     ) {
         if (posterUrl != null) {
@@ -667,6 +709,11 @@ private fun ShelfCard(
                 maxLines = 2
             )
             ProgressLines(progress, compact = true)
+        }
+        if (hasNewSeason) {
+            Box(modifier = Modifier.align(Alignment.TopStart).padding(6.dp)) {
+                NewSeasonBadge()
+            }
         }
         Box(modifier = Modifier.align(Alignment.TopEnd).padding(6.dp)) {
             ProgressBadge(progress)
@@ -810,6 +857,25 @@ private fun ProgressBadge(progress: ShowProgress?) {
             content = MaterialTheme.colorScheme.primary
         )
         is ShowProgress.Unknown, null -> Unit
+    }
+}
+
+@Composable
+private fun NewSeasonBadge() {
+    val description = stringResource(R.string.home_new_season_available_cd)
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(MaterialTheme.colorScheme.primary)
+            .padding(4.dp)
+            .semantics { contentDescription = description }
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Star,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onPrimary,
+            modifier = Modifier.size(12.dp)
+        )
     }
 }
 

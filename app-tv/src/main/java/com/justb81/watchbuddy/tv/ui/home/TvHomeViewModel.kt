@@ -43,6 +43,8 @@ data class TvHomeUiState(
     val allShows: List<EnrichedShowEntry> = emptyList(),
     /** Progress keyed by Trakt id. */
     val progress: Map<Int, ShowProgress> = emptyMap(),
+    /** True for shows where the next unwatched episode is S(n+1)E01, keyed by Trakt id. */
+    val hasNewSeason: Map<Int, Boolean> = emptyMap(),
     val connectedPhones: Int = 0,
     val activeViewers: List<ActiveViewer> = emptyList(),
     val noPhoneConnected: Boolean = false,
@@ -185,6 +187,7 @@ class TvHomeViewModel @Inject constructor(
                         continueWatching = continueWatching,
                         allShows = otherShows,
                         progress = computeProgress(allShows),
+                        hasNewSeason = computeHasNewSeason(allShows),
                         canLoadMore = hasMore
                     )
                 }
@@ -212,6 +215,7 @@ class TvHomeViewModel @Inject constructor(
                             continueWatching = cw,
                             allShows = others,
                             progress = computeProgress(cached),
+                            hasNewSeason = computeHasNewSeason(cached),
                             noPhoneConnected = true,
                             canLoadMore = false
                         )
@@ -233,6 +237,7 @@ class TvHomeViewModel @Inject constructor(
                             continueWatching = cw,
                             allShows = others,
                             progress = computeProgress(cached),
+                            hasNewSeason = computeHasNewSeason(cached),
                             phoneApiError = reason.phoneFound,
                             error = reason.message,
                             canLoadMore = false
@@ -269,6 +274,13 @@ class TvHomeViewModel @Inject constructor(
         shows.mapNotNull { enriched ->
             enriched.entry.show.ids.trakt?.let { id ->
                 id to ShowProgressCalculator.compute(enriched.entry, enriched.tmdb)
+            }
+        }.toMap()
+
+    private fun computeHasNewSeason(shows: List<EnrichedShowEntry>): Map<Int, Boolean> =
+        shows.mapNotNull { enriched ->
+            enriched.entry.show.ids.trakt?.let { id ->
+                id to ShowProgressCalculator.hasNewSeasonAvailable(enriched.entry, enriched.tmdb)
             }
         }.toMap()
 

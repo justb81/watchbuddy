@@ -51,6 +51,7 @@
     <string name="home_caught_up">Al día</string>
     <string name="home_show_completed">Terminada</string>
     <string name="home_not_started">No iniciada</string>
+    <string name="home_new_season_available_cd">Nueva temporada disponible</string>
     <string name="home_show_ended_caught_up">Terminada %1$s</string>
     <string name="home_section_expand">Expandir sección</string>
     <string name="home_section_collapse">Contraer sección</string>

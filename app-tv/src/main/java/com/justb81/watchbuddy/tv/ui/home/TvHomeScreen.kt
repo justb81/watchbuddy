@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -170,6 +171,7 @@ private fun TvHomeShelves(
                         TvShowCard(
                             enriched = enriched,
                             progress = enriched.entry.show.ids.trakt?.let { state.progress[it] },
+                            hasNewSeason = enriched.entry.show.ids.trakt?.let { state.hasNewSeason[it] } == true,
                             onClick = { onShowClick(enriched.entry) }
                         )
                     }
@@ -195,6 +197,7 @@ private fun TvHomeShelves(
                         TvShowCard(
                             enriched = enriched,
                             progress = enriched.entry.show.ids.trakt?.let { state.progress[it] },
+                            hasNewSeason = enriched.entry.show.ids.trakt?.let { state.hasNewSeason[it] } == true,
                             onClick = { onShowClick(enriched.entry) }
                         )
                     }
@@ -334,6 +337,7 @@ internal fun showCardContentDescription(
 private fun TvShowCard(
     enriched: EnrichedShowEntry,
     progress: ShowProgress?,
+    hasNewSeason: Boolean,
     onClick: () -> Unit
 ) {
     val entry = enriched.entry
@@ -390,10 +394,34 @@ private fun TvShowCard(
                 TvProgressLines(progress)
             }
 
+            if (hasNewSeason) {
+                Box(modifier = Modifier.align(Alignment.TopStart).padding(6.dp)) {
+                    TvNewSeasonBadge()
+                }
+            }
             Box(modifier = Modifier.align(Alignment.TopEnd).padding(6.dp)) {
                 TvProgressBadge(progress)
             }
         }
+    }
+}
+
+@Composable
+private fun TvNewSeasonBadge() {
+    val description = stringResource(R.string.tv_new_season_available_cd)
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(MaterialTheme.colorScheme.primary)
+            .padding(4.dp)
+            .clearAndSetSemantics { contentDescription = description }
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Star,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onPrimary,
+            modifier = Modifier.size(10.dp)
+        )
     }
 }
 
