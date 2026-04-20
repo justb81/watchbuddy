@@ -191,7 +191,7 @@ The `release-please--` prefix is reserved for the automated release-please bot �
 
 ### Monitoring PR checks & accessing build logs
 
-The MCP toolset has **no** `get_workflow_run_logs` / `list_workflow_runs` / `download_artifact` tool, and raw GitHub Actions log URLs require auth that agents do not have — the Actions UI is a dead end for automated agents. To close that gap, `build-android.yml` and `test-backend.yml` each have an `if: failure()` step that (a) posts a filtered failure excerpt as a PR comment and (b) commits the unfiltered full log to the dedicated `ci-logs` branch. Both channels are reachable through MCP.
+The MCP toolset has **no** `get_workflow_run_logs` / `list_workflow_runs` / `download_artifact` tool, and raw GitHub Actions log URLs require auth that agents do not have. To close that gap, `build-android.yml` and `test-backend.yml` each have an `if: failure()` step that posts a filtered failure excerpt as a PR comment — agents read it through MCP like any other comment. Most failures are caught locally before this matters (see § "Local pre-commit checks").
 
 **1. Check overall CI status first:**
 
@@ -207,15 +207,9 @@ The MCP toolset has **no** `get_workflow_run_logs` / `list_workflow_runs` / `dow
 - Excerpts are upserted per run — always read the latest comment with the marker.
 - The excerpt is a regex-filtered slice (gradle `FAILED` / detekt violations / Android Lint `Error:` / JUnit `<failure>` / ESLint error lines / Prettier mismatches / JVM stack traces) with ~20 lines of surrounding context per match, capped at ~55 000 chars.
 
-**3. Fetch the full unfiltered log:**
+**3. Wait for CI without polling:** subscribe with `mcp__github__subscribe_pr_activity` and react to the CI completion webhook event instead of polling `get_check_runs`.
 
-- `mcp__github__get_file_contents` with `owner: "justb81"`, `repo: "watchbuddy"`, `ref: "ci-logs"`, `path: "pr-<PR_NUMBER>/run-<RUN_ID>-<JOB_NAME>.log"`. The exact path is printed at the top of the failure-excerpt comment.
-- Use this when the 20-line filter context misses the root cause (e.g. a warning emitted much earlier in the log).
-- The `ci-logs` branch is pruned weekly by `ci-logs-prune.yml`, which deletes log directories belonging to closed/merged PRs.
-
-**4. Wait for CI without polling:** subscribe with `mcp__github__subscribe_pr_activity` and react to the CI completion webhook event instead of polling `get_check_runs`.
-
-**5. Last-resort fallback:** if even the full log doesn't explain the failure, surface the failing check's `details_url` to the user and stop — do not attempt to scrape GitHub Actions HTML.
+**4. Last-resort fallback:** if the filtered excerpt doesn't explain the failure, surface the failing check's `details_url` (or the `Actions log:` link at the top of the comment) to the user and stop — do not attempt to scrape GitHub Actions HTML.
 
 ### Versioning
 - release-please with Conventional Commits (`feat:`, `fix:`, `chore:`, etc.)
