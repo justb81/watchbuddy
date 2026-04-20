@@ -41,14 +41,10 @@
     <ID>MagicNumber:DiagnosticsScreen.kt$60_000</ID>
     <ID>MagicNumber:FallbackProvider.kt$FallbackProvider$4</ID>
     <ID>MagicNumber:FallbackProvider.kt$FallbackProvider$6</ID>
-    <ID>MagicNumber:HomeScreen.kt$1000L</ID>
     <ID>MagicNumber:HomeScreen.kt$180f</ID>
-    <ID>MagicNumber:HomeScreen.kt$2</ID>
-    <ID>MagicNumber:HomeScreen.kt$24</ID>
     <ID>MagicNumber:HomeScreen.kt$300</ID>
     <ID>MagicNumber:HomeScreen.kt$3f</ID>
     <ID>MagicNumber:HomeScreen.kt$500</ID>
-    <ID>MagicNumber:HomeScreen.kt$60</ID>
     <ID>MagicNumber:HomeViewModel.kt$HomeViewModel$401</ID>
     <ID>MagicNumber:HomeViewModel.kt$HomeViewModel$403</ID>
     <ID>MagicNumber:InitialsAvatar.kt$0xFF26A69A</ID>
@@ -83,12 +79,10 @@
     <ID>MultiLineIfElse:DiagnosticsScreen.kt$Status.OK</ID>
     <ID>MultiLineIfElse:DiagnosticsScreen.kt$stringResource(R.string.diagnostics_value_no)</ID>
     <ID>MultiLineIfElse:DiagnosticsScreen.kt$stringResource(R.string.diagnostics_value_yes)</ID>
-    <ID>MultiLineIfElse:HomeScreen.kt$Color.White.copy(alpha = 0.85f)</ID>
     <ID>MultiLineIfElse:HomeScreen.kt$MaterialTheme.colorScheme.onPrimaryContainer</ID>
     <ID>MultiLineIfElse:HomeScreen.kt$MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)</ID>
     <ID>MultiLineIfElse:HomeScreen.kt$MaterialTheme.colorScheme.onSurface</ID>
     <ID>MultiLineIfElse:HomeScreen.kt$MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)</ID>
-    <ID>MultiLineIfElse:HomeScreen.kt$MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)</ID>
     <ID>MultiLineIfElse:HomeScreen.kt$MaterialTheme.colorScheme.onSurfaceVariant</ID>
     <ID>MultiLineIfElse:HomeScreen.kt$MaterialTheme.colorScheme.primaryContainer</ID>
     <ID>MultiLineIfElse:HomeScreen.kt$MaterialTheme.colorScheme.surfaceVariant</ID>
