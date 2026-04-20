@@ -267,6 +267,94 @@ class ShowProgressCalculatorTest {
     }
 
     @Nested
+    @DisplayName("isCompleted")
+    inner class IsCompletedTest {
+
+        private fun seasons(vararg counts: Pair<Int, Int>) =
+            counts.map { (season, count) -> TmdbSeasonSummary(season, count) }
+
+        @Test
+        fun `returns false when hint is null`() {
+            val e = entry(Triple(1, 1, "2024-01-01T10:00:00Z"), Triple(1, 2, "2024-01-02T10:00:00Z"))
+            assertFalse(ShowProgressCalculator.isCompleted(e, null))
+        }
+
+        @Test
+        fun `returns false when airedRegular is zero (upcoming series)`() {
+            val e = entry()
+            val h = hint(seasons = seasons(1 to 0))
+            assertFalse(ShowProgressCalculator.isCompleted(e, h))
+        }
+
+        @Test
+        fun `returns false when no episodes watched`() {
+            val e = entry()
+            val h = hint(seasons = seasons(1 to 5))
+            assertFalse(ShowProgressCalculator.isCompleted(e, h))
+        }
+
+        @Test
+        fun `returns false when partially watched`() {
+            val e = entry(Triple(1, 1, "2024-01-01T10:00:00Z"), Triple(1, 2, "2024-01-02T10:00:00Z"))
+            val h = hint(seasons = seasons(1 to 5))
+            assertFalse(ShowProgressCalculator.isCompleted(e, h))
+        }
+
+        @Test
+        fun `returns true when all regular episodes watched`() {
+            val e = entry(
+                Triple(1, 1, "2024-01-01T10:00:00Z"),
+                Triple(1, 2, "2024-01-02T10:00:00Z"),
+                Triple(2, 1, "2024-02-01T10:00:00Z")
+            )
+            val h = hint(seasons = seasons(1 to 2, 2 to 1))
+            assertTrue(ShowProgressCalculator.isCompleted(e, h))
+        }
+
+        @Test
+        fun `returns true when Trakt is ahead of TMDB (watched count exceeds aired)`() {
+            // Stale TMDB: user has watched 3 but TMDB says only 2 aired.
+            val e = entry(
+                Triple(1, 1, "2024-01-01T10:00:00Z"),
+                Triple(1, 2, "2024-01-02T10:00:00Z"),
+                Triple(1, 3, "2024-01-03T10:00:00Z")
+            )
+            val h = hint(seasons = seasons(1 to 2))
+            assertTrue(ShowProgressCalculator.isCompleted(e, h))
+        }
+
+        @Test
+        fun `specials (S0) are excluded from both aired and watched counts`() {
+            // Only S0 aired (no regular episodes) → not completed.
+            val e = entry(Triple(0, 1, "2024-01-01T10:00:00Z"))
+            val h = hint(seasons = seasons(0 to 5))
+            assertFalse(ShowProgressCalculator.isCompleted(e, h))
+        }
+
+        @Test
+        fun `specials watched alongside regulars do not inflate watched count`() {
+            // 1 regular aired, 1 regular watched + 1 special watched → completed
+            val e = entry(
+                Triple(0, 1, "2024-01-01T10:00:00Z"), // special
+                Triple(1, 1, "2024-02-01T10:00:00Z")  // regular
+            )
+            val h = hint(seasons = seasons(0 to 5, 1 to 1))
+            assertTrue(ShowProgressCalculator.isCompleted(e, h))
+        }
+
+        @Test
+        fun `multi-season show partially watched is not completed`() {
+            val e = entry(
+                Triple(1, 1, "2024-01-01T10:00:00Z"),
+                Triple(1, 2, "2024-01-02T10:00:00Z"),
+                Triple(2, 1, "2024-02-01T10:00:00Z")
+            )
+            val h = hint(seasons = seasons(1 to 2, 2 to 3))
+            assertFalse(ShowProgressCalculator.isCompleted(e, h))
+        }
+    }
+
+    @Nested
     @DisplayName("CaughtUp")
     inner class CaughtUpTest {
         @Test

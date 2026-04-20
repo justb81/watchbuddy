@@ -120,6 +120,24 @@ object ShowProgressCalculator {
     fun latestWatchedInstant(entry: TraktWatchedEntry): Instant? =
         latestWatched(entry)?.instant
 
+    /**
+     * Returns true when every aired regular episode has been watched.
+     * Requires a TMDB hint to know how many regular episodes have aired; returns false when
+     * hint is null or no regular episodes have aired yet (upcoming series).
+     * Uses >= instead of == to stay correct when Trakt is fresher than the cached TMDB data.
+     */
+    fun isCompleted(entry: TraktWatchedEntry, hint: TmdbProgressHint?): Boolean {
+        if (hint == null) return false
+        val airedRegular = hint.seasons
+            .filter { isRegularSeason(it.season_number) }
+            .sumOf { it.episode_count }
+        if (airedRegular == 0) return false
+        val watchedRegular = entry.seasons
+            .filter { isRegularSeason(it.number) }
+            .sumOf { it.episodes.size }
+        return watchedRegular >= airedRegular
+    }
+
     private data class WatchedRef(val season: Int, val episode: Int, val instant: Instant) {
         val label: String get() = formatLabel(season, episode)
     }
