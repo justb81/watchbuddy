@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Shared pre-commit hook. Enable once per clone:
+#   git config core.hooksPath .githooks
+# Delegates to scripts/precommit.sh so the check logic stays invokable
+# outside the hook too.
+exec "$(git rev-parse --show-toplevel)/scripts/precommit.sh"
