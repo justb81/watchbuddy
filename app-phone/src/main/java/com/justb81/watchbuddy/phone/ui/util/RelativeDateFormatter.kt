@@ -12,6 +12,7 @@ import kotlin.math.abs
 
 internal const val DAY_MS = 24L * 60 * 60 * 1000
 internal const val WEEK_MS = 7 * DAY_MS
+private const val TWO_DAYS_MS = 2 * DAY_MS
 
 private val shortDateFormatter get() = DateTimeFormatter.ofPattern("d MMM", Locale.getDefault())
 
@@ -36,8 +37,8 @@ internal fun formatRelativeTime(
     val delta = momentMs - now
     return when {
         delta in -DAY_MS..DAY_MS -> todayStr
-        delta in -2 * DAY_MS..-DAY_MS -> yesterdayStr
-        delta in DAY_MS..2 * DAY_MS -> tomorrowStr
+        delta in -TWO_DAYS_MS..-DAY_MS -> yesterdayStr
+        delta in DAY_MS..TWO_DAYS_MS -> tomorrowStr
         abs(delta) > WEEK_MS -> Instant.ofEpochMilli(momentMs)
             .atZone(ZoneId.systemDefault())
             .toLocalDate()

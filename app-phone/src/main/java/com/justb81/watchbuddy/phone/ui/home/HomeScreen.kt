@@ -839,4 +839,3 @@ private fun BadgePill(
         Text(text = text, style = MaterialTheme.typography.labelSmall, color = content)
     }
 }
-
