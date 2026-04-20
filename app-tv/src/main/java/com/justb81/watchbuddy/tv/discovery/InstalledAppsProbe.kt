@@ -24,6 +24,12 @@ class InstalledAppsProbe @Inject constructor(
 ) {
     @Volatile private var cachedPackages: Set<String>? = null
 
+    private val packageChangeReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            cachedPackages = null
+        }
+    }
+
     init {
         val filter = IntentFilter().apply {
             addAction(Intent.ACTION_PACKAGE_ADDED)
@@ -31,12 +37,6 @@ class InstalledAppsProbe @Inject constructor(
             addDataScheme("package")
         }
         context.registerReceiver(packageChangeReceiver, filter)
-    }
-
-    private val packageChangeReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context, intent: Intent) {
-            cachedPackages = null
-        }
     }
 
     fun isInstalled(packageName: String): Boolean = getInstalledPackages().contains(packageName)
