@@ -150,7 +150,7 @@ The only exceptions are **localization string resources** (`values-de/`, `values
 2. Create a feature branch from `main`
 3. Make changes and commit using Conventional Commits (see below)
 4. Push the branch and open a PR against `main`
-5. **Wait for a green CI build** (`build-android.yml`) — do not continue if the build is red; fix the issue first
+5. **Wait for a green CI build** (`build-android.yml`) — do not continue if the build is red; fix the issue first (see "Monitoring PR checks & accessing build logs" below)
 6. **Auto-merge when green.** Once every required build step on the PR has completed successfully, the agent may merge the PR into `main` automatically (e.g. via `enable_pr_auto_merge` or by merging directly after CI passes). Use a squash merge and delete the branch after merge.
 7. If CI fails or a required check is still pending, do NOT merge — fix the failure or wait.
 
@@ -167,6 +167,34 @@ The only exceptions are **localization string resources** (`values-de/`, `values
 | Release (automated) | `release-please--` | `release-please--branches--main` |
 
 The `release-please--` prefix is reserved for the automated release-please bot — never create branches with this prefix manually.
+
+### Monitoring PR checks & accessing build logs
+
+The MCP toolset has **no** `get_workflow_run_logs` / `list_workflow_runs` / `download_artifact` tool, and raw GitHub Actions log URLs require auth that agents do not have — the Actions UI is a dead end for automated agents. To close that gap, `build-android.yml` and `test-backend.yml` each have an `if: failure()` step that (a) posts a filtered failure excerpt as a PR comment and (b) commits the unfiltered full log to the dedicated `ci-logs` branch. Both channels are reachable through MCP.
+
+**1. Check overall CI status first:**
+
+- `mcp__github__pull_request_read` with `method: "get_check_runs"` → per-job `status` / `conclusion` / `details_url`. Expect `Test & Build` (from `build-android.yml`) and `Backend Tests` (from `test-backend.yml`); the `changes` path-filter jobs may legitimately be skipped.
+- `mcp__github__pull_request_read` with `method: "get_status"` → compact combined commit status.
+
+**2. Read the filtered failure excerpt via PR comments:**
+
+- `mcp__github__pull_request_read` with `method: "get_comments"`. Match by marker at the start of `body`:
+  - `<!-- watchbuddy-build-log -->` — Android build / detekt / Android Lint / unit-test failure from `build-android.yml`.
+  - `<!-- watchbuddy-backend-log -->` — ESLint / Prettier / Jest failure from `test-backend.yml`.
+  - `<!-- watchbuddy-lint-report -->` — per-module detekt + Android Lint finding counts (separate concern, see § Static analysis); useful when CI is green-but-noisy rather than red.
+- Excerpts are upserted per run — always read the latest comment with the marker.
+- The excerpt is a regex-filtered slice (gradle `FAILED` / detekt violations / Android Lint `Error:` / JUnit `<failure>` / ESLint error lines / Prettier mismatches / JVM stack traces) with ~20 lines of surrounding context per match, capped at ~55 000 chars.
+
+**3. Fetch the full unfiltered log:**
+
+- `mcp__github__get_file_contents` with `owner: "justb81"`, `repo: "watchbuddy"`, `ref: "ci-logs"`, `path: "pr-<PR_NUMBER>/run-<RUN_ID>-<JOB_NAME>.log"`. The exact path is printed at the top of the failure-excerpt comment.
+- Use this when the 20-line filter context misses the root cause (e.g. a warning emitted much earlier in the log).
+- The `ci-logs` branch is pruned weekly by `ci-logs-prune.yml`, which deletes log directories belonging to closed/merged PRs.
+
+**4. Wait for CI without polling:** subscribe with `mcp__github__subscribe_pr_activity` and react to the CI completion webhook event instead of polling `get_check_runs`.
+
+**5. Last-resort fallback:** if even the full log doesn't explain the failure, surface the failing check's `details_url` to the user and stop — do not attempt to scrape GitHub Actions HTML.
 
 ### Versioning
 - release-please with Conventional Commits (`feat:`, `fix:`, `chore:`, etc.)

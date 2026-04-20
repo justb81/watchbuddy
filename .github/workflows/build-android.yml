@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pull-requests: write
   security-events: write
   actions: read
@@ -216,3 +216,133 @@ jobs:
         with:
           name: watchbuddy-tv-debug
           path: app-tv/build/outputs/apk/debug/*.apk
+
+      # Surface the failing job's raw log to PR reviewers (humans) and to
+      # automated agents (MCP). Posts a filtered failure excerpt as a PR
+      # comment keyed by the `<!-- watchbuddy-build-log -->` marker, and
+      # commits the full unfiltered log to the dedicated `ci-logs` branch
+      # where agents can fetch it via `get_file_contents`.
+      # See CLAUDE.md § "Monitoring PR checks & accessing build logs".
+      - name: Post failing build log
+        if: failure() && github.event_name == 'pull_request'
+        uses: actions/github-script@v8
+        env:
+          MARKER: '<!-- watchbuddy-build-log -->'
+          CURRENT_JOB: ${{ github.job }}
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const run_id = context.runId;
+            const pr = context.issue.number;
+
+            const jobs = await github.paginate(
+              github.rest.actions.listJobsForWorkflowRun,
+              { owner, repo, run_id, per_page: 100 },
+            );
+            const job =
+              jobs.find((j) => j.name.startsWith(process.env.CURRENT_JOB)) ||
+              jobs.find((j) => j.conclusion === 'failure');
+            if (!job) {
+              core.warning('No failing job found in this run');
+              return;
+            }
+
+            const resp = await github.request(
+              'GET /repos/{owner}/{repo}/actions/jobs/{job_id}/logs',
+              { owner, repo, job_id: job.id },
+            );
+            const raw =
+              typeof resp.data === 'string'
+                ? resp.data
+                : Buffer.from(resp.data).toString('utf8');
+
+            const patterns = [
+              /^FAILURE:/i,
+              /^BUILD FAILED/i,
+              /> Task .* FAILED/,
+              /\.kt:\d+:\d+:/,
+              /^\s*Error: /i,
+              /<failure[\s>]/,
+              / error /,
+              /^Exception |Caused by: /,
+              /AssertionError|AssertionFailedError/,
+              /Prettier.*would reformat/i,
+            ];
+            const lines = raw.split('\n');
+            const keep = new Set();
+            lines.forEach((ln, i) => {
+              if (patterns.some((p) => p.test(ln))) {
+                const start = Math.max(0, i - 5);
+                const end = Math.min(lines.length - 1, i + 20);
+                for (let k = start; k <= end; k++) keep.add(k);
+              }
+            });
+            const excerpt = [...keep]
+              .sort((a, b) => a - b)
+              .map((i) => lines[i])
+              .join('\n');
+            const clipped =
+              excerpt.length > 55000
+                ? excerpt.slice(-55000) + '\n… (truncated — see full log link)'
+                : excerpt;
+
+            const safeJobName = job.name.replace(/[^\w.-]/g, '_');
+            const logPath = `pr-${pr}/run-${run_id}-${safeJobName}.log`;
+            let sha;
+            try {
+              const existing = await github.rest.repos.getContent({
+                owner,
+                repo,
+                path: logPath,
+                ref: 'ci-logs',
+              });
+              sha = existing.data.sha;
+            } catch (e) {
+              // new file — no existing sha
+            }
+            await github.rest.repos.createOrUpdateFileContents({
+              owner,
+              repo,
+              path: logPath,
+              branch: 'ci-logs',
+              message: `ci-logs: ${job.name} (PR #${pr}, run ${run_id})`,
+              content: Buffer.from(raw).toString('base64'),
+              sha,
+            });
+            const fullLogUrl =
+              `https://github.com/${owner}/${repo}/blob/ci-logs/${logPath}`;
+
+            const body = [
+              process.env.MARKER,
+              `### Build failure — \`${job.name}\` (run ${run_id})`,
+              `Full log: ${fullLogUrl}`,
+              `Agent access: \`pull_request_read\` with \`method: "get_comments"\` for this excerpt;`,
+              `\`get_file_contents\` with \`ref: "ci-logs"\`, \`path: "${logPath}"\` for the full log.`,
+              '',
+              '```text',
+              clipped || '(no filter matches — see full log link above)',
+              '```',
+            ].join('\n');
+
+            const existingComments = await github.paginate(
+              github.rest.issues.listComments,
+              { owner, repo, issue_number: pr, per_page: 100 },
+            );
+            const found = existingComments.find(
+              (c) => c.body && c.body.includes(process.env.MARKER),
+            );
+            if (found) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: found.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: pr,
+                body,
+              });
+            }
