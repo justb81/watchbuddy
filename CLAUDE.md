@@ -73,7 +73,11 @@ watchbuddy/
 │   └── workflows/
 │       ├── build-android.yml   CI: builds debug APKs on push/PR
 │       ├── release.yml         CD: release-please + signed APK builds
+│       ├── stats.yml           CI: refreshes the README "Code Statistics" table after a green main build
 │       └── test-backend.yml    CI: tests for the Node.js backend
+├── scripts/
+│   ├── precommit.sh            Scoped local mirror of CI checks (see "Local pre-commit checks")
+│   └── update-readme-stats.sh  Regenerates the README "Code Statistics" block (cloc + JUnit + Jest)
 └── gradle/
     └── libs.versions.toml  Version catalog (single source of truth for dependencies)
 ```

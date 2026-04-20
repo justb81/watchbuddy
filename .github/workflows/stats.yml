@@ -1,0 +1,62 @@
+name: Update README stats
+
+# Refreshes the Code Statistics table in README.md. Chains off a successful
+# `Build Android APKs` run on main so we don't duplicate test/build work on PRs,
+# and the job only fires on the authoritative branch. The resulting commit is
+# tagged with `[skip ci]` to break the workflow_run -> push -> workflow_run loop.
+
+on:
+  workflow_run:
+    workflows: ["Build Android APKs"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    name: Refresh README stats
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          # Use the built-in token so the follow-up push is authenticated.
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Android build
+        uses: ./.github/actions/setup-android-build
+
+      - name: Install cloc
+        run: sudo apt-get update && sudo apt-get install -y cloc
+
+      - name: Run Gradle tests (populate JUnit XML)
+        run: ./gradlew test
+
+      - name: Run backend tests (populate Jest summary)
+        run: |
+          npm --prefix backend ci
+          npm --prefix backend test -- --json --outputFile="$RUNNER_TEMP/jest.json"
+        env:
+          CI: 'true'
+
+      - name: Regenerate README stats
+        env:
+          JEST_JSON: ${{ runner.temp }}/jest.json
+        run: ./scripts/update-readme-stats.sh
+
+      - name: Commit and push if changed
+        run: |
+          if git diff --quiet README.md; then
+            echo "README unchanged; nothing to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md
+          git commit -m "chore(readme): refresh code statistics [skip ci]"
+          git push origin main
