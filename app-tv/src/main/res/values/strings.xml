@@ -58,18 +58,20 @@
     <string name="tv_error_phone_unreachable">Companion app unreachable. Showing cached data.</string>
     <string name="tv_error_phone_unreachable_no_cache">Companion app unreachable. Make sure WatchBuddy is running on your phone.</string>
 
-    <!-- Streaming settings -->
-    <string name="tv_streaming_settings_button">Services</string>
-    <string name="tv_streaming_settings_title">Streaming Services</string>
-    <string name="tv_streaming_settings_subtitle">Select your subscribed services. Order determines priority for Watch Now.</string>
+    <!-- Show detail — provider availability (#367) -->
+    <string name="tv_not_available_region">Not available for streaming in your region.</string>
+    <string name="tv_providers_retry">Could not load streaming info. Tap to retry.</string>
+    <string name="tv_provider_last_used_label">Last used</string>
+    <string name="tv_provider_last_used_cd">Last used: %1$s</string>
 
-    <!-- TV Settings hub (#344) -->
+    <!-- TV Settings hub (#344 / #367) -->
     <string name="tv_settings_title">Settings</string>
     <string name="tv_settings_phone_discovery_title">Phone discovery</string>
     <string name="tv_settings_phone_discovery_subtitle">Scan the network for WatchBuddy phones</string>
     <string name="tv_settings_autostart_title">Autostart at TV boot</string>
     <string name="tv_settings_autostart_subtitle">Start discovery automatically when the TV turns on</string>
-    <string name="tv_settings_streaming_services">Streaming services</string>
+    <string name="tv_settings_show_non_installed_title">Show unavailable services</string>
+    <string name="tv_settings_show_non_installed_subtitle">Also show streaming services not installed on this TV</string>
     <string name="tv_settings_diagnostics">Diagnostics</string>
     <string name="tv_settings_notification_access_title">Notification access</string>
     <string name="tv_settings_notification_access_subtitle">Required for scrobbling — lets WatchBuddy see what\'s playing on the TV</string>
@@ -96,8 +98,6 @@
 
     <!-- Accessibility content descriptions -->
     <string name="cd_scrobble_countdown">Auto-confirm in %1$d seconds</string>
-    <string name="cd_service_move_up">Move %1$s up in priority</string>
-    <string name="cd_service_move_down">Move %1$s down in priority</string>
 
     <!-- Diagnostics -->
     <string name="tv_diagnostics_title">Diagnostics</string>

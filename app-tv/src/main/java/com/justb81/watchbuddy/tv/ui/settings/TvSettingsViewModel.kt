@@ -23,6 +23,7 @@ data class TvSettingsUiState(
     val isPhoneDiscoveryEnabled: Boolean = true,
     val isAutostartEnabled: Boolean = false,
     val isNotificationAccessGranted: Boolean = false,
+    val showNonInstalledProviders: Boolean = false,
 )
 
 @HiltViewModel
@@ -47,13 +48,15 @@ class TvSettingsViewModel @Inject constructor(
             combine(
                 repository.isPhoneDiscoveryEnabled,
                 repository.isAutostartEnabled,
-            ) { discovery, autostart -> discovery to autostart }
+                repository.showNonInstalledProviders,
+            ) { discovery, autostart, nonInstalled -> Triple(discovery, autostart, nonInstalled) }
                 .catch { e -> DiagnosticLog.error(TAG, "tv settings observation failed", e) }
-                .collect { (discovery, autostart) ->
+                .collect { (discovery, autostart, nonInstalled) ->
                     _uiState.update {
                         it.copy(
                             isPhoneDiscoveryEnabled = discovery,
                             isAutostartEnabled = autostart,
+                            showNonInstalledProviders = nonInstalled,
                         )
                     }
                 }
@@ -70,13 +73,18 @@ class TvSettingsViewModel @Inject constructor(
         launchSafe { repository.setAutostartEnabled(enabled) }
     }
 
+    fun setShowNonInstalledProviders(show: Boolean) {
+        _uiState.update { it.copy(showNonInstalledProviders = show) }
+        launchSafe { repository.setShowNonInstalledProviders(show) }
+    }
+
     /**
      * Re-read the system notification-access allowlist. Called from the UI
      * on every ON_RESUME because there is no broadcast to observe — the user
      * flips the toggle in system Settings and we only learn about it on
      * return to our own screen. Wrapped in runCatching so unit tests (which
      * run against a stubbed Android JAR) don't throw on the static
-     * [android.provider.Settings.Secure] lookup inside NotificationManagerCompat.
+     * android.provider.Settings.Secure lookup inside NotificationManagerCompat.
      */
     fun refreshNotificationAccess() {
         val granted = runCatching {

@@ -67,6 +67,22 @@
          back to NSD alone. -->
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
 
+    <!-- Visibility declarations for Android 11+ PackageManager queries.
+         Without these entries InstalledAppsProbe cannot see streaming apps
+         in getInstalledApplications() results on API 30+ devices. -->
+    <queries>
+        <package android:name="com.netflix.ninja" />
+        <package android:name="com.amazon.amazonvideo.livingroom" />
+        <package android:name="com.disney.disneyplus" />
+        <package android:name="com.apple.atve.androidtv.appletv" />
+        <package android:name="com.cbs.app" />
+        <package android:name="com.hbo.hbonow" />
+        <package android:name="tv.waipu.app" />
+        <package android:name="de.prosiebensat1digital.android.joyn" />
+        <package android:name="de.swr.avp.ard.phone" />
+        <package android:name="de.zdf.android.app" />
+    </queries>
+
     <application
         android:name=".WatchBuddyTvApp"
         android:allowBackup="false"

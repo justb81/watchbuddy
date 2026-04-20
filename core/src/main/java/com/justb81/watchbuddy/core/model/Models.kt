@@ -1,5 +1,6 @@
 package com.justb81.watchbuddy.core.model
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 // ── Trakt Models ─────────────────────────────────────────────────────────────
@@ -171,6 +172,48 @@ data class ScrobbleDisplayEvent(
     val episode: TraktEpisode,
     val progress: Float,
     val timestamp: Long
+)
+
+// ── TMDB Watch Providers ──────────────────────────────────────────────────────
+
+@Serializable
+data class WatchProviderEntry(
+    @SerialName("provider_id") val providerId: Int,
+    @SerialName("provider_name") val providerName: String,
+    @SerialName("logo_path") val logoPath: String? = null,
+    @SerialName("display_priority") val displayPriority: Int = 0,
+)
+
+@Serializable
+data class WatchProviderResult(
+    val link: String? = null,
+    val flatrate: List<WatchProviderEntry> = emptyList(),
+    val rent: List<WatchProviderEntry> = emptyList(),
+    val buy: List<WatchProviderEntry> = emptyList(),
+    val ads: List<WatchProviderEntry> = emptyList(),
+    val free: List<WatchProviderEntry> = emptyList(),
+)
+
+@Serializable
+data class WatchProviderResponse(
+    val id: Int,
+    val results: Map<String, WatchProviderResult> = emptyMap(),
+)
+
+/**
+ * A fully resolved streaming provider for a show, ready for the UI.
+ * Combines TMDB provider data with the [ProviderCatalog] mapping and
+ * TV-local state (installed app, last-used tracking).
+ */
+data class ResolvedProvider(
+    val providerId: Int,
+    val name: String,
+    val logoPath: String?,
+    val packageName: String?,
+    val deepLinkTemplate: String?,
+    val isInstalled: Boolean,
+    val isLastUsed: Boolean,
+    val tmdbPageUrl: String?,
 )
 
 // ── Streaming Deep Links ──────────────────────────────────────────────────────

@@ -58,18 +58,20 @@
     <string name="tv_error_phone_unreachable">Application compagnon inaccessible. Affichage des données en cache.</string>
     <string name="tv_error_phone_unreachable_no_cache">Application compagnon inaccessible. Assurez-vous que WatchBuddy est en cours d\'exécution sur votre téléphone.</string>
 
-    <!-- Streaming settings -->
-    <string name="tv_streaming_settings_button">Services</string>
-    <string name="tv_streaming_settings_title">Services de streaming</string>
-    <string name="tv_streaming_settings_subtitle">Sélectionnez vos services abonnés. L\'ordre détermine la priorité pour Regarder maintenant.</string>
+    <!-- Show detail — provider availability (#367) -->
+    <string name="tv_not_available_region">Non disponible en streaming dans votre région.</string>
+    <string name="tv_providers_retry">Impossible de charger les infos streaming. Appuyer pour réessayer.</string>
+    <string name="tv_provider_last_used_label">Dernière utilisation</string>
+    <string name="tv_provider_last_used_cd">Dernière utilisation : %1$s</string>
 
-    <!-- TV Settings hub (#344) -->
+    <!-- TV Settings hub (#344 / #367) -->
     <string name="tv_settings_title">Paramètres</string>
     <string name="tv_settings_phone_discovery_title">Recherche de téléphones</string>
     <string name="tv_settings_phone_discovery_subtitle">Rechercher des téléphones WatchBuddy sur le réseau</string>
     <string name="tv_settings_autostart_title">Démarrage automatique au boot</string>
     <string name="tv_settings_autostart_subtitle">Lancer la recherche automatiquement au démarrage du téléviseur</string>
-    <string name="tv_settings_streaming_services">Services de streaming</string>
+    <string name="tv_settings_show_non_installed_title">Afficher les services non installés</string>
+    <string name="tv_settings_show_non_installed_subtitle">Afficher aussi les services de streaming non installés sur ce téléviseur</string>
     <string name="tv_settings_diagnostics">Diagnostics</string>
     <string name="tv_settings_notification_access_title">Accès aux notifications</string>
     <string name="tv_settings_notification_access_subtitle">Requis pour le scrobble — permet à WatchBuddy de détecter ce qui est lu sur le téléviseur</string>
@@ -96,8 +98,6 @@
 
     <!-- Accessibilité -->
     <string name="cd_scrobble_countdown">Confirmation automatique dans %1$d secondes</string>
-    <string name="cd_service_move_up">Monter %1$s dans la priorité</string>
-    <string name="cd_service_move_down">Descendre %1$s dans la priorité</string>
 
     <!-- Diagnostics -->
     <string name="tv_diagnostics_title">Diagnostic</string>

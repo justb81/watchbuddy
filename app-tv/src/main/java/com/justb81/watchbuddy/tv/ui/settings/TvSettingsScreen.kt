@@ -65,7 +65,6 @@ private sealed interface SettingsRow {
 @Composable
 fun TvSettingsScreen(
     onBack: () -> Unit,
-    onStreamingServicesClick: () -> Unit,
     onDiagnosticsClick: () -> Unit,
     viewModel: TvSettingsViewModel = hiltViewModel(),
 ) {
@@ -116,11 +115,12 @@ fun TvSettingsScreen(
             statusLabel = if (uiState.isNotificationAccessGranted) grantedLabel else notGrantedLabel,
             statusOk = uiState.isNotificationAccessGranted,
         ),
-        SettingsRow.Navigate(
-            key = "streaming_services",
-            title = stringResource(R.string.tv_settings_streaming_services),
-            subtitle = stringResource(R.string.tv_streaming_settings_subtitle),
-            onClick = onStreamingServicesClick,
+        SettingsRow.Toggle(
+            key = "show_non_installed",
+            title = stringResource(R.string.tv_settings_show_non_installed_title),
+            subtitle = stringResource(R.string.tv_settings_show_non_installed_subtitle),
+            enabled = uiState.showNonInstalledProviders,
+            onChange = viewModel::setShowNonInstalledProviders,
         ),
         SettingsRow.Navigate(
             key = "diagnostics",
@@ -130,6 +130,15 @@ fun TvSettingsScreen(
         ),
     )
 
+    TvSettingsBodyContent(rows = rows, onBack = onBack)
+}
+
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+private fun TvSettingsBodyContent(
+    rows: List<SettingsRow>,
+    onBack: () -> Unit,
+) {
     Box(
         modifier = Modifier
             .fillMaxSize()

@@ -42,8 +42,10 @@ class TvSettingsViewModelTest {
         DiagnosticLog.clear()
         every { repository.isPhoneDiscoveryEnabled } returns flowOf(true)
         every { repository.isAutostartEnabled } returns flowOf(false)
+        every { repository.showNonInstalledProviders } returns flowOf(false)
         coEvery { repository.setPhoneDiscoveryEnabled(any()) } just runs
         coEvery { repository.setAutostartEnabled(any()) } just runs
+        coEvery { repository.setShowNonInstalledProviders(any()) } just runs
     }
 
     @AfterEach
