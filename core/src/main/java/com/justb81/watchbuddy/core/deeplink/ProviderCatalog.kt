@@ -38,9 +38,7 @@ object ProviderCatalog {
     )
 
     /** Fast lookup by provider_id. */
-    val byId: Map<Int, ProviderEntry> = buildMap {
-        entries.forEach { e -> putIfAbsent(e.providerId, e) }
-    }
+    val byId: Map<Int, ProviderEntry> = entries.associateBy { it.providerId }
 
     /** Set of all known package names (for <queries> and PackageManager checks). */
     val knownPackageNames: Set<String> = entries.map { it.packageName }.toSet()
