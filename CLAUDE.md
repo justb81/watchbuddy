@@ -161,6 +161,12 @@ Once enabled, `.githooks/pre-commit` delegates to `scripts/precommit.sh` on ever
 
 If you change either workflow's `paths-filter`, update `scripts/precommit.sh` in the same commit.
 
+**Sandboxed environments without the Android SDK** (Claude Code on the web, ephemeral runners): `scripts/precommit.sh` detects a missing SDK (`ANDROID_HOME` / `ANDROID_SDK_ROOT` unset and no `sdk.dir=` in `local.properties`) and **skips only the Gradle scope** with a loud yellow warning, while still running backend and workflow-YAML checks. The commit is allowed to proceed and CI (`build-android.yml`) becomes the real gate for Kotlin/Android changes. Agents in this situation MUST:
+
+1. Run `./scripts/precommit.sh` (or let the hook run it); do not reach for `--no-verify`.
+2. Surface the skip notice in the PR description so reviewers know the Gradle scope wasn't exercised locally.
+3. Treat a red `Test & Build` check on the PR as a blocker — there's no local pre-flight to fall back on.
+
 ### Git Workflow — IMPORTANT
 
 **Never push directly to `main`.** All changes must go through a Pull Request — no exceptions, including for agents.
