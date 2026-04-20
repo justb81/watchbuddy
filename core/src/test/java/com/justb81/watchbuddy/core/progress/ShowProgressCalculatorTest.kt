@@ -336,8 +336,8 @@ class ShowProgressCalculatorTest {
         fun `specials watched alongside regulars do not inflate watched count`() {
             // 1 regular aired, 1 regular watched + 1 special watched → completed
             val e = entry(
-                Triple(0, 1, "2024-01-01T10:00:00Z"), // special
-                Triple(1, 1, "2024-02-01T10:00:00Z")  // regular
+                Triple(0, 1, "2024-01-01T10:00:00Z"),
+                Triple(1, 1, "2024-02-01T10:00:00Z")
             )
             val h = hint(seasons = seasons(0 to 5, 1 to 1))
             assertTrue(ShowProgressCalculator.isCompleted(e, h))

@@ -120,12 +120,6 @@ object ShowProgressCalculator {
     fun latestWatchedInstant(entry: TraktWatchedEntry): Instant? =
         latestWatched(entry)?.instant
 
-    /**
-     * Returns true when every aired regular episode has been watched.
-     * Requires a TMDB hint to know how many regular episodes have aired; returns false when
-     * hint is null or no regular episodes have aired yet (upcoming series).
-     * Uses >= instead of == to stay correct when Trakt is fresher than the cached TMDB data.
-     */
     fun isCompleted(entry: TraktWatchedEntry, hint: TmdbProgressHint?): Boolean {
         if (hint == null) return false
         val airedRegular = hint.seasons

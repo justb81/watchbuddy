@@ -256,8 +256,7 @@ class TvHomeViewModel @Inject constructor(
         now: Instant = Instant.now()
     ): Pair<List<EnrichedShowEntry>, List<EnrichedShowEntry>> {
         val cutoff = now.minus(CONTINUE_WATCHING_WINDOW)
-        // Completed shows (all aired regular episodes watched) are hidden on TV — they are noise,
-        // not a browsing target. Phone HomeScreen is unaffected by this filter (#362).
+        // Completed shows are hidden on TV only; phone HomeScreen keeps showing them (#362).
         val active = shows.filter { !ShowProgressCalculator.isCompleted(it.entry, it.tmdb) }
         val (continueWatching, others) = active.partition { entry ->
             val lastWatched = ShowProgressCalculator.latestWatchedInstant(entry.entry)
