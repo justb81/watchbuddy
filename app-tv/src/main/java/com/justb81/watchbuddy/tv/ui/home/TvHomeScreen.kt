@@ -47,6 +47,11 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 
+private val TvNewSeasonBadgeCorner = 10.dp
+private val TvNewSeasonBadgePadding = 4.dp
+private val TvNewSeasonBadgeIconSize = 10.dp
+private val TvShowCardBadgeOffset = 6.dp
+
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun TvHomeScreen(
@@ -395,11 +400,11 @@ private fun TvShowCard(
             }
 
             if (hasNewSeason) {
-                Box(modifier = Modifier.align(Alignment.TopStart).padding(6.dp)) {
+                Box(modifier = Modifier.align(Alignment.TopStart).padding(TvShowCardBadgeOffset)) {
                     TvNewSeasonBadge()
                 }
             }
-            Box(modifier = Modifier.align(Alignment.TopEnd).padding(6.dp)) {
+            Box(modifier = Modifier.align(Alignment.TopEnd).padding(TvShowCardBadgeOffset)) {
                 TvProgressBadge(progress)
             }
         }
@@ -411,16 +416,16 @@ private fun TvNewSeasonBadge() {
     val description = stringResource(R.string.tv_new_season_available_cd)
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(10.dp))
+            .clip(RoundedCornerShape(TvNewSeasonBadgeCorner))
             .background(MaterialTheme.colorScheme.primary)
-            .padding(4.dp)
+            .padding(TvNewSeasonBadgePadding)
             .clearAndSetSemantics { contentDescription = description }
     ) {
         Icon(
             imageVector = Icons.Filled.Star,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onPrimary,
-            modifier = Modifier.size(10.dp)
+            modifier = Modifier.size(TvNewSeasonBadgeIconSize)
         )
     }
 }
