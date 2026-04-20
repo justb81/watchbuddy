@@ -128,7 +128,7 @@ class ShowDetailViewModelTest {
         @Test
         fun `produces null stillUrl when TMDB returns no still_path`() = runTest {
             every { phoneDiscovery.getBestPhone() } returns makePhone("key")
-            coEvery { tmdbApi.getEpisode(any(), any(), any(), any()) } returns makeTmdbEpisode(stillPath = null)
+            coEvery { tmdbApi.getEpisode(any(), any(), any(), any(), any()) } returns makeTmdbEpisode(stillPath = null)
 
             viewModel.loadNextEpisode(makeEntry())
 
@@ -177,7 +177,7 @@ class ShowDetailViewModelTest {
         @Test
         fun `clears episode data on TMDB API failure`() = runTest {
             every { phoneDiscovery.getBestPhone() } returns makePhone("key")
-            coEvery { tmdbApi.getEpisode(any(), any(), any(), any()) } throws RuntimeException("404")
+            coEvery { tmdbApi.getEpisode(any(), any(), any(), any(), any()) } throws RuntimeException("404")
 
             viewModel.nextEpisode.test {
                 awaitItem()
