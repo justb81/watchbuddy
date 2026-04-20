@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.25.0](https://github.com/justb81/watchbuddy/compare/v0.24.0...v0.25.0) (2026-04-20)
+
+
+### Features
+
+* **tv:** integrate TMDB watch providers, installed-app filter, and last-used ranking on ShowDetail ([#388](https://github.com/justb81/watchbuddy/issues/388)) ([387dd21](https://github.com/justb81/watchbuddy/commit/387dd211c7ea0b1af378c5d2b0a3b3e62f396768))
+
+
+### Bug Fixes
+
+* **ci:** match kotlinc error lines directly in build-log filter ([#389](https://github.com/justb81/watchbuddy/issues/389)) ([c45cb95](https://github.com/justb81/watchbuddy/commit/c45cb95913efea3c1ebce782180ac3dc388fcd60))
+
 ## [0.24.0](https://github.com/justb81/watchbuddy/compare/v0.23.0...v0.24.0) (2026-04-20)
 
 
