@@ -1,0 +1,83 @@
+name: Prune ci-logs branch
+
+# Keeps the `ci-logs` side branch bounded by removing log files for PRs that
+# are already closed or merged. See CLAUDE.md § "Monitoring PR checks &
+# accessing build logs" for the log-posting flow this cleans up after.
+
+on:
+  schedule:
+    - cron: '0 3 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  prune:
+    name: Prune closed-PR log directories
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v8
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+
+            let tree;
+            try {
+              const root = await github.rest.repos.getContent({
+                owner,
+                repo,
+                path: '',
+                ref: 'ci-logs',
+              });
+              tree = Array.isArray(root.data) ? root.data : [];
+            } catch (e) {
+              core.info('ci-logs branch does not exist yet — nothing to prune');
+              return;
+            }
+
+            const prDirs = tree.filter(
+              (e) => e.type === 'dir' && /^pr-\d+$/.test(e.name),
+            );
+            core.info(`Found ${prDirs.length} pr-* directories on ci-logs`);
+
+            for (const dir of prDirs) {
+              const prNumber = Number(dir.name.replace(/^pr-/, ''));
+              let pr;
+              try {
+                pr = await github.rest.pulls.get({
+                  owner,
+                  repo,
+                  pull_number: prNumber,
+                });
+              } catch (e) {
+                core.warning(
+                  `Could not fetch PR #${prNumber}: ${e.message} — skipping`,
+                );
+                continue;
+              }
+              if (pr.data.state !== 'closed') {
+                core.info(`PR #${prNumber} is still open — keeping logs`);
+                continue;
+              }
+
+              const files = await github.rest.repos.getContent({
+                owner,
+                repo,
+                path: dir.path,
+                ref: 'ci-logs',
+              });
+              const entries = Array.isArray(files.data) ? files.data : [];
+              for (const file of entries) {
+                if (file.type !== 'file') continue;
+                core.info(`Deleting ${file.path} (PR #${prNumber} closed)`);
+                await github.rest.repos.deleteFile({
+                  owner,
+                  repo,
+                  path: file.path,
+                  branch: 'ci-logs',
+                  message: `ci-logs: prune PR #${prNumber} (${pr.data.state})`,
+                  sha: file.sha,
+                });
+              }
+            }
