@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
   pull-requests: write
   security-events: write
   actions: read
@@ -217,12 +217,10 @@ jobs:
           name: watchbuddy-tv-debug
           path: app-tv/build/outputs/apk/debug/*.apk
 
-      # Surface the failing job's raw log to PR reviewers (humans) and to
-      # automated agents (MCP). Posts a filtered failure excerpt as a PR
-      # comment keyed by the `<!-- watchbuddy-build-log -->` marker, and
-      # commits the full unfiltered log to the dedicated `ci-logs` branch
-      # where agents can fetch it via `get_file_contents`.
-      # See CLAUDE.md § "Monitoring PR checks & accessing build logs".
+      # Surface a filtered failure excerpt from the failing job's raw log as
+      # a PR comment keyed by the `<!-- watchbuddy-build-log -->` marker, so
+      # both humans and MCP agents can read it without touching the Actions
+      # UI. See CLAUDE.md § "Monitoring PR checks & accessing build logs".
       - name: Post failing build log
         if: failure() && github.event_name == 'pull_request'
         uses: actions/github-script@v8
@@ -284,44 +282,17 @@ jobs:
               .join('\n');
             const clipped =
               excerpt.length > 55000
-                ? excerpt.slice(-55000) + '\n… (truncated — see full log link)'
+                ? excerpt.slice(-55000) + '\n… (truncated — open the Actions UI for the full log)'
                 : excerpt;
-
-            const safeJobName = job.name.replace(/[^\w.-]/g, '_');
-            const logPath = `pr-${pr}/run-${run_id}-${safeJobName}.log`;
-            let sha;
-            try {
-              const existing = await github.rest.repos.getContent({
-                owner,
-                repo,
-                path: logPath,
-                ref: 'ci-logs',
-              });
-              sha = existing.data.sha;
-            } catch (e) {
-              // new file — no existing sha
-            }
-            await github.rest.repos.createOrUpdateFileContents({
-              owner,
-              repo,
-              path: logPath,
-              branch: 'ci-logs',
-              message: `ci-logs: ${job.name} (PR #${pr}, run ${run_id})`,
-              content: Buffer.from(raw).toString('base64'),
-              sha,
-            });
-            const fullLogUrl =
-              `https://github.com/${owner}/${repo}/blob/ci-logs/${logPath}`;
 
             const body = [
               process.env.MARKER,
               `### Build failure — \`${job.name}\` (run ${run_id})`,
-              `Full log: ${fullLogUrl}`,
-              `Agent access: \`pull_request_read\` with \`method: "get_comments"\` for this excerpt;`,
-              `\`get_file_contents\` with \`ref: "ci-logs"\`, \`path: "${logPath}"\` for the full log.`,
+              `Actions log: ${job.html_url}`,
+              `Agent access: \`pull_request_read\` with \`method: "get_comments"\` for this excerpt.`,
               '',
               '```text',
-              clipped || '(no filter matches — see full log link above)',
+              clipped || '(no filter matches — open the Actions log linked above)',
               '```',
             ].join('\n');
 
