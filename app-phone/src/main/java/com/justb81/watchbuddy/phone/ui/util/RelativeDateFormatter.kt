@@ -62,7 +62,7 @@ internal fun formatRelativeDate(
         ).toString()
     },
 ): String {
-    val today = LocalDate.now(ZoneId.systemDefault())
+    val today = Instant.ofEpochMilli(now).atZone(ZoneId.systemDefault()).toLocalDate()
     val day = moment.atZone(ZoneId.systemDefault()).toLocalDate()
     val delta = moment.toEpochMilli() - now
     return when {
