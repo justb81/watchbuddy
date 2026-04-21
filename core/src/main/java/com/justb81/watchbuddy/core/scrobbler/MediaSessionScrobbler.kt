@@ -266,8 +266,8 @@ class MediaSessionScrobbler @Inject constructor(
             )
             return null
         }
-        val guessed = ShowProgressCalculator.nextEpisodeNumbers(cacheEntry, hint) ?: return null
-        return TraktEpisode(season = guessed.first, number = guessed.second)
+        return ShowProgressCalculator.nextEpisodeNumbers(cacheEntry, hint)
+            ?.let { TraktEpisode(season = it.first, number = it.second) }
     }
 
     internal fun normalize(title: String): String {
