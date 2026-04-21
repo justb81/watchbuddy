@@ -4,7 +4,6 @@ import android.content.Context
 import android.text.format.DateUtils
 import com.justb81.watchbuddy.R
 import java.time.Instant
-import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
