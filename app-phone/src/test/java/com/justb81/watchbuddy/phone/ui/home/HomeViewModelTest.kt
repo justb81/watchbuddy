@@ -2,6 +2,8 @@ package com.justb81.watchbuddy.phone.ui.home
 
 import android.app.Application
 import com.justb81.watchbuddy.core.model.EnrichedShowEntry
+import com.justb81.watchbuddy.core.model.TmdbProgressHint
+import com.justb81.watchbuddy.core.model.TmdbSeasonSummary
 import com.justb81.watchbuddy.core.model.TraktWatchedEpisode
 import com.justb81.watchbuddy.core.model.TraktWatchedSeason
 import com.justb81.watchbuddy.phone.MainDispatcherRule
@@ -100,6 +102,52 @@ class HomeViewModelTest {
                     episodes = listOf(TraktWatchedEpisode(number = 1, last_watched_at = lastWatchedAt))
                 )
             )
+        )
+    )
+
+    /**
+     * Show whose watched-episode count on S1 matches the TMDB aired count —
+     * so `ShowProgressCalculator.isCompleted` returns true.
+     */
+    private fun enrichedCompleted(
+        title: String,
+        lastWatchedAt: String,
+        episodeCount: Int = 3
+    ) = EnrichedShowEntry(
+        entry = TestFixtures.traktWatchedEntry(show = TestFixtures.traktShow(title)).copy(
+            seasons = listOf(
+                TraktWatchedSeason(
+                    number = 1,
+                    episodes = (1..episodeCount).map {
+                        TraktWatchedEpisode(number = it, last_watched_at = lastWatchedAt)
+                    }
+                )
+            )
+        ),
+        tmdb = TmdbProgressHint(
+            seasons = listOf(TmdbSeasonSummary(season_number = 1, episode_count = episodeCount))
+        )
+    )
+
+    /** Show with a TMDB hint that reports more aired episodes than the user has watched. */
+    private fun enrichedInProgressWithHint(
+        title: String,
+        lastWatchedAt: String,
+        watchedCount: Int = 1,
+        airedCount: Int = 3
+    ) = EnrichedShowEntry(
+        entry = TestFixtures.traktWatchedEntry(show = TestFixtures.traktShow(title)).copy(
+            seasons = listOf(
+                TraktWatchedSeason(
+                    number = 1,
+                    episodes = (1..watchedCount).map {
+                        TraktWatchedEpisode(number = it, last_watched_at = lastWatchedAt)
+                    }
+                )
+            )
+        ),
+        tmdb = TmdbProgressHint(
+            seasons = listOf(TmdbSeasonSummary(season_number = 1, episode_count = airedCount))
         )
     )
 
@@ -457,6 +505,74 @@ class HomeViewModelTest {
 
             assertTrue(cw.isEmpty())
             assertEquals(listOf(show), others)
+        }
+
+        @Test
+        fun `completed show watched recently goes into allShows, not continueWatching (#398)`() {
+            val vm = createViewModel()
+            val fiveDaysAgo = now.minus(5, ChronoUnit.DAYS).toString()
+            val finished = enrichedCompleted("Finished", fiveDaysAgo)
+
+            val (cw, others) = vm.partitionShows(listOf(finished), now)
+
+            assertTrue(cw.isEmpty(), "completed shows must not appear in Continue Watching")
+            assertEquals(listOf(finished), others)
+        }
+
+        @Test
+        fun `completed show watched long ago stays in allShows (#398)`() {
+            val vm = createViewModel()
+            val fortyDaysAgo = now.minus(40, ChronoUnit.DAYS).toString()
+            val finished = enrichedCompleted("Finished long ago", fortyDaysAgo)
+
+            val (cw, others) = vm.partitionShows(listOf(finished), now)
+
+            assertTrue(cw.isEmpty())
+            assertEquals(listOf(finished), others)
+        }
+
+        @Test
+        fun `in-progress show watched recently stays in continueWatching even with hint (#398)`() {
+            // Regression: the completed filter must not over-match shows that
+            // merely have a TMDB hint attached.
+            val vm = createViewModel()
+            val fiveDaysAgo = now.minus(5, ChronoUnit.DAYS).toString()
+            val show = enrichedInProgressWithHint("Partial", fiveDaysAgo, watchedCount = 1, airedCount = 3)
+
+            val (cw, others) = vm.partitionShows(listOf(show), now)
+
+            assertEquals(listOf(show), cw)
+            assertTrue(others.isEmpty())
+        }
+
+        @Test
+        fun `recently-watched show with no TMDB hint stays in continueWatching (#398)`() {
+            // Without a hint, isCompleted returns false — the 30-day window alone decides.
+            val vm = createViewModel()
+            val fiveDaysAgo = now.minus(5, ChronoUnit.DAYS).toString()
+            val show = enrichedWatched("No hint", fiveDaysAgo)
+
+            val (cw, others) = vm.partitionShows(listOf(show), now)
+
+            assertEquals(listOf(show), cw)
+            assertTrue(others.isEmpty())
+        }
+
+        @Test
+        fun `allShows stays alphabetical when completed and old shows are mixed (#398)`() {
+            val vm = createViewModel()
+            val fiveDaysAgo = now.minus(5, ChronoUnit.DAYS).toString()
+            val fortyDaysAgo = now.minus(40, ChronoUnit.DAYS).toString()
+            val completedRecent = enrichedCompleted("zebra", fiveDaysAgo)
+            val oldUnwatched = enrichedWatched("apple", fortyDaysAgo)
+            val neverWatched = enriched("Mango")
+
+            val (_, others) = vm.partitionShows(
+                listOf(completedRecent, oldUnwatched, neverWatched),
+                now
+            )
+
+            assertEquals(listOf("apple", "Mango", "zebra"), others.map { it.entry.show.title })
         }
 
         @Test
