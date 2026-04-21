@@ -1,6 +1,8 @@
 package com.justb81.watchbuddy.core.scrobbler
 
+import com.justb81.watchbuddy.core.model.TmdbProgressHint
 import com.justb81.watchbuddy.core.model.TraktEpisode
+import com.justb81.watchbuddy.core.model.TraktIds
 import com.justb81.watchbuddy.core.model.TraktShow
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
 
@@ -12,6 +14,13 @@ import com.justb81.watchbuddy.core.model.TraktWatchedEntry
 interface WatchedShowSource {
     suspend fun getCachedShows(): List<TraktWatchedEntry>
     suspend fun getTmdbApiKey(): String?
+
+    /**
+     * Returns the cached TMDB progress hint for a show, used by the scrobbler to guess
+     * the next unwatched episode when the playing app's MediaMetadata title lacks an
+     * explicit `S##E##` marker (issue #401). Returns null when no hint is cached.
+     */
+    suspend fun getShowHint(ids: TraktIds): TmdbProgressHint? = null
 }
 
 /**

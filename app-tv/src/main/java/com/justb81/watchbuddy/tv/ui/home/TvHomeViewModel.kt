@@ -176,7 +176,7 @@ class TvHomeViewModel @Inject constructor(
 
                 fallbackCache = allShows
                 fallbackCacheTimestamp = System.currentTimeMillis()
-                tvShowCache.updateShows(allShows.map { it.entry })
+                tvShowCache.updateEnrichedShows(allShows)
 
                 val (continueWatching, otherShows) = partitionShows(allShows)
                 _uiState.update {
