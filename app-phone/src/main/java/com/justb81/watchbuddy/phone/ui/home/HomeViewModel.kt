@@ -224,11 +224,18 @@ class HomeViewModel @Inject constructor(
         now: Instant = Instant.now()
     ): Pair<List<EnrichedShowEntry>, List<EnrichedShowEntry>> {
         val cutoff = now.minus(CONTINUE_WATCHING_WINDOW)
-        val (continueWatching, others) = shows.partition { entry ->
+        // Completed shows always fall through to "All Shows" — the shelf is a
+        // "watch next" prompt and a finished show has nothing left to watch.
+        // (#398. TV hides completed shows entirely — #362.)
+        val (completed, active) = shows.partition {
+            ShowProgressCalculator.isCompleted(it.entry, it.tmdb)
+        }
+        val (continueWatching, olderActive) = active.partition { entry ->
             val lastWatched = ShowProgressCalculator.latestWatchedInstant(entry.entry)
             lastWatched != null && lastWatched.isAfter(cutoff)
         }
-        return continueWatching to others.sortedBy { it.entry.show.title.lowercase() }
+        val allShows = (olderActive + completed).sortedBy { it.entry.show.title.lowercase() }
+        return continueWatching to allShows
     }
 
     private suspend fun fetchShows() {
