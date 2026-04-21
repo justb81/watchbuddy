@@ -13,7 +13,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
@@ -73,7 +72,6 @@ fun HomeScreen(
     // Polled once per composition; the diagnostic banner doesn't need real-time updates
     // and this avoids adding Flow plumbing to HomeViewModel just for a debug surface.
     var pendingReports by remember { mutableStateOf(CrashReporter.listReports(context).size) }
-    var overflowExpanded by remember { mutableStateOf(false) }
     var showNotificationRationale by remember { mutableStateOf(false) }
 
     // BLE advertising is a best-effort fallback discovery channel for networks
@@ -156,27 +154,6 @@ fun HomeScreen(
                     }
                     IconButton(onClick = onSettingsClick) {
                         Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.home_cd_settings))
-                    }
-                    Box {
-                        IconButton(onClick = { overflowExpanded = true }) {
-                            Icon(
-                                Icons.Default.MoreVert,
-                                contentDescription = stringResource(R.string.home_cd_overflow)
-                            )
-                        }
-                        DropdownMenu(
-                            expanded = overflowExpanded,
-                            onDismissRequest = { overflowExpanded = false }
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.diagnostics_export)) },
-                                onClick = {
-                                    overflowExpanded = false
-                                    DiagnosticShare.launchShare(context)
-                                    pendingReports = CrashReporter.listReports(context).size
-                                }
-                            )
-                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(

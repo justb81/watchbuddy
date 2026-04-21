@@ -4,7 +4,6 @@ import android.content.Context
 import android.text.format.DateUtils
 import com.justb81.watchbuddy.R
 import java.time.Instant
-import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -62,7 +61,7 @@ internal fun formatRelativeDate(
         ).toString()
     },
 ): String {
-    val today = LocalDate.now(ZoneId.systemDefault())
+    val today = Instant.ofEpochMilli(now).atZone(ZoneId.systemDefault()).toLocalDate()
     val day = moment.atZone(ZoneId.systemDefault()).toLocalDate()
     val delta = moment.toEpochMilli() - now
     return when {
