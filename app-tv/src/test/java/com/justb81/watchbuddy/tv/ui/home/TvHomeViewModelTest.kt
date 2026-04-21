@@ -157,7 +157,7 @@ class TvHomeViewModelTest {
         createViewModel()
         advanceUntilIdle()
 
-        verify { tvShowCache.updateShows(testTraktShows) }
+        verify { tvShowCache.updateEnrichedShows(testShows) }
     }
 
     @Test
@@ -381,7 +381,7 @@ class TvHomeViewModelTest {
             advanceUntilIdle()
 
             val allShows = (page1 + page2).sortedByLastWatched()
-            verify { tvShowCache.updateShows(allShows.map { it.entry }) }
+            verify { tvShowCache.updateEnrichedShows(allShows) }
         }
     }
 

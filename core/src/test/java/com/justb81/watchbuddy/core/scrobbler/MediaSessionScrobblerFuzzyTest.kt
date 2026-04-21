@@ -248,6 +248,7 @@ class MediaSessionScrobblerFuzzyTest {
         fun `title without SxxExx has null episode`() = runTest {
             coEvery { watchedShowSource.getCachedShows() } returns
                 listOf(TraktWatchedEntry(show = breakingBadShow))
+            coEvery { watchedShowSource.getShowHint(any()) } returns null
 
             val result = scrobbler.matchTitle("com.netflix", "Breaking Bad")
 

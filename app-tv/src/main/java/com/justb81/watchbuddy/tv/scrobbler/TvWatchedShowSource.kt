@@ -1,5 +1,7 @@
 package com.justb81.watchbuddy.tv.scrobbler
 
+import com.justb81.watchbuddy.core.model.TmdbProgressHint
+import com.justb81.watchbuddy.core.model.TraktIds
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
 import com.justb81.watchbuddy.core.scrobbler.WatchedShowSource
 import com.justb81.watchbuddy.tv.data.TvShowCache
@@ -17,4 +19,6 @@ class TvWatchedShowSource @Inject constructor(
 
     override suspend fun getTmdbApiKey(): String? =
         phoneDiscovery.getBestPhone()?.capability?.tmdbApiKey
+
+    override suspend fun getShowHint(ids: TraktIds): TmdbProgressHint? = tvShowCache.getHint(ids)
 }

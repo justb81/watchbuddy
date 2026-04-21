@@ -5,10 +5,13 @@ import android.content.Context
 import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
 import android.util.Log
+import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.model.ScrobbleCandidate
 import com.justb81.watchbuddy.core.model.TraktEpisode
 import com.justb81.watchbuddy.core.model.TraktIds
 import com.justb81.watchbuddy.core.model.TraktShow
+import com.justb81.watchbuddy.core.model.TraktWatchedEntry
+import com.justb81.watchbuddy.core.progress.ShowProgressCalculator
 import com.justb81.watchbuddy.core.tmdb.TmdbApiService
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
@@ -17,6 +20,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -72,6 +76,13 @@ class MediaSessionScrobbler @Inject constructor(
 
     private var currentlyScrobbling: String? = null
 
+    /**
+     * Last observed playback progress per media title, captured on every poll that yields
+     * a usable `position/duration`. Feeds the implicit-stop dispatched by [reconcileVanished]
+     * when a session disappears without ever emitting STATE_STOPPED (issue #402).
+     */
+    private val lastProgressByTitle = ConcurrentHashMap<String, Float>()
+
     fun startListening(notificationListenerComponent: ComponentName) {
         scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
         _isListening.value = true
@@ -82,6 +93,10 @@ class MediaSessionScrobbler @Inject constructor(
             while (isActive) {
                 try {
                     val sessions = sessionManager.getActiveSessions(notificationListenerComponent)
+                    val liveTitles = sessions
+                        .mapNotNull { it.metadata?.getString(android.media.MediaMetadata.METADATA_KEY_TITLE) }
+                        .toSet()
+                    reconcileVanished(liveTitles)
                     sessions.forEach { controller ->
                         val packageName = controller.packageName
                         val metadata = controller.metadata ?: return@forEach
@@ -89,6 +104,7 @@ class MediaSessionScrobbler @Inject constructor(
                         val title = metadata.getString(android.media.MediaMetadata.METADATA_KEY_TITLE)
                             ?: return@forEach
                         val progress = computeProgress(playbackState, metadata)
+                        if (progress != null) recordProgress(title, progress)
                         when (playbackState.state) {
                             PlaybackState.STATE_PLAYING -> processPlayingMedia(packageName, title, progress)
                             PlaybackState.STATE_PAUSED -> handleScrobblePause(title, progress)
@@ -105,10 +121,51 @@ class MediaSessionScrobbler @Inject constructor(
         }
     }
 
+    internal fun recordProgress(title: String, progress: Float) {
+        lastProgressByTitle[title] = progress
+    }
+
+    /**
+     * Detect the case where a streaming app destroys its MediaSession instead of
+     * transitioning through STATE_STOPPED (common on YouTube and some Fire TV skins —
+     * issue #402). Without this reconciliation `currentlyScrobbling` would stay pinned
+     * to the last episode forever, silently blocking every future scrobble of the same
+     * title inside [processPlayingMedia]'s dedup guard.
+     *
+     * When the previously-tracked title is no longer in the live session set, dispatch
+     * an implicit stop with the last observed progress (best-effort — we don't know the
+     * real endpoint) and clear local state so the next playback can scrobble again.
+     */
+    internal suspend fun reconcileVanished(liveTitles: Set<String>) {
+        val stale = currentlyScrobbling ?: return
+        if (stale in liveTitles) return
+        val lastProgress = lastProgressByTitle.remove(stale)
+        currentlyScrobbling = null
+        if (lastProgress == null) {
+            DiagnosticLog.warn(TAG, "Session vanished without captured progress — cleared '$stale'")
+            return
+        }
+        try {
+            val candidate = matchTitle("", stale)
+            val show = candidate?.matchedShow
+            val episode = candidate?.matchedEpisode
+            if (show != null && episode != null) {
+                scrobbleDispatcher.dispatchStop(show, episode, lastProgress)
+                Log.i(TAG, "Session vanished — implicit stop: ${show.title} S${episode.season}E${episode.number}")
+            } else {
+                DiagnosticLog.warn(TAG, "Session vanished — no match for '$stale', dispatch skipped")
+            }
+        } catch (e: Exception) {
+            DiagnosticLog.warn(TAG, "Session vanished — stop dispatch failed for '$stale'", e)
+        }
+    }
+
     fun stopListening() {
         pollingJob?.cancel()
         scope.cancel()
         _isListening.value = false
+        currentlyScrobbling = null
+        lastProgressByTitle.clear()
     }
 
     private suspend fun processPlayingMedia(packageName: String, rawTitle: String, progress: Float?) {
@@ -148,13 +205,13 @@ class MediaSessionScrobbler @Inject constructor(
             val bestCacheMatch = cachedShows.maxByOrNull { fuzzyScore(it.show.title, showTitle) }
             val cacheScore = bestCacheMatch?.let { fuzzyScore(it.show.title, showTitle) } ?: 0f
             if (cacheScore >= 0.70f && bestCacheMatch != null) {
+                val matchedEpisode = resolveEpisode(season, episode, bestCacheMatch, cacheScore)
                 return ScrobbleCandidate(
                     packageName = packageName,
                     mediaTitle = rawTitle,
                     confidence = cacheScore,
                     matchedShow = bestCacheMatch.show,
-                    matchedEpisode = if (season != null && episode != null)
-                        TraktEpisode(season = season, number = episode) else null
+                    matchedEpisode = matchedEpisode
                 )
             }
         }
@@ -181,6 +238,36 @@ class MediaSessionScrobbler @Inject constructor(
             Log.w(TAG, "TMDB search failed for '$showTitle'", e)
             null
         }
+    }
+
+    /**
+     * Resolve the episode tuple for a cache-matched show. Prefers the explicit `S##E##`
+     * pair parsed from MediaMetadata when available; otherwise falls back to the progress
+     * hint so scrobbles from Netflix / Prime / Disney+ (which ship only the episode title
+     * in `METADATA_KEY_TITLE`) aren't silently dropped (issue #401). The fallback only
+     * activates when show-match confidence clears [AUTO_SCROBBLE_THRESHOLD] — below that
+     * the overlay path still asks the user to confirm.
+     */
+    private suspend fun resolveEpisode(
+        explicitSeason: Int?,
+        explicitEpisode: Int?,
+        cacheEntry: TraktWatchedEntry,
+        confidence: Float
+    ): TraktEpisode? {
+        if (explicitSeason != null && explicitEpisode != null) {
+            return TraktEpisode(season = explicitSeason, number = explicitEpisode)
+        }
+        if (confidence < AUTO_SCROBBLE_THRESHOLD) return null
+        val hint = watchedShowSource.getShowHint(cacheEntry.show.ids)
+        if (hint == null) {
+            DiagnosticLog.warn(
+                TAG,
+                "scrobble dropped — no episode in title and no progress hint for '${cacheEntry.show.title}'"
+            )
+            return null
+        }
+        return ShowProgressCalculator.nextEpisodeNumbers(cacheEntry, hint)
+            ?.let { TraktEpisode(season = it.first, number = it.second) }
     }
 
     internal fun normalize(title: String): String {
