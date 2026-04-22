@@ -12,7 +12,7 @@ import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
@@ -51,7 +51,7 @@ class PhoneTitleExtractionClientTest {
     }
 
     @Test
-    fun `returns null when no phones have an on-device LLM`() = runTest(Dispatchers.IO) {
+    fun `returns null when no phones have an on-device LLM`() = runBlocking {
         every { phoneDiscovery.discoveredPhones } returns kotlinx.coroutines.flow.MutableStateFlow(
             listOf(
                 makeDiscoveredPhone(
@@ -70,7 +70,7 @@ class PhoneTitleExtractionClientTest {
     }
 
     @Test
-    fun `picks highest-scoring phone that actually has an LLM`() = runTest(Dispatchers.IO) {
+    fun `picks highest-scoring phone that actually has an LLM`() = runBlocking {
         server.enqueue(
             MockResponse().setBody(
                 """{"showTitle":"Breaking Bad","season":1,"episode":1,"confidence":0.9}"""
@@ -110,7 +110,7 @@ class PhoneTitleExtractionClientTest {
     }
 
     @Test
-    fun `concurrent extract calls for the same title share one inference`() = runTest(Dispatchers.IO) {
+    fun `concurrent extract calls for the same title share one inference`() = runBlocking {
         // Only one MockResponse enqueued — if the client makes two HTTP calls
         // it will hang on the second and this test will time out.
         server.enqueue(
@@ -139,7 +139,7 @@ class PhoneTitleExtractionClientTest {
     }
 
     @Test
-    fun `different titles DO trigger separate inferences even when concurrent`() = runTest(Dispatchers.IO) {
+    fun `different titles DO trigger separate inferences even when concurrent`() = runBlocking {
         server.enqueue(MockResponse().setBody("""{"showTitle":"Breaking Bad","confidence":0.9}"""))
         server.enqueue(MockResponse().setBody("""{"showTitle":"The Bear","confidence":0.9}"""))
 
@@ -164,7 +164,7 @@ class PhoneTitleExtractionClientTest {
     }
 
     @Test
-    fun `HTTP failure returns null without throwing`() = runTest(Dispatchers.IO) {
+    fun `HTTP failure returns null without throwing`() = runBlocking {
         server.enqueue(MockResponse().setResponseCode(503))
 
         every { phoneDiscovery.discoveredPhones } returns kotlinx.coroutines.flow.MutableStateFlow(

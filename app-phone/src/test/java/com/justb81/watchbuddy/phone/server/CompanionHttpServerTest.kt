@@ -844,7 +844,7 @@ class CompanionHttpServerTest {
         }
 
         @Test
-        fun `returns 200 with zero confidence when extractor returns null`() = testApp {
+        fun `returns 200 with empty object when extractor returns null`() = testApp {
             coEvery { titleExtractor.extract(any<MediaMetadataSnapshot>(), any()) } returns null
 
             val response = client.post("/scrobble/extract") {
@@ -853,8 +853,12 @@ class CompanionHttpServerTest {
             }
 
             assertEquals(HttpStatusCode.OK, response.status)
+            // WatchBuddyJson drops default-valued fields, so the all-default
+            // response serializes to `{}`. What matters is the OK status and
+            // the missing showTitle/season/episode — the TV treats any missing
+            // field as a "no confident result" signal.
             val body = response.bodyAsText()
-            assertTrue(body.contains("\"confidence\":0"))
+            assertEquals("{}", body)
         }
 
         @Test
