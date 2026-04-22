@@ -92,28 +92,44 @@ class LlmTitleExtractor @Inject constructor(
     internal fun extractJsonObject(raw: String): String? {
         val start = raw.indexOf('{')
         if (start < 0) return null
-        var depth = 0
-        var inString = false
-        var escaped = false
+        val scanner = BraceScanner()
         for (i in start until raw.length) {
-            val c = raw[i]
-            when {
-                escaped -> escaped = false
-                inString -> when (c) {
-                    '\\' -> escaped = true
-                    '"' -> inString = false
-                }
-                else -> when (c) {
-                    '"' -> inString = true
-                    '{' -> depth++
-                    '}' -> {
-                        depth--
-                        if (depth == 0) return raw.substring(start, i + 1)
-                    }
-                }
-            }
+            if (scanner.step(raw[i])) return raw.substring(start, i + 1)
         }
         return null
+    }
+
+    /**
+     * String-literal-aware brace-depth counter. Reports `true` from [step] on
+     * the `}` that closes the top-level `{...}` object. Extracted so the main
+     * scan loop stays shallow enough for detekt's nesting rule.
+     */
+    private class BraceScanner {
+        private var depth = 0
+        private var inString = false
+        private var escaped = false
+
+        fun step(c: Char): Boolean {
+            if (escaped) { escaped = false; return false }
+            if (inString) { stepInString(c); return false }
+            return stepTopLevel(c)
+        }
+
+        private fun stepInString(c: Char) {
+            when (c) {
+                '\\' -> escaped = true
+                '"' -> inString = false
+            }
+        }
+
+        private fun stepTopLevel(c: Char): Boolean {
+            when (c) {
+                '"' -> inString = true
+                '{' -> depth++
+                '}' -> depth--
+            }
+            return c == '}' && depth == 0
+        }
     }
 
     private fun buildPrompt(
