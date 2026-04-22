@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.27.0](https://github.com/justb81/watchbuddy/compare/v0.26.1...v0.27.0) (2026-04-22)
+
+
+### Features
+
+* **tv:** recent events section on Diagnostics + debug media-session firehose ([#409](https://github.com/justb81/watchbuddy/issues/409)) ([0d99701](https://github.com/justb81/watchbuddy/commit/0d99701fda412110392b4d105a0ec46035dfa4c9)), closes [#407](https://github.com/justb81/watchbuddy/issues/407)
+
 ## [0.26.1](https://github.com/justb81/watchbuddy/compare/v0.26.0...v0.26.1) (2026-04-21)
 
 
