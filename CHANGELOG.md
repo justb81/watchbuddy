@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.26.1](https://github.com/justb81/watchbuddy/compare/v0.26.0...v0.26.1) (2026-04-21)
+
+
+### Bug Fixes
+
+* **core:** rescue silently-dropped scrobbles ([#401](https://github.com/justb81/watchbuddy/issues/401), [#402](https://github.com/justb81/watchbuddy/issues/402)) ([#406](https://github.com/justb81/watchbuddy/issues/406)) ([24a8e74](https://github.com/justb81/watchbuddy/commit/24a8e74126ea4f12786104460c40d12428b6508c))
+* **phone:** move finished shows to "All Shows" instead of "Continue Watching" ([#399](https://github.com/justb81/watchbuddy/issues/399)) ([c465f4c](https://github.com/justb81/watchbuddy/commit/c465f4c72fb68f279e49fa15c4a06f8dbac4807d)), closes [#398](https://github.com/justb81/watchbuddy/issues/398)
+
 ## [0.26.0](https://github.com/justb81/watchbuddy/compare/v0.25.0...v0.26.0) (2026-04-20)
 
 
