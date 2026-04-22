@@ -77,6 +77,17 @@ class MediaSessionScrobbler @Inject constructor(
     private var currentlyScrobbling: String? = null
 
     /**
+     * Debug firehose toggle. When true, every poll tick writes a per-session breadcrumb
+     * to [DiagnosticLog] (package, title, state, position, duration) regardless of
+     * confidence, plus a near-miss line when a title fails to clear [OVERLAY_THRESHOLD].
+     *
+     * Set from the TV layer (see `TvDiscoveryService.observePreferences`) based on the
+     * "Debug: log every media session" setting. The phone leaves this `false`.
+     */
+    @Volatile
+    var debugLogMediaSession: Boolean = false
+
+    /**
      * Last observed playback progress per media title, captured on every poll that yields
      * a usable `position/duration`. Feeds the implicit-stop dispatched by [reconcileVanished]
      * when a session disappears without ever emitting STATE_STOPPED (issue #402).
@@ -99,17 +110,23 @@ class MediaSessionScrobbler @Inject constructor(
                     reconcileVanished(liveTitles)
                     sessions.forEach { controller ->
                         val packageName = controller.packageName
-                        val metadata = controller.metadata ?: return@forEach
-                        val playbackState = controller.playbackState ?: return@forEach
-                        val title = metadata.getString(android.media.MediaMetadata.METADATA_KEY_TITLE)
-                            ?: return@forEach
+                        val metadata = controller.metadata
+                        val playbackState = controller.playbackState
+                        val rawTitle = metadata
+                            ?.getString(android.media.MediaMetadata.METADATA_KEY_TITLE)
+                        val durationMs = metadata
+                            ?.getLong(android.media.MediaMetadata.METADATA_KEY_DURATION) ?: -1L
+                        val state = playbackState?.state ?: -1
+                        val positionMs = playbackState?.position ?: -1L
+                        logSessionIfDebug(packageName, rawTitle, state, positionMs, durationMs)
+                        if (metadata == null || playbackState == null || rawTitle == null) return@forEach
                         val progress = computeProgress(playbackState, metadata)
-                        if (progress != null) recordProgress(title, progress)
+                        if (progress != null) recordProgress(rawTitle, progress)
                         when (playbackState.state) {
-                            PlaybackState.STATE_PLAYING -> processPlayingMedia(packageName, title, progress)
-                            PlaybackState.STATE_PAUSED -> handleScrobblePause(title, progress)
+                            PlaybackState.STATE_PLAYING -> processPlayingMedia(packageName, rawTitle, progress)
+                            PlaybackState.STATE_PAUSED -> handleScrobblePause(rawTitle, progress)
                             PlaybackState.STATE_STOPPED,
-                            PlaybackState.STATE_NONE -> handleScrobbleStop(title, progress)
+                            PlaybackState.STATE_NONE -> handleScrobbleStop(rawTitle, progress)
                             else -> {}
                         }
                     }
@@ -123,6 +140,21 @@ class MediaSessionScrobbler @Inject constructor(
 
     internal fun recordProgress(title: String, progress: Float) {
         lastProgressByTitle[title] = progress
+    }
+
+    internal fun logSessionIfDebug(
+        packageName: String,
+        title: String?,
+        state: Int,
+        positionMs: Long,
+        durationMs: Long,
+    ) {
+        if (!debugLogMediaSession) return
+        DiagnosticLog.event(
+            TAG,
+            "session pkg=$packageName title='${title ?: "(null)"}' state=$state " +
+                "pos=${positionMs}ms dur=${durationMs}ms",
+        )
     }
 
     /**
@@ -170,13 +202,24 @@ class MediaSessionScrobbler @Inject constructor(
 
     private suspend fun processPlayingMedia(packageName: String, rawTitle: String, progress: Float?) {
         if (rawTitle == currentlyScrobbling) return
-        val candidate = matchTitle(packageName, rawTitle) ?: return
+        val candidate = matchTitle(packageName, rawTitle)
+        if (candidate == null) {
+            if (debugLogMediaSession) {
+                DiagnosticLog.debug(TAG, "no match for '$rawTitle' — best confidence null")
+            }
+            return
+        }
         if (candidate.confidence >= AUTO_SCROBBLE_THRESHOLD) {
             autoScrobble(candidate, progress)
             _lastCandidate.value = LastCandidate(candidate, System.currentTimeMillis(), autoScrobbled = true)
         } else if (candidate.confidence >= OVERLAY_THRESHOLD) {
             _pendingConfirmation.emit(candidate)
             _lastCandidate.value = LastCandidate(candidate, System.currentTimeMillis(), autoScrobbled = false)
+        } else if (debugLogMediaSession) {
+            DiagnosticLog.debug(
+                TAG,
+                "no match for '$rawTitle' — best confidence ${candidate.confidence}",
+            )
         }
     }
 

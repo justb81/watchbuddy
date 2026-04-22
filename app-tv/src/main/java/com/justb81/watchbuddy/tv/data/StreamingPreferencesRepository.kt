@@ -26,6 +26,7 @@ class StreamingPreferencesRepository @Inject constructor(
     private val phoneDiscoveryKey = booleanPreferencesKey("phone_discovery_enabled")
     private val autostartKey = booleanPreferencesKey("autostart_enabled")
     private val showNonInstalledKey = booleanPreferencesKey("show_non_installed_providers")
+    private val debugLogMediaSessionKey = booleanPreferencesKey("debug_log_media_session")
 
     /** Whether phone discovery (NSD + BLE) should be active. Defaults to true. */
     val isPhoneDiscoveryEnabled: Flow<Boolean> = context.streamingDataStore.data
@@ -45,6 +46,16 @@ class StreamingPreferencesRepository @Inject constructor(
         .catch { emit(emptyPreferences()) }
         .map { prefs -> prefs[showNonInstalledKey] ?: false }
 
+    /**
+     * Debug: when true, [MediaSessionScrobbler] writes a `DiagnosticLog.event` for every
+     * raw media-session poll tick so every package/title/state/position/duration is
+     * visible in TV Diagnostics. Off by default — this is firehose output intended for
+     * troubleshooting scrobble miss reports.
+     */
+    val debugLogMediaSession: Flow<Boolean> = context.streamingDataStore.data
+        .catch { emit(emptyPreferences()) }
+        .map { prefs -> prefs[debugLogMediaSessionKey] ?: false }
+
     suspend fun getShowNonInstalledProviders(): Boolean =
         showNonInstalledProviders.first()
 
@@ -58,5 +69,9 @@ class StreamingPreferencesRepository @Inject constructor(
 
     suspend fun setShowNonInstalledProviders(show: Boolean) {
         context.streamingDataStore.edit { prefs -> prefs[showNonInstalledKey] = show }
+    }
+
+    suspend fun setDebugLogMediaSession(enabled: Boolean) {
+        context.streamingDataStore.edit { prefs -> prefs[debugLogMediaSessionKey] = enabled }
     }
 }

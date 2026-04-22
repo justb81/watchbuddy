@@ -24,6 +24,7 @@ data class TvSettingsUiState(
     val isAutostartEnabled: Boolean = false,
     val isNotificationAccessGranted: Boolean = false,
     val showNonInstalledProviders: Boolean = false,
+    val debugLogMediaSession: Boolean = false,
 )
 
 @HiltViewModel
@@ -49,19 +50,30 @@ class TvSettingsViewModel @Inject constructor(
                 repository.isPhoneDiscoveryEnabled,
                 repository.isAutostartEnabled,
                 repository.showNonInstalledProviders,
-            ) { discovery, autostart, nonInstalled -> Triple(discovery, autostart, nonInstalled) }
+                repository.debugLogMediaSession,
+            ) { discovery, autostart, nonInstalled, debugLog ->
+                Snapshot(discovery, autostart, nonInstalled, debugLog)
+            }
                 .catch { e -> DiagnosticLog.error(TAG, "tv settings observation failed", e) }
-                .collect { (discovery, autostart, nonInstalled) ->
+                .collect { snapshot ->
                     _uiState.update {
                         it.copy(
-                            isPhoneDiscoveryEnabled = discovery,
-                            isAutostartEnabled = autostart,
-                            showNonInstalledProviders = nonInstalled,
+                            isPhoneDiscoveryEnabled = snapshot.discovery,
+                            isAutostartEnabled = snapshot.autostart,
+                            showNonInstalledProviders = snapshot.nonInstalled,
+                            debugLogMediaSession = snapshot.debugLog,
                         )
                     }
                 }
         }
     }
+
+    private data class Snapshot(
+        val discovery: Boolean,
+        val autostart: Boolean,
+        val nonInstalled: Boolean,
+        val debugLog: Boolean,
+    )
 
     fun setPhoneDiscoveryEnabled(enabled: Boolean) {
         _uiState.update { it.copy(isPhoneDiscoveryEnabled = enabled) }
@@ -76,6 +88,11 @@ class TvSettingsViewModel @Inject constructor(
     fun setShowNonInstalledProviders(show: Boolean) {
         _uiState.update { it.copy(showNonInstalledProviders = show) }
         launchSafe { repository.setShowNonInstalledProviders(show) }
+    }
+
+    fun setDebugLogMediaSession(enabled: Boolean) {
+        _uiState.update { it.copy(debugLogMediaSession = enabled) }
+        launchSafe { repository.setDebugLogMediaSession(enabled) }
     }
 
     /**

@@ -12,6 +12,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -19,6 +20,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.tv.material3.*
 import com.justb81.watchbuddy.R
+import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.scrobbler.MediaSessionScrobbler
 import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
 
@@ -178,6 +180,36 @@ fun TvDiagnosticsScreen(
             }
 
             item {
+                Text(
+                    text = stringResource(R.string.tv_diagnostics_section_recent_events).uppercase(),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White.copy(alpha = 0.7f),
+                    modifier = Modifier.padding(top = 8.dp, bottom = 4.dp, start = 4.dp),
+                )
+            }
+
+            if (uiState.recentEvents.isEmpty()) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = CardDefaults.shape(RoundedCornerShape(12.dp)),
+                        onClick = {},
+                    ) {
+                        Text(
+                            text = stringResource(R.string.tv_diagnostics_value_no_events),
+                            color = Color.White.copy(alpha = 0.5f),
+                            modifier = Modifier.padding(16.dp),
+                        )
+                    }
+                }
+            } else {
+                items(uiState.recentEvents) { entry ->
+                    RecentEventRow(entry)
+                }
+            }
+
+            item {
                 Spacer(Modifier.height(16.dp))
                 OutlinedButton(onClick = onBack) {
                     Text(stringResource(R.string.tv_back))
@@ -248,6 +280,51 @@ private fun PhoneRow(label: String, value: String) {
     ) {
         Text(label, fontSize = 12.sp, color = Color.White.copy(alpha = 0.7f))
         Text(value, fontSize = 12.sp, color = Color.White)
+    }
+}
+
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+private fun RecentEventRow(entry: DiagnosticLog.Entry) {
+    val status = when (entry.level) {
+        DiagnosticLog.Level.DEBUG -> Status.NEUTRAL
+        DiagnosticLog.Level.INFO -> Status.OK
+        DiagnosticLog.Level.WARN -> Status.WARN
+        DiagnosticLog.Level.ERROR -> Status.FAIL
+    }
+    val message = entry.throwableSummary?.let { "${entry.message} → $it" } ?: entry.message
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = CardDefaults.shape(RoundedCornerShape(12.dp)),
+        onClick = {},
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(10.dp)
+                    .background(statusColor(status), RoundedCornerShape(2.dp)),
+            )
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = "${formatAge(entry.timestampMs)} · ${entry.tag}",
+                    fontSize = 12.sp,
+                    color = Color.White.copy(alpha = 0.6f),
+                )
+                Text(
+                    text = message,
+                    fontSize = 13.sp,
+                    color = Color.White,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
     }
 }
 

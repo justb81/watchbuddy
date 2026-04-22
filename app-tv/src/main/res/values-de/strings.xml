@@ -73,6 +73,8 @@
     <string name="tv_settings_show_non_installed_title">Nicht installierte Dienste anzeigen</string>
     <string name="tv_settings_show_non_installed_subtitle">Auch Streamingdienste anzeigen, die nicht auf diesem Fernseher installiert sind</string>
     <string name="tv_settings_diagnostics">Diagnose</string>
+    <string name="tv_settings_debug_log_media_session_title">Debug: jede Mediensitzung protokollieren</string>
+    <string name="tv_settings_debug_log_media_session_subtitle">Schreibt jede erkannte Mediensitzung ins Ereignisprotokoll</string>
     <string name="tv_settings_notification_access_title">Benachrichtigungszugriff</string>
     <string name="tv_settings_notification_access_subtitle">Erforderlich für Scrobbling – damit WatchBuddy erkennt, was am TV läuft</string>
     <string name="tv_settings_status_granted">Erteilt</string>
@@ -124,6 +126,8 @@
     <string name="tv_diagnostics_value_yes">Ja</string>
     <string name="tv_diagnostics_value_no">Nein</string>
     <string name="tv_diagnostics_value_no_phones">Noch keine Telefone gefunden.</string>
+    <string name="tv_diagnostics_section_recent_events">Letzte Ereignisse</string>
+    <string name="tv_diagnostics_value_no_events">Noch keine Ereignisse</string>
 
     <!-- Version footer -->
     <string name="settings_version_footer">WatchBuddy v%1$s (Build %2$d)</string>

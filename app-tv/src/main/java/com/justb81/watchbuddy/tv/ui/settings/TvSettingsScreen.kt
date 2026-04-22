@@ -128,6 +128,13 @@ fun TvSettingsScreen(
             subtitle = stringResource(R.string.tv_diagnostics_title),
             onClick = onDiagnosticsClick,
         ),
+        SettingsRow.Toggle(
+            key = "debug_log_media_session",
+            title = stringResource(R.string.tv_settings_debug_log_media_session_title),
+            subtitle = stringResource(R.string.tv_settings_debug_log_media_session_subtitle),
+            enabled = uiState.debugLogMediaSession,
+            onChange = viewModel::setDebugLogMediaSession,
+        ),
     )
 
     TvSettingsBodyContent(rows = rows, onBack = onBack)
