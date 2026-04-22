@@ -97,20 +97,19 @@ class LlmTitleExtractor @Inject constructor(
         var escaped = false
         for (i in start until raw.length) {
             val c = raw[i]
-            if (escaped) { escaped = false; continue }
-            if (inString) {
-                when (c) {
+            when {
+                escaped -> escaped = false
+                inString -> when (c) {
                     '\\' -> escaped = true
                     '"' -> inString = false
                 }
-                continue
-            }
-            when (c) {
-                '"' -> inString = true
-                '{' -> depth++
-                '}' -> {
-                    depth--
-                    if (depth == 0) return raw.substring(start, i + 1)
+                else -> when (c) {
+                    '"' -> inString = true
+                    '{' -> depth++
+                    '}' -> {
+                        depth--
+                        if (depth == 0) return raw.substring(start, i + 1)
+                    }
                 }
             }
         }
