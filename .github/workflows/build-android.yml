@@ -87,13 +87,48 @@ jobs:
           done < <(find app-phone app-tv core -type f -name "*.sarif" 2>/dev/null)
           ls -la sarif-reports/
 
-      - name: Upload SARIF to GitHub code scanning
+      # CodeQL Action v4 requires a unique category per SARIF run, so each file
+      # is uploaded on its own. See
+      # https://github.blog/changelog/2025-07-21-code-scanning-will-stop-combining-multiple-sarif-runs-uploaded-in-the-same-sarif-file/
+      - name: Upload app-phone detekt SARIF
         if: always()
         continue-on-error: true
         uses: github/codeql-action/upload-sarif@v4
         with:
-          sarif_file: sarif-reports
-          category: watchbuddy-static-analysis
+          sarif_file: sarif-reports/app-phone-detekt.sarif
+          category: app-phone-detekt
+
+      - name: Upload app-phone lint SARIF
+        if: always()
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: sarif-reports/app-phone-lint-results-debug.sarif
+          category: app-phone-lint
+
+      - name: Upload app-tv detekt SARIF
+        if: always()
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: sarif-reports/app-tv-detekt.sarif
+          category: app-tv-detekt
+
+      - name: Upload app-tv lint SARIF
+        if: always()
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: sarif-reports/app-tv-lint-results-debug.sarif
+          category: app-tv-lint
+
+      - name: Upload core detekt SARIF
+        if: always()
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: sarif-reports/core-detekt.sarif
+          category: core-detekt
 
       - name: Archive analysis reports
         if: always()
