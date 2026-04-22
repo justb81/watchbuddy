@@ -53,6 +53,48 @@ class LlmProviderFactory @Inject constructor(
         return buildMinimalFallback()
     }
 
+    /**
+     * On-device cascade for non-recap use-cases (e.g. title extraction). Tries
+     * AICore → LiteRT-LM and returns `null` when both fail or no on-device LLM
+     * is configured. Intentionally skips [FallbackProvider] (recap-HTML only)
+     * so callers can cleanly distinguish "no LLM available" from "LLM
+     * succeeded".
+     */
+    suspend fun generateOrNull(prompt: String): String? {
+        val config = llmOrchestrator.selectConfig()
+        val providers = buildOnDeviceProviders(config)
+        if (providers.isEmpty()) {
+            Log.d(TAG, "No on-device LLM available")
+            return null
+        }
+        for (provider in providers) {
+            try {
+                Log.d(TAG, "Trying provider: ${provider.displayName}")
+                val result = provider.generate(prompt)
+                Log.d(TAG, "Success with provider: ${provider.displayName}")
+                return result
+            } catch (e: Exception) {
+                Log.w(TAG, "Provider ${provider.displayName} failed: ${e.message}")
+            }
+        }
+        return null
+    }
+
+    private fun buildOnDeviceProviders(config: LlmOrchestrator.LlmConfig): List<LlmProvider> {
+        val providers = mutableListOf<LlmProvider>()
+        when (config.backend) {
+            LlmBackend.AICORE -> {
+                providers += AiCoreLlmProvider(context)
+                config.modelVariant?.let { providers += LiteRtLlmProvider(context, it) }
+            }
+            LlmBackend.LITERT -> {
+                config.modelVariant?.let { providers += LiteRtLlmProvider(context, it) }
+            }
+            LlmBackend.NONE -> { /* no on-device backend */ }
+        }
+        return providers
+    }
+
     private fun buildProviderCascade(
         config: LlmOrchestrator.LlmConfig,
         episodes: List<TmdbEpisode>

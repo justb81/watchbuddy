@@ -6,7 +6,9 @@ import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
 import android.util.Log
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
+import com.justb81.watchbuddy.core.model.MediaMetadataSnapshot
 import com.justb81.watchbuddy.core.model.ScrobbleCandidate
+import com.justb81.watchbuddy.core.model.TitleExtractionResponse
 import com.justb81.watchbuddy.core.model.TraktEpisode
 import com.justb81.watchbuddy.core.model.TraktIds
 import com.justb81.watchbuddy.core.model.TraktShow
@@ -40,7 +42,8 @@ class MediaSessionScrobbler @Inject constructor(
     @param:ApplicationContext private val context: Context,
     private val tmdbApiService: TmdbApiService,
     private val watchedShowSource: WatchedShowSource,
-    private val scrobbleDispatcher: ScrobbleDispatcher
+    private val scrobbleDispatcher: ScrobbleDispatcher,
+    private val titleExtractor: TitleExtractor,
 ) {
     companion object {
         private const val TAG = "MediaSessionScrobbler"
@@ -120,10 +123,11 @@ class MediaSessionScrobbler @Inject constructor(
                         val positionMs = playbackState?.position ?: -1L
                         logSessionIfDebug(packageName, rawTitle, state, positionMs, durationMs)
                         if (metadata == null || playbackState == null || rawTitle == null) return@forEach
+                        val snapshot = buildSnapshot(packageName, metadata)
                         val progress = computeProgress(playbackState, metadata)
                         if (progress != null) recordProgress(rawTitle, progress)
                         when (playbackState.state) {
-                            PlaybackState.STATE_PLAYING -> processPlayingMedia(packageName, rawTitle, progress)
+                            PlaybackState.STATE_PLAYING -> processPlayingMedia(snapshot, rawTitle, progress)
                             PlaybackState.STATE_PAUSED -> handleScrobblePause(rawTitle, progress)
                             PlaybackState.STATE_STOPPED,
                             PlaybackState.STATE_NONE -> handleScrobbleStop(rawTitle, progress)
@@ -137,6 +141,29 @@ class MediaSessionScrobbler @Inject constructor(
             }
         }
     }
+
+    /**
+     * Reads every MediaMetadata field a streaming app might use to ship the show
+     * name or `S##E##` marker. Netflix/Prime/Disney+ ship only the episode title
+     * in `METADATA_KEY_TITLE`; Plex publishes the show in `ALBUM_ARTIST`;
+     * Jellyfin uses `ALBUM`; some Netflix skins use `DISPLAY_SUBTITLE`. Pulling
+     * all of them up front lets the match cascade score each candidate and keep
+     * the best one without round-tripping back to the controller.
+     */
+    internal fun buildSnapshot(
+        packageName: String,
+        metadata: android.media.MediaMetadata,
+    ): MediaMetadataSnapshot = MediaMetadataSnapshot(
+        packageName = packageName,
+        title = metadata.getString(android.media.MediaMetadata.METADATA_KEY_TITLE),
+        displayTitle = metadata.getString(android.media.MediaMetadata.METADATA_KEY_DISPLAY_TITLE),
+        displaySubtitle = metadata.getString(android.media.MediaMetadata.METADATA_KEY_DISPLAY_SUBTITLE),
+        displayDescription = metadata.getString(android.media.MediaMetadata.METADATA_KEY_DISPLAY_DESCRIPTION),
+        artist = metadata.getString(android.media.MediaMetadata.METADATA_KEY_ARTIST),
+        albumArtist = metadata.getString(android.media.MediaMetadata.METADATA_KEY_ALBUM_ARTIST),
+        album = metadata.getString(android.media.MediaMetadata.METADATA_KEY_ALBUM),
+        subtitle = metadata.getString(android.media.MediaMetadata.METADATA_KEY_SUBTITLE),
+    )
 
     internal fun recordProgress(title: String, progress: Float) {
         lastProgressByTitle[title] = progress
@@ -200,9 +227,13 @@ class MediaSessionScrobbler @Inject constructor(
         lastProgressByTitle.clear()
     }
 
-    private suspend fun processPlayingMedia(packageName: String, rawTitle: String, progress: Float?) {
+    private suspend fun processPlayingMedia(
+        snapshot: MediaMetadataSnapshot,
+        rawTitle: String,
+        progress: Float?,
+    ) {
         if (rawTitle == currentlyScrobbling) return
-        val candidate = matchTitle(packageName, rawTitle)
+        val candidate = matchSnapshot(snapshot)
         if (candidate == null) {
             if (debugLogMediaSession) {
                 DiagnosticLog.debug(TAG, "no match for '$rawTitle' — best confidence null")
@@ -235,52 +266,191 @@ class MediaSessionScrobbler @Inject constructor(
 
     // ── Fuzzy Matching ────────────────────────────────────────────────────────
 
-    internal suspend fun matchTitle(packageName: String, rawTitle: String): ScrobbleCandidate? {
+    /**
+     * Convenience adaptor preserved so vanish/stop paths and existing tests can
+     * match with only a raw title. The full multi-field + LLM fallback cascade
+     * runs through [matchSnapshot] — always prefer that entry point when the
+     * full `MediaMetadata` is available.
+     */
+    internal suspend fun matchTitle(packageName: String, rawTitle: String): ScrobbleCandidate? =
+        matchSnapshot(MediaMetadataSnapshot(packageName = packageName, title = rawTitle))
+
+    /**
+     * Full match cascade:
+     *   1. **Phase 1 (cheap)** — try every MediaMetadata field from [snapshot] as
+     *      a candidate show title, parse any `S##E##` marker, score against the
+     *      cached library with [fuzzyScore], keep the highest-scoring cache hit.
+     *   2. **LLM fallback** — if no field clears [OVERLAY_THRESHOLD], ask the
+     *      injected [TitleExtractor] for a normalized `(showTitle, season?,
+     *      episode?)` and retry the cache match with it.
+     *   3. **TMDB fallback** — if the library still has no match, search TMDB
+     *      with the best-scoring candidate (cheap-path best or extractor
+     *      output).
+     */
+    internal suspend fun matchSnapshot(snapshot: MediaMetadataSnapshot): ScrobbleCandidate? {
+        val candidates = snapshot.candidateStrings()
+        if (candidates.isEmpty()) return null
+        val mediaTitle = snapshot.title ?: candidates.first()
+
+        val (globalSeason, globalEpisode) = findGlobalEpisodeMarker(candidates)
+        val cachedShows = watchedShowSource.getCachedShows()
+        val bestCheap = candidates
+            .map { field -> scoreCandidate(field, cachedShows) }
+            .maxByOrNull { it.score }
+
+        val cheapHit = resolveCheapHit(snapshot, bestCheap, globalSeason, globalEpisode, mediaTitle)
+        if (cheapHit != null) return cheapHit
+
+        val extraction = runCatching { titleExtractor.extract(snapshot) }
+            .onFailure { DiagnosticLog.warn(TAG, "Title extractor threw", it) }
+            .getOrNull()
+        val llmHit = extraction?.let { resolveExtraction(snapshot, it, cachedShows, mediaTitle) }
+        if (llmHit != null) return llmHit
+
+        return tmdbFallback(snapshot, extraction, bestCheap, mediaTitle)
+    }
+
+    private fun findGlobalEpisodeMarker(candidates: List<String>): Pair<Int?, Int?> {
         val episodePattern = Regex("""(?i)S(\d{1,2})E(\d{1,2})""")
-        val match = episodePattern.find(rawTitle)
-        val showTitle = if (match != null) rawTitle.substringBefore(match.value).trim() else rawTitle
+        val match = candidates.firstNotNullOfOrNull { episodePattern.find(it) }
         val season = match?.groupValues?.get(1)?.toIntOrNull()
         val episode = match?.groupValues?.get(2)?.toIntOrNull()
-        if (showTitle.isBlank()) return null
+        return season to episode
+    }
 
-        val cachedShows = watchedShowSource.getCachedShows()
-        if (cachedShows.isNotEmpty()) {
-            val bestCacheMatch = cachedShows.maxByOrNull { fuzzyScore(it.show.title, showTitle) }
-            val cacheScore = bestCacheMatch?.let { fuzzyScore(it.show.title, showTitle) } ?: 0f
-            if (cacheScore >= 0.70f && bestCacheMatch != null) {
-                val matchedEpisode = resolveEpisode(season, episode, bestCacheMatch, cacheScore)
-                return ScrobbleCandidate(
-                    packageName = packageName,
-                    mediaTitle = rawTitle,
-                    confidence = cacheScore,
-                    matchedShow = bestCacheMatch.show,
-                    matchedEpisode = matchedEpisode
-                )
-            }
-        }
+    private suspend fun resolveCheapHit(
+        snapshot: MediaMetadataSnapshot,
+        bestCheap: CheapMatch?,
+        globalSeason: Int?,
+        globalEpisode: Int?,
+        mediaTitle: String,
+    ): ScrobbleCandidate? {
+        val entry = bestCheap?.cacheEntry ?: return null
+        if (bestCheap.score < OVERLAY_THRESHOLD) return null
+        val matchedEpisode = resolveEpisode(
+            bestCheap.season ?: globalSeason,
+            bestCheap.episode ?: globalEpisode,
+            entry,
+            bestCheap.score,
+        )
+        return ScrobbleCandidate(
+            packageName = snapshot.packageName,
+            mediaTitle = mediaTitle,
+            confidence = bestCheap.score,
+            matchedShow = entry.show,
+            matchedEpisode = matchedEpisode,
+        )
+    }
 
+    private suspend fun tmdbFallback(
+        snapshot: MediaMetadataSnapshot,
+        extraction: TitleExtractionResponse?,
+        bestCheap: CheapMatch?,
+        mediaTitle: String,
+    ): ScrobbleCandidate? {
+        val tmdbQuery = extraction?.showTitle?.takeIf { it.isNotBlank() }
+            ?: bestCheap?.normalizedTitle?.takeIf { it.isNotBlank() }
+            ?: return null
+        val tmdbSeason = extraction?.season ?: bestCheap?.season
+        val tmdbEpisode = extraction?.episode ?: bestCheap?.episode
         val tmdbApiKey = watchedShowSource.getTmdbApiKey() ?: return null
         return try {
-            val tmdbResults = tmdbApiService.searchTv(showTitle, tmdbApiKey).results
-            val bestTmdbMatch = tmdbResults.maxByOrNull { fuzzyScore(it.name, showTitle) }
-            val tmdbScore = bestTmdbMatch?.let { fuzzyScore(it.name, showTitle) } ?: 0f
-            if (tmdbScore < 0.50f || bestTmdbMatch == null) return null
-            ScrobbleCandidate(
-                packageName = packageName,
-                mediaTitle = rawTitle,
-                confidence = tmdbScore,
-                matchedShow = TraktShow(
-                    title = bestTmdbMatch.name,
-                    year = bestTmdbMatch.first_air_date?.take(4)?.toIntOrNull(),
-                    ids = TraktIds(tmdb = bestTmdbMatch.id)
-                ),
-                matchedEpisode = if (season != null && episode != null)
-                    TraktEpisode(season = season, number = episode) else null
-            )
+            val tmdbResults = tmdbApiService.searchTv(tmdbQuery, tmdbApiKey).results
+            val bestTmdbMatch = tmdbResults.maxByOrNull { fuzzyScore(it.name, tmdbQuery) }
+            val tmdbScore = bestTmdbMatch?.let { fuzzyScore(it.name, tmdbQuery) } ?: 0f
+            if (tmdbScore < 0.50f || bestTmdbMatch == null) {
+                null
+            } else {
+                ScrobbleCandidate(
+                    packageName = snapshot.packageName,
+                    mediaTitle = mediaTitle,
+                    confidence = tmdbScore,
+                    matchedShow = TraktShow(
+                        title = bestTmdbMatch.name,
+                        year = bestTmdbMatch.first_air_date?.take(4)?.toIntOrNull(),
+                        ids = TraktIds(tmdb = bestTmdbMatch.id),
+                    ),
+                    matchedEpisode = if (tmdbSeason != null && tmdbEpisode != null) {
+                        TraktEpisode(season = tmdbSeason, number = tmdbEpisode)
+                    } else {
+                        null
+                    },
+                )
+            }
         } catch (e: Exception) {
-            Log.w(TAG, "TMDB search failed for '$showTitle'", e)
+            Log.w(TAG, "TMDB search failed for '$tmdbQuery'", e)
             null
         }
+    }
+
+    /**
+     * Result of scoring one MediaMetadata field against the cache. [score] is
+     * the best fuzzy score achieved by any cache entry against the normalized
+     * show-title slice of this field; [cacheEntry] is the winning entry (null
+     * when the library is empty or the field was unusable).
+     */
+    private data class CheapMatch(
+        val rawField: String,
+        val normalizedTitle: String,
+        val season: Int?,
+        val episode: Int?,
+        val score: Float,
+        val cacheEntry: TraktWatchedEntry?,
+    )
+
+    private fun scoreCandidate(
+        field: String,
+        cachedShows: List<TraktWatchedEntry>,
+    ): CheapMatch {
+        val episodePattern = Regex("""(?i)S(\d{1,2})E(\d{1,2})""")
+        val match = episodePattern.find(field)
+        val showTitle = if (match != null) field.substringBefore(match.value).trim() else field.trim()
+        val season = match?.groupValues?.get(1)?.toIntOrNull()
+        val episode = match?.groupValues?.get(2)?.toIntOrNull()
+        if (showTitle.isBlank() || cachedShows.isEmpty()) {
+            return CheapMatch(field, showTitle, season, episode, 0f, null)
+        }
+        val best = cachedShows.maxByOrNull { fuzzyScore(it.show.title, showTitle) }
+        val score = best?.let { fuzzyScore(it.show.title, showTitle) } ?: 0f
+        return CheapMatch(field, showTitle, season, episode, score, best)
+    }
+
+    /**
+     * Takes the LLM extractor's normalized output and resolves it through the
+     * same deterministic cache match the cheap path uses. This guarantees the
+     * TV never scrobbles a show the LLM hallucinated that isn't in the user's
+     * library — the cache match stays the source of truth.
+     */
+    private suspend fun resolveExtraction(
+        snapshot: MediaMetadataSnapshot,
+        extraction: TitleExtractionResponse,
+        cachedShows: List<TraktWatchedEntry>,
+        mediaTitle: String,
+    ): ScrobbleCandidate? {
+        val showTitle = extraction.showTitle?.trim() ?: return null
+        if (showTitle.isBlank() || cachedShows.isEmpty()) return null
+        val bestCacheMatch = cachedShows.maxByOrNull { fuzzyScore(it.show.title, showTitle) }
+            ?: return null
+        val score = fuzzyScore(bestCacheMatch.show.title, showTitle)
+        if (score < OVERLAY_THRESHOLD) return null
+        val matchedEpisode = resolveEpisode(
+            extraction.season,
+            extraction.episode,
+            bestCacheMatch,
+            score,
+        )
+        DiagnosticLog.event(
+            TAG,
+            "LLM fallback resolved '${snapshot.title}' → '${bestCacheMatch.show.title}' " +
+                "S${matchedEpisode?.season}E${matchedEpisode?.number} score=$score",
+        )
+        return ScrobbleCandidate(
+            packageName = snapshot.packageName,
+            mediaTitle = mediaTitle,
+            confidence = score,
+            matchedShow = bestCacheMatch.show,
+            matchedEpisode = matchedEpisode,
+        )
     }
 
     /**

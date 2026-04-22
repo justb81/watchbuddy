@@ -7,6 +7,7 @@ import com.justb81.watchbuddy.core.model.TraktEpisode
 import com.justb81.watchbuddy.core.model.TraktIds
 import com.justb81.watchbuddy.core.model.TraktShow
 import com.justb81.watchbuddy.core.scrobbler.MediaSessionScrobbler
+import com.justb81.watchbuddy.core.scrobbler.NoOpTitleExtractor
 import com.justb81.watchbuddy.core.scrobbler.ScrobbleDispatcher
 import com.justb81.watchbuddy.core.scrobbler.WatchedShowSource
 import com.justb81.watchbuddy.core.tmdb.TmdbApiService
@@ -49,7 +50,7 @@ class MediaSessionScrobblerTest {
         val mockSessionManager = mockk<MediaSessionManager>(relaxed = true)
         every { context.getSystemService(Context.MEDIA_SESSION_SERVICE) } returns mockSessionManager
         every { mockSessionManager.getActiveSessions(any()) } returns emptyList()
-        scrobbler = MediaSessionScrobbler(context, tmdbApiService, watchedShowSource, scrobbleDispatcher)
+        scrobbler = MediaSessionScrobbler(context, tmdbApiService, watchedShowSource, scrobbleDispatcher, NoOpTitleExtractor)
     }
 
     // ── autoScrobble() ───────────────────────────────────────────────────────

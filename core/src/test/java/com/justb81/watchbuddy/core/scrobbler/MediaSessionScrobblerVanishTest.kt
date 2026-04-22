@@ -47,7 +47,7 @@ class MediaSessionScrobblerVanishTest {
 
     @BeforeEach
     fun setUp() {
-        scrobbler = MediaSessionScrobbler(context, tmdbApiService, watchedShowSource, scrobbleDispatcher)
+        scrobbler = MediaSessionScrobbler(context, tmdbApiService, watchedShowSource, scrobbleDispatcher, NoOpTitleExtractor)
         coEvery { scrobbleDispatcher.dispatchStart(any(), any(), any()) } just runs
         coEvery { scrobbleDispatcher.dispatchStop(any(), any(), any()) } just runs
         coEvery { watchedShowSource.getCachedShows() } returns

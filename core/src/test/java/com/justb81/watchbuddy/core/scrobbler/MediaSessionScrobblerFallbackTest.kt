@@ -44,7 +44,7 @@ class MediaSessionScrobblerFallbackTest {
 
     @BeforeEach
     fun setUp() {
-        scrobbler = MediaSessionScrobbler(context, tmdbApiService, watchedShowSource, scrobbleDispatcher)
+        scrobbler = MediaSessionScrobbler(context, tmdbApiService, watchedShowSource, scrobbleDispatcher, NoOpTitleExtractor)
         coEvery { watchedShowSource.getTmdbApiKey() } returns null
     }
 

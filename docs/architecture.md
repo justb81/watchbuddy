@@ -52,6 +52,7 @@ The 9-byte payload is the authoritative wire contract — see
 | POST | `/scrobble/start` | Forward scrobble start to this user's Trakt account |
 | POST | `/scrobble/pause` | Forward scrobble pause to this user's Trakt account |
 | POST | `/scrobble/stop` | Forward scrobble stop to this user's Trakt account |
+| POST | `/scrobble/extract` | LLM fallback — accepts a `MediaMetadataSnapshot` + library hints, returns normalized `(showTitle, season?, episode?, confidence)`. TV calls this only when the deterministic multi-field + fuzzy-match cascade misses (< 0.70 cache confidence). 90 s client / 75 s server budget absorbs cold LiteRT-LM inference; per-raw-title in-flight dedup on the TV side prevents the 30 s `MediaSession` poll cycle from stacking duplicate inferences. |
 
 **TV app API boundaries:**
 - **TMDB API** — show/movie details, images, search (direct call from TV using key from `/capability`)

@@ -1,5 +1,7 @@
 package com.justb81.watchbuddy.core.scrobbler
 
+import com.justb81.watchbuddy.core.model.MediaMetadataSnapshot
+import com.justb81.watchbuddy.core.model.TitleExtractionResponse
 import com.justb81.watchbuddy.core.model.TmdbProgressHint
 import com.justb81.watchbuddy.core.model.TraktEpisode
 import com.justb81.watchbuddy.core.model.TraktIds
@@ -31,4 +33,25 @@ interface ScrobbleDispatcher {
     suspend fun dispatchStart(show: TraktShow, episode: TraktEpisode, progress: Float)
     suspend fun dispatchPause(show: TraktShow, episode: TraktEpisode, progress: Float)
     suspend fun dispatchStop(show: TraktShow, episode: TraktEpisode, progress: Float)
+}
+
+/**
+ * Last-resort fallback for [MediaSessionScrobbler.matchSnapshot]: when the
+ * cache / multi-field regex path cannot resolve a title to a show (confidence
+ * below the overlay threshold), the scrobbler consults a [TitleExtractor]
+ * for a normalized `(showTitle, season?, episode?)` triple and re-runs the
+ * deterministic cascade with it.
+ *
+ * The TV implementation forwards the snapshot to the best-scoring phone's
+ * `POST /scrobble/extract`, which invokes the local LLM. The phone app binds
+ * [NoOpTitleExtractor] — the scrobbler there already has the Trakt library
+ * in-process so richer matching is unnecessary.
+ */
+interface TitleExtractor {
+    suspend fun extract(snapshot: MediaMetadataSnapshot): TitleExtractionResponse?
+}
+
+/** No-op implementation wired on the phone app and in tests that don't exercise the LLM path. */
+object NoOpTitleExtractor : TitleExtractor {
+    override suspend fun extract(snapshot: MediaMetadataSnapshot): TitleExtractionResponse? = null
 }

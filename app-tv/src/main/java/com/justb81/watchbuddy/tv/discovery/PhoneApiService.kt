@@ -1,6 +1,8 @@
 package com.justb81.watchbuddy.tv.discovery
 
 import com.justb81.watchbuddy.core.model.EnrichedShowEntry
+import com.justb81.watchbuddy.core.model.TitleExtractionRequest
+import com.justb81.watchbuddy.core.model.TitleExtractionResponse
 import com.justb81.watchbuddy.core.model.TraktEpisode
 import com.justb81.watchbuddy.core.model.TraktShow
 import kotlinx.serialization.Serializable
@@ -33,6 +35,9 @@ interface PhoneApiService {
 
     @POST("/scrobble/stop")
     suspend fun scrobbleStop(@Body body: PhoneScrobbleRequest): PhoneScrobbleActionResponse
+
+    @POST("/scrobble/extract")
+    suspend fun extractTitle(@Body body: TitleExtractionRequest): TitleExtractionResponse
 }
 
 @Serializable

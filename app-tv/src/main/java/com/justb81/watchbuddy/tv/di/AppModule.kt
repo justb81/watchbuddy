@@ -1,7 +1,9 @@
 package com.justb81.watchbuddy.tv.di
 
 import com.justb81.watchbuddy.core.scrobbler.ScrobbleDispatcher
+import com.justb81.watchbuddy.core.scrobbler.TitleExtractor
 import com.justb81.watchbuddy.core.scrobbler.WatchedShowSource
+import com.justb81.watchbuddy.tv.discovery.PhoneTitleExtractionClient
 import com.justb81.watchbuddy.tv.scrobbler.TvScrobbleDispatcher
 import com.justb81.watchbuddy.tv.scrobbler.TvWatchedShowSource
 import dagger.Binds
@@ -21,6 +23,9 @@ abstract class AppModule {
 
     @Binds
     abstract fun bindScrobbleDispatcher(impl: TvScrobbleDispatcher): ScrobbleDispatcher
+
+    @Binds
+    abstract fun bindTitleExtractor(impl: PhoneTitleExtractionClient): TitleExtractor
 
     companion object {
 

@@ -160,6 +160,81 @@ data class ScrobbleCandidate(
     val matchedEpisode: TraktEpisode? = null
 )
 
+/**
+ * Structured view of the MediaMetadata fields a streaming app publishes for the
+ * currently-playing session. Streaming apps distribute signal across several
+ * fields (Plex puts the show in ALBUM_ARTIST, Jellyfin in ALBUM, some Netflix
+ * skins use DISPLAY_SUBTITLE for SxxExx) so the scrobbler tries them all before
+ * falling back to the LLM extractor.
+ */
+@Serializable
+data class MediaMetadataSnapshot(
+    val packageName: String,
+    val title: String? = null,
+    val displayTitle: String? = null,
+    val displaySubtitle: String? = null,
+    val displayDescription: String? = null,
+    val artist: String? = null,
+    val albumArtist: String? = null,
+    val album: String? = null,
+    val subtitle: String? = null,
+) {
+    /**
+     * Candidate strings to try for SxxExx parsing + fuzzy matching, ordered by
+     * how likely they are to hold the show title: `ALBUM_ARTIST` > `ALBUM` >
+     * `ARTIST` > `DISPLAY_TITLE` > `DISPLAY_SUBTITLE` > `TITLE` > `SUBTITLE` >
+     * `DISPLAY_DESCRIPTION`. Empty / blank values are filtered; duplicates are
+     * collapsed so the fuzzy cascade doesn't redo the same scoring twice.
+     */
+    fun candidateStrings(): List<String> =
+        listOfNotNull(albumArtist, album, artist, displayTitle, displaySubtitle, title, subtitle, displayDescription)
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .distinct()
+}
+
+/**
+ * Minimal show reference shipped to the LLM extractor so it can prefer a library
+ * match when the raw MediaSession values match a show the user already watches.
+ * Kept tiny (~40 bytes per entry) so the prompt stays under a few KB even with
+ * 50+ shows.
+ */
+@Serializable
+data class LibraryHint(
+    val traktId: Int? = null,
+    val tmdbId: Int? = null,
+    val title: String,
+    val year: Int? = null,
+)
+
+/**
+ * Request body for `POST /scrobble/extract`. The TV ships every MediaMetadata
+ * field it has + a top-N library hint list; the phone returns normalized
+ * `(showTitle, season?, episode?)`.
+ */
+@Serializable
+data class TitleExtractionRequest(
+    val snapshot: MediaMetadataSnapshot,
+    val libraryHints: List<LibraryHint> = emptyList(),
+)
+
+/**
+ * Response from the phone's LLM title extractor. The TV never trusts it blindly
+ * — it re-runs the existing cache/TMDB match cascade with the normalized
+ * [showTitle] instead. Fields are optional because a) the LLM may fail, b) the
+ * extractor is a *hint provider*, not an authority.
+ */
+@Serializable
+data class TitleExtractionResponse(
+    val showTitle: String? = null,
+    val season: Int? = null,
+    val episode: Int? = null,
+    /** Populated when the LLM picked a library hint. Validated server-side. */
+    val libraryTraktId: Int? = null,
+    /** Self-reported, clamped to `[0.0, 1.0]` server-side. */
+    val confidence: Float = 0f,
+)
+
 // ── Scrobble Display ─────────────────────────────────────────────────────────
 
 @Serializable
