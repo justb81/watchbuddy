@@ -1,6 +1,10 @@
 package com.justb81.watchbuddy.core.logging
 
 import android.util.Log
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import java.text.SimpleDateFormat
 import java.util.ArrayDeque
 import java.util.Date
@@ -37,6 +41,19 @@ object DiagnosticLog {
 
     private val buffer = ArrayDeque<Entry>(MAX_ENTRIES)
     private val lock = Any()
+
+    private val _updates = MutableSharedFlow<Unit>(
+        extraBufferCapacity = 1,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
+
+    /**
+     * Emits a tick after every [append] so reactive consumers (e.g. the TV diagnostics
+     * screen) can refresh their view without polling. Consumers snapshot on each tick
+     * and pick whatever slice they want — the flow itself carries no payload to keep
+     * it cheap.
+     */
+    val updates: SharedFlow<Unit> = _updates.asSharedFlow()
 
     private val timestampFormatter: ThreadLocal<SimpleDateFormat> =
         object : ThreadLocal<SimpleDateFormat>() {
@@ -96,6 +113,7 @@ object DiagnosticLog {
             buffer.addLast(entry)
         }
         mirrorToLogcat(entry, throwable)
+        _updates.tryEmit(Unit)
     }
 
     private fun summarizeThrowable(t: Throwable): String {

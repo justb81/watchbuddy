@@ -1,6 +1,7 @@
 package com.justb81.watchbuddy.tv.scrobbler
 
 import android.util.Log
+import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.model.TraktEpisode
 import com.justb81.watchbuddy.core.model.TraktShow
 import com.justb81.watchbuddy.core.scrobbler.ScrobbleDispatcher
@@ -52,6 +53,10 @@ class TvScrobbleDispatcher @Inject constructor(
         val phones = availablePhones()
         if (phones.isEmpty()) {
             Log.w(TAG, "No phones available — scrobble ${action.name.lowercase()} skipped")
+            DiagnosticLog.warn(
+                TAG,
+                "scrobble ${action.name.lowercase()} dropped — no phones reachable",
+            )
             return
         }
         val request = PhoneScrobbleRequest(show = show, episode = episode, progress = progress)

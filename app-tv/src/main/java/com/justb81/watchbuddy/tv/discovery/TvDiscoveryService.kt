@@ -65,14 +65,21 @@ class TvDiscoveryService : Service() {
     private fun observePreferences() {
         if (observerJob != null) return
         observerJob = scope.launch {
-            preferences.isPhoneDiscoveryEnabled.collect { discovery ->
-                if (discovery) {
-                    phoneDiscovery.setEnabled(true)
-                    startScrobblerIfPermitted()
-                } else {
-                    DiagnosticLog.event(TAG, "phone discovery disabled — stopping self")
-                    scrobbler.stopListening()
-                    stopSelf()
+            launch {
+                preferences.isPhoneDiscoveryEnabled.collect { discovery ->
+                    if (discovery) {
+                        phoneDiscovery.setEnabled(true)
+                        startScrobblerIfPermitted()
+                    } else {
+                        DiagnosticLog.event(TAG, "phone discovery disabled — stopping self")
+                        scrobbler.stopListening()
+                        stopSelf()
+                    }
+                }
+            }
+            launch {
+                preferences.debugLogMediaSession.collect { enabled ->
+                    scrobbler.debugLogMediaSession = enabled
                 }
             }
         }

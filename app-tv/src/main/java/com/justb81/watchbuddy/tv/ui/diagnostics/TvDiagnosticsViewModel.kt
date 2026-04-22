@@ -5,6 +5,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.justb81.watchbuddy.BuildConfig
+import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.scrobbler.MediaSessionScrobbler
 import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -13,6 +14,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -26,6 +28,7 @@ data class TvDiagnosticsUiState(
     val notificationAccessGranted: Boolean = false,
     val scrobblerListening: Boolean = false,
     val lastCandidate: MediaSessionScrobbler.LastCandidate? = null,
+    val recentEvents: List<DiagnosticLog.Entry> = emptyList(),
     val versionName: String = BuildConfig.VERSION_NAME,
     val versionCode: Int = BuildConfig.VERSION_CODE,
 )
@@ -70,7 +73,19 @@ class TvDiagnosticsViewModel @Inject constructor(
                     lastCandidate = s.second,
                 )
             }.collect { snapshot ->
-                _uiState.update { snapshot.copy(notificationAccessGranted = it.notificationAccessGranted) }
+                _uiState.update {
+                    snapshot.copy(
+                        notificationAccessGranted = it.notificationAccessGranted,
+                        recentEvents = it.recentEvents,
+                    )
+                }
+            }
+        }
+
+        viewModelScope.launch {
+            DiagnosticLog.updates.onStart { emit(Unit) }.collect {
+                val latest = DiagnosticLog.snapshot().asReversed().take(MAX_RECENT_EVENTS)
+                _uiState.update { it.copy(recentEvents = latest) }
             }
         }
     }
@@ -86,5 +101,9 @@ class TvDiagnosticsViewModel @Inject constructor(
                 .contains(application.packageName)
         }.getOrDefault(false)
         _uiState.update { it.copy(notificationAccessGranted = granted) }
+    }
+
+    companion object {
+        private const val MAX_RECENT_EVENTS = 100
     }
 }
