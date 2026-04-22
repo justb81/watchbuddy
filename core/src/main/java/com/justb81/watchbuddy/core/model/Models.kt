@@ -177,17 +177,16 @@ data class MediaMetadataSnapshot(
     val artist: String? = null,
     val albumArtist: String? = null,
     val album: String? = null,
-    val subtitle: String? = null,
 ) {
     /**
      * Candidate strings to try for SxxExx parsing + fuzzy matching, ordered by
      * how likely they are to hold the show title: `ALBUM_ARTIST` > `ALBUM` >
-     * `ARTIST` > `DISPLAY_TITLE` > `DISPLAY_SUBTITLE` > `TITLE` > `SUBTITLE` >
+     * `ARTIST` > `DISPLAY_TITLE` > `DISPLAY_SUBTITLE` > `TITLE` >
      * `DISPLAY_DESCRIPTION`. Empty / blank values are filtered; duplicates are
      * collapsed so the fuzzy cascade doesn't redo the same scoring twice.
      */
     fun candidateStrings(): List<String> =
-        listOfNotNull(albumArtist, album, artist, displayTitle, displaySubtitle, title, subtitle, displayDescription)
+        listOfNotNull(albumArtist, album, artist, displayTitle, displaySubtitle, title, displayDescription)
             .map { it.trim() }
             .filter { it.isNotBlank() }
             .distinct()

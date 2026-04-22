@@ -162,7 +162,6 @@ class MediaSessionScrobbler @Inject constructor(
         artist = metadata.getString(android.media.MediaMetadata.METADATA_KEY_ARTIST),
         albumArtist = metadata.getString(android.media.MediaMetadata.METADATA_KEY_ALBUM_ARTIST),
         album = metadata.getString(android.media.MediaMetadata.METADATA_KEY_ALBUM),
-        subtitle = metadata.getString(android.media.MediaMetadata.METADATA_KEY_SUBTITLE),
     )
 
     internal fun recordProgress(title: String, progress: Float) {

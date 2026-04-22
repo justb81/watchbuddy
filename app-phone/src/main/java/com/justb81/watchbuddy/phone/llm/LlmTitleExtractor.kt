@@ -139,7 +139,6 @@ class LlmTitleExtractor @Inject constructor(
             snapshot.artist?.let { appendLine("ARTIST: $it") }
             snapshot.albumArtist?.let { appendLine("ALBUM_ARTIST: $it") }
             snapshot.album?.let { appendLine("ALBUM: $it") }
-            snapshot.subtitle?.let { appendLine("SUBTITLE: $it") }
         }
         return """
 You extract TV-show metadata from Android MediaSession fields published by
