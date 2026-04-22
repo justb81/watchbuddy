@@ -426,8 +426,10 @@ class MediaSessionScrobbler @Inject constructor(
         cachedShows: List<TraktWatchedEntry>,
         mediaTitle: String,
     ): ScrobbleCandidate? {
-        val showTitle = extraction.showTitle?.trim() ?: return null
-        if (showTitle.isBlank() || cachedShows.isEmpty()) return null
+        // Collapse the "no usable title" and "empty cache" paths into one
+        // return: if either fails, maxByOrNull returns null and we exit
+        // through the single cache-miss branch.
+        val showTitle = extraction.showTitle?.trim()?.takeIf { it.isNotBlank() } ?: return null
         val bestCacheMatch = cachedShows.maxByOrNull { fuzzyScore(it.show.title, showTitle) }
             ?: return null
         val score = fuzzyScore(bestCacheMatch.show.title, showTitle)
