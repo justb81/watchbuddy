@@ -2,8 +2,10 @@ package com.justb81.watchbuddy.phone.server
 
 import com.justb81.watchbuddy.core.model.EnrichedShowEntry
 import com.justb81.watchbuddy.core.model.LlmBackend
+import com.justb81.watchbuddy.core.model.MediaMetadataSnapshot
 import com.justb81.watchbuddy.core.model.ScrobbleAction
 import com.justb81.watchbuddy.core.model.DeviceCapability
+import com.justb81.watchbuddy.core.model.TitleExtractionResponse
 import com.justb81.watchbuddy.core.model.TmdbEpisode
 import com.justb81.watchbuddy.core.model.TmdbShow
 import com.justb81.watchbuddy.core.model.TraktEpisode
@@ -18,6 +20,7 @@ import com.justb81.watchbuddy.core.trakt.ScrobbleResponse
 import com.justb81.watchbuddy.core.trakt.TraktApiService
 import com.justb81.watchbuddy.phone.auth.TokenRefreshManager
 import com.justb81.watchbuddy.phone.auth.TokenRepository
+import com.justb81.watchbuddy.phone.llm.LlmTitleExtractor
 import com.justb81.watchbuddy.phone.llm.RecapGenerator
 import com.justb81.watchbuddy.phone.settings.AvatarImageStore
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
@@ -50,6 +53,7 @@ class CompanionHttpServerTest {
     private val settingsRepository: SettingsRepository = mockk()
     private val avatarImageStore: AvatarImageStore = mockk(relaxed = true)
     private val stateManager = CompanionStateManager()
+    private val titleExtractor: LlmTitleExtractor = mockk(relaxed = true)
 
     // ── Shared test fixtures ──────────────────────────────────────────────────
 
@@ -93,7 +97,7 @@ class CompanionHttpServerTest {
             configureCompanionRoutes(
                 recapGenerator, capabilityProvider, showRepository,
                 tokenRepository, tokenRefreshManager, traktApiService, tmdbApiService, tmdbCache, settingsRepository,
-                avatarImageStore, stateManager
+                avatarImageStore, stateManager, titleExtractor,
             )
         }
         block()
@@ -795,6 +799,87 @@ class CompanionHttpServerTest {
             }
 
             assertEquals(HttpStatusCode.BadRequest, response.status)
+        }
+    }
+
+    // ── POST /scrobble/extract ────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("POST /scrobble/extract")
+    inner class ExtractEndpoint {
+
+        private val extractRequestBody = """
+            {
+              "snapshot": {
+                "packageName": "com.netflix.ninja",
+                "title": "Pilot"
+              },
+              "libraryHints": [
+                {"traktId": 1, "tmdbId": 100, "title": "Breaking Bad", "year": 2008}
+              ]
+            }
+        """.trimIndent()
+
+        @Test
+        fun `returns 200 with extractor output when LLM produces a result`() = testApp {
+            coEvery { titleExtractor.extract(any<MediaMetadataSnapshot>(), any()) } returns
+                TitleExtractionResponse(
+                    showTitle = "Breaking Bad",
+                    season = 1,
+                    episode = 1,
+                    libraryTraktId = 1,
+                    confidence = 0.85f,
+                )
+
+            val response = client.post("/scrobble/extract") {
+                contentType(ContentType.Application.Json)
+                setBody(extractRequestBody)
+            }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = response.bodyAsText()
+            assertTrue(body.contains("\"showTitle\":\"Breaking Bad\""))
+            assertTrue(body.contains("\"season\":1"))
+            assertTrue(body.contains("\"confidence\":0.85"))
+        }
+
+        @Test
+        fun `returns 200 with empty object when extractor returns null`() = testApp {
+            coEvery { titleExtractor.extract(any<MediaMetadataSnapshot>(), any()) } returns null
+
+            val response = client.post("/scrobble/extract") {
+                contentType(ContentType.Application.Json)
+                setBody(extractRequestBody)
+            }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            // WatchBuddyJson drops default-valued fields, so the all-default
+            // response serializes to `{}`. What matters is the OK status and
+            // the missing showTitle/season/episode — the TV treats any missing
+            // field as a "no confident result" signal.
+            val body = response.bodyAsText()
+            assertEquals("{}", body)
+        }
+
+        @Test
+        fun `returns 400 on malformed request body`() = testApp {
+            val response = client.post("/scrobble/extract") {
+                contentType(ContentType.Application.Json)
+                setBody("not-valid-json")
+            }
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+        }
+
+        @Test
+        fun `returns 503 when extractor throws`() = testApp {
+            coEvery { titleExtractor.extract(any<MediaMetadataSnapshot>(), any()) } throws
+                RuntimeException("LLM OOM")
+
+            val response = client.post("/scrobble/extract") {
+                contentType(ContentType.Application.Json)
+                setBody(extractRequestBody)
+            }
+            assertEquals(HttpStatusCode.ServiceUnavailable, response.status)
         }
     }
 }

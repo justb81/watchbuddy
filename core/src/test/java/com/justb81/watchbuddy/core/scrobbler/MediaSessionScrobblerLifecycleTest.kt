@@ -37,7 +37,7 @@ class MediaSessionScrobblerLifecycleTest {
         val mockSessionManager = mockk<MediaSessionManager>(relaxed = true)
         every { context.getSystemService(Context.MEDIA_SESSION_SERVICE) } returns mockSessionManager
         every { mockSessionManager.getActiveSessions(any()) } returns emptyList()
-        scrobbler = MediaSessionScrobbler(context, tmdbApiService, watchedShowSource, scrobbleDispatcher)
+        scrobbler = MediaSessionScrobbler(context, tmdbApiService, watchedShowSource, scrobbleDispatcher, NoOpTitleExtractor)
     }
 
     // ── startListening / stopListening ────────────────────────────────────────

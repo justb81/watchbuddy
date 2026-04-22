@@ -3,6 +3,8 @@ package com.justb81.watchbuddy.phone.di
 import android.content.Context
 import androidx.work.WorkManager
 import com.justb81.watchbuddy.BuildConfig
+import com.justb81.watchbuddy.core.scrobbler.NoOpTitleExtractor
+import com.justb81.watchbuddy.core.scrobbler.TitleExtractor
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -65,4 +67,15 @@ object AppModule {
     @Singleton
     fun provideWorkManager(@ApplicationContext context: Context): WorkManager =
         WorkManager.getInstance(context)
+
+    /**
+     * The phone doesn't run [com.justb81.watchbuddy.core.scrobbler.MediaSessionScrobbler]
+     * today, but the core module binds the scrobbler as `@Singleton @Inject`, so the
+     * graph still has to resolve its [TitleExtractor] dependency. The phone binds
+     * [NoOpTitleExtractor] — if phone-side scrobbling is ever enabled, the phone
+     * has the Trakt library in-process and can match without the HTTP detour.
+     */
+    @Provides
+    @Singleton
+    fun provideTitleExtractor(): TitleExtractor = NoOpTitleExtractor
 }

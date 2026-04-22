@@ -153,6 +153,7 @@ dependencies {
     testImplementation(libs.robolectric)
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.androidx.arch.core.testing)
+    testImplementation(libs.okhttp.mockwebserver)
 }
 
 kotlin {

@@ -26,7 +26,7 @@ class MediaSessionScrobblerFuzzyTest {
 
     @BeforeEach
     fun setUp() {
-        scrobbler = MediaSessionScrobbler(context, tmdbApiService, watchedShowSource, scrobbleDispatcher)
+        scrobbler = MediaSessionScrobbler(context, tmdbApiService, watchedShowSource, scrobbleDispatcher, NoOpTitleExtractor)
     }
 
     // ── normalize() ──────────────────────────────────────────────────────────

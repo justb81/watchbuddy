@@ -4,6 +4,8 @@ import com.justb81.watchbuddy.core.locale.LocaleHelper
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.model.ScrobbleAction
 import com.justb81.watchbuddy.core.model.ScrobbleDisplayEvent
+import com.justb81.watchbuddy.core.model.TitleExtractionRequest
+import com.justb81.watchbuddy.core.model.TitleExtractionResponse
 import com.justb81.watchbuddy.core.model.TraktEpisode
 import com.justb81.watchbuddy.core.model.TraktShow
 import com.justb81.watchbuddy.core.tmdb.TmdbApiService
@@ -12,6 +14,7 @@ import com.justb81.watchbuddy.core.trakt.ScrobbleBody
 import com.justb81.watchbuddy.core.trakt.TraktApiService
 import com.justb81.watchbuddy.phone.auth.TokenRefreshManager
 import com.justb81.watchbuddy.phone.auth.TokenRepository
+import com.justb81.watchbuddy.phone.llm.LlmTitleExtractor
 import com.justb81.watchbuddy.phone.llm.RecapGenerator
 import com.justb81.watchbuddy.phone.settings.AvatarImageStore
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
@@ -50,6 +53,8 @@ private const val MAX_PAGE_SIZE = 200
  *   POST /scrobble/start       → Forward scrobble start to this user's Trakt account
  *   POST /scrobble/pause       → Forward scrobble pause to this user's Trakt account
  *   POST /scrobble/stop        → Forward scrobble stop to this user's Trakt account
+ *   POST /scrobble/extract     → LLM fallback — normalize raw MediaSession
+ *                                metadata into (showTitle, season?, episode?)
  */
 @Singleton
 class CompanionHttpServer @Inject constructor(
@@ -63,7 +68,8 @@ class CompanionHttpServer @Inject constructor(
     private val tmdbCache: TmdbCache,
     private val settingsRepository: SettingsRepository,
     private val avatarImageStore: AvatarImageStore,
-    private val stateManager: CompanionStateManager
+    private val stateManager: CompanionStateManager,
+    private val titleExtractor: LlmTitleExtractor,
 ) {
     companion object {
         const val PORT = 8765
@@ -82,7 +88,7 @@ class CompanionHttpServer @Inject constructor(
                 configureCompanionRoutes(
                     recapGenerator, capabilityProvider, showRepository,
                     tokenRepository, tokenRefreshManager, traktApiService, tmdbApiService, tmdbCache,
-                    settingsRepository, avatarImageStore, stateManager
+                    settingsRepository, avatarImageStore, stateManager, titleExtractor,
                 )
             }.start(wait = false)
         }.onFailure {
@@ -112,7 +118,8 @@ internal fun Application.configureCompanionRoutes(
     tmdbCache: TmdbCache,
     settingsRepository: SettingsRepository,
     avatarImageStore: AvatarImageStore,
-    stateManager: CompanionStateManager
+    stateManager: CompanionStateManager,
+    titleExtractor: LlmTitleExtractor,
 ) {
     install(ContentNegotiation) {
         json(WatchBuddyJson)
@@ -268,6 +275,22 @@ internal fun Application.configureCompanionRoutes(
         ScrobbleAction.entries.forEach { action ->
             post("/scrobble/${action.name.lowercase()}") {
                 call.handleScrobble(action, tokenRefreshManager, traktApiService, stateManager)
+            }
+        }
+
+        post("/scrobble/extract") {
+            val body = try {
+                call.receive<TitleExtractionRequest>()
+            } catch (_: Exception) {
+                return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid request body"))
+            }
+            try {
+                val response = titleExtractor.extract(body.snapshot, body.libraryHints)
+                    ?: TitleExtractionResponse(confidence = 0f)
+                call.respond(response)
+            } catch (e: Exception) {
+                DiagnosticLog.warn(TAG, "title extraction failed", e)
+                call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("Extraction failed"))
             }
         }
     }
