@@ -62,7 +62,9 @@ jobs:
           fi
 
       # -- Signed release builds (APK + AAB) ------------------------------
-      - name: Build signed Phone release (APK + AAB)
+      # Build phone + TV in a single Gradle invocation so the `core` module
+      # compiles once and the task graph is resolved once.
+      - name: Build signed Phone + TV release (APK + AAB)
         if: steps.keystore.outputs.available == 'true'
         env:
           KEYSTORE_FILE: /tmp/release.keystore
@@ -74,47 +76,12 @@ jobs:
           TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
           TOKEN_BACKEND_URL: ${{ secrets.TOKEN_BACKEND_URL }}
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
-        run: ./gradlew :app-phone:assembleRelease :app-phone:bundleRelease
-
-      - name: Build signed TV release (APK + AAB)
-        if: steps.keystore.outputs.available == 'true'
-        env:
-          KEYSTORE_FILE: /tmp/release.keystore
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          VERSION_NAME: ${{ needs.release-please.outputs.version }}
-          VERSION_CODE: ${{ github.run_number }}
-          TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
-          TOKEN_BACKEND_URL: ${{ secrets.TOKEN_BACKEND_URL }}
-        run: ./gradlew :app-tv:assembleRelease :app-tv:bundleRelease
-
-      # -- Signed debug APKs (only when keystore is available) ---------------
-      - name: Build debug APKs (signed)
-        if: steps.keystore.outputs.available == 'true'
-        env:
-          VERSION_NAME: ${{ needs.release-please.outputs.version }}
-          VERSION_CODE: ${{ github.run_number }}
-          KEYSTORE_FILE: /tmp/release.keystore
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
-          TOKEN_BACKEND_URL: ${{ secrets.TOKEN_BACKEND_URL }}
-        run: ./gradlew :app-phone:assembleDebug :app-tv:assembleDebug
+        run: ./gradlew :app-phone:assembleRelease :app-phone:bundleRelease :app-tv:assembleRelease :app-tv:bundleRelease
 
       # -- Collect release artifacts ---------------------------------------
       - name: Collect release artifacts
         run: |
           mkdir -p release-assets
-
-          # Signed debug APKs (only present when keystore was available)
-          for apk in app-phone/build/outputs/apk/debug/*.apk; do
-            [ -f "$apk" ] && cp "$apk" "release-assets/watchbuddy-phone-${VERSION}-debug.apk"
-          done
-          for apk in app-tv/build/outputs/apk/debug/*.apk; do
-            [ -f "$apk" ] && cp "$apk" "release-assets/watchbuddy-tv-${VERSION}-debug.apk"
-          done
 
           # Release APKs (when available)
           for apk in app-phone/build/outputs/apk/release/*.apk; do

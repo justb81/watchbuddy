@@ -47,21 +47,8 @@ jobs:
       - uses: actions/checkout@v6
       - uses: ./.github/actions/setup-android-build
 
-      # Decode release keystore when available so debug APKs are signed with the
-      # same certificate as release APKs.  This prevents INSTALL_FAILED_UPDATE_INCOMPATIBLE
-      # when users upgrade between debug and release builds.
-      - name: Decode Keystore
-        id: keystore
-        run: |
-          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
-            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > /tmp/release.keystore
-            echo "available=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "available=false" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Run unit tests
-        run: ./gradlew test
+        run: ./gradlew testDebugUnitTest
 
       # Static analysis — detekt runs on every subproject; baselines commit the
       # accepted legacy findings. Any new finding fails the build.
@@ -224,33 +211,6 @@ jobs:
             } else {
               await github.rest.issues.createComment({ owner, repo, issue_number, body });
             }
-
-      - name: Build Phone and TV debug APKs (signed)
-        if: steps.keystore.outputs.available == 'true'
-        env:
-          VERSION_CODE: ${{ github.run_number }}
-          KEYSTORE_FILE: /tmp/release.keystore
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
-          TOKEN_BACKEND_URL: ${{ secrets.TOKEN_BACKEND_URL }}
-          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
-        run: ./gradlew :app-phone:assembleDebug :app-tv:assembleDebug
-
-      - name: Upload Phone APK
-        if: steps.keystore.outputs.available == 'true'
-        uses: actions/upload-artifact@v7
-        with:
-          name: watchbuddy-phone-debug
-          path: app-phone/build/outputs/apk/debug/*.apk
-
-      - name: Upload TV APK
-        if: steps.keystore.outputs.available == 'true'
-        uses: actions/upload-artifact@v7
-        with:
-          name: watchbuddy-tv-debug
-          path: app-tv/build/outputs/apk/debug/*.apk
 
       # Surface a filtered failure excerpt from the failing job's raw log as
       # a PR comment keyed by the `<!-- watchbuddy-build-log -->` marker, so

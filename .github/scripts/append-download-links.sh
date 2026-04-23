@@ -19,12 +19,6 @@ DOWNLOADS="${DOWNLOADS}\n\n## Downloads\n"
 DOWNLOADS="${DOWNLOADS}\n| Asset | Link |"
 DOWNLOADS="${DOWNLOADS}\n|-------|------|"
 
-if [ -f "${ASSETS_DIR}/watchbuddy-phone-${VERSION}-debug.apk" ]; then
-    DOWNLOADS="${DOWNLOADS}\n| Phone (debug) | [watchbuddy-phone-${VERSION}-debug.apk](${BASE}/watchbuddy-phone-${VERSION}-debug.apk) |"
-fi
-if [ -f "${ASSETS_DIR}/watchbuddy-tv-${VERSION}-debug.apk" ]; then
-    DOWNLOADS="${DOWNLOADS}\n| TV (debug) | [watchbuddy-tv-${VERSION}-debug.apk](${BASE}/watchbuddy-tv-${VERSION}-debug.apk) |"
-fi
 if [ -f "${ASSETS_DIR}/watchbuddy-phone-${VERSION}-release.apk" ]; then
     DOWNLOADS="${DOWNLOADS}\n| Phone (signed APK) | [watchbuddy-phone-${VERSION}-release.apk](${BASE}/watchbuddy-phone-${VERSION}-release.apk) |"
 fi
