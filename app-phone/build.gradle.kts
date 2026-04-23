@@ -12,7 +12,7 @@ plugins {
 
 android {
     namespace = "com.justb81.watchbuddy"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.justb81.watchbuddy"

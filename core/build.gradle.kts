@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "com.justb81.watchbuddy.core"
-    compileSdk = 35
+    compileSdk = 36
 
     buildFeatures {
         buildConfig = true
