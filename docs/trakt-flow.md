@@ -67,7 +67,7 @@ flowchart TD
     F -->|SELF_HOSTED| H["POST user_url/trakt/token\n{ code: device_code }\nSame protocol, user-operated"]
     F -->|DIRECT| I["POST trakt.tv/oauth/device/token\n{ code, client_id, client_secret }\nSecret from Android Keystore"]
     G & H & I --> J["Response:\n{ access_token, refresh_token, expires_in }"]
-    J --> K["TokenRepository.saveTokens()\nEncryptedSharedPreferences\n(AES-256-GCM, Android Keystore)"]
+    J --> K["TokenRepository.saveTokens()\nSharedPreferences (Tink AEAD,\nAES-256-GCM keyset wrapped by\nAndroid Keystore)"]
     K --> L["GET trakt.tv/users/me\n(Bearer token)"]
     L --> M["OnboardingState.Success(username)"]
 ```
@@ -327,10 +327,10 @@ fun resolveClientId(authMode, backendUrl, directClientId): String? = when (authM
 
 | Item | Storage | Encryption |
 |------|---------|------------|
-| `access_token` | EncryptedSharedPreferences | AES-256-GCM (Keystore master key) |
-| `refresh_token` | EncryptedSharedPreferences | AES-256-GCM (Keystore master key) |
-| `expires_at` | EncryptedSharedPreferences | AES-256-GCM (Keystore master key) |
-| `trakt_client_secret` (DIRECT mode) | EncryptedSharedPreferences | AES-256-GCM (Keystore master key) |
+| `access_token` | `watchbuddy_tokens_v2` SharedPreferences | Tink AEAD — AES-256-GCM keyset wrapped by Android Keystore KEK |
+| `refresh_token` | `watchbuddy_tokens_v2` SharedPreferences | Tink AEAD — AES-256-GCM keyset wrapped by Android Keystore KEK |
+| `expires_at` | `watchbuddy_tokens_v2` SharedPreferences | Tink AEAD — AES-256-GCM keyset wrapped by Android Keystore KEK |
+| `trakt_client_secret` (DIRECT mode) | `watchbuddy_tokens_v2` SharedPreferences | Tink AEAD — AES-256-GCM keyset wrapped by Android Keystore KEK |
 
 ### Token Flow Across Devices
 

@@ -52,9 +52,6 @@ dependencies {
     // DataStore
     api(libs.datastore.preferences)
 
-    // Security
-    api(libs.security.crypto)
-
     // DI
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)

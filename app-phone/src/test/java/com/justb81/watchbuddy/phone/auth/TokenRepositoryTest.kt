@@ -2,14 +2,11 @@ package com.justb81.watchbuddy.phone.auth
 
 import android.content.Context
 import android.content.SharedPreferences
-import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKeys
+import com.google.crypto.tink.Aead
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.mockkStatic
-import io.mockk.unmockkStatic
+import io.mockk.slot
 import io.mockk.verify
-import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
@@ -18,54 +15,73 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertThrows
+import java.util.Base64
 
 @DisplayName("TokenRepository")
 class TokenRepositoryTest {
 
     private val context: Context = mockk(relaxed = true)
+    private val legacyPrefs: SharedPreferences = mockk(relaxed = true)
     private val mockPrefs: SharedPreferences = mockk(relaxed = true)
     private val mockEditor: SharedPreferences.Editor = mockk(relaxed = true)
+    private val aead: Aead = mockk()
     private lateinit var repository: TokenRepository
 
     @BeforeEach
     fun setUp() {
-        mockkStatic(MasterKeys::class)
-        mockkStatic(EncryptedSharedPreferences::class)
-        every { MasterKeys.getOrCreate(any()) } returns "test-master-key"
-        every {
-            EncryptedSharedPreferences.create(any(), any(), any(), any(), any())
-        } returns mockPrefs
+        every { context.getSharedPreferences("watchbuddy_tokens", Context.MODE_PRIVATE) } returns legacyPrefs
+        every { legacyPrefs.all } returns emptyMap()
+
+        every { context.getSharedPreferences("watchbuddy_tokens_v2", Context.MODE_PRIVATE) } returns mockPrefs
         every { mockPrefs.edit() } returns mockEditor
         every { mockEditor.putString(any(), any()) } returns mockEditor
-        every { mockEditor.putLong(any(), any()) } returns mockEditor
         every { mockEditor.remove(any()) } returns mockEditor
-        repository = TokenRepository(context)
+
+        // Deterministic AEAD: the ciphertext layout is "enc($aad):$plaintext" so the
+        // tests can round-trip through Base64 without a real crypto backend.
+        val plaintextSlot = slot<ByteArray>()
+        val encryptAssociatedSlot = slot<ByteArray>()
+        every { aead.encrypt(capture(plaintextSlot), capture(encryptAssociatedSlot)) } answers {
+            val plain = String(plaintextSlot.captured, Charsets.UTF_8)
+            val aad = String(encryptAssociatedSlot.captured, Charsets.UTF_8)
+            "enc($aad):$plain".toByteArray(Charsets.UTF_8)
+        }
+        val cipherSlot = slot<ByteArray>()
+        val decryptAssociatedSlot = slot<ByteArray>()
+        every { aead.decrypt(capture(cipherSlot), capture(decryptAssociatedSlot)) } answers {
+            val raw = String(cipherSlot.captured, Charsets.UTF_8)
+            val aad = String(decryptAssociatedSlot.captured, Charsets.UTF_8)
+            val prefix = "enc($aad):"
+            require(raw.startsWith(prefix)) { "aad mismatch" }
+            raw.removePrefix(prefix).toByteArray(Charsets.UTF_8)
+        }
+
+        repository = TokenRepository(context, aead)
     }
 
-    @AfterEach
-    fun tearDown() {
-        unmockkStatic(MasterKeys::class)
-        unmockkStatic(EncryptedSharedPreferences::class)
+    private fun storedCiphertext(key: String, plaintext: String): String {
+        val bytes = "enc($key):$plaintext".toByteArray(Charsets.UTF_8)
+        return Base64.getEncoder().encodeToString(bytes)
     }
 
-    @Test
-    fun `constructor opens EncryptedSharedPreferences with correct parameters`() {
-        verify { EncryptedSharedPreferences.create(any(), any(), any(), any(), any()) }
-    }
+    @Nested
+    @DisplayName("legacy migration")
+    inner class LegacyMigration {
 
-    @Test
-    fun `constructor propagates SecurityException when MasterKeys throws`() {
-        every { MasterKeys.getOrCreate(any()) } throws SecurityException("Keystore unavailable")
-        assertThrows<SecurityException> { TokenRepository(context) }
-    }
+        @Test
+        fun `deletes legacy EncryptedSharedPreferences file when present`() {
+            every { legacyPrefs.all } returns mapOf("access_token" to "legacy-blob")
+            every { context.deleteSharedPreferences("watchbuddy_tokens") } returns true
 
-    @Test
-    fun `constructor propagates SecurityException when EncryptedSharedPreferences throws`() {
-        every {
-            EncryptedSharedPreferences.create(any(), any(), any(), any(), any())
-        } throws SecurityException("AES key invalid")
-        assertThrows<SecurityException> { TokenRepository(context) }
+            TokenRepository(context, aead)
+
+            verify { context.deleteSharedPreferences("watchbuddy_tokens") }
+        }
+
+        @Test
+        fun `skips deletion when legacy file is empty`() {
+            verify(exactly = 0) { context.deleteSharedPreferences("watchbuddy_tokens") }
+        }
     }
 
     @Nested
@@ -79,22 +95,24 @@ class TokenRepositoryTest {
         }
 
         @Test
-        fun `returns false when access token is blank`() {
-            every { mockPrefs.getString("access_token", null) } returns ""
+        fun `returns false when access token decrypts to blank`() {
+            every { mockPrefs.getString("access_token", null) } returns storedCiphertext("access_token", "")
             assertFalse(repository.isTokenValid())
         }
 
         @Test
         fun `returns true when token is present and not expired`() {
-            every { mockPrefs.getString("access_token", null) } returns "valid-token"
-            every { mockPrefs.getLong("expires_at", 0L) } returns System.currentTimeMillis() + 60_000L
+            every { mockPrefs.getString("access_token", null) } returns storedCiphertext("access_token", "valid-token")
+            every { mockPrefs.getString("expires_at", null) } returns
+                storedCiphertext("expires_at", (System.currentTimeMillis() + 60_000L).toString())
             assertTrue(repository.isTokenValid())
         }
 
         @Test
         fun `returns false when token has expired`() {
-            every { mockPrefs.getString("access_token", null) } returns "expired-token"
-            every { mockPrefs.getLong("expires_at", 0L) } returns System.currentTimeMillis() - 1_000L
+            every { mockPrefs.getString("access_token", null) } returns storedCiphertext("access_token", "expired")
+            every { mockPrefs.getString("expires_at", null) } returns
+                storedCiphertext("expires_at", (System.currentTimeMillis() - 1_000L).toString())
             assertFalse(repository.isTokenValid())
         }
     }
@@ -110,45 +128,44 @@ class TokenRepositoryTest {
         }
 
         @Test
-        fun `returns true when token is blank`() {
-            every { mockPrefs.getString("access_token", null) } returns ""
+        fun `returns true when token decrypts to blank`() {
+            every { mockPrefs.getString("access_token", null) } returns storedCiphertext("access_token", "")
             assertTrue(repository.isTokenExpiredOrExpiringSoon(5 * 60_000L))
         }
 
         @Test
         fun `returns true when token expires within the buffer window`() {
-            every { mockPrefs.getString("access_token", null) } returns "token"
-            // expires in 1 second, well within the 5-minute buffer
-            every { mockPrefs.getLong("expires_at", 0L) } returns System.currentTimeMillis() + 1_000L
+            every { mockPrefs.getString("access_token", null) } returns storedCiphertext("access_token", "token")
+            every { mockPrefs.getString("expires_at", null) } returns
+                storedCiphertext("expires_at", (System.currentTimeMillis() + 1_000L).toString())
             assertTrue(repository.isTokenExpiredOrExpiringSoon(5 * 60_000L))
         }
 
         @Test
         fun `returns false when token expires well beyond the buffer`() {
-            every { mockPrefs.getString("access_token", null) } returns "token"
-            // expires in 10 minutes, outside the 5-minute buffer
-            every { mockPrefs.getLong("expires_at", 0L) } returns System.currentTimeMillis() + 10 * 60_000L
+            every { mockPrefs.getString("access_token", null) } returns storedCiphertext("access_token", "token")
+            every { mockPrefs.getString("expires_at", null) } returns
+                storedCiphertext("expires_at", (System.currentTimeMillis() + 10 * 60_000L).toString())
             assertFalse(repository.isTokenExpiredOrExpiringSoon(5 * 60_000L))
         }
     }
 
     @Nested
-    @DisplayName("token storage")
+    @DisplayName("token storage roundtrip")
     inner class TokenStorage {
 
         @Test
-        fun `saveTokens writes access token, refresh token, and expiry`() {
+        fun `saveTokens writes ciphertext for each key`() {
             repository.saveTokens("access-123", "refresh-456", 3600)
 
-            verify { mockEditor.putString("access_token", "access-123") }
-            verify { mockEditor.putString("refresh_token", "refresh-456") }
-            verify { mockEditor.putLong(eq("expires_at"), any()) }
-            verify { mockEditor.apply() }
+            verify { mockEditor.putString("access_token", storedCiphertext("access_token", "access-123")) }
+            verify { mockEditor.putString("refresh_token", storedCiphertext("refresh_token", "refresh-456")) }
+            verify { mockEditor.putString(eq("expires_at"), any()) }
         }
 
         @Test
-        fun `getAccessToken returns the stored access token`() {
-            every { mockPrefs.getString("access_token", null) } returns "my-access-token"
+        fun `getAccessToken decrypts the stored ciphertext`() {
+            every { mockPrefs.getString("access_token", null) } returns storedCiphertext("access_token", "my-access-token")
             assertEquals("my-access-token", repository.getAccessToken())
         }
 
@@ -159,9 +176,15 @@ class TokenRepositoryTest {
         }
 
         @Test
-        fun `getRefreshToken returns the stored refresh token`() {
-            every { mockPrefs.getString("refresh_token", null) } returns "my-refresh-token"
+        fun `getRefreshToken decrypts the stored ciphertext`() {
+            every { mockPrefs.getString("refresh_token", null) } returns storedCiphertext("refresh_token", "my-refresh-token")
             assertEquals("my-refresh-token", repository.getRefreshToken())
+        }
+
+        @Test
+        fun `getAccessToken returns null on ciphertext corruption`() {
+            every { mockPrefs.getString("access_token", null) } returns "not-base64-or-valid-ciphertext"
+            assertNull(repository.getAccessToken())
         }
 
         @Test
@@ -171,7 +194,6 @@ class TokenRepositoryTest {
             verify { mockEditor.remove("access_token") }
             verify { mockEditor.remove("refresh_token") }
             verify { mockEditor.remove("expires_at") }
-            verify { mockEditor.apply() }
         }
     }
 
@@ -180,22 +202,27 @@ class TokenRepositoryTest {
     inner class ClientSecret {
 
         @Test
-        fun `saveClientSecret persists the secret`() {
+        fun `saveClientSecret writes ciphertext`() {
             repository.saveClientSecret("super-secret")
 
-            verify { mockEditor.putString("trakt_client_secret", "super-secret") }
-            verify { mockEditor.apply() }
+            verify {
+                mockEditor.putString(
+                    "trakt_client_secret",
+                    storedCiphertext("trakt_client_secret", "super-secret"),
+                )
+            }
         }
 
         @Test
-        fun `getClientSecret returns the stored value`() {
-            every { mockPrefs.getString("trakt_client_secret", "") } returns "stored-secret"
+        fun `getClientSecret decrypts the stored value`() {
+            every { mockPrefs.getString("trakt_client_secret", null) } returns
+                storedCiphertext("trakt_client_secret", "stored-secret")
             assertEquals("stored-secret", repository.getClientSecret())
         }
 
         @Test
         fun `getClientSecret returns empty string when prefs returns null`() {
-            every { mockPrefs.getString("trakt_client_secret", "") } returns null
+            every { mockPrefs.getString("trakt_client_secret", null) } returns null
             assertEquals("", repository.getClientSecret())
         }
     }

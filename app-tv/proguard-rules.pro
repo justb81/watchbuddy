@@ -56,10 +56,10 @@
 -dontwarn dagger.hilt.android.internal.**
 
 # ── Coil ─────────────────────────────────────────────────────────────────────
--dontwarn coil.**
+-dontwarn coil3.**
 
-# ── Security Crypto / Tink ───────────────────────────────────────────────────
--keep class androidx.security.crypto.** { *; }
+# ── Error-prone annotations ──────────────────────────────────────────────────
+# Kept for any future transitive native dependency that references them.
 -dontwarn com.google.errorprone.annotations.**
 
 # ── Room ────────────────────────────────────────────────────────────────────

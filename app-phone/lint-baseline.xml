@@ -146,17 +146,6 @@
 
     <issue
         id="GradleDependency"
-        message="A newer version of androidx.security:security-crypto than 1.0.0 is available: 1.1.0"
-        errorLine1="security-crypto = &quot;1.0.0&quot;"
-        errorLine2="                  ~~~~~~~">
-        <location
-            file="../gradle/libs.versions.toml"
-            line="20"
-            column="19"/>
-    </issue>
-
-    <issue
-        id="GradleDependency"
         message="A newer version of androidx.test:core-ktx than 1.6.1 is available: 1.7.0"
         errorLine1="androidx-test-core = &quot;1.6.1&quot;"
         errorLine2="                     ~~~~~~~">

@@ -77,10 +77,13 @@
 -dontwarn reactor.blockhound.integration.BlockHoundIntegration
 
 # ── Coil ─────────────────────────────────────────────────────────────────────
--dontwarn coil.**
+-dontwarn coil3.**
 
-# ── Security Crypto ──────────────────────────────────────────────────────────
--keep class androidx.security.crypto.** { *; }
+# ── Tink (AEAD) ──────────────────────────────────────────────────────────────
+# Tink relies on service loaders + reflection to register proto key managers.
+-keep class com.google.crypto.tink.** { *; }
+-keepnames class com.google.crypto.tink.**
+-dontwarn com.google.errorprone.annotations.**
 
 # ── Room / WorkManager ──────────────────────────────────────────────────────
 # Room 2.7+ reflectively invokes a no-arg constructor on generated _Impl

@@ -27,11 +27,11 @@ android {
             .orElse("0.28.3").get() // x-release-please-version
 
         // Package native debug symbols into the AAB so Google Play Console can
-        // symbolicate native stack traces (Tink via security-crypto is the main
-        // contributor on TV).  FULL is required — SYMBOL_TABLE strips line
-        // numbers and Play Console still flags the bundle as "no symbols for
-        // debugging" (#262).  AGP also emits native-debug-symbols.zip alongside
-        // the AAB, which CI uploads to Play and attaches to the GitHub Release.
+        // symbolicate any native stack traces picked up by future transitive
+        // dependencies.  FULL is required — SYMBOL_TABLE strips line numbers and
+        // Play Console still flags the bundle as "no symbols for debugging"
+        // (#262).  AGP also emits native-debug-symbols.zip alongside the AAB,
+        // which CI uploads to Play and attaches to the GitHub Release.
         ndk {
             debugSymbolLevel = "FULL"
         }
@@ -136,7 +136,8 @@ dependencies {
     implementation(libs.hilt.lifecycle.viewmodel.compose)
 
     // Image loading
-    implementation(libs.coil)
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp)
 
     // Error-prone annotations — compileOnly so R8 can resolve references from Tink
     // without bundling the annotation library in the APK.

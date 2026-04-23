@@ -189,11 +189,12 @@ dependencies {
     // WorkManager (background model updates)
     implementation(libs.work.runtime)
 
-    // Security / Encrypted Storage
-    implementation(libs.security.crypto)
+    // Security / Encrypted Storage (Tink AEAD + Android Keystore-wrapped KEK)
+    implementation(libs.tink.android)
 
     // Image loading
-    implementation(libs.coil)
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp)
 
     // Testing
     testImplementation(libs.junit5.api)
