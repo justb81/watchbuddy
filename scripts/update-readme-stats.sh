@@ -62,7 +62,10 @@ print(f"{summary.get('"'"'nFiles'"'"', 0)}\t{summary.get('"'"'code'"'"', 0)}")
 '
 }
 
-# Sum JUnit XML counts under <module>/**/build/test-results/test/*.xml.
+# Sum JUnit XML counts under <module>/**/build/test-results/testDebugUnitTest/*.xml.
+# The Android Gradle Plugin writes unit-test results per build variant
+# (testDebugUnitTest / testReleaseUnitTest); matching only the debug variant
+# avoids double-counting when `./gradlew test` runs both.
 # Output: "<tests>\t<failures>\t<errors>\t<skipped>"
 junit_counts() {
   local module="$1"
@@ -71,7 +74,7 @@ import glob, os, sys, xml.etree.ElementTree as ET
 
 module = sys.argv[1]
 total = failures = errors = skipped = 0
-pattern = os.path.join(module, "**", "build", "test-results", "test", "*.xml")
+pattern = os.path.join(module, "**", "build", "test-results", "testDebugUnitTest", "*.xml")
 for path in glob.glob(pattern, recursive=True):
     try:
         root = ET.parse(path).getroot()
