@@ -2,6 +2,7 @@ package com.justb81.watchbuddy.phone.auth
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.core.content.edit
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKeys
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
@@ -30,11 +31,11 @@ class TokenRepository @Inject constructor(@ApplicationContext context: Context) 
 
     fun saveTokens(accessToken: String, refreshToken: String, expiresIn: Int) {
         val expiresAt = System.currentTimeMillis() + expiresIn * 1_000L
-        prefs.edit()
-            .putString(KEY_ACCESS_TOKEN, accessToken)
-            .putString(KEY_REFRESH_TOKEN, refreshToken)
-            .putLong(KEY_EXPIRES_AT, expiresAt)
-            .apply()
+        prefs.edit {
+            putString(KEY_ACCESS_TOKEN, accessToken)
+            putString(KEY_REFRESH_TOKEN, refreshToken)
+            putLong(KEY_EXPIRES_AT, expiresAt)
+        }
     }
 
     fun getAccessToken(): String? = prefs.getString(KEY_ACCESS_TOKEN, null)
@@ -61,17 +62,17 @@ class TokenRepository @Inject constructor(@ApplicationContext context: Context) 
     }
 
     fun clearTokens() {
-        prefs.edit()
-            .remove(KEY_ACCESS_TOKEN)
-            .remove(KEY_REFRESH_TOKEN)
-            .remove(KEY_EXPIRES_AT)
-            .apply()
+        prefs.edit {
+            remove(KEY_ACCESS_TOKEN)
+            remove(KEY_REFRESH_TOKEN)
+            remove(KEY_EXPIRES_AT)
+        }
     }
 
     fun getClientSecret(): String = prefs.getString(KEY_CLIENT_SECRET, "") ?: ""
 
     fun saveClientSecret(secret: String) {
-        prefs.edit().putString(KEY_CLIENT_SECRET, secret).apply()
+        prefs.edit { putString(KEY_CLIENT_SECRET, secret) }
     }
 
     private companion object {

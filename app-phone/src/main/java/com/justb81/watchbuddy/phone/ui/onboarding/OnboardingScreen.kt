@@ -2,7 +2,6 @@ package com.justb81.watchbuddy.phone.ui.onboarding
 
 import android.content.ClipData
 import android.widget.Toast
-import kotlinx.coroutines.launch
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -17,10 +16,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.justb81.watchbuddy.R
+import kotlinx.coroutines.launch
 
 @Composable
 fun OnboardingScreen(
@@ -268,7 +269,7 @@ private fun PinCard(userCode: String, verificationUrl: String, expiresIn: Int) {
             trackColor  = MaterialTheme.colorScheme.surfaceVariant
         )
         Text(
-            text  = stringResource(R.string.onboarding_code_expires, expiresIn),
+            text  = pluralStringResource(R.plurals.onboarding_code_expires, expiresIn, expiresIn),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
         )

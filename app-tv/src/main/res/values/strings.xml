@@ -35,9 +35,10 @@
     <string name="tv_next_episode">Next episode</string>
     <string name="tv_watch_now">Watch now</string>
     <string name="tv_recap">Previously on…</string>
-    <string name="tv_no_streaming_service">No streaming service assigned</string>
-    <string name="tv_watched_episodes">%1$d episodes watched</string>
-    <string name="tv_seasons">%1$d seasons</string>
+    <plurals name="tv_watched_episodes">
+        <item quantity="one">%1$d episode watched</item>
+        <item quantity="other">%1$d episodes watched</item>
+    </plurals>
     <string name="tv_back">Back</string>
     <string name="tv_back_arrow">‹ Back</string>
     <string name="tv_available_at">Available on:</string>
@@ -45,7 +46,6 @@
 
     <!-- Recap -->
     <string name="tv_recap_title">Previously on</string>
-    <string name="tv_recap_generating">Generating recap…</string>
     <string name="tv_recap_generating_on">Generating recap on %1$s…</string>
     <string name="tv_recap_error">Could not load recap.</string>
     <string name="tv_recap_fallback">No AI summary available.\nBrief description from TMDB:</string>
@@ -87,17 +87,15 @@
     <string name="tv_scrobble_no">No</string>
 
     <!-- Phone status -->
-    <string name="tv_phones_connected">%1$d phone connected</string>
-    <string name="tv_phone_best">Best device: %1$s (%2$s)</string>
     <string name="tv_default_device_name">Phone</string>
 
     <!-- LLM labels -->
-    <string name="tv_llm_aicore">AICore</string>
-    <string name="tv_llm_gemma_gpu">Gemma GPU</string>
-    <string name="tv_llm_gemma_cpu">Gemma CPU</string>
 
     <!-- Accessibility content descriptions -->
-    <string name="cd_scrobble_countdown">Auto-confirm in %1$d seconds</string>
+    <plurals name="cd_scrobble_countdown">
+        <item quantity="one">Auto-confirm in %1$d second</item>
+        <item quantity="other">Auto-confirm in %1$d seconds</item>
+    </plurals>
 
     <!-- Diagnostics -->
     <string name="tv_diagnostics_title">Diagnostics</string>

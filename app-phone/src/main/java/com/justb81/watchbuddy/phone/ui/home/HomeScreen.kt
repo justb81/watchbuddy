@@ -71,7 +71,7 @@ fun HomeScreen(
     val context = LocalContext.current
     // Polled once per composition; the diagnostic banner doesn't need real-time updates
     // and this avoids adding Flow plumbing to HomeViewModel just for a debug surface.
-    var pendingReports by remember { mutableStateOf(CrashReporter.listReports(context).size) }
+    var pendingReports by remember { mutableIntStateOf(CrashReporter.listReports(context).size) }
     var showNotificationRationale by remember { mutableStateOf(false) }
 
     // BLE advertising is a best-effort fallback discovery channel for networks
@@ -428,7 +428,7 @@ private fun DiagnosticsBanner(
                     color = MaterialTheme.colorScheme.onErrorContainer
                 )
                 Text(
-                    text = stringResource(R.string.diagnostics_banner_message, reportCount),
+                    text = pluralStringResource(R.plurals.diagnostics_banner_message, reportCount, reportCount),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onErrorContainer.copy(alpha = 0.85f)
                 )

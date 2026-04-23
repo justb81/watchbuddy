@@ -10,6 +10,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -97,7 +98,8 @@ fun ScrobbleOverlay(
                     }
 
                     // Auto-dismiss countdown bar (material3 LinearProgressIndicator)
-                    val countdownDescription = stringResource(R.string.cd_scrobble_countdown, secondsLeft)
+                    val countdownDescription =
+                        pluralStringResource(R.plurals.cd_scrobble_countdown, secondsLeft, secondsLeft)
                     LinearProgressIndicator(
                         progress = { secondsLeft / 15f },
                         modifier = Modifier

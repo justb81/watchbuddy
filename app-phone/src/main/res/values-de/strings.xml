@@ -3,22 +3,20 @@
     <string name="app_name">WatchBuddy</string>
 
     <!-- Onboarding -->
-    <string name="onboarding_title">Mit Trakt verbinden</string>
     <string name="onboarding_subtitle">WatchBuddy nutzt Trakt, um deine gesehenen Serien geräteübergreifend zu synchronisieren.</string>
     <string name="onboarding_step1">Gehe auf deinem PC oder Handy zu:</string>
     <string name="onboarding_activate_url">trakt.tv/activate</string>
     <string name="onboarding_step2">Gib diesen Code ein:</string>
-    <string name="onboarding_loading_code">Code wird geladen…</string>
     <string name="onboarding_waiting">Warte auf Bestätigung…</string>
-    <string name="onboarding_success">Verbunden! Willkommen, %1$s</string>
-    <string name="onboarding_error">Verbindung fehlgeschlagen. Bitte versuche es erneut.</string>
     <string name="onboarding_retry">Erneut versuchen</string>
     <string name="onboarding_code_copied">Code in die Zwischenablage kopiert</string>
-    <string name="onboarding_code_expires">Code läuft ab in %1$d Sekunden</string>
+    <plurals name="onboarding_code_expires">
+        <item quantity="one">Code läuft in %1$d Sekunde ab</item>
+        <item quantity="other">Code läuft in %1$d Sekunden ab</item>
+    </plurals>
     <string name="onboarding_error_loading_code">Fehler beim Laden des Codes: %1$s</string>
     <string name="onboarding_code_expired">Code abgelaufen. Bitte erneut versuchen.</string>
     <string name="onboarding_error_denied">Die Autorisierung wurde abgelehnt. Bitte versuche es erneut.</string>
-    <string name="onboarding_not_configured">Trakt ist noch nicht konfiguriert. Du kannst deine Zugangsdaten in den Einstellungen einrichten.</string>
     <string name="onboarding_not_configured_managed_no_client_id">Dieses Build enthält keine Trakt-Client-ID. Öffne Einstellungen → Erweitert und wähle \"Eigene Zugangsdaten\".</string>
     <string name="onboarding_not_configured_managed_no_backend">Das Token-Backend ist nicht konfiguriert. Öffne Einstellungen → Erweitert, um den Authentifizierungsmodus zu wechseln.</string>
     <string name="onboarding_not_configured_self_hosted_no_url">Backend-URL nicht gesetzt. Trage deine Proxy-Server-URL in Einstellungen → Erweitert ein.</string>
@@ -37,7 +35,6 @@
     <string name="home_all_shows">Alle Serien</string>
     <string name="home_no_shows">Noch keine Serien vorhanden.\nVerbinde dich mit Trakt, um loszulegen.</string>
     <string name="home_connect_to_trakt">Mit Trakt verbinden</string>
-    <string name="home_syncing">Synchronisiere mit Trakt…</string>
     <string name="home_last_sync">Zuletzt synchronisiert: %1$s</string>
     <string name="home_next_episode">Nächste: S%1$02dE%2$02d</string>
     <string name="home_just_now">Gerade eben</string>
@@ -88,7 +85,6 @@
     <string name="settings_tmdb_helper">Kostenlosen API-Schlüssel auf themoviedb.org → Einstellungen → API holen</string>
     <string name="settings_tmdb_helper_link">API-Schlüssel holen</string>
     <string name="settings_tmdb_default_key_active">Integrierter Schlüssel aktiv</string>
-    <string name="settings_tmdb_default_key_hint">Ein integrierter TMDB-Schlüssel ist aktiv. Du kannst optional deinen eigenen Schlüssel eingeben, um ihn zu überschreiben.</string>
     <string name="settings_disconnect">Trennen</string>
     <string name="settings_companion">Companion-Dienst</string>
     <string name="settings_companion_running">Läuft (Port 8765)</string>
@@ -133,7 +129,6 @@
     <string name="home_scrobble_started">Wiedergabe gestartet</string>
     <string name="home_scrobble_paused">Pausiert</string>
     <string name="home_scrobble_stopped">Wiedergabe beendet</string>
-    <string name="companion_auto_deactivated">Companion deaktiviert — TV antwortet nicht</string>
 
     <!-- Companion Service -->
     <string name="companion_channel_name">Companion-Dienst</string>
@@ -153,13 +148,8 @@
     <!-- Show Detail -->
     <string name="show_detail_seasons">Staffeln</string>
     <string name="show_detail_season">Staffel %1$d</string>
-    <string name="show_detail_episode">F%1$02d</string>
     <string name="show_detail_episode_label">S%1$02dF%2$02d</string>
     <string name="show_detail_season_progress">%1$d / %2$d</string>
-    <string name="show_detail_watched">Gesehen</string>
-    <string name="show_detail_not_watched">Nicht gesehen</string>
-    <string name="show_detail_mark_watched">Als gesehen markieren</string>
-    <string name="show_detail_mark_unwatched">Aus dem Verlauf entfernen</string>
     <string name="show_detail_no_episodes">Keine Folgen für diese Serie gefunden.</string>
     <string name="show_detail_error_toggle">Status konnte nicht aktualisiert werden. Bitte versuche es erneut.</string>
     <string name="show_detail_cd_back">Zurück</string>
@@ -170,14 +160,15 @@
 
     <!-- Common -->
     <string name="no_description">Keine Beschreibung verfügbar.</string>
-    <string name="loading">Wird geladen…</string>
     <string name="error_generic">Ein Fehler ist aufgetreten.</string>
     <string name="retry">Erneut versuchen</string>
-    <string name="ok">OK</string>
 
     <!-- Diagnostics -->
     <string name="diagnostics_banner_title">Diagnoseprotokoll verfügbar</string>
-    <string name="diagnostics_banner_message">Die App hat %1$d Absturzprotokoll(e) erfasst. Teile sie mit dem Entwickler, damit das Problem analysiert werden kann.</string>
+    <plurals name="diagnostics_banner_message">
+        <item quantity="one">Die App hat %1$d Absturzprotokoll erfasst. Teile es mit dem Entwickler, damit das Problem analysiert werden kann.</item>
+        <item quantity="other">Die App hat %1$d Absturzprotokolle erfasst. Teile sie mit dem Entwickler, damit das Problem analysiert werden kann.</item>
+    </plurals>
     <string name="diagnostics_banner_share">Teilen</string>
     <string name="diagnostics_banner_dismiss">Verwerfen</string>
 
