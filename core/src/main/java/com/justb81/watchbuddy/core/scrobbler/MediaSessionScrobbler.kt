@@ -58,6 +58,31 @@ class MediaSessionScrobbler @Inject constructor(
         val autoScrobbled: Boolean,
     )
 
+    /**
+     * Full dump of the most recent `MediaSession` the scrobbler polled, regardless
+     * of whether it produced a scrobble candidate. Intended for the TV diagnostics
+     * view so the user can see exactly which `MediaMetadata` fields the streaming
+     * app published — `METADATA_KEY_TITLE` is frequently null on Plex, Jellyfin,
+     * and some Netflix skins, so surfacing only the title row hides everything.
+     */
+    data class LastObservedSession(
+        val snapshot: MediaMetadataSnapshot,
+        val playbackState: Int,
+        val positionMs: Long,
+        val durationMs: Long,
+        val observedAtMs: Long,
+    )
+
+    /**
+     * Per-session progress snapshot kept around so `reconcileVanished` can dispatch
+     * an implicit stop using the full [MediaMetadataSnapshot] (not just the title)
+     * when the session disappears without transitioning through `STATE_STOPPED`.
+     */
+    internal data class LastKnownProgress(
+        val snapshot: MediaMetadataSnapshot?,
+        val progress: Float,
+    )
+
     private val _pendingConfirmation = MutableSharedFlow<ScrobbleCandidate>()
     val pendingConfirmation: SharedFlow<ScrobbleCandidate> = _pendingConfirmation
 
@@ -74,10 +99,20 @@ class MediaSessionScrobbler @Inject constructor(
      */
     val lastCandidate: StateFlow<LastCandidate?> = _lastCandidate.asStateFlow()
 
+    private val _lastObservedSession = MutableStateFlow<LastObservedSession?>(null)
+
+    /**
+     * Most recent `MediaSession` polled, regardless of match outcome. Populated
+     * on every poll tick that encounters at least one session, so the diagnostics
+     * view can show every MediaMetadata field even when the scrobble cascade
+     * can't produce a match (e.g. TITLE is null).
+     */
+    val lastObservedSession: StateFlow<LastObservedSession?> = _lastObservedSession.asStateFlow()
+
     private var scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var pollingJob: Job? = null
 
-    private var currentlyScrobbling: String? = null
+    private var currentlySessionKey: String? = null
 
     /**
      * Debug firehose toggle. When true, every poll tick writes a per-session breadcrumb
@@ -91,11 +126,13 @@ class MediaSessionScrobbler @Inject constructor(
     var debugLogMediaSession: Boolean = false
 
     /**
-     * Last observed playback progress per media title, captured on every poll that yields
+     * Last observed playback progress per session key, captured on every poll that yields
      * a usable `position/duration`. Feeds the implicit-stop dispatched by [reconcileVanished]
-     * when a session disappears without ever emitting STATE_STOPPED (issue #402).
+     * when a session disappears without ever emitting STATE_STOPPED (issue #402). Stores the
+     * last-known [MediaMetadataSnapshot] alongside the progress so vanished-stop can re-run
+     * the full multi-field match cascade, not just title-based matching.
      */
-    private val lastProgressByTitle = ConcurrentHashMap<String, Float>()
+    private val lastProgressBySessionKey = ConcurrentHashMap<String, LastKnownProgress>()
 
     fun startListening(notificationListenerComponent: ComponentName) {
         scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -107,39 +144,75 @@ class MediaSessionScrobbler @Inject constructor(
             while (isActive) {
                 try {
                     val sessions = sessionManager.getActiveSessions(notificationListenerComponent)
-                    val liveTitles = sessions
-                        .mapNotNull { it.metadata?.getString(android.media.MediaMetadata.METADATA_KEY_TITLE) }
-                        .toSet()
-                    reconcileVanished(liveTitles)
+                    val liveKeys = mutableSetOf<String>()
+                    var publishedDiagnostics = false
                     sessions.forEach { controller ->
                         val packageName = controller.packageName
                         val metadata = controller.metadata
                         val playbackState = controller.playbackState
-                        val rawTitle = metadata
-                            ?.getString(android.media.MediaMetadata.METADATA_KEY_TITLE)
+                        val snapshot = if (metadata != null) {
+                            buildSnapshot(packageName, metadata)
+                        } else {
+                            MediaMetadataSnapshot(packageName = packageName)
+                        }
                         val durationMs = metadata
                             ?.getLong(android.media.MediaMetadata.METADATA_KEY_DURATION) ?: -1L
                         val state = playbackState?.state ?: -1
                         val positionMs = playbackState?.position ?: -1L
-                        logSessionIfDebug(packageName, rawTitle, state, positionMs, durationMs)
-                        if (metadata == null || playbackState == null || rawTitle == null) return@forEach
-                        val snapshot = buildSnapshot(packageName, metadata)
+                        if (!publishedDiagnostics) {
+                            publishObservedSession(snapshot, state, positionMs, durationMs)
+                            publishedDiagnostics = true
+                        }
+                        logSessionIfDebug(snapshot, state, positionMs, durationMs)
+                        val key = snapshot.sessionKey() ?: return@forEach
+                        liveKeys.add(key)
+                        if (metadata == null || playbackState == null) return@forEach
                         val progress = computeProgress(playbackState, metadata)
-                        if (progress != null) recordProgress(rawTitle, progress)
+                        if (progress != null) recordProgress(key, snapshot, progress)
                         when (playbackState.state) {
-                            PlaybackState.STATE_PLAYING -> processPlayingMedia(snapshot, rawTitle, progress)
-                            PlaybackState.STATE_PAUSED -> handleScrobblePause(rawTitle, progress)
+                            PlaybackState.STATE_PLAYING -> processPlayingMedia(snapshot, key, progress)
+                            PlaybackState.STATE_PAUSED -> handleScrobblePause(snapshot, key, progress)
                             PlaybackState.STATE_STOPPED,
-                            PlaybackState.STATE_NONE -> handleScrobbleStop(rawTitle, progress)
+                            PlaybackState.STATE_NONE -> handleScrobbleStop(snapshot, key, progress)
                             else -> {}
                         }
                     }
+                    reconcileVanished(liveKeys)
                 } catch (e: Exception) {
                     Log.w(TAG, "Session polling error", e)
                 }
                 delay(30_000)
             }
         }
+    }
+
+    /**
+     * Stable identity for a media session across polls. Uses the first non-blank
+     * field from [MediaMetadataSnapshot.candidateStrings] so sessions where
+     * `METADATA_KEY_TITLE` is null (Plex ships the show in `ALBUM_ARTIST`,
+     * Jellyfin in `ALBUM`) still get a durable key instead of being dropped.
+     * Returns null when every string field is blank — caller skips scrobble but
+     * still publishes the snapshot to [lastObservedSession] for diagnostics.
+     */
+    internal fun MediaMetadataSnapshot.sessionKey(): String? =
+        candidateStrings().firstOrNull()?.let { "$packageName:$it" }
+
+    internal fun sessionKey(candidate: ScrobbleCandidate): String =
+        "${candidate.packageName}:${candidate.mediaTitle}"
+
+    internal fun publishObservedSession(
+        snapshot: MediaMetadataSnapshot,
+        playbackState: Int,
+        positionMs: Long,
+        durationMs: Long,
+    ) {
+        _lastObservedSession.value = LastObservedSession(
+            snapshot = snapshot,
+            playbackState = playbackState,
+            positionMs = positionMs,
+            durationMs = durationMs,
+            observedAtMs = System.currentTimeMillis(),
+        )
     }
 
     /**
@@ -164,51 +237,77 @@ class MediaSessionScrobbler @Inject constructor(
         album = metadata.getString(android.media.MediaMetadata.METADATA_KEY_ALBUM),
     )
 
-    internal fun recordProgress(title: String, progress: Float) {
-        lastProgressByTitle[title] = progress
+    internal fun recordProgress(sessionKey: String, snapshot: MediaMetadataSnapshot?, progress: Float) {
+        lastProgressBySessionKey[sessionKey] = LastKnownProgress(snapshot, progress)
     }
 
+    internal fun recordProgress(sessionKey: String, progress: Float) {
+        recordProgress(sessionKey, null, progress)
+    }
+
+    /**
+     * Writes a breadcrumb listing every non-null `MediaMetadata` string field
+     * the streaming app published, plus playback state / position / duration.
+     * Previous versions only logged `title`, which hid the fact that Plex /
+     * Jellyfin / some Netflix skins ship the show in other fields and leave
+     * `METADATA_KEY_TITLE` null — the "Debug: log every media session" toggle
+     * needs to surface the full picture so the user can see which field
+     * actually carries signal.
+     */
     internal fun logSessionIfDebug(
-        packageName: String,
-        title: String?,
+        snapshot: MediaMetadataSnapshot,
         state: Int,
         positionMs: Long,
         durationMs: Long,
     ) {
         if (!debugLogMediaSession) return
-        DiagnosticLog.event(
-            TAG,
-            "session pkg=$packageName title='${title ?: "(null)"}' state=$state " +
-                "pos=${positionMs}ms dur=${durationMs}ms",
-        )
+        val head = "session pkg=${snapshot.packageName} state=$state " +
+            "pos=${positionMs}ms dur=${durationMs}ms"
+        val fields = buildList {
+            add("title" to snapshot.title)
+            add("displayTitle" to snapshot.displayTitle)
+            add("displaySubtitle" to snapshot.displaySubtitle)
+            add("displayDescription" to snapshot.displayDescription)
+            add("artist" to snapshot.artist)
+            add("albumArtist" to snapshot.albumArtist)
+            add("album" to snapshot.album)
+        }
+        val tail = fields.joinToString(" ") { (name, value) ->
+            "$name='${value ?: "(null)"}'"
+        }
+        DiagnosticLog.event(TAG, "$head $tail")
     }
 
     /**
      * Detect the case where a streaming app destroys its MediaSession instead of
      * transitioning through STATE_STOPPED (common on YouTube and some Fire TV skins —
-     * issue #402). Without this reconciliation `currentlyScrobbling` would stay pinned
-     * to the last episode forever, silently blocking every future scrobble of the same
-     * title inside [processPlayingMedia]'s dedup guard.
+     * issue #402). Without this reconciliation `currentlySessionKey` would stay
+     * pinned to the last episode forever, silently blocking every future scrobble
+     * of the same session inside [processPlayingMedia]'s dedup guard.
      *
-     * When the previously-tracked title is no longer in the live session set, dispatch
+     * When the previously-tracked session key is no longer in the live set, dispatch
      * an implicit stop with the last observed progress (best-effort — we don't know the
      * real endpoint) and clear local state so the next playback can scrobble again.
+     * Uses the last-known [MediaMetadataSnapshot] so the match goes through the full
+     * multi-field cascade — falling back to title-only matching on the key suffix
+     * (`packageName:title`) only when no snapshot was stashed (direct test calls).
      */
-    internal suspend fun reconcileVanished(liveTitles: Set<String>) {
-        val stale = currentlyScrobbling ?: return
-        if (stale in liveTitles) return
-        val lastProgress = lastProgressByTitle.remove(stale)
-        currentlyScrobbling = null
-        if (lastProgress == null) {
+    internal suspend fun reconcileVanished(liveKeys: Set<String>) {
+        val stale = currentlySessionKey ?: return
+        if (stale in liveKeys) return
+        val last = lastProgressBySessionKey.remove(stale)
+        currentlySessionKey = null
+        if (last == null) {
             DiagnosticLog.warn(TAG, "Session vanished without captured progress — cleared '$stale'")
             return
         }
         try {
-            val candidate = matchTitle("", stale)
+            val candidate = last.snapshot?.let { matchSnapshot(it) }
+                ?: matchTitle("", stale.substringAfter(':', missingDelimiterValue = stale))
             val show = candidate?.matchedShow
             val episode = candidate?.matchedEpisode
             if (show != null && episode != null) {
-                scrobbleDispatcher.dispatchStop(show, episode, lastProgress)
+                scrobbleDispatcher.dispatchStop(show, episode, last.progress)
                 Log.i(TAG, "Session vanished — implicit stop: ${show.title} S${episode.season}E${episode.number}")
             } else {
                 DiagnosticLog.warn(TAG, "Session vanished — no match for '$stale', dispatch skipped")
@@ -222,25 +321,26 @@ class MediaSessionScrobbler @Inject constructor(
         pollingJob?.cancel()
         scope.cancel()
         _isListening.value = false
-        currentlyScrobbling = null
-        lastProgressByTitle.clear()
+        currentlySessionKey = null
+        lastProgressBySessionKey.clear()
+        _lastObservedSession.value = null
     }
 
     private suspend fun processPlayingMedia(
         snapshot: MediaMetadataSnapshot,
-        rawTitle: String,
+        sessionKey: String,
         progress: Float?,
     ) {
-        if (rawTitle == currentlyScrobbling) return
+        if (sessionKey == currentlySessionKey) return
         val candidate = matchSnapshot(snapshot)
         if (candidate == null) {
             if (debugLogMediaSession) {
-                DiagnosticLog.debug(TAG, "no match for '$rawTitle' — best confidence null")
+                DiagnosticLog.debug(TAG, "no match for '$sessionKey' — best confidence null")
             }
             return
         }
         if (candidate.confidence >= AUTO_SCROBBLE_THRESHOLD) {
-            autoScrobble(candidate, progress)
+            autoScrobble(candidate, progress, sessionKey)
             _lastCandidate.value = LastCandidate(candidate, System.currentTimeMillis(), autoScrobbled = true)
         } else if (candidate.confidence >= OVERLAY_THRESHOLD) {
             _pendingConfirmation.emit(candidate)
@@ -248,7 +348,7 @@ class MediaSessionScrobbler @Inject constructor(
         } else if (debugLogMediaSession) {
             DiagnosticLog.debug(
                 TAG,
-                "no match for '$rawTitle' — best confidence ${candidate.confidence}",
+                "no match for '$sessionKey' — best confidence ${candidate.confidence}",
             )
         }
     }
@@ -519,35 +619,48 @@ class MediaSessionScrobbler @Inject constructor(
 
     // ── Scrobble API ──────────────────────────────────────────────────────────
 
-    suspend fun autoScrobble(candidate: ScrobbleCandidate, progress: Float? = null) {
+    suspend fun autoScrobble(
+        candidate: ScrobbleCandidate,
+        progress: Float? = null,
+        sessionKey: String? = null,
+    ) {
         val show = candidate.matchedShow ?: return
         val episode = candidate.matchedEpisode ?: return
         scrobbleDispatcher.dispatchStart(show, episode, progress ?: 0f)
-        currentlyScrobbling = candidate.mediaTitle
+        currentlySessionKey = sessionKey ?: this.sessionKey(candidate)
         Log.i(TAG, "Scrobble started: ${show.title} S${episode.season}E${episode.number}")
     }
 
-    internal suspend fun handleScrobblePause(rawTitle: String, progress: Float? = null) {
-        if (rawTitle != currentlyScrobbling) return
-        val candidate = matchTitle("", rawTitle) ?: return
+    internal suspend fun handleScrobblePause(
+        snapshot: MediaMetadataSnapshot,
+        sessionKey: String,
+        progress: Float? = null,
+    ) {
+        if (sessionKey != currentlySessionKey) return
+        val candidate = matchSnapshot(snapshot) ?: return
         val show = candidate.matchedShow ?: return
         val episode = candidate.matchedEpisode ?: return
         scrobbleDispatcher.dispatchPause(show, episode, progress ?: 50f)
         Log.i(TAG, "Scrobble paused: ${show.title}")
     }
 
-    internal suspend fun handleScrobbleStop(rawTitle: String, progress: Float? = null) {
-        if (rawTitle != currentlyScrobbling) return
+    internal suspend fun handleScrobbleStop(
+        snapshot: MediaMetadataSnapshot,
+        sessionKey: String,
+        progress: Float? = null,
+    ) {
+        if (sessionKey != currentlySessionKey) return
         if (progress == null) {
-            Log.w(TAG, "Scrobble stop skipped — playback position/duration unavailable for '$rawTitle'")
-            currentlyScrobbling = null
+            Log.w(TAG, "Scrobble stop skipped — playback position/duration unavailable for '$sessionKey'")
+            currentlySessionKey = null
             return
         }
-        val candidate = matchTitle("", rawTitle) ?: return
-        val show = candidate.matchedShow ?: return
-        val episode = candidate.matchedEpisode ?: return
+        val candidate = matchSnapshot(snapshot)
+        val show = candidate?.matchedShow
+        val episode = candidate?.matchedEpisode
+        if (show == null || episode == null) return
         scrobbleDispatcher.dispatchStop(show, episode, progress)
-        currentlyScrobbling = null
+        currentlySessionKey = null
         Log.i(TAG, "Scrobble stopped: ${show.title} S${episode.season}E${episode.number}")
     }
 }

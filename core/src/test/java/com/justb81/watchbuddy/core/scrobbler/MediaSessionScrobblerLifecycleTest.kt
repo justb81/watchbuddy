@@ -3,6 +3,7 @@ package com.justb81.watchbuddy.core.scrobbler
 import android.content.ComponentName
 import android.content.Context
 import android.media.session.MediaSessionManager
+import com.justb81.watchbuddy.core.model.MediaMetadataSnapshot
 import com.justb81.watchbuddy.core.model.ScrobbleCandidate
 import com.justb81.watchbuddy.core.model.TraktEpisode
 import com.justb81.watchbuddy.core.model.TraktIds
@@ -31,6 +32,16 @@ class MediaSessionScrobblerLifecycleTest {
     private val testCandidate = ScrobbleCandidate(
         "com.netflix", "Breaking Bad S01E01", 0.95f, testShow, testEpisode
     )
+    private val testSnapshot = MediaMetadataSnapshot(
+        packageName = "com.netflix",
+        title = "Breaking Bad S01E01",
+    )
+    private val testSessionKey = "com.netflix:Breaking Bad S01E01"
+    private val otherSnapshot = MediaMetadataSnapshot(
+        packageName = "com.netflix",
+        title = "Other Show",
+    )
+    private val otherSessionKey = "com.netflix:Other Show"
 
     @BeforeEach
     fun setUp() {
@@ -146,7 +157,7 @@ class MediaSessionScrobblerLifecycleTest {
             coEvery { scrobbleDispatcher.dispatchPause(any(), any(), any()) } just runs
             primeScrobbling()
 
-            scrobbler.handleScrobblePause("Breaking Bad S01E01", progress = 42f)
+            scrobbler.handleScrobblePause(testSnapshot, testSessionKey, progress = 42f)
 
             coVerify { scrobbleDispatcher.dispatchPause(any(), any(), 42f) }
         }
@@ -156,14 +167,14 @@ class MediaSessionScrobblerLifecycleTest {
             coEvery { scrobbleDispatcher.dispatchPause(any(), any(), any()) } just runs
             primeScrobbling()
 
-            scrobbler.handleScrobblePause("Breaking Bad S01E01", progress = null)
+            scrobbler.handleScrobblePause(testSnapshot, testSessionKey, progress = null)
 
             coVerify { scrobbleDispatcher.dispatchPause(any(), any(), 50f) }
         }
 
         @Test
-        fun `skips when title does not match currently scrobbling`() = runTest {
-            scrobbler.handleScrobblePause("Other Show", progress = 50f)
+        fun `skips when session key does not match currently scrobbling`() = runTest {
+            scrobbler.handleScrobblePause(otherSnapshot, otherSessionKey, progress = 50f)
 
             coVerify(exactly = 0) { scrobbleDispatcher.dispatchPause(any(), any(), any()) }
         }
@@ -188,7 +199,7 @@ class MediaSessionScrobblerLifecycleTest {
             coEvery { scrobbleDispatcher.dispatchStop(any(), any(), any()) } just runs
             primeScrobbling()
 
-            scrobbler.handleScrobbleStop("Breaking Bad S01E01", progress = 80f)
+            scrobbler.handleScrobbleStop(testSnapshot, testSessionKey, progress = 80f)
 
             coVerify { scrobbleDispatcher.dispatchStop(any(), any(), 80f) }
         }
@@ -197,14 +208,14 @@ class MediaSessionScrobblerLifecycleTest {
         fun `skips stop when progress is null`() = runTest {
             primeScrobbling()
 
-            scrobbler.handleScrobbleStop("Breaking Bad S01E01", progress = null)
+            scrobbler.handleScrobbleStop(testSnapshot, testSessionKey, progress = null)
 
             coVerify(exactly = 0) { scrobbleDispatcher.dispatchStop(any(), any(), any()) }
         }
 
         @Test
-        fun `skips when title does not match currently scrobbling`() = runTest {
-            scrobbler.handleScrobbleStop("Other Show", progress = 90f)
+        fun `skips when session key does not match currently scrobbling`() = runTest {
+            scrobbler.handleScrobbleStop(otherSnapshot, otherSessionKey, progress = 90f)
 
             coVerify(exactly = 0) { scrobbleDispatcher.dispatchStop(any(), any(), any()) }
         }

@@ -132,6 +132,10 @@ fun TvDiagnosticsScreen(
             }
 
             item {
+                MediaSessionSection(uiState.lastObservedSession)
+            }
+
+            item {
                 Text(
                     text = stringResource(R.string.tv_diagnostics_section_phones).uppercase(),
                     fontSize = 14.sp,
@@ -417,4 +421,83 @@ private fun formatLastCandidate(last: MediaSessionScrobbler.LastCandidate?): Str
     val pct = (last.candidate.confidence * 100).toInt()
     val marker = if (last.autoScrobbled) "auto" else "overlay"
     return "$title @ ${pct}% · $marker · ${formatAge(last.observedAtMs)}"
+}
+
+@Composable
+private fun MediaSessionSection(last: MediaSessionScrobbler.LastObservedSession?) {
+    val title = stringResource(R.string.tv_diagnostics_section_media_session)
+    val snapshot = last?.snapshot
+    val headerStatus = when {
+        last == null -> Status.NEUTRAL
+        snapshot != null && snapshot.candidateStrings().isNotEmpty() -> Status.OK
+        else -> Status.WARN
+    }
+    val rows = buildMediaSessionRows(last, headerStatus)
+    DiagnosticsSection(title = title, rows = rows)
+}
+
+@Composable
+private fun buildMediaSessionRows(
+    last: MediaSessionScrobbler.LastObservedSession?,
+    headerStatus: Status,
+): List<DiagRow> {
+    val em = "—"
+    val snapshot = last?.snapshot
+    return listOf(
+        DiagRow(
+            stringResource(R.string.tv_diagnostics_row_media_session_package),
+            snapshot?.packageName ?: em,
+            headerStatus,
+        ),
+        stringRow(R.string.tv_diagnostics_row_media_session_title, snapshot, snapshot?.title),
+        stringRow(R.string.tv_diagnostics_row_media_session_display_title, snapshot, snapshot?.displayTitle),
+        stringRow(R.string.tv_diagnostics_row_media_session_display_subtitle, snapshot, snapshot?.displaySubtitle),
+        stringRow(
+            R.string.tv_diagnostics_row_media_session_display_description,
+            snapshot,
+            snapshot?.displayDescription,
+        ),
+        stringRow(R.string.tv_diagnostics_row_media_session_artist, snapshot, snapshot?.artist),
+        stringRow(R.string.tv_diagnostics_row_media_session_album_artist, snapshot, snapshot?.albumArtist),
+        stringRow(R.string.tv_diagnostics_row_media_session_album, snapshot, snapshot?.album),
+        DiagRow(
+            stringResource(R.string.tv_diagnostics_row_media_session_playback_state),
+            last?.playbackState?.toString() ?: em,
+            Status.NEUTRAL,
+        ),
+        DiagRow(
+            stringResource(R.string.tv_diagnostics_row_media_session_position),
+            last?.positionMs?.let { "${it}ms" } ?: em,
+            Status.NEUTRAL,
+        ),
+        DiagRow(
+            stringResource(R.string.tv_diagnostics_row_media_session_duration),
+            last?.durationMs?.let { "${it}ms" } ?: em,
+            Status.NEUTRAL,
+        ),
+        DiagRow(
+            stringResource(R.string.tv_diagnostics_row_media_session_observed_age),
+            formatAge(last?.observedAtMs ?: 0L),
+            Status.NEUTRAL,
+        ),
+    )
+}
+
+@Composable
+private fun stringRow(
+    labelRes: Int,
+    snapshot: com.justb81.watchbuddy.core.model.MediaMetadataSnapshot?,
+    value: String?,
+): DiagRow {
+    val display = when {
+        value != null -> value
+        snapshot == null -> "—"
+        else -> stringResource(R.string.tv_diagnostics_value_null)
+    }
+    val status = when {
+        snapshot == null -> Status.NEUTRAL
+        value.isNullOrBlank() -> Status.WARN
+        else -> Status.OK
+    }
+    return DiagRow(stringResource(labelRes), display, status)
 }

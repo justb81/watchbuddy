@@ -3,6 +3,7 @@ package com.justb81.watchbuddy.core.scrobbler
 import android.content.Context
 import android.media.session.MediaSessionManager
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
+import com.justb81.watchbuddy.core.model.MediaMetadataSnapshot
 import com.justb81.watchbuddy.core.tmdb.TmdbApiService
 import io.mockk.every
 import io.mockk.mockk
@@ -41,8 +42,10 @@ class MediaSessionScrobblerDebugLogTest {
         scrobbler.debugLogMediaSession = false
 
         scrobbler.logSessionIfDebug(
-            packageName = "com.netflix.ninja",
-            title = "Breaking Bad S01E01",
+            snapshot = MediaMetadataSnapshot(
+                packageName = "com.netflix.ninja",
+                title = "Breaking Bad S01E01",
+            ),
             state = 3,
             positionMs = 1234L,
             durationMs = 2600000L,
@@ -58,8 +61,10 @@ class MediaSessionScrobblerDebugLogTest {
         scrobbler.debugLogMediaSession = true
 
         scrobbler.logSessionIfDebug(
-            packageName = "com.netflix.ninja",
-            title = "Breaking Bad S01E01",
+            snapshot = MediaMetadataSnapshot(
+                packageName = "com.netflix.ninja",
+                title = "Breaking Bad S01E01",
+            ),
             state = 3,
             positionMs = 1234L,
             durationMs = 2600000L,
@@ -82,8 +87,7 @@ class MediaSessionScrobblerDebugLogTest {
         scrobbler.debugLogMediaSession = true
 
         scrobbler.logSessionIfDebug(
-            packageName = "com.netflix.ninja",
-            title = null,
+            snapshot = MediaMetadataSnapshot(packageName = "com.netflix.ninja"),
             state = -1,
             positionMs = -1L,
             durationMs = -1L,
@@ -92,5 +96,33 @@ class MediaSessionScrobblerDebugLogTest {
         val entry = DiagnosticLog.snapshot()
             .single { it.message.startsWith("session pkg=") }
         assertTrue(entry.message.contains("title='(null)'"))
+    }
+
+    @Test
+    fun `breadcrumb includes every non-null MediaMetadata field`() {
+        scrobbler.debugLogMediaSession = true
+
+        scrobbler.logSessionIfDebug(
+            snapshot = MediaMetadataSnapshot(
+                packageName = "com.plexapp.android",
+                title = null,
+                displayTitle = "Pilot",
+                displaySubtitle = "S01E01",
+                albumArtist = "Breaking Bad",
+                album = null,
+            ),
+            state = 3,
+            positionMs = 100L,
+            durationMs = 2000L,
+        )
+
+        val entry = DiagnosticLog.snapshot()
+            .single { it.message.startsWith("session pkg=") }
+        assertTrue(entry.message.contains("pkg=com.plexapp.android"))
+        assertTrue(entry.message.contains("title='(null)'"))
+        assertTrue(entry.message.contains("displayTitle='Pilot'"))
+        assertTrue(entry.message.contains("displaySubtitle='S01E01'"))
+        assertTrue(entry.message.contains("albumArtist='Breaking Bad'"))
+        assertTrue(entry.message.contains("album='(null)'"))
     }
 }
