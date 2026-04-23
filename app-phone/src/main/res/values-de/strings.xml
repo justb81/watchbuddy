@@ -220,6 +220,29 @@
     <string name="diagnostics_value_stopped">Gestoppt</string>
     <string name="diagnostics_value_none">Keine</string>
 
+    <!-- LLM activity diagnostics -->
+    <string name="settings_llm_activity_logging_title">LLM-Prompts &amp; Antworten protokollieren</string>
+    <string name="settings_llm_activity_logging_summary">Erfasst, was das lokale Modell für Recaps und Scrobble-Erkennung sieht. Sichtbar in der Diagnose.</string>
+    <string name="diagnostics_section_llm_activity">LLM-Aktivität</string>
+    <string name="diagnostics_row_llm_activity_disabled">Protokollierung ist aus. In den Einstellungen aktivieren.</string>
+    <string name="diagnostics_row_llm_activity_empty">Noch keine LLM-Aufrufe.</string>
+    <string name="diagnostics_llm_caller_recap">Recap</string>
+    <string name="diagnostics_llm_caller_extract">Scrobble-Erkennung</string>
+    <string name="diagnostics_llm_status_success">Erfolg</string>
+    <string name="diagnostics_llm_status_empty">Keine Ausgabe</string>
+    <string name="diagnostics_llm_status_error">Fehler</string>
+    <string name="diagnostics_llm_detail_title">LLM-Aufruf</string>
+    <string name="diagnostics_llm_detail_caller_label">Aufrufer</string>
+    <string name="diagnostics_llm_detail_backend_label">Backend</string>
+    <string name="diagnostics_llm_detail_timestamp_label">Gestartet</string>
+    <string name="diagnostics_llm_detail_duration_label">Dauer</string>
+    <string name="diagnostics_llm_detail_status_label">Status</string>
+    <string name="diagnostics_llm_detail_prompt">Prompt</string>
+    <string name="diagnostics_llm_detail_response">Antwort</string>
+    <string name="diagnostics_llm_detail_error">Fehler</string>
+    <string name="diagnostics_llm_detail_empty_response">(keine Antwort)</string>
+    <string name="diagnostics_llm_detail_not_found">Dieser LLM-Aufruf ist nicht mehr verfügbar — neuere Aufrufe haben ihn aus dem Puffer verdrängt.</string>
+
     <!-- Version footer -->
     <string name="settings_version_footer">WatchBuddy v%1$s (Build %2$d)</string>
 </resources>

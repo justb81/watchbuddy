@@ -220,6 +220,29 @@
     <string name="diagnostics_value_stopped">Arrêté</string>
     <string name="diagnostics_value_none">Aucun</string>
 
+    <!-- LLM activity diagnostics -->
+    <string name="settings_llm_activity_logging_title">Journaliser les invites &amp; réponses du LLM</string>
+    <string name="settings_llm_activity_logging_summary">Capture ce que le modèle local voit pour les récapitulatifs et la détection de scrobble. Visible dans les diagnostics.</string>
+    <string name="diagnostics_section_llm_activity">Activité LLM</string>
+    <string name="diagnostics_row_llm_activity_disabled">Journalisation désactivée. Activez-la dans les paramètres.</string>
+    <string name="diagnostics_row_llm_activity_empty">Aucun appel LLM pour le moment.</string>
+    <string name="diagnostics_llm_caller_recap">Récapitulatif</string>
+    <string name="diagnostics_llm_caller_extract">Détection de scrobble</string>
+    <string name="diagnostics_llm_status_success">Succès</string>
+    <string name="diagnostics_llm_status_empty">Aucune sortie</string>
+    <string name="diagnostics_llm_status_error">Erreur</string>
+    <string name="diagnostics_llm_detail_title">Appel LLM</string>
+    <string name="diagnostics_llm_detail_caller_label">Appelant</string>
+    <string name="diagnostics_llm_detail_backend_label">Backend</string>
+    <string name="diagnostics_llm_detail_timestamp_label">Démarré</string>
+    <string name="diagnostics_llm_detail_duration_label">Durée</string>
+    <string name="diagnostics_llm_detail_status_label">Statut</string>
+    <string name="diagnostics_llm_detail_prompt">Invite</string>
+    <string name="diagnostics_llm_detail_response">Réponse</string>
+    <string name="diagnostics_llm_detail_error">Erreur</string>
+    <string name="diagnostics_llm_detail_empty_response">(pas de réponse)</string>
+    <string name="diagnostics_llm_detail_not_found">Cet appel LLM n\'est plus disponible — des appels plus récents l\'ont évincé du tampon.</string>
+
     <!-- Version footer -->
     <string name="settings_version_footer">WatchBuddy v%1$s (build %2$d)</string>
 </resources>

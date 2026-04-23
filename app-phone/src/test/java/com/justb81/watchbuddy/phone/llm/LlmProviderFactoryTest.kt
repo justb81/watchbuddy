@@ -3,7 +3,11 @@ package com.justb81.watchbuddy.phone.llm
 import android.content.Context
 import com.justb81.watchbuddy.core.model.LlmBackend
 import com.justb81.watchbuddy.core.model.TmdbEpisode
+import com.justb81.watchbuddy.phone.settings.AppSettings
+import com.justb81.watchbuddy.phone.settings.SettingsRepository
+import dagger.Lazy
 import io.mockk.*
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
@@ -16,6 +20,13 @@ class LlmProviderFactoryTest {
 
     private val context: Context = mockk(relaxed = true)
     private val orchestrator: LlmOrchestrator = mockk()
+    private val eventLog = LlmEventLog()
+    private val settingsRepository: SettingsRepository = mockk {
+        every { settings } returns flowOf(AppSettings(llmActivityLoggingEnabled = false))
+    }
+    private val settingsLazy = object : Lazy<SettingsRepository> {
+        override fun get(): SettingsRepository = settingsRepository
+    }
     private lateinit var factory: LlmProviderFactory
 
     private val episodes = listOf(
@@ -24,7 +35,7 @@ class LlmProviderFactoryTest {
 
     @BeforeEach
     fun setUp() {
-        factory = LlmProviderFactory(context, orchestrator)
+        factory = LlmProviderFactory(context, orchestrator, eventLog, settingsLazy)
     }
 
     @Nested
@@ -37,7 +48,7 @@ class LlmProviderFactoryTest {
                 LlmBackend.NONE, null, 0
             )
             // With NONE backend, cascade goes straight to Fallback
-            val result = factory.generateWithCascade("prompt", episodes)
+            val result = factory.generateWithCascade("recap", "prompt", episodes)
             assertTrue(result.isNotBlank())
         }
 
@@ -47,7 +58,7 @@ class LlmProviderFactoryTest {
                 LlmBackend.NONE, null, 0
             )
             // Empty episodes means Fallback generates valid but empty HTML
-            val result = factory.generateWithCascade("prompt", emptyList())
+            val result = factory.generateWithCascade("recap", "prompt", emptyList())
             assertTrue(result.isNotBlank())
         }
     }
@@ -62,7 +73,7 @@ class LlmProviderFactoryTest {
                 LlmBackend.AICORE, null, 150
             )
             // AICore fails (no Play Services in test), then cascade continues
-            val result = factory.generateWithCascade("prompt", episodes)
+            val result = factory.generateWithCascade("recap", "prompt", episodes)
             assertNotNull(result)
         }
 
@@ -74,7 +85,7 @@ class LlmProviderFactoryTest {
                 70
             )
             // LiteRT-LM will fail (no model file), then Fallback succeeds
-            val result = factory.generateWithCascade("prompt", episodes)
+            val result = factory.generateWithCascade("recap", "prompt", episodes)
             assertNotNull(result)
         }
 
@@ -83,7 +94,7 @@ class LlmProviderFactoryTest {
             every { orchestrator.selectConfig() } returns LlmOrchestrator.LlmConfig(
                 LlmBackend.NONE, null, 0
             )
-            val result = factory.generateWithCascade("prompt", episodes)
+            val result = factory.generateWithCascade("recap", "prompt", episodes)
             assertNotNull(result)
         }
     }

@@ -103,7 +103,11 @@ Respond in $language.
 
     private suspend fun inferWithLlm(prompt: String, episodes: List<TmdbEpisode>): String {
         Log.d(TAG, "Starting LLM inference with cascade fallback")
-        return llmProviderFactory.generateWithCascade(prompt, episodes)
+        return llmProviderFactory.generateWithCascade(
+            LlmProviderFactory.CALLER_RECAP,
+            prompt,
+            episodes,
+        )
     }
 
     /**

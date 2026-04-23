@@ -280,6 +280,38 @@ fun SettingsScreen(
                         )
                     }
                 }
+
+                HorizontalDivider(
+                    color     = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                    thickness = 0.5.dp,
+                    modifier  = Modifier.padding(horizontal = 16.dp)
+                )
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            stringResource(R.string.settings_llm_activity_logging_title),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            stringResource(R.string.settings_llm_activity_logging_summary),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Switch(
+                        checked         = uiState.llmActivityLoggingEnabled,
+                        onCheckedChange = viewModel::setLlmActivityLoggingEnabled
+                    )
+                }
             }
 
             // ── Advanced Settings ─────────────────────────────────────────────

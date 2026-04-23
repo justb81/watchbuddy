@@ -24,5 +24,13 @@ data class AppSettings(
      * Used as the `?v=N` query arg + ETag on `/avatar` so Coil on the TV
      * revalidates cheaply across updates.
      */
-    val customAvatarVersion: Long = 0L
+    val customAvatarVersion: Long = 0L,
+    /**
+     * When true, [com.justb81.watchbuddy.phone.llm.LlmProviderFactory] records
+     * every on-device LLM invocation (prompt + response) into
+     * [com.justb81.watchbuddy.phone.llm.LlmEventLog] so the Diagnostics screen
+     * can surface them. Off-by-default would hide the feature; on-by-default
+     * mirrors how the rest of the Diagnostics data is always captured.
+     */
+    val llmActivityLoggingEnabled: Boolean = true
 )
