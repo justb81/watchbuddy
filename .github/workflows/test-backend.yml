@@ -23,7 +23,7 @@ jobs:
       backend: ${{ steps.filter.outputs.backend }}
     steps:
       - uses: actions/checkout@v6
-      - uses: dorny/paths-filter@v3
+      - uses: dorny/paths-filter@v4
         id: filter
         with:
           filters: |
@@ -42,7 +42,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '22'
           cache: 'npm'
@@ -67,7 +67,7 @@ jobs:
       # logs".
       - name: Post failing backend log
         if: failure() && github.event_name == 'pull_request'
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         env:
           MARKER: '<!-- watchbuddy-backend-log -->'
           CURRENT_JOB: ${{ github.job }}

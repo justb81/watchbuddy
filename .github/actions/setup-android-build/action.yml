@@ -23,7 +23,7 @@ runs:
     # Key on all build scripts + properties so any structural change
     # invalidates and rebuilds the cache rather than serving a stale one.
     - name: Cache Gradle configuration cache
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: .gradle/configuration-cache
         key: config-cache-${{ hashFiles('**/*.gradle.kts', 'gradle.properties', 'gradle/libs.versions.toml') }}
