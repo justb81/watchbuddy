@@ -24,7 +24,7 @@ android {
 
         // versionName: release-please sets VERSION_NAME, fallback to hardcoded value
         versionName = providers.environmentVariable("VERSION_NAME")
-            .orElse("0.28.3").get() // x-release-please-version
+            .orElse("0.29.0").get() // x-release-please-version
 
         // Package native debug symbols into the AAB so Google Play Console can
         // symbolicate any native stack traces picked up by future transitive
