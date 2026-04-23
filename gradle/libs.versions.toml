@@ -30,7 +30,7 @@ detekt = "1.23.8"
 
 [libraries]
 # AndroidX Core
-androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version = "1.18.0" }
+androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version = "1.17.0" }
 androidx-lifecycle-runtime = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycle" }
 androidx-lifecycle-viewmodel = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "lifecycle" }
 
