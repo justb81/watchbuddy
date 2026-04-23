@@ -1,7 +1,6 @@
 package com.justb81.watchbuddy.tv.ui.showdetail
 
 import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -22,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.net.toUri
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.tv.material3.*
 import coil.compose.AsyncImage
@@ -83,7 +83,7 @@ fun ShowDetailScreen(
                     val deepLink = viewModel.resolveDeepLink(entry)
                     if (deepLink != null) {
                         context.startActivity(
-                            Intent(Intent.ACTION_VIEW, Uri.parse(deepLink))
+                            Intent(Intent.ACTION_VIEW, deepLink.toUri())
                                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                         )
                     }
@@ -92,7 +92,7 @@ fun ShowDetailScreen(
                     val link = viewModel.onProviderSelected(provider, entry)
                     if (link != null) {
                         context.startActivity(
-                            Intent(Intent.ACTION_VIEW, Uri.parse(link))
+                            Intent(Intent.ACTION_VIEW, link.toUri())
                                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                         )
                     }

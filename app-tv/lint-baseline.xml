@@ -750,15 +750,4 @@
             file="src/main/res/drawable/tv_banner.png"/>
     </issue>
 
-    <issue
-        id="UseKtx"
-        message="Use the KTX extension function `String.toUri` instead?"
-        errorLine1="                                Intent(Intent.ACTION_VIEW, Uri.parse(deepLink))"
-        errorLine2="                                                           ~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="src/main/java/com/justb81/watchbuddy/tv/ui/showdetail/ShowDetailScreen.kt"
-            line="137"
-            column="60"/>
-    </issue>
-
 </issues>
