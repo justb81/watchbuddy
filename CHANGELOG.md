@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.28.3](https://github.com/justb81/watchbuddy/compare/v0.28.2...v0.28.3) (2026-04-23)
+
+
+### Bug Fixes
+
+* use connectedDevice FGS type for companion services ([#460](https://github.com/justb81/watchbuddy/issues/460)) ([dabd256](https://github.com/justb81/watchbuddy/commit/dabd25605eb34156fc807ace2de287e58535945a))
+
 ## [0.28.2](https://github.com/justb81/watchbuddy/compare/v0.28.1...v0.28.2) (2026-04-23)
 
 
