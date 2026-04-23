@@ -226,5 +226,4 @@ class ModelsSerializationTest {
             assertNull(candidate.matchedEpisode)
         }
     }
-
 }

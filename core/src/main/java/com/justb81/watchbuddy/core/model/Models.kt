@@ -289,4 +289,3 @@ data class ResolvedProvider(
     val isLastUsed: Boolean,
     val tmdbPageUrl: String?,
 )
-
