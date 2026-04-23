@@ -59,8 +59,6 @@
     <ID>MagicNumber:NetworkModule.kt$NetworkModule$30</ID>
     <ID>MagicNumber:NetworkModule.kt$NetworkModule$60</ID>
     <ID>MagicNumber:TokenProxyService.kt$503</ID>
-    <ID>MaxLineLength:Models.kt$StreamingService("disney", "Disney+", "com.disney.disneyplus", "https://www.disneyplus.com/series/{slug}/{tmdb_id}")</ID>
-    <ID>MaxLineLength:Models.kt$StreamingService("prime", "Prime Video", "com.amazon.amazonvideo.livingroom", "https://www.primevideo.com/search?phrase={slug}")</ID>
     <ID>MaxLineLength:TraktApiServiceDtoTest.kt$TraktApiServiceDtoTest.DeviceCodeResponseTest$val jsonStr = """{"device_code":"dc","user_code":"1234","verification_url":"https://trakt.tv/activate","expires_in":600,"interval":5}"""</ID>
     <ID>MaxLineLength:TraktApiServiceDtoTest.kt$TraktApiServiceDtoTest.TraktUserProfileTest$val jsonStr = """{"username":"user1","name":"User One","vip":true,"images":{"avatar":{"full":"https://example.com/avatar.jpg"}}}"""</ID>
     <ID>MultiLineIfElse:DiagnosticLog.kt$DiagnosticLog$Log.e(androidTag, entry.message)</ID>
@@ -79,12 +77,10 @@
     <ID>NoMultipleSpaces:Models.kt$ </ID>
     <ID>NoMultipleSpaces:Models.kt$DeviceCapability$ </ID>
     <ID>NoMultipleSpaces:Models.kt$ScrobbleCandidate$ </ID>
-    <ID>NoMultipleSpaces:Models.kt$StreamingService$ </ID>
     <ID>NoMultipleSpaces:ShowProgressCalculatorTest.kt$ShowProgressCalculatorTest.InProgressTest$ </ID>
     <ID>NoMultipleSpaces:TmdbCacheTest.kt$TmdbCacheTest.TtlTest$ </ID>
     <ID>NoMultipleSpaces:TraktApiService.kt$DeviceTokenRequest$ </ID>
     <ID>NoMultipleSpaces:TraktApiService.kt$ScrobbleBody$ </ID>
-    <ID>NoWildcardImports:KnownStreamingServicesTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
     <ID>NoWildcardImports:LocaleHelperTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
     <ID>NoWildcardImports:MediaSessionScrobbler.kt$import kotlinx.coroutines.*</ID>
     <ID>NoWildcardImports:MediaSessionScrobblerFuzzyTest.kt$import io.mockk.*</ID>
@@ -110,7 +106,6 @@
     <ID>SpacingBetweenDeclarationsWithComments:MediaSessionScrobbler.kt$MediaSessionScrobbler$/** * Most recent candidate observed — regardless of whether it was auto-scrobbled * or emitted to [pendingConfirmation]. Populated only for candidates that * clear [OVERLAY_THRESHOLD]. Intended for diagnostics/UI surfacing so the * user can see "the scrobbler *is* seeing things" even when no match auto-fires. */</ID>
     <ID>SpacingBetweenDeclarationsWithComments:MediaSessionScrobbler.kt$MediaSessionScrobbler$/** True while [startListening] is active; flips back to false on [stopListening]. */</ID>
     <ID>StringTemplate:TmdbApiService.kt$TmdbImageHelper$${it}</ID>
-    <ID>WildcardImport:KnownStreamingServicesTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
     <ID>WildcardImport:LocaleHelperTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
     <ID>WildcardImport:MediaSessionScrobbler.kt$import kotlinx.coroutines.*</ID>
     <ID>WildcardImport:MediaSessionScrobblerFuzzyTest.kt$import io.mockk.*</ID>

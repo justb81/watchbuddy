@@ -74,10 +74,12 @@
         <package android:name="com.apple.atve.androidtv.appletv" />
         <package android:name="com.cbs.app" />
         <package android:name="com.hbo.hbonow" />
-        <package android:name="tv.waipu.app" />
-        <package android:name="de.prosiebensat1digital.android.joyn" />
-        <package android:name="de.swr.avp.ard.phone" />
-        <package android:name="de.zdf.android.app" />
+        <package android:name="de.exaring.waipu" />
+        <package android:name="de.prosiebensat1digital.seventv" />
+        <package android:name="de.swr.avp.ard.tv" />
+        <package android:name="com.zdf.android.mediathek" />
+        <package android:name="com.google.android.youtube.tv" />
+        <package android:name="tv.wuaki.apptv" />
     </queries>
 
     <application
