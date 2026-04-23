@@ -33,7 +33,6 @@
 
     <!-- Show detail -->
     <string name="tv_next_episode">Nächste Folge</string>
-    <string name="tv_episode_label">S%1$02dE%2$02d — %3$s</string>
     <string name="tv_watch_now">Jetzt ansehen</string>
     <string name="tv_recap">Was bisher geschah…</string>
     <string name="tv_no_streaming_service">Kein Streamingdienst zugeordnet</string>
@@ -62,7 +61,6 @@
     <string name="tv_not_available_region">In deiner Region nicht zum Streaming verfügbar.</string>
     <string name="tv_providers_retry">Streaming-Infos konnten nicht geladen werden. Tippen zum Wiederholen.</string>
     <string name="tv_provider_last_used_label">Zuletzt genutzt</string>
-    <string name="tv_provider_last_used_cd">Zuletzt genutzt: %1$s</string>
 
     <!-- TV Settings hub (#344 / #367) -->
     <string name="tv_settings_title">Einstellungen</string>

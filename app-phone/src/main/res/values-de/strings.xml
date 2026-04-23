@@ -42,7 +42,6 @@
     <string name="home_next_episode">Nächste: S%1$02dE%2$02d</string>
     <string name="home_just_now">Gerade eben</string>
     <string name="home_last_watched">Zuletzt gesehen: %1$s, %2$s</string>
-    <string name="home_last_aired_episode">Zuletzt ausgestrahlt: %1$s, %2$s</string>
     <string name="home_label_last_watched">Zuletzt gesehen</string>
     <string name="home_label_last_aired">Zuletzt ausgestrahlt</string>
     <string name="home_time_today">heute</string>
