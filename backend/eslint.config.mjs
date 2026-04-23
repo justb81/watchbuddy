@@ -4,7 +4,7 @@
 // disables any stylistic rule that would conflict with Prettier.
 import js from '@eslint/js';
 import nodePlugin from 'eslint-plugin-n';
-import prettierConfig from 'eslint-config-prettier';
+import prettierConfig from 'eslint-config-prettier/flat';
 import globals from 'globals';
 
 export default [
