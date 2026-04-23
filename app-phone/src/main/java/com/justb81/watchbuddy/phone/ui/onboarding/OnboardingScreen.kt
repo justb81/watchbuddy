@@ -21,6 +21,7 @@ import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -268,7 +269,7 @@ private fun PinCard(userCode: String, verificationUrl: String, expiresIn: Int) {
             trackColor  = MaterialTheme.colorScheme.surfaceVariant
         )
         Text(
-            text  = stringResource(R.string.onboarding_code_expires, expiresIn),
+            text  = pluralStringResource(R.plurals.onboarding_code_expires, expiresIn, expiresIn),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
         )

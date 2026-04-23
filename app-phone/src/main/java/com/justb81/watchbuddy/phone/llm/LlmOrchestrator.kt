@@ -2,7 +2,6 @@ package com.justb81.watchbuddy.phone.llm
 
 import android.app.ActivityManager
 import android.content.Context
-import android.os.Build
 import com.justb81.watchbuddy.core.model.LlmBackend
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -67,11 +66,11 @@ class LlmOrchestrator @Inject constructor(
     }
 
     private fun isAiCoreAvailable(): Boolean {
-        // AICore requires Android 14+ and supported hardware
-        // Real check via com.google.android.aicore package presence
+        // AICore requires Android 14+ and supported hardware; our minSdk is 34
+        // so the OS version is always new enough, we only probe for the package.
         return try {
             context.packageManager.getPackageInfo("com.google.android.aicore", 0)
-            Build.VERSION.SDK_INT >= 34
+            true
         } catch (e: Exception) {
             false
         }

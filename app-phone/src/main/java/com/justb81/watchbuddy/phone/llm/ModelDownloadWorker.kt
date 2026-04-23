@@ -3,7 +3,6 @@ package com.justb81.watchbuddy.phone.llm
 import android.app.Notification
 import android.content.Context
 import android.content.pm.ServiceInfo
-import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.hilt.work.HiltWorker
@@ -74,11 +73,7 @@ class ModelDownloadWorker @AssistedInject constructor(
 
     internal fun createForegroundInfo(): ForegroundInfo {
         val notification = buildNotification()
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            ForegroundInfo(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
-        } else {
-            ForegroundInfo(NOTIFICATION_ID, notification)
-        }
+        return ForegroundInfo(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
     }
 
     private fun buildNotification(): Notification =

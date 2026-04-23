@@ -134,14 +134,8 @@ object CrashReporter {
 
     private fun appVersionString(context: Context): String =
         try {
-            @Suppress("DEPRECATION")
             val info = context.packageManager.getPackageInfo(context.packageName, 0)
-            val versionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                info.longVersionCode.toString()
-            } else {
-                @Suppress("DEPRECATION") info.versionCode.toString()
-            }
-            "${context.packageName} v${info.versionName} (vc=$versionCode)"
+            "${context.packageName} v${info.versionName} (vc=${info.longVersionCode})"
         } catch (_: PackageManager.NameNotFoundException) {
             context.packageName
         }

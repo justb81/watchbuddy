@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import androidx.core.graphics.scale
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -124,6 +125,6 @@ class AvatarImageStore @Inject constructor(
         val scale = maxEdge.toFloat() / longest
         val w = (src.width * scale).toInt().coerceAtLeast(1)
         val h = (src.height * scale).toInt().coerceAtLeast(1)
-        return Bitmap.createScaledBitmap(src, w, h, true)
+        return src.scale(w, h)
     }
 }

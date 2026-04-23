@@ -3,22 +3,20 @@
     <string name="app_name">WatchBuddy</string>
 
     <!-- Onboarding -->
-    <string name="onboarding_title">Connect with Trakt</string>
     <string name="onboarding_subtitle">WatchBuddy uses Trakt to sync your watched shows across devices.</string>
     <string name="onboarding_step1">On your PC or phone, go to:</string>
     <string name="onboarding_activate_url">trakt.tv/activate</string>
     <string name="onboarding_step2">Enter this code:</string>
-    <string name="onboarding_loading_code">Loading code…</string>
     <string name="onboarding_waiting">Waiting for confirmation…</string>
-    <string name="onboarding_success">Connected! Welcome, %1$s</string>
-    <string name="onboarding_error">Connection failed. Please try again.</string>
     <string name="onboarding_retry">Try again</string>
     <string name="onboarding_code_copied">Code copied to clipboard</string>
-    <string name="onboarding_code_expires">Code expires in %1$d seconds</string>
+    <plurals name="onboarding_code_expires">
+        <item quantity="one">Code expires in %1$d second</item>
+        <item quantity="other">Code expires in %1$d seconds</item>
+    </plurals>
     <string name="onboarding_error_loading_code">Error loading code: %1$s</string>
     <string name="onboarding_code_expired">Code expired. Please try again.</string>
     <string name="onboarding_error_denied">Authorization was denied. Please try again.</string>
-    <string name="onboarding_not_configured">Trakt is not configured yet. You can set up your credentials in Settings.</string>
     <string name="onboarding_not_configured_managed_no_client_id">This build has no Trakt Client ID. Open Settings → Advanced and switch to \"Own credentials\".</string>
     <string name="onboarding_not_configured_managed_no_backend">Token backend is not configured. Open Settings → Advanced to switch authentication mode.</string>
     <string name="onboarding_not_configured_self_hosted_no_url">Backend URL not set. Enter your proxy server URL in Settings → Advanced.</string>
@@ -37,7 +35,6 @@
     <string name="home_all_shows">All Shows</string>
     <string name="home_no_shows">No shows yet.\nConnect with Trakt to get started.</string>
     <string name="home_connect_to_trakt">Connect to Trakt</string>
-    <string name="home_syncing">Syncing with Trakt…</string>
     <string name="home_last_sync">Last synced: %1$s</string>
     <string name="home_next_episode">Next: S%1$02dE%2$02d</string>
     <string name="home_just_now">Just now</string>
@@ -60,7 +57,10 @@
     <string name="home_cd_settings">Settings</string>
     <!-- Diagnostics -->
     <string name="diagnostics_banner_title">Diagnostic report available</string>
-    <string name="diagnostics_banner_message">The app captured %1$d crash report(s). Share them with the maintainer so the problem can be analysed.</string>
+    <plurals name="diagnostics_banner_message">
+        <item quantity="one">The app captured %1$d crash report. Share it with the maintainer so the problem can be analysed.</item>
+        <item quantity="other">The app captured %1$d crash reports. Share them with the maintainer so the problem can be analysed.</item>
+    </plurals>
     <string name="diagnostics_banner_share">Share</string>
     <string name="diagnostics_banner_dismiss">Dismiss</string>
     <string name="home_watching_tv_toggle">I am watching TV</string>
@@ -93,7 +93,6 @@
     <string name="settings_tmdb_helper_link">Get API key</string>
     <string name="settings_tmdb_api_url" translatable="false">https://www.themoviedb.org/settings/api</string>
     <string name="settings_tmdb_default_key_active">Built-in key active</string>
-    <string name="settings_tmdb_default_key_hint">A built-in TMDB key is active. You can optionally enter your own key below to override it.</string>
     <string name="settings_tmdb_attribution" translatable="false">This app uses the TMDB API but is not endorsed or certified by TMDB.</string>
     <string name="settings_disconnect">Disconnect</string>
     <string name="settings_companion">Companion service</string>
@@ -139,7 +138,6 @@
     <string name="home_scrobble_started">Started watching</string>
     <string name="home_scrobble_paused">Paused</string>
     <string name="home_scrobble_stopped">Finished watching</string>
-    <string name="companion_auto_deactivated">Companion deactivated — TV not responding</string>
 
     <!-- Companion Service -->
     <string name="companion_channel_name">Companion Service</string>
@@ -159,13 +157,8 @@
     <!-- Show Detail -->
     <string name="show_detail_seasons">Seasons</string>
     <string name="show_detail_season">Season %1$d</string>
-    <string name="show_detail_episode">E%1$02d</string>
     <string name="show_detail_episode_label">S%1$02dE%2$02d</string>
     <string name="show_detail_season_progress">%1$d / %2$d</string>
-    <string name="show_detail_watched">Watched</string>
-    <string name="show_detail_not_watched">Not watched</string>
-    <string name="show_detail_mark_watched">Mark as watched</string>
-    <string name="show_detail_mark_unwatched">Remove from history</string>
     <string name="show_detail_no_episodes">No episodes found for this show.</string>
     <string name="show_detail_error_toggle">Could not update watched status. Please try again.</string>
     <string name="show_detail_cd_back">Back</string>
@@ -176,10 +169,8 @@
 
     <!-- Common -->
     <string name="no_description">No description available.</string>
-    <string name="loading">Loading…</string>
     <string name="error_generic">An error occurred.</string>
     <string name="retry">Try again</string>
-    <string name="ok">OK</string>
 
     <!-- Home plurals -->
     <plurals name="home_episodes_behind">

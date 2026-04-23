@@ -3,22 +3,21 @@
     <string name="app_name">WatchBuddy</string>
 
     <!-- Onboarding -->
-    <string name="onboarding_title">Se connecter avec Trakt</string>
     <string name="onboarding_subtitle">WatchBuddy utilise Trakt pour synchroniser vos séries vues sur tous vos appareils.</string>
     <string name="onboarding_step1">Sur votre PC ou téléphone, allez sur :</string>
     <string name="onboarding_activate_url">trakt.tv/activate</string>
     <string name="onboarding_step2">Entrez ce code :</string>
-    <string name="onboarding_loading_code">Chargement du code…</string>
     <string name="onboarding_waiting">En attente de confirmation…</string>
-    <string name="onboarding_success">Connecté ! Bienvenue, %1$s</string>
-    <string name="onboarding_error">La connexion a échoué. Veuillez réessayer.</string>
     <string name="onboarding_retry">Réessayer</string>
     <string name="onboarding_code_copied">Code copié dans le presse-papiers</string>
-    <string name="onboarding_code_expires">Le code expire dans %1$d secondes</string>
+    <plurals name="onboarding_code_expires">
+        <item quantity="one">Le code expire dans %1$d seconde</item>
+        <item quantity="many">Le code expire dans %1$d secondes</item>
+        <item quantity="other">Le code expire dans %1$d secondes</item>
+    </plurals>
     <string name="onboarding_error_loading_code">Erreur lors du chargement du code : %1$s</string>
     <string name="onboarding_code_expired">Code expiré. Veuillez réessayer.</string>
     <string name="onboarding_error_denied">L\'autorisation a été refusée. Veuillez réessayer.</string>
-    <string name="onboarding_not_configured">Trakt n\'est pas encore configuré. Vous pouvez configurer vos identifiants dans les paramètres.</string>
     <string name="onboarding_not_configured_managed_no_client_id">Ce build ne contient pas de Client ID Trakt. Ouvrez Paramètres → Avancé et choisissez \"Propres identifiants\".</string>
     <string name="onboarding_not_configured_managed_no_backend">Le backend de jetons n\'est pas configuré. Ouvrez Paramètres → Avancé pour changer de mode d\'authentification.</string>
     <string name="onboarding_not_configured_self_hosted_no_url">URL du backend non définie. Entrez l\'URL de votre serveur proxy dans Paramètres → Avancé.</string>
@@ -37,7 +36,6 @@
     <string name="home_all_shows">Toutes les séries</string>
     <string name="home_no_shows">Aucune série pour le moment.\nConnectez-vous avec Trakt pour commencer.</string>
     <string name="home_connect_to_trakt">Se connecter à Trakt</string>
-    <string name="home_syncing">Synchronisation avec Trakt…</string>
     <string name="home_last_sync">Dernière synchronisation : %1$s</string>
     <string name="home_next_episode">Suivant : S%1$02dE%2$02d</string>
     <string name="home_just_now">À l\'instant</string>
@@ -88,7 +86,6 @@
     <string name="settings_tmdb_helper">Obtenez votre clé API gratuite sur themoviedb.org → Paramètres → API</string>
     <string name="settings_tmdb_helper_link">Obtenir la clé API</string>
     <string name="settings_tmdb_default_key_active">Clé intégrée active</string>
-    <string name="settings_tmdb_default_key_hint">Une clé TMDB intégrée est active. Vous pouvez optionnellement entrer votre propre clé ci-dessous pour la remplacer.</string>
     <string name="settings_disconnect">Déconnecter</string>
     <string name="settings_companion">Service compagnon</string>
     <string name="settings_companion_running">En cours (port 8765)</string>
@@ -133,7 +130,6 @@
     <string name="home_scrobble_started">Lecture démarrée</string>
     <string name="home_scrobble_paused">En pause</string>
     <string name="home_scrobble_stopped">Lecture terminée</string>
-    <string name="companion_auto_deactivated">Companion désactivé — TV ne répond pas</string>
 
     <!-- Companion Service -->
     <string name="companion_channel_name">Service compagnon</string>
@@ -153,13 +149,8 @@
     <!-- Show Detail -->
     <string name="show_detail_seasons">Saisons</string>
     <string name="show_detail_season">Saison %1$d</string>
-    <string name="show_detail_episode">É%1$02d</string>
     <string name="show_detail_episode_label">S%1$02dÉ%2$02d</string>
     <string name="show_detail_season_progress">%1$d / %2$d</string>
-    <string name="show_detail_watched">Vu</string>
-    <string name="show_detail_not_watched">Non vu</string>
-    <string name="show_detail_mark_watched">Marquer comme vu</string>
-    <string name="show_detail_mark_unwatched">Retirer de l\'historique</string>
     <string name="show_detail_no_episodes">Aucun épisode trouvé pour cette série.</string>
     <string name="show_detail_error_toggle">Impossible de mettre à jour le statut. Veuillez réessayer.</string>
     <string name="show_detail_cd_back">Retour</string>
@@ -170,24 +161,28 @@
 
     <!-- Common -->
     <string name="no_description">Aucune description disponible.</string>
-    <string name="loading">Chargement…</string>
     <string name="error_generic">Une erreur est survenue.</string>
     <string name="retry">Réessayer</string>
-    <string name="ok">OK</string>
 
     <!-- Diagnostics -->
     <string name="diagnostics_banner_title">Rapport de diagnostic disponible</string>
-    <string name="diagnostics_banner_message">L\'application a enregistré %1$d rapport(s) de plantage. Partagez-les avec le mainteneur pour qu\'il puisse analyser le problème.</string>
+    <plurals name="diagnostics_banner_message">
+        <item quantity="one">L\'application a enregistré %1$d rapport de plantage. Partagez-le avec le mainteneur pour qu\'il puisse analyser le problème.</item>
+        <item quantity="many">L\'application a enregistré %1$d rapports de plantage. Partagez-les avec le mainteneur pour qu\'il puisse analyser le problème.</item>
+        <item quantity="other">L\'application a enregistré %1$d rapports de plantage. Partagez-les avec le mainteneur pour qu\'il puisse analyser le problème.</item>
+    </plurals>
     <string name="diagnostics_banner_share">Partager</string>
     <string name="diagnostics_banner_dismiss">Ignorer</string>
 
     <!-- Home plurals -->
     <plurals name="home_episodes_behind">
         <item quantity="one">%d épisode de retard</item>
+        <item quantity="many">%d épisodes en retard</item>
         <item quantity="other">%d épisodes de retard</item>
     </plurals>
     <plurals name="home_section_all_shows_count">
         <item quantity="one">%d série</item>
+        <item quantity="many">%d séries</item>
         <item quantity="other">%d séries</item>
     </plurals>
 

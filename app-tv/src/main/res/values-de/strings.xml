@@ -35,9 +35,10 @@
     <string name="tv_next_episode">Nächste Folge</string>
     <string name="tv_watch_now">Jetzt ansehen</string>
     <string name="tv_recap">Was bisher geschah…</string>
-    <string name="tv_no_streaming_service">Kein Streamingdienst zugeordnet</string>
-    <string name="tv_watched_episodes">%1$d Folgen gesehen</string>
-    <string name="tv_seasons">%1$d Staffeln</string>
+    <plurals name="tv_watched_episodes">
+        <item quantity="one">%1$d Folge gesehen</item>
+        <item quantity="other">%1$d Folgen gesehen</item>
+    </plurals>
     <string name="tv_back">Zurück</string>
     <string name="tv_back_arrow">Zurück</string>
     <string name="tv_available_at">Verfügbar bei:</string>
@@ -45,7 +46,6 @@
 
     <!-- Recap -->
     <string name="tv_recap_title">Was bisher geschah</string>
-    <string name="tv_recap_generating">Recap wird generiert…</string>
     <string name="tv_recap_generating_on">Recap wird auf %1$s generiert…</string>
     <string name="tv_recap_error">Recap konnte nicht geladen werden.</string>
     <string name="tv_recap_fallback">Keine KI-Zusammenfassung verfügbar.\nKurzbeschreibung aus TMDB:</string>
@@ -87,17 +87,15 @@
     <string name="tv_scrobble_no">Nein</string>
 
     <!-- Phone status -->
-    <string name="tv_phones_connected">%1$d Handy verbunden</string>
-    <string name="tv_phone_best">Bestes Gerät: %1$s (%2$s)</string>
     <string name="tv_default_device_name">Handy</string>
 
     <!-- LLM labels -->
-    <string name="tv_llm_aicore">AICore</string>
-    <string name="tv_llm_gemma_gpu">Gemma GPU</string>
-    <string name="tv_llm_gemma_cpu">Gemma CPU</string>
 
     <!-- Barrierefreiheit -->
-    <string name="cd_scrobble_countdown">Automatisch bestätigen in %1$d Sekunden</string>
+    <plurals name="cd_scrobble_countdown">
+        <item quantity="one">Automatisch bestätigen in %1$d Sekunde</item>
+        <item quantity="other">Automatisch bestätigen in %1$d Sekunden</item>
+    </plurals>
 
     <!-- Diagnostics -->
     <string name="tv_diagnostics_title">Diagnose</string>

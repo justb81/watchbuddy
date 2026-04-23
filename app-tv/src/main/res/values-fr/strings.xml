@@ -23,10 +23,12 @@
     <string name="tv_section_collapse">Réduire la section</string>
     <plurals name="tv_episodes_behind">
         <item quantity="one">%d en retard</item>
+        <item quantity="many">%d en retard</item>
         <item quantity="other">%d en retard</item>
     </plurals>
     <plurals name="tv_section_all_shows_count">
         <item quantity="one">%d série</item>
+        <item quantity="many">%d séries</item>
         <item quantity="other">%d séries</item>
     </plurals>
 
@@ -35,9 +37,11 @@
     <string name="tv_next_episode">Prochain épisode</string>
     <string name="tv_watch_now">Regarder maintenant</string>
     <string name="tv_recap">Précédemment…</string>
-    <string name="tv_no_streaming_service">Aucun service de streaming attribué</string>
-    <string name="tv_watched_episodes">%1$d épisodes vus</string>
-    <string name="tv_seasons">%1$d saisons</string>
+    <plurals name="tv_watched_episodes">
+        <item quantity="one">%1$d épisode vu</item>
+        <item quantity="many">%1$d épisodes vus</item>
+        <item quantity="other">%1$d épisodes vus</item>
+    </plurals>
     <string name="tv_back">Retour</string>
     <string name="tv_back_arrow">‹ Retour</string>
     <string name="tv_available_at">Disponible sur :</string>
@@ -45,7 +49,6 @@
 
     <!-- Recap -->
     <string name="tv_recap_title">Précédemment</string>
-    <string name="tv_recap_generating">Génération du récap…</string>
     <string name="tv_recap_generating_on">Génération du récap sur %1$s…</string>
     <string name="tv_recap_error">Impossible de charger le récap.</string>
     <string name="tv_recap_fallback">Aucun résumé IA disponible.\nDescription courte de TMDB :</string>
@@ -87,17 +90,16 @@
     <string name="tv_scrobble_no">Non</string>
 
     <!-- Phone status -->
-    <string name="tv_phones_connected">%1$d téléphone connecté</string>
-    <string name="tv_phone_best">Meilleur appareil : %1$s (%2$s)</string>
     <string name="tv_default_device_name">Téléphone</string>
 
     <!-- LLM labels -->
-    <string name="tv_llm_aicore">AICore</string>
-    <string name="tv_llm_gemma_gpu">Gemma GPU</string>
-    <string name="tv_llm_gemma_cpu">Gemma CPU</string>
 
     <!-- Accessibilité -->
-    <string name="cd_scrobble_countdown">Confirmation automatique dans %1$d secondes</string>
+    <plurals name="cd_scrobble_countdown">
+        <item quantity="one">Confirmation automatique dans %1$d seconde</item>
+        <item quantity="many">Confirmation automatique dans %1$d secondes</item>
+        <item quantity="other">Confirmation automatique dans %1$d secondes</item>
+    </plurals>
 
     <!-- Diagnostics -->
     <string name="tv_diagnostics_title">Diagnostic</string>

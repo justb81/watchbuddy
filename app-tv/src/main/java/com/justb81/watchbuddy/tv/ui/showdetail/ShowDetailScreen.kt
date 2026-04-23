@@ -17,6 +17,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -209,7 +210,8 @@ private fun ShowDetailContent(
         )
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             entry.show.year?.let { MetaChip(it.toString()) }
-            MetaChip(stringResource(R.string.tv_watched_episodes, entry.seasons.sumOf { it.episodes.size }))
+            val watchedCount = entry.seasons.sumOf { it.episodes.size }
+            MetaChip(pluralStringResource(R.plurals.tv_watched_episodes, watchedCount, watchedCount))
         }
         Spacer(Modifier.height(8.dp))
         Text(text = stringResource(R.string.tv_next_episode), fontSize = 14.sp, color = Color.White.copy(alpha = 0.5f))
