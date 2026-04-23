@@ -205,6 +205,16 @@ swipes the app from recents.
 is already true the start is skipped, and `CompanionHttpServer.start()` additionally guards against
 double-binding Netty.
 
+**Foreground service type:** Both `CompanionService` (phone) and `TvDiscoveryService` (TV) run as
+`connectedDevice` foreground services — **not** `dataSync`. The service maintains long-lived P2P
+connectivity with a paired device (BLE advert / scan + Ktor HTTP heartbeat), which is exactly what
+`connectedDevice` is intended for. Android 15/16 time-box `dataSync` FGS at ~6 h per 24 h and kill
+the service with `ForegroundServiceDidNotStopInTimeException` once the quota is exhausted, which
+was crashing the app on Android 16 devices (#459). The runtime `startForeground(id, notification,
+type)` call must pass `ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE` so it matches the
+manifest declaration on Android 14+. The `connectedDevice` type is authorised by the existing
+`BLUETOOTH_ADVERTISE` (phone) / `BLUETOOTH_SCAN` (TV) permissions.
+
 ## Presence Heartbeat (TV)
 
 The TV's `PhoneDiscoveryManager` runs a heartbeat coroutine every 60 seconds that re-fetches

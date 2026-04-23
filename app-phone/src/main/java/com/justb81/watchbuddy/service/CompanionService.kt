@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
@@ -76,7 +77,11 @@ class CompanionService : Service() {
         super.onCreate()
         DiagnosticLog.event(TAG, "onCreate")
         ensureNotificationChannel()
-        startForeground(NOTIFICATION_ID, buildNotification())
+        startForeground(
+            NOTIFICATION_ID,
+            buildNotification(),
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE,
+        )
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
