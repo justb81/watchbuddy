@@ -24,7 +24,7 @@ jobs:
       android: ${{ steps.filter.outputs.android }}
     steps:
       - uses: actions/checkout@v6
-      - uses: dorny/paths-filter@v3
+      - uses: dorny/paths-filter@v4
         id: filter
         with:
           filters: |
@@ -145,7 +145,7 @@ jobs:
 
       - name: Post PR lint summary
         if: always() && github.event_name == 'pull_request'
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const fs = require('fs');
@@ -258,7 +258,7 @@ jobs:
       # UI. See CLAUDE.md § "Monitoring PR checks & accessing build logs".
       - name: Post failing build log
         if: failure() && github.event_name == 'pull_request'
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         env:
           MARKER: '<!-- watchbuddy-build-log -->'
           CURRENT_JOB: ${{ github.job }}
