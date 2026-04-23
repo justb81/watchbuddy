@@ -90,7 +90,7 @@ class SettingsViewModel @Inject constructor(
     private val deviceCapabilityProvider: DeviceCapabilityProvider,
     private val settingsRepository: SettingsRepository,
     private val avatarImageStore: AvatarImageStore,
-    @Named("managedBackendAvailable") private val managedBackendAvailable: Boolean
+    @param:Named("managedBackendAvailable") private val managedBackendAvailable: Boolean
 ) : AndroidViewModel(application) {
 
     private inline fun <T> initSafely(label: String, default: T, block: () -> T): T =
@@ -224,13 +224,9 @@ class SettingsViewModel @Inject constructor(
 
     private fun observeModelReadyState() {
         launchSafe {
-            settingsRepository.modelReady
-                .catch { e ->
-                    DiagnosticLog.error(TAG, "observeModelReadyState:flow-error", e)
-                }
-                .collect { ready ->
-                    _uiState.value = _uiState.value.copy(llmReady = ready)
-                }
+            settingsRepository.modelReady.collect { ready ->
+                _uiState.value = _uiState.value.copy(llmReady = ready)
+            }
         }
     }
 

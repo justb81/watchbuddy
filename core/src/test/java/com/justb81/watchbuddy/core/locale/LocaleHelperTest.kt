@@ -21,11 +21,11 @@ class LocaleHelperTest {
             Arguments.of(Locale.FRENCH, "French"),
             Arguments.of(Locale.CHINESE, "Chinese"),
             Arguments.of(Locale.JAPANESE, "Japanese"),
-            Arguments.of(Locale("es"), "Spanish"),
-            Arguments.of(Locale("ar"), "Arabic"),
-            Arguments.of(Locale("ko"), "Korean"),
-            Arguments.of(Locale("pt"), "Portuguese"),
-            Arguments.of(Locale("it"), "Italian")
+            Arguments.of(Locale.of("es"), "Spanish"),
+            Arguments.of(Locale.of("ar"), "Arabic"),
+            Arguments.of(Locale.of("ko"), "Korean"),
+            Arguments.of(Locale.of("pt"), "Portuguese"),
+            Arguments.of(Locale.of("it"), "Italian")
         )
 
         @JvmStatic
@@ -34,11 +34,11 @@ class LocaleHelperTest {
             Arguments.of(Locale.UK, "en-GB"),
             Arguments.of(Locale.GERMANY, "de-DE"),
             Arguments.of(Locale.FRANCE, "fr-FR"),
-            Arguments.of(Locale("es", "ES"), "es-ES"),
-            Arguments.of(Locale("ja", "JP"), "ja-JP"),
+            Arguments.of(Locale.of("es", "ES"), "es-ES"),
+            Arguments.of(Locale.of("ja", "JP"), "ja-JP"),
             Arguments.of(Locale.ENGLISH, "en"),
             Arguments.of(Locale.GERMAN, "de"),
-            Arguments.of(Locale("fr"), "fr")
+            Arguments.of(Locale.of("fr"), "fr")
         )
     }
 
@@ -50,7 +50,7 @@ class LocaleHelperTest {
 
     @Test
     fun `returns non-empty string for any locale`() {
-        val result = LocaleHelper.getLlmResponseLanguage(Locale("xx"))
+        val result = LocaleHelper.getLlmResponseLanguage(Locale.of("xx"))
         assertNotNull(result)
         assertTrue(result.isNotEmpty())
     }
@@ -67,7 +67,7 @@ class LocaleHelperTest {
 
         @Test
         fun `returns en-US for empty locale`() {
-            val emptyLocale = Locale("", "")
+            val emptyLocale = Locale.of("", "")
             assertEquals("en-US", LocaleHelper.getTmdbLanguage(emptyLocale))
         }
 

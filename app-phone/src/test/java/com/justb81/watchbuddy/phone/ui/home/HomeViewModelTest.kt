@@ -24,7 +24,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import okhttp3.ResponseBody
+import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -208,7 +208,7 @@ class HomeViewModelTest {
         @Test
         fun `shows auth error message on HTTP 401`() = runTest {
             every { tokenRepository.getAccessToken() } returns "valid-token"
-            val httpEx = HttpException(retrofit2.Response.error<Any>(401, ResponseBody.create(null, "")))
+            val httpEx = HttpException(retrofit2.Response.error<Any>(401, "".toResponseBody(null)))
             stubShowsThrows(httpEx)
             every { application.getString(com.justb81.watchbuddy.R.string.home_sync_failed_auth) } returns "Session expired"
 
@@ -222,7 +222,7 @@ class HomeViewModelTest {
         @Test
         fun `shows auth error message on HTTP 403`() = runTest {
             every { tokenRepository.getAccessToken() } returns "valid-token"
-            val httpEx = HttpException(retrofit2.Response.error<Any>(403, ResponseBody.create(null, "")))
+            val httpEx = HttpException(retrofit2.Response.error<Any>(403, "".toResponseBody(null)))
             stubShowsThrows(httpEx)
             every { application.getString(com.justb81.watchbuddy.R.string.home_sync_failed_auth) } returns "Session expired"
 

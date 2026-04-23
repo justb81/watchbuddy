@@ -36,7 +36,7 @@ class SettingsRepository @Inject constructor(
     @param:ApplicationContext private val context: Context,
     private val tokenRepository: TokenRepository,
     private val llmEventLog: LlmEventLog,
-    @Named("defaultTmdbApiKey") private val defaultTmdbApiKey: String
+    @param:Named("defaultTmdbApiKey") private val defaultTmdbApiKey: String
 ) {
     private object Keys {
         val AUTH_MODE = stringPreferencesKey("auth_mode")

@@ -39,8 +39,8 @@ class TokenRefreshManager @Inject constructor(
     private val traktApi: TraktApiService,
     private val tokenProxy: TokenProxyService,
     private val tokenProxyServiceFactory: TokenProxyServiceFactory,
-    @Named("managedBackendAvailable") private val managedBackendAvailable: Boolean,
-    @Named("traktClientId") private val clientId: String
+    @param:Named("managedBackendAvailable") private val managedBackendAvailable: Boolean,
+    @param:Named("traktClientId") private val clientId: String
 ) {
     private val mutex = Mutex()
 

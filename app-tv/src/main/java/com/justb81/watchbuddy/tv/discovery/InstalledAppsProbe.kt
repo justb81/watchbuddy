@@ -21,7 +21,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class InstalledAppsProbe @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
 ) {
     @Volatile private var cachedPackages: Set<String>? = null
 

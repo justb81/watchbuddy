@@ -105,25 +105,6 @@
             </intent-filter>
         </activity>
 
-        <!-- TV app does not use WorkManager; disable its auto-init so the
-             startup path does not build a Room-backed WorkDatabase for
-             nothing (which can crash under R8 if any keep rule is off).
-             tools:ignore="MissingClass" — the TV module excludes the
-             androidx.work group entirely, so the InitializationProvider
-             class isn't on the classpath at lint time; the merge directive
-             only needs the name to match a transitive manifest entry. -->
-        <provider
-            android:name="androidx.startup.InitializationProvider"
-            android:authorities="${applicationId}.androidx-startup"
-            android:exported="false"
-            tools:node="merge"
-            tools:ignore="MissingClass">
-            <meta-data
-                android:name="androidx.work.WorkManagerInitializer"
-                android:value="androidx.startup"
-                tools:node="remove" />
-        </provider>
-
         <!-- Background phone discovery service. Runs the BLE scanner when
              "Autostart at TV boot" is enabled so new phones are picked up
              without the user opening the launcher first. Uses `dataSync`

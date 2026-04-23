@@ -66,7 +66,7 @@ class OnboardingViewModel @Inject constructor(
     private val tokenRepository: TokenRepository,
     private val settingsRepository: SettingsRepository,
     private val tokenProxyServiceFactory: TokenProxyServiceFactory,
-    @Named("managedBackendAvailable") private val managedBackendAvailable: Boolean
+    @param:Named("managedBackendAvailable") private val managedBackendAvailable: Boolean
 ) : AndroidViewModel(application) {
 
     private val _state = MutableStateFlow<OnboardingState>(OnboardingState.Idle)
@@ -248,7 +248,7 @@ class OnboardingViewModel @Inject constructor(
                         400 -> consecutiveNetworkFailures = 0
                         429 -> delay(response.interval * 1_000L)
                         503 -> {
-                            val msg = if ((e as? HttpException)?.isServerMisconfigured() == true) {
+                            val msg = if (e.isServerMisconfigured()) {
                                 getApplication<Application>().getString(
                                     R.string.onboarding_error_server_misconfigured
                                 )
