@@ -35,7 +35,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y cloc
 
       - name: Run Gradle tests (populate JUnit XML)
-        run: ./gradlew test
+        run: ./gradlew testDebugUnitTest
 
       - name: Run backend tests (populate Jest summary)
         run: |
