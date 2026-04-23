@@ -88,8 +88,12 @@ fun PhoneNavGraph(
         composable(
             route = PhoneRoute.LlmEventDetail.route,
             arguments = listOf(navArgument("eventId") { type = NavType.LongType })
-        ) {
-            LlmEventDetailScreen(onBack = { navController.popBackStack() })
+        ) { backStackEntry ->
+            val eventId = backStackEntry.arguments?.getLong("eventId") ?: 0L
+            LlmEventDetailScreen(
+                eventId = eventId,
+                onBack = { navController.popBackStack() },
+            )
         }
 
         composable(PhoneRoute.Connect.route) {

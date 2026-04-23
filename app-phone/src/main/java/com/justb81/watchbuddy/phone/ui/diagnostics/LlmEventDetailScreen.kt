@@ -7,28 +7,45 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
 import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.phone.llm.LlmEventLog
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
+import dagger.hilt.android.EntryPointAccessors
+import dagger.hilt.components.SingletonComponent
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+@EntryPoint
+@InstallIn(SingletonComponent::class)
+internal interface LlmEventDetailEntryPoint {
+    fun llmEventLog(): LlmEventLog
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LlmEventDetailScreen(
+    eventId: Long,
     onBack: () -> Unit,
-    viewModel: LlmEventDetailViewModel = hiltViewModel(),
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+    val event = remember(eventId) {
+        val log = EntryPointAccessors
+            .fromApplication(context.applicationContext, LlmEventDetailEntryPoint::class.java)
+            .llmEventLog()
+        log.findById(eventId)
+    }
 
     Scaffold(
         topBar = {
@@ -57,7 +74,6 @@ fun LlmEventDetailScreen(
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            val event = uiState.event
             if (event == null) {
                 Text(
                     text = stringResource(R.string.diagnostics_llm_detail_not_found),
