@@ -56,7 +56,7 @@
 -dontwarn dagger.hilt.android.internal.**
 
 # ── Coil ─────────────────────────────────────────────────────────────────────
--dontwarn coil.**
+-dontwarn coil3.**
 
 # ── Security Crypto / Tink ───────────────────────────────────────────────────
 -keep class androidx.security.crypto.** { *; }

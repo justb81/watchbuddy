@@ -193,7 +193,8 @@ dependencies {
     implementation(libs.security.crypto)
 
     // Image loading
-    implementation(libs.coil)
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp)
 
     // Testing
     testImplementation(libs.junit5.api)

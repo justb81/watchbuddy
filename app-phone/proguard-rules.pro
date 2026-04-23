@@ -77,7 +77,7 @@
 -dontwarn reactor.blockhound.integration.BlockHoundIntegration
 
 # ── Coil ─────────────────────────────────────────────────────────────────────
--dontwarn coil.**
+-dontwarn coil3.**
 
 # ── Security Crypto ──────────────────────────────────────────────────────────
 -keep class androidx.security.crypto.** { *; }

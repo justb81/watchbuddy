@@ -26,7 +26,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.tv.material3.*
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImage
 import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.core.model.EnrichedShowEntry
 import com.justb81.watchbuddy.core.model.ResolvedProvider

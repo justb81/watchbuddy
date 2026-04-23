@@ -136,7 +136,8 @@ dependencies {
     implementation(libs.hilt.lifecycle.viewmodel.compose)
 
     // Image loading
-    implementation(libs.coil)
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp)
 
     // Error-prone annotations — compileOnly so R8 can resolve references from Tink
     // without bundling the annotation library in the APK.
