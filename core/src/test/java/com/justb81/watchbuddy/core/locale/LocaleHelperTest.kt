@@ -14,6 +14,12 @@ import java.util.stream.Stream
 class LocaleHelperTest {
 
     companion object {
+        // `Locale.of(...)` is JDK 19+; CI runs tests on JDK 17, so the direct
+        // call throws NoSuchMethodError at runtime. `Locale.Builder()` works on
+        // JDK 17 and isn't flagged as deprecated by newer compilers.
+        private fun locale(language: String, country: String = ""): Locale =
+            Locale.Builder().setLanguage(language).setRegion(country).build()
+
         @JvmStatic
         fun localeProvider(): Stream<Arguments> = Stream.of(
             Arguments.of(Locale.ENGLISH, "English"),
@@ -21,11 +27,11 @@ class LocaleHelperTest {
             Arguments.of(Locale.FRENCH, "French"),
             Arguments.of(Locale.CHINESE, "Chinese"),
             Arguments.of(Locale.JAPANESE, "Japanese"),
-            Arguments.of(Locale.of("es"), "Spanish"),
-            Arguments.of(Locale.of("ar"), "Arabic"),
-            Arguments.of(Locale.of("ko"), "Korean"),
-            Arguments.of(Locale.of("pt"), "Portuguese"),
-            Arguments.of(Locale.of("it"), "Italian")
+            Arguments.of(locale("es"), "Spanish"),
+            Arguments.of(locale("ar"), "Arabic"),
+            Arguments.of(locale("ko"), "Korean"),
+            Arguments.of(locale("pt"), "Portuguese"),
+            Arguments.of(locale("it"), "Italian")
         )
 
         @JvmStatic
@@ -34,11 +40,11 @@ class LocaleHelperTest {
             Arguments.of(Locale.UK, "en-GB"),
             Arguments.of(Locale.GERMANY, "de-DE"),
             Arguments.of(Locale.FRANCE, "fr-FR"),
-            Arguments.of(Locale.of("es", "ES"), "es-ES"),
-            Arguments.of(Locale.of("ja", "JP"), "ja-JP"),
+            Arguments.of(locale("es", "ES"), "es-ES"),
+            Arguments.of(locale("ja", "JP"), "ja-JP"),
             Arguments.of(Locale.ENGLISH, "en"),
             Arguments.of(Locale.GERMAN, "de"),
-            Arguments.of(Locale.of("fr"), "fr")
+            Arguments.of(locale("fr"), "fr")
         )
     }
 
@@ -50,7 +56,7 @@ class LocaleHelperTest {
 
     @Test
     fun `returns non-empty string for any locale`() {
-        val result = LocaleHelper.getLlmResponseLanguage(Locale.of("xx"))
+        val result = LocaleHelper.getLlmResponseLanguage(locale("xx"))
         assertNotNull(result)
         assertTrue(result.isNotEmpty())
     }
@@ -67,7 +73,7 @@ class LocaleHelperTest {
 
         @Test
         fun `returns en-US for empty locale`() {
-            val emptyLocale = Locale.of("", "")
+            val emptyLocale = locale("", "")
             assertEquals("en-US", LocaleHelper.getTmdbLanguage(emptyLocale))
         }
 
