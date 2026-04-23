@@ -128,6 +128,20 @@
     <string name="tv_diagnostics_value_no_phones">Aucun téléphone détecté.</string>
     <string name="tv_diagnostics_section_recent_events">Événements récents</string>
     <string name="tv_diagnostics_value_no_events">Aucun événement</string>
+    <string name="tv_diagnostics_section_media_session">Dernière session média</string>
+    <string name="tv_diagnostics_row_media_session_package">Paquet</string>
+    <string name="tv_diagnostics_row_media_session_title">Titre</string>
+    <string name="tv_diagnostics_row_media_session_display_title">Titre affiché</string>
+    <string name="tv_diagnostics_row_media_session_display_subtitle">Sous-titre affiché</string>
+    <string name="tv_diagnostics_row_media_session_display_description">Description affichée</string>
+    <string name="tv_diagnostics_row_media_session_artist">Artiste</string>
+    <string name="tv_diagnostics_row_media_session_album_artist">Artiste de l\'album</string>
+    <string name="tv_diagnostics_row_media_session_album">Album</string>
+    <string name="tv_diagnostics_row_media_session_playback_state">État de lecture</string>
+    <string name="tv_diagnostics_row_media_session_position">Position</string>
+    <string name="tv_diagnostics_row_media_session_duration">Durée</string>
+    <string name="tv_diagnostics_row_media_session_observed_age">Observé</string>
+    <string name="tv_diagnostics_value_null">(null)</string>
 
     <!-- Version footer -->
     <string name="settings_version_footer">WatchBuddy v%1$s (build %2$d)</string>

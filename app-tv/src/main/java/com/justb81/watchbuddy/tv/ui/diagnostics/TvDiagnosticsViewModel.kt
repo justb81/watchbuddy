@@ -28,6 +28,7 @@ data class TvDiagnosticsUiState(
     val notificationAccessGranted: Boolean = false,
     val scrobblerListening: Boolean = false,
     val lastCandidate: MediaSessionScrobbler.LastCandidate? = null,
+    val lastObservedSession: MediaSessionScrobbler.LastObservedSession? = null,
     val recentEvents: List<DiagnosticLog.Entry> = emptyList(),
     val versionName: String = BuildConfig.VERSION_NAME,
     val versionCode: Int = BuildConfig.VERSION_CODE,
@@ -58,7 +59,8 @@ class TvDiagnosticsViewModel @Inject constructor(
         val scrobbleState = combine(
             scrobbler.isListening,
             scrobbler.lastCandidate,
-        ) { listening, last -> listening to last }
+            scrobbler.lastObservedSession,
+        ) { listening, last, observed -> Triple(listening, last, observed) }
 
         viewModelScope.launch {
             combine(discoveryState, discoveryTail, scrobbleState) { a, b, s ->
@@ -71,6 +73,7 @@ class TvDiagnosticsViewModel @Inject constructor(
                     notificationAccessGranted = _uiState.value.notificationAccessGranted,
                     scrobblerListening = s.first,
                     lastCandidate = s.second,
+                    lastObservedSession = s.third,
                 )
             }.collect { snapshot ->
                 _uiState.update {

@@ -22,10 +22,10 @@ import org.junit.jupiter.api.Test
  * Regression tests for issue #402: some streaming apps destroy their MediaSession
  * entirely when playback ends instead of transitioning through STATE_STOPPED.
  * When that happens `getActiveSessions` just stops returning the session — no
- * STATE_STOPPED is ever observed — so the dedup key `currentlyScrobbling` used
- * to stay pinned forever, silently blocking every future scrobble of the same title.
+ * STATE_STOPPED is ever observed — so the dedup key `currentlySessionKey` used
+ * to stay pinned forever, silently blocking every future scrobble of the same session.
  *
- * The fix reconciles `currentlyScrobbling` against the set of titles currently
+ * The fix reconciles `currentlySessionKey` against the set of session keys currently
  * reported as live on each poll, dispatches an implicit stop with the last
  * captured progress, and clears local state so the next play can scrobble again.
  */
@@ -44,6 +44,7 @@ class MediaSessionScrobblerVanishTest {
     private val testCandidate = ScrobbleCandidate(
         "com.netflix", testTitle, 0.95f, testShow, testEpisode
     )
+    private val testSessionKey = "com.netflix:$testTitle"
 
     @BeforeEach
     fun setUp() {
@@ -59,9 +60,9 @@ class MediaSessionScrobblerVanishTest {
     @Test
     fun `vanished session dispatches stop with last captured progress`() = runTest {
         scrobbler.autoScrobble(testCandidate)
-        scrobbler.recordProgress(testTitle, 42f)
+        scrobbler.recordProgress(testSessionKey, 42f)
 
-        scrobbler.reconcileVanished(liveTitles = emptySet())
+        scrobbler.reconcileVanished(liveKeys = emptySet())
 
         coVerify { scrobbleDispatcher.dispatchStop(testShow, testEpisode, 42f) }
     }
@@ -69,8 +70,8 @@ class MediaSessionScrobblerVanishTest {
     @Test
     fun `subsequent scrobble of same title proceeds after reconciliation`() = runTest {
         scrobbler.autoScrobble(testCandidate)
-        scrobbler.recordProgress(testTitle, 42f)
-        scrobbler.reconcileVanished(liveTitles = emptySet())
+        scrobbler.recordProgress(testSessionKey, 42f)
+        scrobbler.reconcileVanished(liveKeys = emptySet())
         clearMocks(scrobbleDispatcher, answers = false)
 
         scrobbler.autoScrobble(testCandidate)
@@ -81,16 +82,16 @@ class MediaSessionScrobblerVanishTest {
     @Test
     fun `live title still present does not trigger implicit stop`() = runTest {
         scrobbler.autoScrobble(testCandidate)
-        scrobbler.recordProgress(testTitle, 42f)
+        scrobbler.recordProgress(testSessionKey, 42f)
 
-        scrobbler.reconcileVanished(liveTitles = setOf(testTitle))
+        scrobbler.reconcileVanished(liveKeys = setOf(testSessionKey))
 
         coVerify(exactly = 0) { scrobbleDispatcher.dispatchStop(any(), any(), any()) }
     }
 
     @Test
     fun `no-op when nothing is currently scrobbling`() = runTest {
-        scrobbler.reconcileVanished(liveTitles = emptySet())
+        scrobbler.reconcileVanished(liveKeys = emptySet())
 
         coVerify(exactly = 0) { scrobbleDispatcher.dispatchStop(any(), any(), any()) }
     }
@@ -100,7 +101,7 @@ class MediaSessionScrobblerVanishTest {
         scrobbler.autoScrobble(testCandidate)
         // Intentionally no recordProgress() — stream ended before any progress-bearing poll.
 
-        scrobbler.reconcileVanished(liveTitles = emptySet())
+        scrobbler.reconcileVanished(liveKeys = emptySet())
 
         coVerify(exactly = 0) { scrobbleDispatcher.dispatchStop(any(), any(), any()) }
         // Follow-up start must no longer be blocked by the dedup guard.
@@ -112,12 +113,12 @@ class MediaSessionScrobblerVanishTest {
     @Test
     fun `stopListening clears scrobble state`() = runTest {
         scrobbler.autoScrobble(testCandidate)
-        scrobbler.recordProgress(testTitle, 42f)
+        scrobbler.recordProgress(testSessionKey, 42f)
 
         scrobbler.stopListening()
 
         // After stop, reconciliation is a no-op because state is cleared.
-        scrobbler.reconcileVanished(liveTitles = emptySet())
+        scrobbler.reconcileVanished(liveKeys = emptySet())
         coVerify(exactly = 0) { scrobbleDispatcher.dispatchStop(any(), any(), any()) }
     }
 }

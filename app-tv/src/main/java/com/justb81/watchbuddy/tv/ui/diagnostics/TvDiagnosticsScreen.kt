@@ -132,6 +132,10 @@ fun TvDiagnosticsScreen(
             }
 
             item {
+                MediaSessionSection(uiState.lastObservedSession)
+            }
+
+            item {
                 Text(
                     text = stringResource(R.string.tv_diagnostics_section_phones).uppercase(),
                     fontSize = 14.sp,
@@ -417,4 +421,87 @@ private fun formatLastCandidate(last: MediaSessionScrobbler.LastCandidate?): Str
     val pct = (last.candidate.confidence * 100).toInt()
     val marker = if (last.autoScrobbled) "auto" else "overlay"
     return "$title @ ${pct}% · $marker · ${formatAge(last.observedAtMs)}"
+}
+
+@Composable
+private fun MediaSessionSection(last: MediaSessionScrobbler.LastObservedSession?) {
+    val title = stringResource(R.string.tv_diagnostics_section_media_session)
+    val nullPlaceholder = stringResource(R.string.tv_diagnostics_value_null)
+    val emPlaceholder = "—"
+    val snapshot = last?.snapshot
+    val anyFieldPresent = snapshot != null && snapshot.candidateStrings().isNotEmpty()
+    val headerStatus = when {
+        last == null -> Status.NEUTRAL
+        anyFieldPresent -> Status.OK
+        else -> Status.WARN
+    }
+
+    val rows = listOf(
+        DiagRow(
+            stringResource(R.string.tv_diagnostics_row_media_session_package),
+            snapshot?.packageName ?: emPlaceholder,
+            headerStatus,
+        ),
+        DiagRow(
+            stringResource(R.string.tv_diagnostics_row_media_session_title),
+            snapshot?.title ?: if (snapshot == null) emPlaceholder else nullPlaceholder,
+            fieldStatus(snapshot?.title, snapshot != null),
+        ),
+        DiagRow(
+            stringResource(R.string.tv_diagnostics_row_media_session_display_title),
+            snapshot?.displayTitle ?: if (snapshot == null) emPlaceholder else nullPlaceholder,
+            fieldStatus(snapshot?.displayTitle, snapshot != null),
+        ),
+        DiagRow(
+            stringResource(R.string.tv_diagnostics_row_media_session_display_subtitle),
+            snapshot?.displaySubtitle ?: if (snapshot == null) emPlaceholder else nullPlaceholder,
+            fieldStatus(snapshot?.displaySubtitle, snapshot != null),
+        ),
+        DiagRow(
+            stringResource(R.string.tv_diagnostics_row_media_session_display_description),
+            snapshot?.displayDescription ?: if (snapshot == null) emPlaceholder else nullPlaceholder,
+            fieldStatus(snapshot?.displayDescription, snapshot != null),
+        ),
+        DiagRow(
+            stringResource(R.string.tv_diagnostics_row_media_session_artist),
+            snapshot?.artist ?: if (snapshot == null) emPlaceholder else nullPlaceholder,
+            fieldStatus(snapshot?.artist, snapshot != null),
+        ),
+        DiagRow(
+            stringResource(R.string.tv_diagnostics_row_media_session_album_artist),
+            snapshot?.albumArtist ?: if (snapshot == null) emPlaceholder else nullPlaceholder,
+            fieldStatus(snapshot?.albumArtist, snapshot != null),
+        ),
+        DiagRow(
+            stringResource(R.string.tv_diagnostics_row_media_session_album),
+            snapshot?.album ?: if (snapshot == null) emPlaceholder else nullPlaceholder,
+            fieldStatus(snapshot?.album, snapshot != null),
+        ),
+        DiagRow(
+            stringResource(R.string.tv_diagnostics_row_media_session_playback_state),
+            last?.playbackState?.toString() ?: emPlaceholder,
+            Status.NEUTRAL,
+        ),
+        DiagRow(
+            stringResource(R.string.tv_diagnostics_row_media_session_position),
+            last?.positionMs?.let { "${it}ms" } ?: emPlaceholder,
+            Status.NEUTRAL,
+        ),
+        DiagRow(
+            stringResource(R.string.tv_diagnostics_row_media_session_duration),
+            last?.durationMs?.let { "${it}ms" } ?: emPlaceholder,
+            Status.NEUTRAL,
+        ),
+        DiagRow(
+            stringResource(R.string.tv_diagnostics_row_media_session_observed_age),
+            formatAge(last?.observedAtMs ?: 0L),
+            Status.NEUTRAL,
+        ),
+    )
+    DiagnosticsSection(title = title, rows = rows)
+}
+
+private fun fieldStatus(value: String?, sessionObserved: Boolean): Status {
+    if (!sessionObserved) return Status.NEUTRAL
+    return if (value.isNullOrBlank()) Status.WARN else Status.OK
 }
