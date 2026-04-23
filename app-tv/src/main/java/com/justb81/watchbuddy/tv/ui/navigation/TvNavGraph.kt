@@ -2,7 +2,7 @@ package com.justb81.watchbuddy.tv.ui.navigation
 
 import androidx.compose.runtime.*
 import androidx.compose.ui.res.stringResource
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
