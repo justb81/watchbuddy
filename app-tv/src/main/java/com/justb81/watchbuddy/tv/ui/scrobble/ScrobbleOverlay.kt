@@ -98,7 +98,8 @@ fun ScrobbleOverlay(
                     }
 
                     // Auto-dismiss countdown bar (material3 LinearProgressIndicator)
-                    val countdownDescription = pluralStringResource(R.plurals.cd_scrobble_countdown, secondsLeft, secondsLeft)
+                    val countdownDescription =
+                        pluralStringResource(R.plurals.cd_scrobble_countdown, secondsLeft, secondsLeft)
                     LinearProgressIndicator(
                         progress = { secondsLeft / 15f },
                         modifier = Modifier
