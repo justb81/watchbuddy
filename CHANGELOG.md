@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.28.1](https://github.com/justb81/watchbuddy/compare/v0.28.0...v0.28.1) (2026-04-23)
+
+
+### Bug Fixes
+
+* match Android unit-test XML path in README stats script ([#447](https://github.com/justb81/watchbuddy/issues/447)) ([737b5db](https://github.com/justb81/watchbuddy/commit/737b5dbdb8196070096953d1e207d1b999957f42))
+
 ## [0.28.0](https://github.com/justb81/watchbuddy/compare/v0.27.0...v0.28.0) (2026-04-22)
 
 
