@@ -56,11 +56,4 @@ object TestFixtures {
         confidence = confidence, matchedShow = matchedShow,
         matchedEpisode = matchedEpisode
     )
-
-    fun streamingService(
-        id: String = "netflix",
-        name: String = "Netflix",
-        packageName: String = "com.netflix.ninja",
-        deepLinkTemplate: String = "https://www.netflix.com/title/{tmdb_id}"
-    ) = StreamingService(id = id, name = name, packageName = packageName, deepLinkTemplate = deepLinkTemplate)
 }

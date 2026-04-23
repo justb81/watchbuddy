@@ -289,23 +289,3 @@ data class ResolvedProvider(
     val isLastUsed: Boolean,
     val tmdbPageUrl: String?,
 )
-
-// ── Streaming Deep Links ──────────────────────────────────────────────────────
-
-@Serializable
-data class StreamingService(
-    val id: String,
-    val name: String,
-    val packageName: String,
-    val deepLinkTemplate: String        // e.g. "https://www.netflix.com/title/{tmdb_id}"
-)
-
-val KNOWN_STREAMING_SERVICES = listOf(
-    StreamingService("netflix",   "Netflix",      "com.netflix.ninja",                    "https://www.netflix.com/title/{tmdb_id}"),
-    StreamingService("prime",     "Prime Video",  "com.amazon.amazonvideo.livingroom",     "https://www.primevideo.com/search?phrase={slug}"),
-    StreamingService("disney",    "Disney+",      "com.disney.disneyplus",                "https://www.disneyplus.com/series/{slug}/{tmdb_id}"),
-    StreamingService("waipu",     "WaipuTV",      "tv.waipu.app",                         "waipu://tv"),
-    StreamingService("joyn",      "Joyn",         "de.prosiebensat1digital.android.joyn", "https://www.joyn.de/serien/{slug}"),
-    StreamingService("ard",       "ARD Mediathek","de.swr.avp.ard.phone",                 "https://www.ardmediathek.de/video/{id}"),
-    StreamingService("zdf",       "ZDF Mediathek","de.zdf.android.app",                   "https://www.zdf.de/serien/{slug}")
-)

@@ -226,15 +226,4 @@ class ModelsSerializationTest {
             assertNull(candidate.matchedEpisode)
         }
     }
-
-    @Nested
-    @DisplayName("StreamingService")
-    inner class StreamingServiceTest {
-        @Test
-        fun `round-trip`() {
-            val service = StreamingService("netflix", "Netflix", "com.netflix.ninja", "https://netflix.com/{tmdb_id}")
-            val decoded = json.decodeFromString<StreamingService>(json.encodeToString(service))
-            assertEquals(service, decoded)
-        }
-    }
 }

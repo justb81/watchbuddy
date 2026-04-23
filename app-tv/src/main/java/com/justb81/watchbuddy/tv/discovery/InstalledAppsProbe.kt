@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import com.justb81.watchbuddy.core.deeplink.ProviderCatalog
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -44,10 +45,15 @@ class InstalledAppsProbe @Inject constructor(
     fun getInstalledPackages(): Set<String> = cachedPackages ?: loadAndCache()
 
     private fun loadAndCache(): Set<String> {
-        val packages = context.packageManager
-            .getInstalledApplications(PackageManager.GET_META_DATA)
-            .map { it.packageName }
-            .toSet()
+        val pm = context.packageManager
+        val packages = ProviderCatalog.knownPackageNames.filterTo(mutableSetOf()) { pkg ->
+            try {
+                pm.getPackageInfo(pkg, 0)
+                true
+            } catch (_: PackageManager.NameNotFoundException) {
+                false
+            }
+        }
         cachedPackages = packages
         return packages
     }

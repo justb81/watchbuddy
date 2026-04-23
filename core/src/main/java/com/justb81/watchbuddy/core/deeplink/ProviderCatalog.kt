@@ -31,10 +31,12 @@ object ProviderCatalog {
         ProviderEntry(350, "Apple TV+", "com.apple.atve.androidtv.appletv", "https://tv.apple.com/show/{tmdb_id}"),
         ProviderEntry(531, "Paramount+", "com.cbs.app", "https://www.paramountplus.com/shows/{slug}/"),
         ProviderEntry(1899, "Max", "com.hbo.hbonow", "https://play.max.com/show/{tmdb_id}"),
-        ProviderEntry(2187, "WaipuTV", "tv.waipu.app", "waipu://tv"),
-        ProviderEntry(2184, "Joyn", "de.prosiebensat1digital.android.joyn", "https://www.joyn.de/serien/{slug}"),
-        ProviderEntry(195, "ARD Mediathek", "de.swr.avp.ard.phone", "https://www.ardmediathek.de/video/{id}"),
-        ProviderEntry(231, "ZDF Mediathek", "de.zdf.android.app", "https://www.zdf.de/serien/{slug}"),
+        ProviderEntry(2187, "WaipuTV", "de.exaring.waipu", "waipu://tv"),
+        ProviderEntry(2184, "Joyn", "de.prosiebensat1digital.seventv", "https://www.joyn.de/serien/{slug}"),
+        ProviderEntry(195, "ARD Mediathek", "de.swr.avp.ard.tv", "https://www.ardmediathek.de/video/{id}"),
+        ProviderEntry(231, "ZDF Mediathek", "com.zdf.android.mediathek", "https://www.zdf.de/serien/{slug}"),
+        ProviderEntry(192, "YouTube", "com.google.android.youtube.tv", ""),
+        ProviderEntry(35, "Rakuten TV", "tv.wuaki.apptv", ""),
     )
 
     /** Fast lookup by provider_id. */
