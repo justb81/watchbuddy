@@ -1,0 +1,120 @@
+# Dependabot configuration for WatchBuddy
+#
+# Scope:
+#   - Gradle / Android / Kotlin via gradle/libs.versions.toml
+#   - Node.js backend via backend/package.json
+#   - GitHub Actions in .github/workflows/*.yml and .github/actions/**
+#   - Docker base image in backend/Dockerfile
+#
+# Grouping strategy mirrors the manual audit issues:
+#   - Minor/patch bumps land as a single grouped PR per ecosystem (cf. #424 / #418).
+#   - Coupled majors (Kotlin↔KSP↔serialization, OkHttp↔Retrofit, Coil, AGP,
+#     Express 5, Vitest 4, ESLint 10) are excluded from grouping so they open
+#     as individual PRs that a human can pair with the tracking issue.
+#
+# Ignored entirely:
+#   - androidx.security:security-crypto (deprecated — manual migration, #430)
+#   - com.google.ai.edge.aicore:aicore (developer-preview track)
+#   - googleapis/release-please-action (hold on v4 until v5 major alias lands)
+
+version: 2
+updates:
+  # ─── Gradle / Android / Kotlin ───────────────────────────────────────────
+  - package-ecosystem: "gradle"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    labels:
+      - "chore"
+    groups:
+      gradle-minor-patch:
+        applies-to: version-updates
+        update-types:
+          - "patch"
+          - "minor"
+        exclude-patterns:
+          # Coupled — must bump together (see #425)
+          - "org.jetbrains.kotlin:*"
+          - "com.google.devtools.ksp*"
+          - "org.jetbrains.kotlinx:kotlinx-serialization-json"
+          # Build tooling — own PR (see #426)
+          - "com.android.tools.build:gradle"
+          # HTTP stack — coupled (see #428)
+          - "com.squareup.okhttp3:*"
+          - "com.squareup.retrofit2:*"
+          # Image loading — major group-id move (see #427)
+          - "io.coil-kt:*"
+          - "io.coil-kt.coil3:*"
+          # Hilt nav-compose — API package move at 1.3.0 (see #429)
+          - "androidx.hilt:hilt-navigation-compose"
+          - "androidx.hilt:hilt-work"
+          - "androidx.hilt:hilt-compiler"
+    ignore:
+      - dependency-name: "androidx.security:security-crypto"
+      - dependency-name: "com.google.ai.edge.aicore:aicore"
+
+  # ─── Backend (npm) ───────────────────────────────────────────────────────
+  - package-ecosystem: "npm"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(backend)"
+    labels:
+      - "chore"
+    groups:
+      backend-minor-patch:
+        applies-to: version-updates
+        update-types:
+          - "patch"
+          - "minor"
+        exclude-patterns:
+          # ESLint 10 upgrade group — must bump together (see #419)
+          - "eslint"
+          - "@eslint/*"
+          - "eslint-config-prettier"
+          - "globals"
+          # Individual majors tracked separately
+          - "express"
+          - "express-rate-limit"
+          - "vitest"
+
+  # ─── GitHub Actions ──────────────────────────────────────────────────────
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(ci)"
+    labels:
+      - "chore"
+      - "CI/CD"
+    groups:
+      github-actions:
+        applies-to: version-updates
+        update-types:
+          - "major"
+          - "minor"
+          - "patch"
+    ignore:
+      - dependency-name: "googleapis/release-please-action"
+
+  # ─── Docker (backend base image) ─────────────────────────────────────────
+  - package-ecosystem: "docker"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "chore(backend)"
+    labels:
+      - "chore"
