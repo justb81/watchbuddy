@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.28.2](https://github.com/justb81/watchbuddy/compare/v0.28.1...v0.28.2) (2026-04-23)
+
+
+### Bug Fixes
+
+* address Android Lint warnings and raise Gradle metaspace ([#458](https://github.com/justb81/watchbuddy/issues/458)) ([2ab622c](https://github.com/justb81/watchbuddy/commit/2ab622cf083e19bb28efe57c7d9340fe1d44cb2c))
+* address GitHub code-scanning alerts ([#454](https://github.com/justb81/watchbuddy/issues/454)) ([333dbf9](https://github.com/justb81/watchbuddy/commit/333dbf93260e4e48790870a9d0f9eff12f71ab2a))
+
 ## [0.28.1](https://github.com/justb81/watchbuddy/compare/v0.28.0...v0.28.1) (2026-04-23)
 
 
