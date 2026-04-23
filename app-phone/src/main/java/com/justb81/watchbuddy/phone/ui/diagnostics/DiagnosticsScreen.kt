@@ -1,5 +1,6 @@
 package com.justb81.watchbuddy.phone.ui.diagnostics
 
+import android.content.Context
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -59,135 +60,167 @@ fun DiagnosticsScreen(
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            DiagnosticsSection(stringResource(R.string.diagnostics_section_connectivity)) {
-                DiagnosticsRow(
-                    label = stringResource(R.string.diagnostics_row_wifi),
-                    value = yesNo(uiState.isOnWifi),
-                    status = if (uiState.isOnWifi) Status.OK else Status.FAIL,
-                )
-                DiagnosticsRow(
-                    label = stringResource(R.string.diagnostics_row_ipv4),
-                    value = uiState.wifiIpv4 ?: stringResource(R.string.diagnostics_value_unknown),
-                    status = if (uiState.wifiIpv4 != null) Status.OK else Status.WARN,
-                )
-                DiagnosticsRow(
-                    label = stringResource(R.string.diagnostics_row_service_running),
-                    value = yesNo(uiState.serviceRunning),
-                    status = if (uiState.serviceRunning) Status.OK else Status.NEUTRAL,
-                )
-            }
-
-            DiagnosticsSection(stringResource(R.string.diagnostics_section_http)) {
-                DiagnosticsRow(
-                    label = stringResource(R.string.diagnostics_row_http_binding),
-                    value = uiState.httpServerBinding ?: stringResource(R.string.diagnostics_value_stopped),
-                    status = if (uiState.httpServerBinding != null) Status.OK else Status.NEUTRAL,
-                )
-                DiagnosticsRow(
-                    label = stringResource(R.string.diagnostics_row_last_capability_poll),
-                    value = formatAge(uiState.lastCapabilityCheckMs),
-                    status = capabilityStatus(uiState.lastCapabilityCheckMs, uiState.serviceRunning),
-                )
-            }
-
-            DiagnosticsSection(stringResource(R.string.diagnostics_section_ble)) {
-                DiagnosticsRow(
-                    label = stringResource(R.string.diagnostics_row_ble_state),
-                    value = uiState.bleState.name,
-                    status = when (uiState.bleState) {
-                        CompanionStateManager.BleAdvertiseState.ADVERTISING -> Status.OK
-                        CompanionStateManager.BleAdvertiseState.FAILED -> Status.FAIL
-                        CompanionStateManager.BleAdvertiseState.IDLE -> Status.NEUTRAL
-                    },
-                )
-                uiState.bleErrorCode?.let { code ->
-                    DiagnosticsRow(
-                        label = stringResource(R.string.diagnostics_row_ble_error),
-                        value = code.toString(),
-                        status = Status.FAIL,
-                    )
-                }
-            }
-
-            DiagnosticsSection(stringResource(R.string.diagnostics_section_scrobble)) {
-                val scrobble = uiState.lastScrobble
-                if (scrobble != null) {
-                    DiagnosticsRow(
-                        label = stringResource(R.string.diagnostics_row_scrobble_show),
-                        value = "${scrobble.show.title} S${scrobble.episode.season}E${scrobble.episode.number}",
-                        status = Status.OK,
-                    )
-                    DiagnosticsRow(
-                        label = stringResource(R.string.diagnostics_row_scrobble_progress),
-                        value = "%.0f%%".format(scrobble.progress),
-                        status = Status.NEUTRAL,
-                    )
-                    DiagnosticsRow(
-                        label = stringResource(R.string.diagnostics_row_scrobble_time),
-                        value = formatAge(scrobble.timestamp),
-                        status = Status.NEUTRAL,
-                    )
-                } else {
-                    DiagnosticsRow(
-                        label = stringResource(R.string.diagnostics_row_scrobble_show),
-                        value = stringResource(R.string.diagnostics_value_none),
-                        status = Status.NEUTRAL,
-                    )
-                }
-            }
-
-            DiagnosticsSection(stringResource(R.string.diagnostics_section_llm_activity)) {
-                when {
-                    !uiState.llmActivityLoggingEnabled -> {
-                        DiagnosticsRow(
-                            label = stringResource(R.string.diagnostics_row_llm_activity_disabled),
-                            value = "",
-                            status = Status.NEUTRAL,
-                        )
-                    }
-                    uiState.llmEvents.isEmpty() -> {
-                        DiagnosticsRow(
-                            label = stringResource(R.string.diagnostics_row_llm_activity_empty),
-                            value = "",
-                            status = Status.NEUTRAL,
-                        )
-                    }
-                    else -> {
-                        uiState.llmEvents.forEach { event ->
-                            LlmEventRow(event = event, onClick = { onLlmEventClick(event.id) })
-                        }
-                    }
-                }
-            }
-
-            DiagnosticsSection(stringResource(R.string.diagnostics_section_build)) {
-                DiagnosticsRow(
-                    label = stringResource(R.string.diagnostics_row_version_name),
-                    value = uiState.versionName,
-                    status = Status.NEUTRAL,
-                )
-                DiagnosticsRow(
-                    label = stringResource(R.string.diagnostics_row_version_code),
-                    value = uiState.versionCode.toString(),
-                    status = Status.NEUTRAL,
-                )
-            }
-
+            ConnectivitySection(uiState)
+            HttpSection(uiState)
+            BleSection(uiState)
+            ScrobbleSection(uiState)
+            LlmActivitySection(uiState, onLlmEventClick)
+            BuildInfoSection(uiState)
             Spacer(Modifier.height(8.dp))
-            Button(
-                onClick = {
-                    // End-marker in the breadcrumb ring so the snapshot always
-                    // has a clear "user hit share" line and the share-sheet
-                    // round-trip is visible in the exported log.
-                    DiagnosticLog.event("DiagnosticsScreen", "Share diagnostics clicked")
-                    DiagnosticShare.launchShare(context)
-                },
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(stringResource(R.string.diagnostics_share_button))
-            }
+            ShareDiagnosticsButton(context)
             Spacer(Modifier.height(24.dp))
         }
+    }
+}
+
+@Composable
+private fun ConnectivitySection(uiState: DiagnosticsUiState) {
+    DiagnosticsSection(stringResource(R.string.diagnostics_section_connectivity)) {
+        DiagnosticsRow(
+            label = stringResource(R.string.diagnostics_row_wifi),
+            value = yesNo(uiState.isOnWifi),
+            status = if (uiState.isOnWifi) Status.OK else Status.FAIL,
+        )
+        DiagnosticsRow(
+            label = stringResource(R.string.diagnostics_row_ipv4),
+            value = uiState.wifiIpv4 ?: stringResource(R.string.diagnostics_value_unknown),
+            status = if (uiState.wifiIpv4 != null) Status.OK else Status.WARN,
+        )
+        DiagnosticsRow(
+            label = stringResource(R.string.diagnostics_row_service_running),
+            value = yesNo(uiState.serviceRunning),
+            status = if (uiState.serviceRunning) Status.OK else Status.NEUTRAL,
+        )
+    }
+}
+
+@Composable
+private fun HttpSection(uiState: DiagnosticsUiState) {
+    DiagnosticsSection(stringResource(R.string.diagnostics_section_http)) {
+        DiagnosticsRow(
+            label = stringResource(R.string.diagnostics_row_http_binding),
+            value = uiState.httpServerBinding ?: stringResource(R.string.diagnostics_value_stopped),
+            status = if (uiState.httpServerBinding != null) Status.OK else Status.NEUTRAL,
+        )
+        DiagnosticsRow(
+            label = stringResource(R.string.diagnostics_row_last_capability_poll),
+            value = formatAge(uiState.lastCapabilityCheckMs),
+            status = capabilityStatus(uiState.lastCapabilityCheckMs, uiState.serviceRunning),
+        )
+    }
+}
+
+@Composable
+private fun BleSection(uiState: DiagnosticsUiState) {
+    DiagnosticsSection(stringResource(R.string.diagnostics_section_ble)) {
+        DiagnosticsRow(
+            label = stringResource(R.string.diagnostics_row_ble_state),
+            value = uiState.bleState.name,
+            status = when (uiState.bleState) {
+                CompanionStateManager.BleAdvertiseState.ADVERTISING -> Status.OK
+                CompanionStateManager.BleAdvertiseState.FAILED -> Status.FAIL
+                CompanionStateManager.BleAdvertiseState.IDLE -> Status.NEUTRAL
+            },
+        )
+        uiState.bleErrorCode?.let { code ->
+            DiagnosticsRow(
+                label = stringResource(R.string.diagnostics_row_ble_error),
+                value = code.toString(),
+                status = Status.FAIL,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ScrobbleSection(uiState: DiagnosticsUiState) {
+    DiagnosticsSection(stringResource(R.string.diagnostics_section_scrobble)) {
+        val scrobble = uiState.lastScrobble
+        if (scrobble != null) {
+            DiagnosticsRow(
+                label = stringResource(R.string.diagnostics_row_scrobble_show),
+                value = "${scrobble.show.title} S${scrobble.episode.season}E${scrobble.episode.number}",
+                status = Status.OK,
+            )
+            DiagnosticsRow(
+                label = stringResource(R.string.diagnostics_row_scrobble_progress),
+                value = "%.0f%%".format(scrobble.progress),
+                status = Status.NEUTRAL,
+            )
+            DiagnosticsRow(
+                label = stringResource(R.string.diagnostics_row_scrobble_time),
+                value = formatAge(scrobble.timestamp),
+                status = Status.NEUTRAL,
+            )
+        } else {
+            DiagnosticsRow(
+                label = stringResource(R.string.diagnostics_row_scrobble_show),
+                value = stringResource(R.string.diagnostics_value_none),
+                status = Status.NEUTRAL,
+            )
+        }
+    }
+}
+
+@Composable
+private fun LlmActivitySection(
+    uiState: DiagnosticsUiState,
+    onLlmEventClick: (Long) -> Unit,
+) {
+    DiagnosticsSection(stringResource(R.string.diagnostics_section_llm_activity)) {
+        when {
+            !uiState.llmActivityLoggingEnabled -> {
+                DiagnosticsRow(
+                    label = stringResource(R.string.diagnostics_row_llm_activity_disabled),
+                    value = "",
+                    status = Status.NEUTRAL,
+                )
+            }
+            uiState.llmEvents.isEmpty() -> {
+                DiagnosticsRow(
+                    label = stringResource(R.string.diagnostics_row_llm_activity_empty),
+                    value = "",
+                    status = Status.NEUTRAL,
+                )
+            }
+            else -> {
+                uiState.llmEvents.forEach { event ->
+                    LlmEventRow(event = event, onClick = { onLlmEventClick(event.id) })
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BuildInfoSection(uiState: DiagnosticsUiState) {
+    DiagnosticsSection(stringResource(R.string.diagnostics_section_build)) {
+        DiagnosticsRow(
+            label = stringResource(R.string.diagnostics_row_version_name),
+            value = uiState.versionName,
+            status = Status.NEUTRAL,
+        )
+        DiagnosticsRow(
+            label = stringResource(R.string.diagnostics_row_version_code),
+            value = uiState.versionCode.toString(),
+            status = Status.NEUTRAL,
+        )
+    }
+}
+
+@Composable
+private fun ShareDiagnosticsButton(context: Context) {
+    Button(
+        onClick = {
+            // End-marker in the breadcrumb ring so the snapshot always
+            // has a clear "user hit share" line and the share-sheet
+            // round-trip is visible in the exported log.
+            DiagnosticLog.event("DiagnosticsScreen", "Share diagnostics clicked")
+            DiagnosticShare.launchShare(context)
+        },
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Text(stringResource(R.string.diagnostics_share_button))
     }
 }
 
