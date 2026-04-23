@@ -2,6 +2,7 @@ package com.justb81.watchbuddy.phone.ui.diagnostics
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -30,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.justb81.watchbuddy.R
@@ -82,7 +84,7 @@ fun LlmEventDetailScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 48.dp),
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    textAlign = TextAlign.Center,
                 )
             } else {
                 MetadataCard(event)
@@ -145,7 +147,7 @@ private fun MetadataCard(event: LlmEventLog.LlmEvent) {
 
 @Composable
 private fun MetadataLine(label: String, value: String) {
-    androidx.compose.foundation.layout.Row(
+    Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.Top,
