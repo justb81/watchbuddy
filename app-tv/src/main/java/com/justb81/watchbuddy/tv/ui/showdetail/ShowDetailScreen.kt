@@ -135,8 +135,9 @@ private fun launchProvider(context: Context, provider: ResolvedProvider?, deepLi
         }
     }
 
-    if (provider?.isInstalled == true && provider.packageName != null) {
-        pm.getLaunchIntentForPackage(provider.packageName)?.let { launchIntent ->
+    val installedPackage = provider?.takeIf { it.isInstalled }?.packageName
+    if (installedPackage != null) {
+        pm.getLaunchIntentForPackage(installedPackage)?.let { launchIntent ->
             context.startActivity(launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             return
         }
