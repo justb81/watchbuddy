@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.28.0](https://github.com/justb81/watchbuddy/compare/v0.27.0...v0.28.0) (2026-04-22)
+
+
+### Features
+
+* **scrobbler:** multi-field MediaMetadata cascade + LLM fallback title extractor ([#414](https://github.com/justb81/watchbuddy/issues/414)) ([855e72e](https://github.com/justb81/watchbuddy/commit/855e72e8de10b4ccec803b84bac0fb463d51a60c))
+
 ## [0.27.0](https://github.com/justb81/watchbuddy/compare/v0.26.1...v0.27.0) (2026-04-22)
 
 
