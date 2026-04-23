@@ -286,7 +286,7 @@ export function createApp(config) {
   // Rate limiting — Trakt allows 1000 calls/5min per app
   const limiter = rateLimit({
     windowMs: 60 * 1000, // 1 minute
-    max: 60, // 60 requests per minute per IP
+    limit: 60, // 60 requests per minute per IP
     message: { error: 'Too many requests, please try again later.' },
   });
   app.use('/trakt', limiter);
