@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
     Mirrors android:allowBackup="false": opt out of both cloud backup and
-    device-to-device transfer. Tokens live in EncryptedSharedPreferences
-    backed by the Android Keystore and must not leave the device.
+    device-to-device transfer. Tokens live in a SharedPreferences file whose
+    values are encrypted with a Tink AEAD keyset wrapped by the Android
+    Keystore, and must not leave the device.
 -->
 <data-extraction-rules>
     <cloud-backup disableIfNoEncryptionCapabilities="true">

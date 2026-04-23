@@ -39,7 +39,7 @@ WatchBuddy ist nach dem Grundsatz der Datenminimierung konzipiert (Art. 25 Abs. 
 
 - **Kein Tracking, kein Analytics-SDK, kein Crashlytics.** Es sind keine Analyse-, Telemetrie- oder Werbe-SDKs eingebunden.
 - **Keine Nutzerkonten bei WatchBuddy.** Die App verwendet den Trakt-Account der Nutzer direkt; WatchBuddy selbst legt keine eigene Nutzerdatenbank an.
-- **Zugangsdaten nur lokal.** Trakt-Access-Token, Refresh-Token sowie ein optionaler Trakt-Client-Secret werden ausschließlich auf dem Endgerät in einer per **Android Keystore** (AES-256-GCM) verschlüsselten `EncryptedSharedPreferences`-Datei abgelegt und verlassen das Gerät nicht, außer bei Aufrufen der Trakt-API (siehe Abschnitt 9). Quelle: `app-phone/src/main/java/com/justb81/watchbuddy/phone/auth/TokenRepository.kt`.
+- **Zugangsdaten nur lokal.** Trakt-Access-Token, Refresh-Token sowie ein optionaler Trakt-Client-Secret werden ausschließlich auf dem Endgerät in einer `SharedPreferences`-Datei abgelegt, deren Werte über ein per **Android Keystore** gekapseltes **Tink-AEAD**-Keyset (AES-256-GCM) verschlüsselt sind, und verlassen das Gerät nicht, außer bei Aufrufen der Trakt-API (siehe Abschnitt 9). Quelle: `app-phone/src/main/java/com/justb81/watchbuddy/phone/auth/TokenRepository.kt`.
 - **LLM-Inferenz ausschließlich auf dem Gerät.** Recap-Generierung erfolgt lokal über AICore (Gemini Nano) oder LiteRT-LM; es werden keine Prompts an Cloud-LLMs übermittelt.
 
 ## 4. Lokal verarbeitete Daten (verlassen das Gerät nicht)
@@ -48,7 +48,7 @@ Die folgenden Daten werden ausschließlich auf dem jeweiligen Endgerät gespeich
 
 ### 4.1 Android Keystore (Phone App)
 
-Verschlüsselt per `EncryptedSharedPreferences` (Quelle: `TokenRepository.kt`):
+Verschlüsselt per Tink-AEAD-Keyset mit Android-Keystore-Wrapping (Quelle: `TokenRepository.kt`):
 
 | Schlüssel | Inhalt |
 |-----------|--------|

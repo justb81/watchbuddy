@@ -189,8 +189,8 @@ dependencies {
     // WorkManager (background model updates)
     implementation(libs.work.runtime)
 
-    // Security / Encrypted Storage
-    implementation(libs.security.crypto)
+    // Security / Encrypted Storage (Tink AEAD + Android Keystore-wrapped KEK)
+    implementation(libs.tink.android)
 
     // Image loading
     implementation(libs.coil.compose)
