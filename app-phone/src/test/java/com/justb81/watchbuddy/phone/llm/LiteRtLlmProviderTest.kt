@@ -35,12 +35,11 @@ class LiteRtLlmProviderTest {
     @BeforeEach
     fun setUp() {
         LiteRtLlmProvider.resetGpuKnownBadForTesting()
-        val filesDir = tempDir.toFile()
-        File(filesDir, "llm_models").mkdirs()
-        File(filesDir, "llm_models/${modelVariant.fileName}").writeText("stub")
-        context = mockk {
-            every { filesDir } returns filesDir
-        }
+        val dir = tempDir.toFile()
+        File(dir, "llm_models").mkdirs()
+        File(dir, "llm_models/${modelVariant.fileName}").writeText("stub")
+        context = mockk()
+        every { context.filesDir } returns dir
     }
 
     @AfterEach

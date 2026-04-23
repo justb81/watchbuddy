@@ -28,11 +28,19 @@ import java.util.concurrent.atomic.AtomicBoolean
  * outcome is latched in [gpuKnownBad] for the remainder of the process so
  * subsequent recaps and scrobble extractions skip the GPU path immediately.
  */
-class LiteRtLlmProvider(
+class LiteRtLlmProvider internal constructor(
     private val context: Context,
     private val modelVariant: LlmOrchestrator.ModelVariant,
-    private val engineFactory: EngineFactory = DefaultEngineFactory,
+    private val engineFactory: EngineFactory,
 ) : LlmProvider {
+
+    // Public production constructor — wires the real Engine factory. The
+    // engineFactory-taking primary constructor is `internal` so it can expose
+    // the `internal` [EngineFactory] type (Kotlin forbids that on public API).
+    constructor(
+        context: Context,
+        modelVariant: LlmOrchestrator.ModelVariant,
+    ) : this(context, modelVariant, DefaultEngineFactory)
 
     /** Test seam: production wires [DefaultEngineFactory] which calls [Engine] directly. */
     internal fun interface EngineFactory {
