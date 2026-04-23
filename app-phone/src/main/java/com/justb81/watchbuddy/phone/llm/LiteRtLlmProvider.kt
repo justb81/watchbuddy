@@ -2,14 +2,17 @@ package com.justb81.watchbuddy.phone.llm
 
 import android.content.Context
 import android.util.Log
+import androidx.annotation.VisibleForTesting
 import com.google.ai.edge.litertlm.Backend
 import com.google.ai.edge.litertlm.ConversationConfig
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
 import com.google.ai.edge.litertlm.Message
+import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * LLM provider backed by LiteRT-LM with a local Gemma model (.litertlm format).
@@ -17,19 +20,80 @@ import java.io.File
  * The model file (e.g. gemma-4-E2B-it.litertlm) must be present in the app's
  * internal files directory before calling [generate]. Model download is handled
  * separately by WorkManager (see SettingsViewModel.downloadModel).
+ *
+ * LiteRT-LM's GPU backend needs an OpenCL runtime that not every Android device
+ * ships. Rather than probing upfront, we try GPU first and fall back to CPU on
+ * any failure — including failures that only surface inside the JNI call for
+ * `sendMessage` (#464: "Can not find OpenCL library on this device"). The
+ * outcome is latched in [gpuKnownBad] for the remainder of the process so
+ * subsequent recaps and scrobble extractions skip the GPU path immediately.
  */
 class LiteRtLlmProvider(
     private val context: Context,
-    private val modelVariant: LlmOrchestrator.ModelVariant
+    private val modelVariant: LlmOrchestrator.ModelVariant,
+    private val engineFactory: EngineFactory = DefaultEngineFactory,
 ) : LlmProvider {
+
+    /** Test seam: production wires [DefaultEngineFactory] which calls [Engine] directly. */
+    internal fun interface EngineFactory {
+        fun create(config: EngineConfig): Engine
+    }
 
     override val displayName: String = "LiteRT-LM (${modelVariant.fileName})"
 
     private var engine: Engine? = null
+    private var currentBackendIsGpu: Boolean = false
 
-    private suspend fun getOrCreateEngine(): Engine {
+    override suspend fun generate(prompt: String): String = withContext(Dispatchers.IO) {
+        val text = try {
+            runInference(getOrCreateEngine(), prompt)
+        } catch (e: Exception) {
+            if (!currentBackendIsGpu) throw e
+            markGpuBadAndLog("inference", e)
+            engine = null
+            currentBackendIsGpu = false
+            runInference(getOrCreateEngine(), prompt)
+        }
+        if (text.isBlank()) {
+            throw IllegalStateException("LiteRT-LM returned empty response")
+        }
+        text
+    }
+
+    private fun runInference(engine: Engine, prompt: String): String {
+        val conversation = engine.createConversation(ConversationConfig())
+        return try {
+            val response: Message = conversation.sendMessage(prompt)
+            response.toString()
+        } finally {
+            conversation.close()
+        }
+    }
+
+    private fun getOrCreateEngine(): Engine {
         engine?.let { return it }
+        val modelPath = resolveModelPath()
+        val newEngine = if (gpuKnownBad.get()) {
+            createEngine(modelPath, useGpu = false).also { currentBackendIsGpu = false }
+        } else {
+            try {
+                createEngine(modelPath, useGpu = true).also { currentBackendIsGpu = true }
+            } catch (e: Exception) {
+                markGpuBadAndLog("init", e)
+                createEngine(modelPath, useGpu = false).also { currentBackendIsGpu = false }
+            }
+        }
+        engine = newEngine
+        return newEngine
+    }
 
+    private fun createEngine(modelPath: String, useGpu: Boolean): Engine {
+        val backend = if (useGpu) Backend.GPU() else Backend.CPU()
+        val config = EngineConfig(modelPath = modelPath, backend = backend)
+        return engineFactory.create(config).also { it.initialize() }
+    }
+
+    private fun resolveModelPath(): String {
         val modelDir = File(context.filesDir, "llm_models")
         val modelPath = File(modelDir, modelVariant.fileName).absolutePath
         if (!File(modelPath).exists()) {
@@ -37,36 +101,37 @@ class LiteRtLlmProvider(
                 "Model file not found: ${modelVariant.fileName}. Download it first via Settings."
             )
         }
+        return modelPath
+    }
 
-        val newEngine = try {
-            val gpuConfig = EngineConfig(modelPath = modelPath, backend = Backend.GPU())
-            Engine(gpuConfig).also { it.initialize() }
-        } catch (e: Exception) {
-            Log.w(TAG, "GPU backend unavailable, falling back to CPU", e)
-            val cpuConfig = EngineConfig(modelPath = modelPath, backend = Backend.CPU())
-            Engine(cpuConfig).also { it.initialize() }
+    private fun markGpuBadAndLog(phase: String, e: Throwable) {
+        if (gpuKnownBad.compareAndSet(false, true)) {
+            Log.w(TAG, "GPU backend unavailable ($phase), falling back to CPU", e)
+            DiagnosticLog.warn(TAG, "gpu-unavailable phase=$phase: ${e.javaClass.simpleName}", e)
+        } else {
+            Log.d(TAG, "GPU backend unavailable ($phase), using CPU (already known)")
         }
+    }
 
-        engine = newEngine
-        return newEngine
+    private object DefaultEngineFactory : EngineFactory {
+        override fun create(config: EngineConfig): Engine = Engine(config)
     }
 
     companion object {
         private const val TAG = "LiteRtLlmProvider"
-    }
 
-    override suspend fun generate(prompt: String): String = withContext(Dispatchers.IO) {
-        val llm = getOrCreateEngine()
-        val conversation = llm.createConversation(ConversationConfig())
-        try {
-            val response: Message = conversation.sendMessage(prompt)
-            val text = response.toString()
-            if (text.isBlank()) {
-                throw IllegalStateException("LiteRT-LM returned empty response")
-            }
-            text
-        } finally {
-            conversation.close()
+        // Process-wide latch: once GPU inference fails on this device we skip
+        // the GPU path for all subsequent [LiteRtLlmProvider] instances in
+        // this process. The cascade builds a fresh provider per call, so
+        // per-instance state can't carry the knowledge.
+        private val gpuKnownBad = AtomicBoolean(false)
+
+        @VisibleForTesting
+        internal fun resetGpuKnownBadForTesting() {
+            gpuKnownBad.set(false)
         }
+
+        @VisibleForTesting
+        internal fun isGpuKnownBadForTesting(): Boolean = gpuKnownBad.get()
     }
 }
