@@ -65,6 +65,8 @@ data class SettingsUiState(
     val llmDownloadProgress: Int?  = null,   // null = not downloading, 0-100 = progress
     val llmReady: Boolean          = false,
     val llmValidationFailed: Boolean = false,
+    /** Whether to capture LLM prompts/responses in the Diagnostics activity log. */
+    val llmActivityLoggingEnabled: Boolean = true,
     val modelDownloadUrl: String   = "",
     val modelDownloadUrlError: Boolean = false,
     val freeRamMb: Int             = 0,
@@ -191,7 +193,8 @@ class SettingsViewModel @Inject constructor(
                     displayNameOverride = saved.displayNameOverride,
                     avatarSource = saved.avatarSource,
                     hasCustomAvatar = avatarImageStore.exists(),
-                    customAvatarVersion = saved.customAvatarVersion
+                    customAvatarVersion = saved.customAvatarVersion,
+                    llmActivityLoggingEnabled = saved.llmActivityLoggingEnabled
                 )
                 Log.d(TAG, "loadPersistedSettings: authMode=$resolvedAuthMode tmdbConnected=${saved.tmdbApiKey.isNotBlank()}")
             } catch (e: Exception) {
@@ -379,6 +382,19 @@ class SettingsViewModel @Inject constructor(
 
     fun clearSaveSuccess() {
         _uiState.value = _uiState.value.copy(saveSuccess = false)
+    }
+
+    fun setLlmActivityLoggingEnabled(enabled: Boolean) {
+        val previous = _uiState.value.llmActivityLoggingEnabled
+        _uiState.value = _uiState.value.copy(llmActivityLoggingEnabled = enabled)
+        launchSafe {
+            try {
+                settingsRepository.setLlmActivityLoggingEnabled(enabled)
+            } catch (e: Exception) {
+                DiagnosticLog.error(TAG, "setLlmActivityLoggingEnabled:failed (reverting)", e)
+                _uiState.value = _uiState.value.copy(llmActivityLoggingEnabled = previous)
+            }
+        }
     }
 
     fun toggleCompanionService() {

@@ -1,5 +1,6 @@
 package com.justb81.watchbuddy.phone.ui.diagnostics
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -18,12 +19,14 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.logging.DiagnosticShare
+import com.justb81.watchbuddy.phone.llm.LlmEventLog
 import com.justb81.watchbuddy.service.CompanionStateManager
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DiagnosticsScreen(
     onBack: () -> Unit,
+    onLlmEventClick: (Long) -> Unit = {},
     viewModel: DiagnosticsViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -130,6 +133,30 @@ fun DiagnosticsScreen(
                         value = stringResource(R.string.diagnostics_value_none),
                         status = Status.NEUTRAL,
                     )
+                }
+            }
+
+            DiagnosticsSection(stringResource(R.string.diagnostics_section_llm_activity)) {
+                when {
+                    !uiState.llmActivityLoggingEnabled -> {
+                        DiagnosticsRow(
+                            label = stringResource(R.string.diagnostics_row_llm_activity_disabled),
+                            value = "",
+                            status = Status.NEUTRAL,
+                        )
+                    }
+                    uiState.llmEvents.isEmpty() -> {
+                        DiagnosticsRow(
+                            label = stringResource(R.string.diagnostics_row_llm_activity_empty),
+                            value = "",
+                            status = Status.NEUTRAL,
+                        )
+                    }
+                    else -> {
+                        uiState.llmEvents.forEach { event ->
+                            LlmEventRow(event = event, onClick = { onLlmEventClick(event.id) })
+                        }
+                    }
                 }
             }
 
@@ -254,4 +281,51 @@ private fun statusColor(status: Status): Color = when (status) {
     Status.WARN -> Color(0xFFF9A825)
     Status.FAIL -> MaterialTheme.colorScheme.error
     Status.NEUTRAL -> MaterialTheme.colorScheme.outline
+}
+
+@Composable
+private fun LlmEventRow(event: LlmEventSummary, onClick: () -> Unit) {
+    val statusDot = when (event.status) {
+        LlmEventLog.Status.SUCCESS -> Status.OK
+        LlmEventLog.Status.EMPTY -> Status.WARN
+        LlmEventLog.Status.ERROR -> Status.FAIL
+    }
+    val callerLabel = when (event.caller) {
+        "recap" -> stringResource(R.string.diagnostics_llm_caller_recap)
+        "extract" -> stringResource(R.string.diagnostics_llm_caller_extract)
+        else -> event.caller
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(modifier = Modifier.size(10.dp), contentAlignment = Alignment.Center) {
+            Surface(
+                shape = MaterialTheme.shapes.small,
+                color = statusColor(statusDot),
+                modifier = Modifier.fillMaxSize(),
+            ) {}
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "$callerLabel · ${event.backend}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = "${formatAge(event.startedAtMs)} · ${event.durationMs} ms",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+            )
+        }
+        Text(
+            text = "›",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+        )
+    }
 }

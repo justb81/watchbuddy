@@ -220,6 +220,29 @@
     <string name="diagnostics_value_stopped">Detenido</string>
     <string name="diagnostics_value_none">Ninguno</string>
 
+    <!-- LLM activity diagnostics -->
+    <string name="settings_llm_activity_logging_title">Registrar indicaciones &amp; respuestas del LLM</string>
+    <string name="settings_llm_activity_logging_summary">Captura lo que ve el modelo local para los resúmenes y la detección de scrobble. Visible en el diagnóstico.</string>
+    <string name="diagnostics_section_llm_activity">Actividad del LLM</string>
+    <string name="diagnostics_row_llm_activity_disabled">Registro desactivado. Actívalo en los ajustes.</string>
+    <string name="diagnostics_row_llm_activity_empty">Aún no hay llamadas al LLM.</string>
+    <string name="diagnostics_llm_caller_recap">Resumen</string>
+    <string name="diagnostics_llm_caller_extract">Detección de scrobble</string>
+    <string name="diagnostics_llm_status_success">Éxito</string>
+    <string name="diagnostics_llm_status_empty">Sin salida</string>
+    <string name="diagnostics_llm_status_error">Error</string>
+    <string name="diagnostics_llm_detail_title">Llamada al LLM</string>
+    <string name="diagnostics_llm_detail_caller_label">Autor</string>
+    <string name="diagnostics_llm_detail_backend_label">Backend</string>
+    <string name="diagnostics_llm_detail_timestamp_label">Iniciado</string>
+    <string name="diagnostics_llm_detail_duration_label">Duración</string>
+    <string name="diagnostics_llm_detail_status_label">Estado</string>
+    <string name="diagnostics_llm_detail_prompt">Indicación</string>
+    <string name="diagnostics_llm_detail_response">Respuesta</string>
+    <string name="diagnostics_llm_detail_error">Error</string>
+    <string name="diagnostics_llm_detail_empty_response">(sin respuesta)</string>
+    <string name="diagnostics_llm_detail_not_found">Esta llamada al LLM ya no está disponible — llamadas más recientes la desplazaron del búfer.</string>
+
     <!-- Version footer -->
     <string name="settings_version_footer">WatchBuddy v%1$s (build %2$d)</string>
 </resources>

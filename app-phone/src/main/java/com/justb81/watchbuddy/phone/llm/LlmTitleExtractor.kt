@@ -47,7 +47,9 @@ class LlmTitleExtractor @Inject constructor(
     ): TitleExtractionResponse? {
         val trimmedHints = libraryHints.take(MAX_HINTS)
         val prompt = buildPrompt(snapshot, trimmedHints)
-        val raw = runCatching { llmProviderFactory.generateOrNull(prompt) }
+        val raw = runCatching {
+            llmProviderFactory.generateOrNull(LlmProviderFactory.CALLER_EXTRACT, prompt)
+        }
             .onFailure { Log.w(TAG, "LLM inference threw", it) }
             .getOrNull()
             ?: return null

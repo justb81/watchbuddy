@@ -11,6 +11,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.model.AvatarSource
 import com.justb81.watchbuddy.phone.auth.TokenRepository
+import com.justb81.watchbuddy.phone.llm.LlmEventLog
 import com.justb81.watchbuddy.phone.ui.settings.AuthMode
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
@@ -34,6 +35,7 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(na
 class SettingsRepository @Inject constructor(
     @param:ApplicationContext private val context: Context,
     private val tokenRepository: TokenRepository,
+    private val llmEventLog: LlmEventLog,
     @Named("defaultTmdbApiKey") private val defaultTmdbApiKey: String
 ) {
     private object Keys {
@@ -47,6 +49,7 @@ class SettingsRepository @Inject constructor(
         val DISPLAY_NAME_OVERRIDE = stringPreferencesKey("display_name_override")
         val AVATAR_SOURCE = stringPreferencesKey("avatar_source")
         val CUSTOM_AVATAR_VERSION = longPreferencesKey("custom_avatar_version")
+        val LLM_ACTIVITY_LOGGING_ENABLED = booleanPreferencesKey("llm_activity_logging_enabled")
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -82,7 +85,8 @@ class SettingsRepository @Inject constructor(
             avatarSource = prefs[Keys.AVATAR_SOURCE]
                 ?.let { runCatching { AvatarSource.valueOf(it) }.getOrNull() }
                 ?: AvatarSource.TRAKT,
-            customAvatarVersion = prefs[Keys.CUSTOM_AVATAR_VERSION] ?: 0L
+            customAvatarVersion = prefs[Keys.CUSTOM_AVATAR_VERSION] ?: 0L,
+            llmActivityLoggingEnabled = prefs[Keys.LLM_ACTIVITY_LOGGING_ENABLED] ?: true
         )
     }
 
@@ -97,6 +101,7 @@ class SettingsRepository @Inject constructor(
             prefs[Keys.DISPLAY_NAME_OVERRIDE] = settings.displayNameOverride
             prefs[Keys.AVATAR_SOURCE] = settings.avatarSource.name
             prefs[Keys.CUSTOM_AVATAR_VERSION] = settings.customAvatarVersion
+            prefs[Keys.LLM_ACTIVITY_LOGGING_ENABLED] = settings.llmActivityLoggingEnabled
         }
     }
 
@@ -166,6 +171,18 @@ class SettingsRepository @Inject constructor(
         context.dataStore.edit { prefs ->
             prefs[Keys.COMPANION_ENABLED] = enabled
         }
+    }
+
+    /**
+     * Flips the "log LLM prompts & responses" toggle. When disabled we also
+     * drop any previously captured events so the Diagnostics list empties
+     * immediately — turning the switch off should mean no in-memory trace.
+     */
+    suspend fun setLlmActivityLoggingEnabled(enabled: Boolean) {
+        context.dataStore.edit { prefs ->
+            prefs[Keys.LLM_ACTIVITY_LOGGING_ENABLED] = enabled
+        }
+        if (!enabled) llmEventLog.clear()
     }
 
     /** Absolute path where downloaded model files are stored. */

@@ -30,7 +30,7 @@ class LlmTitleExtractorTest {
 
     @Test
     fun `well-formed JSON with library traktId is parsed and accepted`() = runTest {
-        coEvery { factory.generateOrNull(any()) } returns """
+        coEvery { factory.generateOrNull(any(), any()) } returns """
             {"showTitle":"Breaking Bad","season":3,"episode":7,"libraryTraktId":1,"confidence":0.88}
         """.trimIndent()
 
@@ -46,7 +46,7 @@ class LlmTitleExtractorTest {
 
     @Test
     fun `LLM wrapping output in prose + markdown still parses via brace extraction`() = runTest {
-        coEvery { factory.generateOrNull(any()) } returns """
+        coEvery { factory.generateOrNull(any(), any()) } returns """
             Sure! Here's the extracted metadata:
 
             ```json
@@ -64,7 +64,7 @@ class LlmTitleExtractorTest {
 
     @Test
     fun `no LLM available returns null (not a fabricated response)`() = runTest {
-        coEvery { factory.generateOrNull(any()) } returns null
+        coEvery { factory.generateOrNull(any(), any()) } returns null
 
         val result = extractor.extract(sampleSnapshot(), hints)
 

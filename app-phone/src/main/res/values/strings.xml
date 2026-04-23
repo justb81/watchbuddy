@@ -220,6 +220,29 @@
     <string name="diagnostics_value_stopped">Stopped</string>
     <string name="diagnostics_value_none">None</string>
 
+    <!-- LLM activity diagnostics -->
+    <string name="settings_llm_activity_logging_title">Log LLM prompts &amp; responses</string>
+    <string name="settings_llm_activity_logging_summary">Captures what the on-device model sees for recaps and scrobble extraction. Visible in Diagnostics.</string>
+    <string name="diagnostics_section_llm_activity">LLM activity</string>
+    <string name="diagnostics_row_llm_activity_disabled">Logging is off. Enable it in Settings.</string>
+    <string name="diagnostics_row_llm_activity_empty">No LLM calls yet.</string>
+    <string name="diagnostics_llm_caller_recap">Recap</string>
+    <string name="diagnostics_llm_caller_extract">Scrobble extract</string>
+    <string name="diagnostics_llm_status_success">Success</string>
+    <string name="diagnostics_llm_status_empty">No output</string>
+    <string name="diagnostics_llm_status_error">Error</string>
+    <string name="diagnostics_llm_detail_title">LLM call</string>
+    <string name="diagnostics_llm_detail_caller_label">Caller</string>
+    <string name="diagnostics_llm_detail_backend_label">Backend</string>
+    <string name="diagnostics_llm_detail_timestamp_label">Started</string>
+    <string name="diagnostics_llm_detail_duration_label">Duration</string>
+    <string name="diagnostics_llm_detail_status_label">Status</string>
+    <string name="diagnostics_llm_detail_prompt">Prompt</string>
+    <string name="diagnostics_llm_detail_response">Response</string>
+    <string name="diagnostics_llm_detail_error">Error</string>
+    <string name="diagnostics_llm_detail_empty_response">(no response)</string>
+    <string name="diagnostics_llm_detail_not_found">This LLM call is no longer available — newer calls pushed it out of the buffer.</string>
+
     <!-- Version footer -->
     <string name="settings_version_footer">WatchBuddy v%1$s (build %2$d)</string>
 </resources>

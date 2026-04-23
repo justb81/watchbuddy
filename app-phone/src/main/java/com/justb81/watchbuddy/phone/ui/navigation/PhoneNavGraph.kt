@@ -7,6 +7,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.justb81.watchbuddy.phone.ui.diagnostics.DiagnosticsScreen
+import com.justb81.watchbuddy.phone.ui.diagnostics.LlmEventDetailScreen
 import com.justb81.watchbuddy.phone.ui.home.HomeScreen
 import com.justb81.watchbuddy.phone.ui.onboarding.OnboardingScreen
 import com.justb81.watchbuddy.phone.ui.settings.SettingsScreen
@@ -20,6 +21,9 @@ sealed class PhoneRoute(val route: String) {
     object Diagnostics : PhoneRoute("diagnostics")
     object ShowDetail  : PhoneRoute("show_detail/{traktShowId}") {
         fun route(traktShowId: Int) = "show_detail/$traktShowId"
+    }
+    object LlmEventDetail : PhoneRoute("llm_event/{eventId}") {
+        fun route(eventId: Long) = "llm_event/$eventId"
     }
 }
 
@@ -73,7 +77,19 @@ fun PhoneNavGraph(
         }
 
         composable(PhoneRoute.Diagnostics.route) {
-            DiagnosticsScreen(onBack = { navController.popBackStack() })
+            DiagnosticsScreen(
+                onBack = { navController.popBackStack() },
+                onLlmEventClick = { id ->
+                    navController.navigate(PhoneRoute.LlmEventDetail.route(id))
+                },
+            )
+        }
+
+        composable(
+            route = PhoneRoute.LlmEventDetail.route,
+            arguments = listOf(navArgument("eventId") { type = NavType.LongType })
+        ) {
+            LlmEventDetailScreen(onBack = { navController.popBackStack() })
         }
 
         composable(PhoneRoute.Connect.route) {
