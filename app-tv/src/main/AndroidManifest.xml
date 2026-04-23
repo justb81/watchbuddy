@@ -22,7 +22,10 @@
          activity hasn't been opened yet. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!-- TvDiscoveryService maintains long-lived BLE scanning + heartbeat polling
+         against paired phones and must use the connectedDevice FGS type to
+         avoid the Android 15/16 dataSync time quota (#459). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- Scrobble detection — WatchBuddyNotificationListener is declared as a
@@ -108,13 +111,16 @@
 
         <!-- Background phone discovery service. Runs the BLE scanner when
              "Autostart at TV boot" is enabled so new phones are picked up
-             without the user opening the launcher first. Uses `dataSync`
-             foreground service type to match the phone-side CompanionService. -->
+             without the user opening the launcher first. Declared as
+             `connectedDevice` — the service holds a long-lived connection to
+             the paired phone (BLE scan + /capability heartbeat). `dataSync`
+             would be wrong here because Android 15/16 time-boxes that type at
+             ~6 h/24 h and kills the service (#459). -->
         <service
             android:name=".tv.discovery.TvDiscoveryService"
             android:enabled="true"
             android:exported="false"
-            android:foregroundServiceType="dataSync" />
+            android:foregroundServiceType="connectedDevice" />
 
         <!-- BOOT_COMPLETED receiver — gated on `isAutostartEnabled` preference.
              Must be exported=true: system broadcasts originate from the

@@ -23,7 +23,15 @@
 
     <!-- Background work (model updates, token refresh) -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <!-- DATA_SYNC: WorkManager's SystemForegroundService runs ModelDownloadWorker
+         as a time-bounded dataSync FGS; keep this permission for that worker.
+         CONNECTED_DEVICE: CompanionService maintains long-lived P2P connectivity
+         with the paired TV (BLE advert + Ktor HTTP server) and must use the
+         connectedDevice type on Android 15/16 to avoid the dataSync 6 h/24 h
+         quota that was killing the service with ForegroundServiceDidNotStop-
+         InTimeException (#459). -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- Play Store: phone app — NOT a TV app. Touchscreen not strictly required
@@ -80,12 +88,16 @@
                 android:resource="@xml/provider_paths" />
         </provider>
 
-        <!-- Companion HTTP server (BLE advertiser + Ktor) -->
+        <!-- Companion HTTP server (BLE advertiser + Ktor). Declared as
+             `connectedDevice` — not `dataSync` — because the service maintains
+             long-lived P2P connectivity with the paired TV. Android 15/16 time-
+             box `dataSync` FGS at ~6 h/24 h which was crashing the service with
+             ForegroundServiceDidNotStopInTimeException (#459). -->
         <service
             android:name=".service.CompanionService"
             android:enabled="true"
             android:exported="false"
-            android:foregroundServiceType="dataSync" />
+            android:foregroundServiceType="connectedDevice" />
 
         <!-- WorkManager foreground service — required for long-running downloads on Android 10+.
              Merges with WorkManager's own SystemForegroundService manifest entry to declare

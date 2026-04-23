@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.ComponentName
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -49,7 +50,11 @@ class TvDiscoveryService : Service() {
     override fun onCreate() {
         super.onCreate()
         ensureNotificationChannel()
-        startForeground(NOTIFICATION_ID, buildNotification())
+        startForeground(
+            NOTIFICATION_ID,
+            buildNotification(),
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE,
+        )
         DiagnosticLog.event(TAG, "service created")
     }
 
