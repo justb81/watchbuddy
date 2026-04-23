@@ -1,5 +1,6 @@
 package com.justb81.watchbuddy.tv.ui.showdetail
 
+import android.content.Context
 import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -80,22 +81,14 @@ fun ShowDetailScreen(
             watchNowFocus = watchNowFocus,
             actions = ShowDetailActions(
                 onWatchNow = {
+                    val firstProvider = (providerState as? ProviderListUiState.Success)
+                        ?.providers?.firstOrNull()
                     val deepLink = viewModel.resolveDeepLink(entry)
-                    if (deepLink != null) {
-                        context.startActivity(
-                            Intent(Intent.ACTION_VIEW, deepLink.toUri())
-                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        )
-                    }
+                    launchProvider(context, firstProvider, deepLink)
                 },
                 onProviderClick = { provider ->
                     val link = viewModel.onProviderSelected(provider, entry)
-                    if (link != null) {
-                        context.startActivity(
-                            Intent(Intent.ACTION_VIEW, link.toUri())
-                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        )
-                    }
+                    launchProvider(context, provider, link)
                 },
                 onRetryProviders = { viewModel.loadProviders(enriched) },
                 onRecapClick = onRecapClick,
@@ -107,6 +100,53 @@ fun ShowDetailScreen(
             modifier = Modifier.align(Alignment.TopStart).padding(32.dp)
         ) {
             Text(stringResource(R.string.tv_back_arrow))
+        }
+    }
+}
+
+/**
+ * Three-stage launch cascade for a streaming provider:
+ *   1. Deep-link intent (with [ResolvedProvider.packageName] targeted when known).
+ *   2. If the provider is detected as installed, fall through to the app's main
+ *      activity via [android.content.pm.PackageManager.getLaunchIntentForPackage].
+ *   3. Otherwise open [ResolvedProvider.tmdbPageUrl] in the system browser.
+ *
+ * Stops at the first stage that resolves to an activity.
+ */
+private fun launchProvider(context: Context, provider: ResolvedProvider?, deepLink: String?) {
+    val pm = context.packageManager
+
+    if (deepLink != null && deepLink.isNotBlank()) {
+        val uri = deepLink.toUri()
+        val targetedIntent = Intent(Intent.ACTION_VIEW, uri)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        provider?.packageName?.let { targetedIntent.setPackage(it) }
+        if (targetedIntent.resolveActivity(pm) != null) {
+            context.startActivity(targetedIntent)
+            return
+        }
+        if (provider?.packageName != null) {
+            val untargetedIntent = Intent(Intent.ACTION_VIEW, uri)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            if (untargetedIntent.resolveActivity(pm) != null) {
+                context.startActivity(untargetedIntent)
+                return
+            }
+        }
+    }
+
+    if (provider?.isInstalled == true && provider.packageName != null) {
+        pm.getLaunchIntentForPackage(provider.packageName)?.let { launchIntent ->
+            context.startActivity(launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            return
+        }
+    }
+
+    provider?.tmdbPageUrl?.let { pageUrl ->
+        val fallback = Intent(Intent.ACTION_VIEW, pageUrl.toUri())
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        if (fallback.resolveActivity(pm) != null) {
+            context.startActivity(fallback)
         }
     }
 }
