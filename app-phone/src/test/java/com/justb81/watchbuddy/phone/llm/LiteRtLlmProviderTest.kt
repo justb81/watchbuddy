@@ -11,7 +11,6 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Assertions.fail
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
@@ -152,10 +151,8 @@ class LiteRtLlmProviderTest {
     @Test
     fun `generate throws IllegalStateException when model file missing`() = runTest {
         File(tempDir.toFile(), "llm_models/${modelVariant.fileName}").delete()
-        val factory = object : LiteRtLlmProvider.EngineFactory {
-            override fun create(config: EngineConfig): LiteRtLlmProvider.EngineHandle {
-                fail("factory should not be called when model file is missing")
-            }
+        val factory = LiteRtLlmProvider.EngineFactory { _ ->
+            throw AssertionError("factory should not be called when model file is missing")
         }
         val provider = LiteRtLlmProvider(context, modelVariant, factory)
 
