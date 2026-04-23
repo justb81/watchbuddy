@@ -2,10 +2,7 @@ package com.justb81.watchbuddy.phone.llm
 
 import android.content.Context
 import com.google.ai.edge.litertlm.Backend
-import com.google.ai.edge.litertlm.Conversation
-import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
-import com.google.ai.edge.litertlm.Message
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.unmockkAll
@@ -48,62 +45,67 @@ class LiteRtLlmProviderTest {
         unmockkAll()
     }
 
-    private fun stubEngine(
-        response: String? = null,
-        throwOnSend: Throwable? = null,
-    ): Engine {
-        val message = mockk<Message>()
-        every { message.toString() } returns (response ?: "")
-        val conversation = mockk<Conversation>(relaxed = true)
-        if (throwOnSend != null) {
-            every { conversation.sendMessage(any()) } throws throwOnSend
-        } else {
-            every { conversation.sendMessage(any()) } returns message
+    private class FakeHandle(
+        private val response: String? = null,
+        private val throwOnSend: Throwable? = null,
+    ) : LiteRtLlmProvider.EngineHandle {
+        var closed: Boolean = false
+            private set
+        var sendCount: Int = 0
+            private set
+
+        override fun sendMessage(prompt: String): String {
+            sendCount++
+            throwOnSend?.let { throw it }
+            return response.orEmpty()
         }
-        return mockk<Engine>(relaxed = true) {
-            every { createConversation(any()) } returns conversation
+
+        override fun close() {
+            closed = true
         }
     }
 
-    private fun recordingFactory(
-        engines: List<Engine>,
-        throwOnGpuInit: Throwable? = null,
-    ): Pair<LiteRtLlmProvider.EngineFactory, MutableList<EngineConfig>> {
-        val calls = mutableListOf<EngineConfig>()
-        val queue = ArrayDeque(engines)
-        val factory = LiteRtLlmProvider.EngineFactory { config ->
-            calls += config
+    private class RecordingFactory(
+        private val handles: ArrayDeque<LiteRtLlmProvider.EngineHandle>,
+        private val throwOnGpuInit: Throwable? = null,
+    ) : LiteRtLlmProvider.EngineFactory {
+        val configs: MutableList<EngineConfig> = mutableListOf()
+
+        override fun create(config: EngineConfig): LiteRtLlmProvider.EngineHandle {
+            configs += config
             if (throwOnGpuInit != null && config.backend is Backend.GPU) {
                 throw throwOnGpuInit
             }
-            queue.removeFirst()
+            return handles.removeFirst()
         }
-        return factory to calls
     }
 
     @Test
     fun `generate falls back to CPU when GPU sendMessage throws`() = runTest {
-        val gpu = stubEngine(
+        val gpu = FakeHandle(
             throwOnSend = RuntimeException("Can not find OpenCL library on this device"),
         )
-        val cpu = stubEngine(response = "recap from CPU")
-        val (factory, calls) = recordingFactory(listOf(gpu, cpu))
+        val cpu = FakeHandle(response = "recap from CPU")
+        val factory = RecordingFactory(ArrayDeque(listOf(gpu, cpu)))
         val provider = LiteRtLlmProvider(context, modelVariant, factory)
 
         val result = provider.generate("hi")
 
         assertEquals("recap from CPU", result)
-        assertEquals(2, calls.size)
-        assertTrue(calls[0].backend is Backend.GPU)
-        assertTrue(calls[1].backend is Backend.CPU)
+        assertEquals(2, factory.configs.size)
+        assertTrue(factory.configs[0].backend is Backend.GPU)
+        assertTrue(factory.configs[1].backend is Backend.CPU)
+        assertTrue(gpu.closed, "GPU handle should be closed before CPU retry")
+        assertEquals(1, gpu.sendCount)
+        assertEquals(1, cpu.sendCount)
         assertTrue(LiteRtLlmProvider.isGpuKnownBadForTesting())
     }
 
     @Test
     fun `generate falls back to CPU when GPU engine init throws`() = runTest {
-        val cpu = stubEngine(response = "cpu response")
-        val (factory, calls) = recordingFactory(
-            engines = listOf(cpu),
+        val cpu = FakeHandle(response = "cpu response")
+        val factory = RecordingFactory(
+            handles = ArrayDeque(listOf(cpu)),
             throwOnGpuInit = RuntimeException("Can not initialize GPU"),
         )
         val provider = LiteRtLlmProvider(context, modelVariant, factory)
@@ -111,36 +113,36 @@ class LiteRtLlmProviderTest {
         val result = provider.generate("hi")
 
         assertEquals("cpu response", result)
-        assertEquals(2, calls.size)
-        assertTrue(calls[0].backend is Backend.GPU)
-        assertTrue(calls[1].backend is Backend.CPU)
+        assertEquals(2, factory.configs.size)
+        assertTrue(factory.configs[0].backend is Backend.GPU)
+        assertTrue(factory.configs[1].backend is Backend.CPU)
         assertTrue(LiteRtLlmProvider.isGpuKnownBadForTesting())
     }
 
     @Test
     fun `subsequent instance skips GPU after first failure latches gpuKnownBad`() = runTest {
-        val firstGpu = stubEngine(
+        val firstGpu = FakeHandle(
             throwOnSend = RuntimeException("Can not find OpenCL library on this device"),
         )
-        val firstCpu = stubEngine(response = "first")
-        val (firstFactory, _) = recordingFactory(listOf(firstGpu, firstCpu))
+        val firstCpu = FakeHandle(response = "first")
+        val firstFactory = RecordingFactory(ArrayDeque(listOf(firstGpu, firstCpu)))
         LiteRtLlmProvider(context, modelVariant, firstFactory).generate("hi")
         assertTrue(LiteRtLlmProvider.isGpuKnownBadForTesting())
 
-        val secondCpu = stubEngine(response = "second")
-        val (secondFactory, secondCalls) = recordingFactory(listOf(secondCpu))
+        val secondCpu = FakeHandle(response = "second")
+        val secondFactory = RecordingFactory(ArrayDeque(listOf(secondCpu)))
         val result = LiteRtLlmProvider(context, modelVariant, secondFactory).generate("hi")
 
         assertEquals("second", result)
-        assertEquals(1, secondCalls.size)
-        assertTrue(secondCalls[0].backend is Backend.CPU)
+        assertEquals(1, secondFactory.configs.size)
+        assertTrue(secondFactory.configs[0].backend is Backend.CPU)
     }
 
     @Test
     fun `generate propagates exception when CPU fallback also fails`() = runTest {
-        val gpu = stubEngine(throwOnSend = RuntimeException("GPU boom"))
-        val cpu = stubEngine(throwOnSend = RuntimeException("CPU boom"))
-        val (factory, _) = recordingFactory(listOf(gpu, cpu))
+        val gpu = FakeHandle(throwOnSend = RuntimeException("GPU boom"))
+        val cpu = FakeHandle(throwOnSend = RuntimeException("CPU boom"))
+        val factory = RecordingFactory(ArrayDeque(listOf(gpu, cpu)))
         val provider = LiteRtLlmProvider(context, modelVariant, factory)
 
         val e = assertThrows<RuntimeException> { provider.generate("hi") }
@@ -150,7 +152,11 @@ class LiteRtLlmProviderTest {
     @Test
     fun `generate throws IllegalStateException when model file missing`() = runTest {
         File(tempDir.toFile(), "llm_models/${modelVariant.fileName}").delete()
-        val factory = LiteRtLlmProvider.EngineFactory { _ -> fail("factory should not be called") }
+        val factory = object : LiteRtLlmProvider.EngineFactory {
+            override fun create(config: EngineConfig): LiteRtLlmProvider.EngineHandle {
+                fail("factory should not be called when model file is missing")
+            }
+        }
         val provider = LiteRtLlmProvider(context, modelVariant, factory)
 
         assertThrows<IllegalStateException> { provider.generate("hi") }
@@ -161,13 +167,13 @@ class LiteRtLlmProviderTest {
         // Empty-response is our own guard, not a JNI failure: the cascade in
         // LlmProviderFactory should fall through to FallbackProvider without
         // latching gpuKnownBad.
-        val gpu = stubEngine(response = "")
-        val (factory, calls) = recordingFactory(listOf(gpu))
+        val gpu = FakeHandle(response = "")
+        val factory = RecordingFactory(ArrayDeque(listOf(gpu)))
         val provider = LiteRtLlmProvider(context, modelVariant, factory)
 
         assertThrows<IllegalStateException> { provider.generate("hi") }
-        assertEquals(1, calls.size)
-        assertTrue(calls[0].backend is Backend.GPU)
+        assertEquals(1, factory.configs.size)
+        assertTrue(factory.configs[0].backend is Backend.GPU)
         assertFalse(LiteRtLlmProvider.isGpuKnownBadForTesting())
     }
 }

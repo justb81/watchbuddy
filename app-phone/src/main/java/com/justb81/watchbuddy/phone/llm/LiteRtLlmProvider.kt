@@ -7,7 +7,6 @@ import com.google.ai.edge.litertlm.Backend
 import com.google.ai.edge.litertlm.ConversationConfig
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
-import com.google.ai.edge.litertlm.Message
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -42,25 +41,37 @@ class LiteRtLlmProvider internal constructor(
         modelVariant: LlmOrchestrator.ModelVariant,
     ) : this(context, modelVariant, DefaultEngineFactory)
 
-    /** Test seam: production wires [DefaultEngineFactory] which calls [Engine] directly. */
+    /**
+     * Test seam: production wires [DefaultEngineFactory] which creates a real
+     * LiteRT-LM [Engine] plus a per-call [com.google.ai.edge.litertlm.Conversation].
+     * Unit tests supply a pure-Kotlin fake so the JNI-backed LiteRT-LM classes
+     * never have to load in the JVM test classpath.
+     */
     internal fun interface EngineFactory {
-        fun create(config: EngineConfig): Engine
+        fun create(config: EngineConfig): EngineHandle
+    }
+
+    /** Opaque handle over an initialized LiteRT-LM engine. */
+    internal interface EngineHandle {
+        fun sendMessage(prompt: String): String
+        fun close() {}
     }
 
     override val displayName: String = "LiteRT-LM (${modelVariant.fileName})"
 
-    private var engine: Engine? = null
+    private var handle: EngineHandle? = null
     private var currentBackendIsGpu: Boolean = false
 
     override suspend fun generate(prompt: String): String = withContext(Dispatchers.IO) {
         val text = try {
-            runInference(getOrCreateEngine(), prompt)
+            getOrCreateHandle().sendMessage(prompt)
         } catch (e: Exception) {
             if (!currentBackendIsGpu) throw e
             markGpuBadAndLog("inference", e)
-            engine = null
+            runCatching { handle?.close() }
+            handle = null
             currentBackendIsGpu = false
-            runInference(getOrCreateEngine(), prompt)
+            getOrCreateHandle().sendMessage(prompt)
         }
         if (text.isBlank()) {
             throw IllegalStateException("LiteRT-LM returned empty response")
@@ -68,37 +79,27 @@ class LiteRtLlmProvider internal constructor(
         text
     }
 
-    private fun runInference(engine: Engine, prompt: String): String {
-        val conversation = engine.createConversation(ConversationConfig())
-        return try {
-            val response: Message = conversation.sendMessage(prompt)
-            response.toString()
-        } finally {
-            conversation.close()
-        }
-    }
-
-    private fun getOrCreateEngine(): Engine {
-        engine?.let { return it }
+    private fun getOrCreateHandle(): EngineHandle {
+        handle?.let { return it }
         val modelPath = resolveModelPath()
-        val newEngine = if (gpuKnownBad.get()) {
-            createEngine(modelPath, useGpu = false).also { currentBackendIsGpu = false }
+        val newHandle = if (gpuKnownBad.get()) {
+            createHandle(modelPath, useGpu = false).also { currentBackendIsGpu = false }
         } else {
             try {
-                createEngine(modelPath, useGpu = true).also { currentBackendIsGpu = true }
+                createHandle(modelPath, useGpu = true).also { currentBackendIsGpu = true }
             } catch (e: Exception) {
                 markGpuBadAndLog("init", e)
-                createEngine(modelPath, useGpu = false).also { currentBackendIsGpu = false }
+                createHandle(modelPath, useGpu = false).also { currentBackendIsGpu = false }
             }
         }
-        engine = newEngine
-        return newEngine
+        handle = newHandle
+        return newHandle
     }
 
-    private fun createEngine(modelPath: String, useGpu: Boolean): Engine {
+    private fun createHandle(modelPath: String, useGpu: Boolean): EngineHandle {
         val backend = if (useGpu) Backend.GPU() else Backend.CPU()
         val config = EngineConfig(modelPath = modelPath, backend = backend)
-        return engineFactory.create(config).also { it.initialize() }
+        return engineFactory.create(config)
     }
 
     private fun resolveModelPath(): String {
@@ -122,7 +123,21 @@ class LiteRtLlmProvider internal constructor(
     }
 
     private object DefaultEngineFactory : EngineFactory {
-        override fun create(config: EngineConfig): Engine = Engine(config)
+        override fun create(config: EngineConfig): EngineHandle {
+            val engine = Engine(config).also { it.initialize() }
+            return RealEngineHandle(engine)
+        }
+    }
+
+    private class RealEngineHandle(private val engine: Engine) : EngineHandle {
+        override fun sendMessage(prompt: String): String {
+            val conversation = engine.createConversation(ConversationConfig())
+            return try {
+                conversation.sendMessage(prompt).toString()
+            } finally {
+                conversation.close()
+            }
+        }
     }
 
     companion object {
