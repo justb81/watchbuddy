@@ -426,70 +426,53 @@ private fun formatLastCandidate(last: MediaSessionScrobbler.LastCandidate?): Str
 @Composable
 private fun MediaSessionSection(last: MediaSessionScrobbler.LastObservedSession?) {
     val title = stringResource(R.string.tv_diagnostics_section_media_session)
-    val nullPlaceholder = stringResource(R.string.tv_diagnostics_value_null)
-    val emPlaceholder = "—"
     val snapshot = last?.snapshot
-    val anyFieldPresent = snapshot != null && snapshot.candidateStrings().isNotEmpty()
     val headerStatus = when {
         last == null -> Status.NEUTRAL
-        anyFieldPresent -> Status.OK
+        snapshot != null && snapshot.candidateStrings().isNotEmpty() -> Status.OK
         else -> Status.WARN
     }
+    val rows = buildMediaSessionRows(last, headerStatus)
+    DiagnosticsSection(title = title, rows = rows)
+}
 
-    val rows = listOf(
+@Composable
+private fun buildMediaSessionRows(
+    last: MediaSessionScrobbler.LastObservedSession?,
+    headerStatus: Status,
+): List<DiagRow> {
+    val em = "—"
+    val snapshot = last?.snapshot
+    return listOf(
         DiagRow(
             stringResource(R.string.tv_diagnostics_row_media_session_package),
-            snapshot?.packageName ?: emPlaceholder,
+            snapshot?.packageName ?: em,
             headerStatus,
         ),
-        DiagRow(
-            stringResource(R.string.tv_diagnostics_row_media_session_title),
-            snapshot?.title ?: if (snapshot == null) emPlaceholder else nullPlaceholder,
-            fieldStatus(snapshot?.title, snapshot != null),
+        stringRow(R.string.tv_diagnostics_row_media_session_title, snapshot, snapshot?.title),
+        stringRow(R.string.tv_diagnostics_row_media_session_display_title, snapshot, snapshot?.displayTitle),
+        stringRow(R.string.tv_diagnostics_row_media_session_display_subtitle, snapshot, snapshot?.displaySubtitle),
+        stringRow(
+            R.string.tv_diagnostics_row_media_session_display_description,
+            snapshot,
+            snapshot?.displayDescription,
         ),
-        DiagRow(
-            stringResource(R.string.tv_diagnostics_row_media_session_display_title),
-            snapshot?.displayTitle ?: if (snapshot == null) emPlaceholder else nullPlaceholder,
-            fieldStatus(snapshot?.displayTitle, snapshot != null),
-        ),
-        DiagRow(
-            stringResource(R.string.tv_diagnostics_row_media_session_display_subtitle),
-            snapshot?.displaySubtitle ?: if (snapshot == null) emPlaceholder else nullPlaceholder,
-            fieldStatus(snapshot?.displaySubtitle, snapshot != null),
-        ),
-        DiagRow(
-            stringResource(R.string.tv_diagnostics_row_media_session_display_description),
-            snapshot?.displayDescription ?: if (snapshot == null) emPlaceholder else nullPlaceholder,
-            fieldStatus(snapshot?.displayDescription, snapshot != null),
-        ),
-        DiagRow(
-            stringResource(R.string.tv_diagnostics_row_media_session_artist),
-            snapshot?.artist ?: if (snapshot == null) emPlaceholder else nullPlaceholder,
-            fieldStatus(snapshot?.artist, snapshot != null),
-        ),
-        DiagRow(
-            stringResource(R.string.tv_diagnostics_row_media_session_album_artist),
-            snapshot?.albumArtist ?: if (snapshot == null) emPlaceholder else nullPlaceholder,
-            fieldStatus(snapshot?.albumArtist, snapshot != null),
-        ),
-        DiagRow(
-            stringResource(R.string.tv_diagnostics_row_media_session_album),
-            snapshot?.album ?: if (snapshot == null) emPlaceholder else nullPlaceholder,
-            fieldStatus(snapshot?.album, snapshot != null),
-        ),
+        stringRow(R.string.tv_diagnostics_row_media_session_artist, snapshot, snapshot?.artist),
+        stringRow(R.string.tv_diagnostics_row_media_session_album_artist, snapshot, snapshot?.albumArtist),
+        stringRow(R.string.tv_diagnostics_row_media_session_album, snapshot, snapshot?.album),
         DiagRow(
             stringResource(R.string.tv_diagnostics_row_media_session_playback_state),
-            last?.playbackState?.toString() ?: emPlaceholder,
+            last?.playbackState?.toString() ?: em,
             Status.NEUTRAL,
         ),
         DiagRow(
             stringResource(R.string.tv_diagnostics_row_media_session_position),
-            last?.positionMs?.let { "${it}ms" } ?: emPlaceholder,
+            last?.positionMs?.let { "${it}ms" } ?: em,
             Status.NEUTRAL,
         ),
         DiagRow(
             stringResource(R.string.tv_diagnostics_row_media_session_duration),
-            last?.durationMs?.let { "${it}ms" } ?: emPlaceholder,
+            last?.durationMs?.let { "${it}ms" } ?: em,
             Status.NEUTRAL,
         ),
         DiagRow(
@@ -498,10 +481,23 @@ private fun MediaSessionSection(last: MediaSessionScrobbler.LastObservedSession?
             Status.NEUTRAL,
         ),
     )
-    DiagnosticsSection(title = title, rows = rows)
 }
 
-private fun fieldStatus(value: String?, sessionObserved: Boolean): Status {
-    if (!sessionObserved) return Status.NEUTRAL
-    return if (value.isNullOrBlank()) Status.WARN else Status.OK
+@Composable
+private fun stringRow(
+    labelRes: Int,
+    snapshot: com.justb81.watchbuddy.core.model.MediaMetadataSnapshot?,
+    value: String?,
+): DiagRow {
+    val display = when {
+        value != null -> value
+        snapshot == null -> "—"
+        else -> stringResource(R.string.tv_diagnostics_value_null)
+    }
+    val status = when {
+        snapshot == null -> Status.NEUTRAL
+        value.isNullOrBlank() -> Status.WARN
+        else -> Status.OK
+    }
+    return DiagRow(stringResource(labelRes), display, status)
 }

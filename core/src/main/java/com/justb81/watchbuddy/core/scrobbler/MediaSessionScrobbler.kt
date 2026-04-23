@@ -100,6 +100,7 @@ class MediaSessionScrobbler @Inject constructor(
     val lastCandidate: StateFlow<LastCandidate?> = _lastCandidate.asStateFlow()
 
     private val _lastObservedSession = MutableStateFlow<LastObservedSession?>(null)
+
     /**
      * Most recent `MediaSession` polled, regardless of match outcome. Populated
      * on every poll tick that encounters at least one session, so the diagnostics
@@ -654,9 +655,10 @@ class MediaSessionScrobbler @Inject constructor(
             currentlySessionKey = null
             return
         }
-        val candidate = matchSnapshot(snapshot) ?: return
-        val show = candidate.matchedShow ?: return
-        val episode = candidate.matchedEpisode ?: return
+        val candidate = matchSnapshot(snapshot)
+        val show = candidate?.matchedShow
+        val episode = candidate?.matchedEpisode
+        if (show == null || episode == null) return
         scrobbleDispatcher.dispatchStop(show, episode, progress)
         currentlySessionKey = null
         Log.i(TAG, "Scrobble stopped: ${show.title} S${episode.season}E${episode.number}")

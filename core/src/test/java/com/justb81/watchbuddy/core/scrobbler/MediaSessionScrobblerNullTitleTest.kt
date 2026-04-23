@@ -53,14 +53,15 @@ class MediaSessionScrobblerNullTitleTest {
     private val breakingBadEntry = TraktWatchedEntry(show = breakingBadShow)
 
     // Plex: TITLE = episode name, ALBUM_ARTIST = show, DISPLAY_SUBTITLE = S##E##
+    // sessionKey = "${packageName}:${candidateStrings().first()}" — priority order
+    // is: albumArtist > album > artist > displayTitle > displaySubtitle > title >
+    // displayDescription, so the Plex snapshot below keys on "Breaking Bad".
     private val plexPlayingSnapshot = MediaMetadataSnapshot(
         packageName = "com.plexapp.android",
         title = null,
         albumArtist = "Breaking Bad",
         displaySubtitle = "S01E01",
     )
-    // sessionKey = "${packageName}:${candidateStrings().first()}"
-    // candidateStrings priority: albumArtist > album > artist > displayTitle > displaySubtitle > title > displayDescription
     private val plexSessionKey = "com.plexapp.android:Breaking Bad"
 
     @BeforeEach
