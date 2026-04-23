@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.29.0](https://github.com/justb81/watchbuddy/compare/v0.28.3...v0.29.0) (2026-04-23)
+
+
+### Features
+
+* **tv-diagnostics:** show full MediaSession snapshot and scrobble null-TITLE sessions ([#465](https://github.com/justb81/watchbuddy/issues/465)) ([306a3ef](https://github.com/justb81/watchbuddy/commit/306a3ef4c8a9b3da1ab93e36ccedbc04a121f8e1))
+
+
+### Bug Fixes
+
+* **phone:** fall back to CPU when LiteRT-LM GPU inference fails ([#467](https://github.com/justb81/watchbuddy/issues/467)) ([403b603](https://github.com/justb81/watchbuddy/commit/403b6036c531c34fe5e27d135ba7a5d25776f2e6))
+
 ## [0.28.3](https://github.com/justb81/watchbuddy/compare/v0.28.2...v0.28.3) (2026-04-23)
 
 
