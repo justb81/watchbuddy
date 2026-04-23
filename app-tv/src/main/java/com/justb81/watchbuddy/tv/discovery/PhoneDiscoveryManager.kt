@@ -192,12 +192,12 @@ class PhoneDiscoveryManager @Inject constructor(
             val url = capabilityUrl(phone.baseUrl)
             try {
                 val response = httpClient.newCall(Request.Builder().url(url).build()).execute()
-                val capability = response.body?.string()?.let {
+                val capability = response.body.string().let {
                     Json.decodeFromString<DeviceCapability>(it)
                 }
                 val newScore = calculateScore(phone.txtRecord, capability)
                 phone.copy(
-                    capability = capability ?: phone.capability,
+                    capability = capability,
                     score = newScore,
                     failCount = 0,
                     lastSuccessfulCheck = System.currentTimeMillis()
@@ -284,7 +284,6 @@ class PhoneDiscoveryManager @Inject constructor(
         val synthInfo = NsdServiceInfo().apply {
             serviceName = "watchbuddy-ble-$hostAddress-$port"
             this.port = port
-            host = ipv4
         }
         val txtRecord = PhoneTxtRecord(
             version = "", // unknown until /capability is fetched
@@ -312,7 +311,7 @@ class PhoneDiscoveryManager @Inject constructor(
         val url = capabilityUrl(baseUrl)
         try {
             val response = httpClient.newCall(Request.Builder().url(url).build()).execute()
-            val capability = response.body?.string()?.let {
+            val capability = response.body.string().let {
                 Json.decodeFromString<DeviceCapability>(it)
             }
             val score = calculateScore(txtRecord, capability)

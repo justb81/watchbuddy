@@ -29,7 +29,7 @@ class ModelDownloadWorker @AssistedInject constructor(
     @Assisted appContext: Context,
     @Assisted workerParams: WorkerParameters,
     private val settingsRepository: SettingsRepository,
-    @Named("download") private val downloadClient: OkHttpClient
+    @param:Named("download") private val downloadClient: OkHttpClient
 ) : CoroutineWorker(appContext, workerParams) {
 
     override suspend fun doWork(): Result {
@@ -91,7 +91,7 @@ class ModelDownloadWorker @AssistedInject constructor(
                 throw RuntimeException("HTTP ${response.code}: ${response.message}")
             }
 
-            val body = response.body ?: throw RuntimeException("Empty response body")
+            val body = response.body
             val contentLength = body.contentLength()
 
             body.byteStream().use { input ->

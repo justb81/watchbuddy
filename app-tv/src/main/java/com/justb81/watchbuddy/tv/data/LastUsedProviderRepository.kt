@@ -27,7 +27,7 @@ private val Context.providerDataStore: DataStore<Preferences> by preferencesData
  */
 @Singleton
 class LastUsedProviderRepository @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
 ) {
     private val mapKey = stringPreferencesKey("provider_map")
 
