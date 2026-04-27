@@ -205,12 +205,13 @@ class MediaSessionScrobblerLifecycleTest {
         }
 
         @Test
-        fun `skips stop when progress is null`() = runTest {
+        fun `defaults to 100f when progress is null — assumes watched`() = runTest {
+            coEvery { scrobbleDispatcher.dispatchStop(any(), any(), any()) } just runs
             primeScrobbling()
 
             scrobbler.handleScrobbleStop(testSnapshot, testSessionKey, progress = null)
 
-            coVerify(exactly = 0) { scrobbleDispatcher.dispatchStop(any(), any(), any()) }
+            coVerify { scrobbleDispatcher.dispatchStop(any(), any(), 100f) }
         }
 
         @Test
