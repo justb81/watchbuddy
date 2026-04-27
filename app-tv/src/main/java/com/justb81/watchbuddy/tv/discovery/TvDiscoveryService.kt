@@ -129,14 +129,14 @@ class TvDiscoveryService : Service() {
     }
 
     /**
-     * Registers a [ContentObserver] on [Settings.Secure.ENABLED_NOTIFICATION_LISTENERS]
-     * so the service can react to permission changes without requiring the user to
-     * toggle Phone discovery. Idempotent — subsequent calls while already registered
-     * are no-ops.
+     * Registers a [ContentObserver] on `enabled_notification_listeners` in
+     * [Settings.Secure] so the service can react to permission changes without
+     * requiring the user to toggle Phone discovery. Idempotent — subsequent calls
+     * while already registered are no-ops.
      */
     private fun registerNotificationAccessObserver() {
         if (notificationAccessObserver != null) return
-        val uri = Settings.Secure.getUriFor(Settings.Secure.ENABLED_NOTIFICATION_LISTENERS)
+        val uri = Settings.Secure.getUriFor("enabled_notification_listeners")
         notificationAccessObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
             override fun onChange(selfChange: Boolean) {
                 onNotificationAccessChanged()
