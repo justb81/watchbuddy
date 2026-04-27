@@ -107,7 +107,7 @@ class JustWatchDeepLinkRepositoryTest {
         fun `returns cached URL without calling API`() = runTest {
             coEvery { dao.get(100, 1, 2, 8, "US") } returns makeLink(url = "https://www.netflix.com/watch/99")
 
-            val result = repository.resolveDeepLink(100, 1, 2, 8, "US", "Breaking Bad", 2008)
+            val result = repository.resolveDeepLink(100, 1, 2, 8, "US", "Breaking Bad")
 
             assertEquals("https://www.netflix.com/watch/99", result)
             coVerify(exactly = 0) { api.query(any()) }
@@ -118,7 +118,7 @@ class JustWatchDeepLinkRepositoryTest {
             val freshNegative = makeLink(url = null, fetchedAt = System.currentTimeMillis())
             coEvery { dao.get(100, 1, 2, 8, "US") } returns freshNegative
 
-            val result = repository.resolveDeepLink(100, 1, 2, 8, "US", "Breaking Bad", 2008)
+            val result = repository.resolveDeepLink(100, 1, 2, 8, "US", "Breaking Bad")
 
             assertNull(result)
             coVerify(exactly = 0) { api.query(any()) }
@@ -138,7 +138,7 @@ class JustWatchDeepLinkRepositoryTest {
             // API returns no results
             coEvery { api.query(any()) } returns JustWatchGraphQlResponse(data = null)
 
-            val result = repository.resolveDeepLink(100, 1, 2, 8, "US", "Breaking Bad", 2008)
+            val result = repository.resolveDeepLink(100, 1, 2, 8, "US", "Breaking Bad")
 
             assertNull(result)
             coVerify(atLeast = 1) { api.query(any()) }
@@ -175,7 +175,7 @@ class JustWatchDeepLinkRepositoryTest {
                     )
                 )
 
-            val result = repository.resolveDeepLink(100, 1, 2, 8, "US", "Breaking Bad", 2008)
+            val result = repository.resolveDeepLink(100, 1, 2, 8, "US", "Breaking Bad")
 
             assertEquals("https://www.netflix.com/watch/42", result)
         }
@@ -197,10 +197,10 @@ class JustWatchDeepLinkRepositoryTest {
             coEvery { api.query(match { it.query == JustWatchApiService.EPISODES_QUERY }) } returns
                 makeEpisodesResponse(emptyList())
 
-            repository.resolveDeepLink(100, 1, 2, 8, "US", "Breaking Bad", 2008)
+            repository.resolveDeepLink(100, 1, 2, 8, "US", "Breaking Bad")
 
             // Show-level offers (season=0, episode=0) should have been cached
-            coVerify { dao.upsert(match { it.season == 0 && it.episode == 0 && it.standard_web_url != null }) }
+            coVerify { dao.upsert(match { it.season == 0 && it.episode == 0 && it.standardWebUrl != null }) }
         }
 
         @Test
@@ -212,10 +212,10 @@ class JustWatchDeepLinkRepositoryTest {
             coEvery { api.query(match { it.query == JustWatchApiService.SEARCH_QUERY }) } returns
                 makeSearchResponse(tmdbId = "999")
 
-            repository.resolveDeepLink(100, 1, 2, 8, "US", "Unknown Show", 2020)
+            repository.resolveDeepLink(100, 1, 2, 8, "US", "Unknown Show")
 
             // Should have cached negatives for all known providers
-            coVerify(atLeast = 1) { dao.upsert(match { it.standard_web_url == null }) }
+            coVerify(atLeast = 1) { dao.upsert(match { it.standardWebUrl == null }) }
         }
 
         @Test
@@ -225,7 +225,7 @@ class JustWatchDeepLinkRepositoryTest {
 
             coEvery { api.query(any()) } throws RuntimeException("network error")
 
-            val result = repository.resolveDeepLink(100, 1, 2, 8, "US", "Breaking Bad", 2008)
+            val result = repository.resolveDeepLink(100, 1, 2, 8, "US", "Breaking Bad")
 
             assertNull(result)
             // No negatives should be cached — allow retry on next call
@@ -249,11 +249,11 @@ class JustWatchDeepLinkRepositoryTest {
             coEvery { api.query(match { it.query == JustWatchApiService.EPISODES_QUERY }) } returns
                 makeEpisodesResponse(emptyList())
 
-            repository.resolveDeepLink(100, 1, 2, 350, "US", "Some Show", 2020)
+            repository.resolveDeepLink(100, 1, 2, 350, "US", "Some Show")
 
             // RENT offer should not produce a positive cache entry
             coVerify(exactly = 0) {
-                dao.upsert(match { it.provider_id == 350 && it.standard_web_url != null })
+                dao.upsert(match { it.providerId == 350 && it.standardWebUrl != null })
             }
         }
     }
@@ -276,7 +276,7 @@ class JustWatchDeepLinkRepositoryTest {
             coEvery { api.query(match { it.query == JustWatchApiService.EPISODES_QUERY }) } returns
                 makeEpisodesResponse(emptyList())
 
-            val result = repository.resolveDeepLink(100, 1, 2, 8, "US", "Breaking Bad", 2008)
+            val result = repository.resolveDeepLink(100, 1, 2, 8, "US", "Breaking Bad")
 
             assertEquals("https://www.netflix.com/title/100", result)
         }

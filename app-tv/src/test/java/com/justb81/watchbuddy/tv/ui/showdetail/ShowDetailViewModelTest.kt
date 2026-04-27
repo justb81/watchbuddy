@@ -115,7 +115,7 @@ class ShowDetailViewModelTest {
     fun setUp() {
         coEvery { streamingPrefs.getShowNonInstalledProviders() } returns false
         coEvery { lastUsedRepo.recordUsed(any(), any()) } just runs
-        coEvery { justWatchRepo.resolveDeepLink(any(), any(), any(), any(), any(), any(), any()) } returns null
+        coEvery { justWatchRepo.resolveDeepLink(any(), any(), any(), any(), any(), any()) } returns null
         viewModel = ShowDetailViewModel(
             watchProviders, lastUsedRepo, streamingPrefs, phoneDiscovery, tmdbApi, justWatchRepo
         )
@@ -286,7 +286,7 @@ class ShowDetailViewModelTest {
             every { phoneDiscovery.getBestPhone() } returns makePhone("api-key")
             coEvery { watchProviders.getResolvedProviders(100, any(), "api-key", false) } returns (listOf(provider) to null)
             coEvery {
-                justWatchRepo.resolveDeepLink(100, 1, 2, 8, any(), "Test Show", 2023)
+                justWatchRepo.resolveDeepLink(100, 1, 2, 8, any(), "Test Show")
             } returns "https://www.netflix.com/watch/12345"
 
             viewModel.loadProviders(makeEntry())
@@ -302,7 +302,7 @@ class ShowDetailViewModelTest {
             val provider = makeProvider(providerId = 8)
             every { phoneDiscovery.getBestPhone() } returns makePhone("api-key")
             coEvery { watchProviders.getResolvedProviders(100, any(), "api-key", false) } returns (listOf(provider) to null)
-            coEvery { justWatchRepo.resolveDeepLink(any(), any(), any(), any(), any(), any(), any()) } returns null
+            coEvery { justWatchRepo.resolveDeepLink(any(), any(), any(), any(), any(), any()) } returns null
 
             viewModel.loadProviders(makeEntry())
             viewModel.loadDeepLinks(makeEntry())
@@ -336,7 +336,7 @@ class ShowDetailViewModelTest {
             every { phoneDiscovery.getBestPhone() } returns makePhone("api-key")
             coEvery { watchProviders.getResolvedProviders(100, any(), "api-key", false) } returns (listOf(provider) to null)
             coEvery {
-                justWatchRepo.resolveDeepLink(100, 1, 2, 8, any(), "Test Show", 2023)
+                justWatchRepo.resolveDeepLink(100, 1, 2, 8, any(), "Test Show")
             } returns "https://www.netflix.com/watch/12345"
 
             viewModel.loadProviders(makeEntry())
@@ -351,7 +351,7 @@ class ShowDetailViewModelTest {
             val provider = makeProvider(providerId = 8, tmdbPageUrl = "https://tmdb.org/watch")
             every { phoneDiscovery.getBestPhone() } returns makePhone("api-key")
             coEvery { watchProviders.getResolvedProviders(100, any(), "api-key", false) } returns (listOf(provider) to null)
-            coEvery { justWatchRepo.resolveDeepLink(any(), any(), any(), any(), any(), any(), any()) } returns null
+            coEvery { justWatchRepo.resolveDeepLink(any(), any(), any(), any(), any(), any()) } returns null
 
             viewModel.loadProviders(makeEntry())
             viewModel.loadDeepLinks(makeEntry())
@@ -391,7 +391,7 @@ class ShowDetailViewModelTest {
             every { phoneDiscovery.getBestPhone() } returns makePhone("api-key")
             coEvery { watchProviders.getResolvedProviders(100, any(), "api-key", false) } returns (listOf(provider) to null)
             coEvery {
-                justWatchRepo.resolveDeepLink(100, 1, 2, 8, any(), "Test Show", 2023)
+                justWatchRepo.resolveDeepLink(100, 1, 2, 8, any(), "Test Show")
             } returns "https://www.netflix.com/watch/99"
 
             viewModel.loadProviders(makeEntry())
@@ -410,7 +410,7 @@ class ShowDetailViewModelTest {
             val provider = makeProvider(providerId = 8)
             every { phoneDiscovery.getBestPhone() } returns makePhone("api-key")
             coEvery { watchProviders.getResolvedProviders(100, any(), "api-key", false) } returns (listOf(provider) to null)
-            coEvery { justWatchRepo.resolveDeepLink(any(), any(), any(), any(), any(), any(), any()) } returns null
+            coEvery { justWatchRepo.resolveDeepLink(any(), any(), any(), any(), any(), any()) } returns null
 
             viewModel.loadProviders(makeEntry())
             viewModel.loadDeepLinks(makeEntry())

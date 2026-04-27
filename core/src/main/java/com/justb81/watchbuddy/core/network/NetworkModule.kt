@@ -18,6 +18,8 @@ import java.util.concurrent.TimeUnit
 import javax.inject.Named
 import javax.inject.Singleton
 
+private const val JUSTWATCH_TIMEOUT_SECONDS = 5L
+
 @Module
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
@@ -87,7 +89,7 @@ object NetworkModule {
         retrofit.create(TmdbApiService::class.java)
 
     /**
-     * Dedicated 5 s OkHttpClient for JustWatch GraphQL calls.
+     * Dedicated OkHttpClient for JustWatch GraphQL calls.
      *
      * TV-direct — the phone is never involved. Short timeout keeps the detail
      * screen from hanging on slow connections; cache absorbs most latency after
@@ -97,8 +99,8 @@ object NetworkModule {
     @Singleton
     @Named("justwatch")
     fun provideJustWatchOkHttpClient(): OkHttpClient = OkHttpClient.Builder()
-        .connectTimeout(5, TimeUnit.SECONDS)
-        .readTimeout(5, TimeUnit.SECONDS)
+        .connectTimeout(JUSTWATCH_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        .readTimeout(JUSTWATCH_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         .build()
 
     @Provides

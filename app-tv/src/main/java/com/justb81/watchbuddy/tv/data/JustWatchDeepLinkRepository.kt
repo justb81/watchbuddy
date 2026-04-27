@@ -3,8 +3,8 @@ package com.justb81.watchbuddy.tv.data
 import com.justb81.watchbuddy.core.justwatch.JustWatchApiService
 import com.justb81.watchbuddy.core.justwatch.JustWatchGraphQlRequest
 import com.justb81.watchbuddy.core.justwatch.JustWatchOffer
-import com.justb81.watchbuddy.core.justwatch.JustWatchTitle
 import com.justb81.watchbuddy.core.justwatch.JustWatchPackageMap
+import com.justb81.watchbuddy.core.justwatch.JustWatchTitle
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -14,6 +14,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 private val ALLOWED_MONETIZATION = setOf("FLATRATE", "ADS", "FREE")
+private const val SEARCH_RESULT_LIMIT = 5
 
 /**
  * Resolves JustWatch per-episode deep links with a persistent Room cache.
@@ -55,53 +56,25 @@ class JustWatchDeepLinkRepository @Inject constructor(
         providerId: Int,
         countryCode: String,
         showTitle: String,
-        showYear: Int?,
     ): String? {
         // 1. Episode-level cache
         val epCached = dao.get(tmdbShowId, season, episode, providerId, countryCode)
-        if (epCached != null) {
-            if (epCached.standard_web_url != null) return epCached.standard_web_url
-            if (!isNegativeExpired(epCached)) return null
-        }
+        if (epCached != null && epCached.isValidCache()) return epCached.standardWebUrl
 
         // 2. Episode-level live fetch (deduped per episode)
         val episodeKey = FetchKey(tmdbShowId, season, episode, countryCode)
-        val epMutex = getMutex(episodeKey)
-        epMutex.withLock {
+        getMutex(episodeKey).withLock {
             // Re-check cache after acquiring lock — another coroutine may have populated it
             val refreshed = dao.get(tmdbShowId, season, episode, providerId, countryCode)
-            if (refreshed != null && (refreshed.standard_web_url != null || !isNegativeExpired(refreshed))) {
-                return refreshed.standard_web_url
-            }
-            fetchAndCacheEpisodeOffers(tmdbShowId, season, episode, countryCode, showTitle, showYear)
+            if (refreshed != null && refreshed.isValidCache()) return refreshed.standardWebUrl
+            fetchAndCacheEpisodeOffers(tmdbShowId, season, episode, countryCode, showTitle)
         }
 
-        // Re-read after fetch
+        // Re-read after episode fetch
         val epResult = dao.get(tmdbShowId, season, episode, providerId, countryCode)
-        if (epResult != null) {
-            if (epResult.standard_web_url != null) return epResult.standard_web_url
-            if (!isNegativeExpired(epResult)) return null
-        }
+        if (epResult != null && epResult.isValidCache()) return epResult.standardWebUrl
 
-        // 3. Show-level cache
-        val showCached = dao.get(tmdbShowId, 0, 0, providerId, countryCode)
-        if (showCached != null) {
-            if (showCached.standard_web_url != null) return showCached.standard_web_url
-            if (!isNegativeExpired(showCached)) return null
-        }
-
-        // 4. Show-level live fetch (deduped)
-        val showKey = FetchKey(tmdbShowId, 0, 0, countryCode)
-        val showMutex = getMutex(showKey)
-        showMutex.withLock {
-            val refreshed = dao.get(tmdbShowId, 0, 0, providerId, countryCode)
-            if (refreshed != null && (refreshed.standard_web_url != null || !isNegativeExpired(refreshed))) {
-                return refreshed.standard_web_url
-            }
-            fetchAndCacheShowOffers(tmdbShowId, 0, 0, countryCode, showTitle, showYear)
-        }
-
-        return dao.get(tmdbShowId, 0, 0, providerId, countryCode)?.standard_web_url
+        return resolveShowLevel(tmdbShowId, providerId, countryCode, showTitle)
     }
 
     suspend fun count(): Int = dao.countPositive()
@@ -114,13 +87,37 @@ class JustWatchDeepLinkRepository @Inject constructor(
 
     // ── Internal helpers ──────────────────────────────────────────────────────
 
+    private suspend fun resolveShowLevel(
+        tmdbShowId: Int,
+        providerId: Int,
+        countryCode: String,
+        showTitle: String,
+    ): String? {
+        // 3. Show-level cache
+        val showCached = dao.get(tmdbShowId, 0, 0, providerId, countryCode)
+        if (showCached != null && showCached.isValidCache()) return showCached.standardWebUrl
+
+        // 4. Show-level live fetch (deduped)
+        val showKey = FetchKey(tmdbShowId, 0, 0, countryCode)
+        getMutex(showKey).withLock {
+            val refreshed = dao.get(tmdbShowId, 0, 0, providerId, countryCode)
+            if (refreshed != null && refreshed.isValidCache()) return refreshed.standardWebUrl
+            fetchAndCacheShowOffers(tmdbShowId, countryCode, showTitle)
+        }
+
+        return dao.get(tmdbShowId, 0, 0, providerId, countryCode)?.standardWebUrl
+    }
+
+    private fun JustWatchDeepLink.isValidCache(): Boolean =
+        standardWebUrl != null || !isNegativeExpired(this)
+
     private suspend fun getMutex(key: FetchKey): Mutex = mapLock.withLock {
         fetchMutexMap.getOrPut(key) { Mutex() }
     }
 
     private fun isNegativeExpired(entry: JustWatchDeepLink): Boolean =
-        entry.standard_web_url == null &&
-            System.currentTimeMillis() - entry.fetched_at >= JustWatchDeepLink.NEGATIVE_TTL_MS
+        entry.standardWebUrl == null &&
+            System.currentTimeMillis() - entry.fetchedAt >= JustWatchDeepLink.NEGATIVE_TTL_MS
 
     private suspend fun fetchAndCacheEpisodeOffers(
         tmdbShowId: Int,
@@ -128,7 +125,6 @@ class JustWatchDeepLinkRepository @Inject constructor(
         episode: Int,
         countryCode: String,
         showTitle: String,
-        showYear: Int?,
     ) {
         try {
             val language = "en"
@@ -193,18 +189,15 @@ class JustWatchDeepLinkRepository @Inject constructor(
 
     private suspend fun fetchAndCacheShowOffers(
         tmdbShowId: Int,
-        season: Int,
-        episode: Int,
         countryCode: String,
         showTitle: String,
-        showYear: Int?,
     ) {
         try {
             val jwNode = searchShowByTmdbId(tmdbShowId, showTitle, countryCode, "en") ?: run {
-                cacheNegativeForAllKnownProviders(tmdbShowId, season, episode, countryCode)
+                cacheNegativeForAllKnownProviders(tmdbShowId, 0, 0, countryCode)
                 return
             }
-            cacheOffers(jwNode.offers, tmdbShowId, season, episode, countryCode)
+            cacheOffers(jwNode.offers, tmdbShowId, 0, 0, countryCode)
         } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
@@ -226,7 +219,7 @@ class JustWatchDeepLinkRepository @Inject constructor(
                     put("searchQuery", showTitle)
                     put("country", countryCode.uppercase())
                     put("language", language)
-                    put("first", 5)
+                    put("first", SEARCH_RESULT_LIMIT)
                 },
             )
         )
@@ -248,13 +241,14 @@ class JustWatchDeepLinkRepository @Inject constructor(
         val now = System.currentTimeMillis()
         // Group by providerId to pick first valid URL per provider
         val providerUrls = mutableMapOf<Int, String>()
-        for (offer in offers) {
-            if (offer.monetizationType !in ALLOWED_MONETIZATION) continue
-            val technicalName = offer.`package`?.technicalName ?: continue
-            val providerId = JustWatchPackageMap.resolveProviderId(technicalName) ?: continue
-            val url = offer.standardWebURL ?: continue
-            providerUrls.putIfAbsent(providerId, url)
-        }
+        offers
+            .filter { it.monetizationType in ALLOWED_MONETIZATION }
+            .forEach { offer ->
+                val technicalName = offer.`package`?.technicalName ?: return@forEach
+                val providerId = JustWatchPackageMap.resolveProviderId(technicalName) ?: return@forEach
+                val url = offer.standardWebURL ?: return@forEach
+                providerUrls.putIfAbsent(providerId, url)
+            }
         for ((providerId, url) in providerUrls) {
             dao.upsert(JustWatchDeepLink(tmdbShowId, season, episode, providerId, countryCode, url, now))
         }

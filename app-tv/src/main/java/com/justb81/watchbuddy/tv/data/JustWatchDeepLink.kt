@@ -1,5 +1,6 @@
 package com.justb81.watchbuddy.tv.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 
 /**
@@ -7,7 +8,7 @@ import androidx.room.Entity
  *
  * Primary key: (tmdb_show_id, season, episode, provider_id, country_code)
  *   - season = 0, episode = 0 → show-level fallback row (no per-episode data from JustWatch)
- *   - standard_web_url = null → negative cache entry (JustWatch returned no offer for this key)
+ *   - standardWebUrl = null → negative cache entry (JustWatch returned no offer for this key)
  *
  * Cache eviction:
  *   - Positive hits (url non-null): cached permanently (until user clears via Diagnostics)
@@ -18,13 +19,13 @@ import androidx.room.Entity
     primaryKeys = ["tmdb_show_id", "season", "episode", "provider_id", "country_code"],
 )
 data class JustWatchDeepLink(
-    val tmdb_show_id: Int,
+    @ColumnInfo(name = "tmdb_show_id") val tmdbShowId: Int,
     val season: Int,
     val episode: Int,
-    val provider_id: Int,
-    val country_code: String,
-    val standard_web_url: String?,
-    val fetched_at: Long,
+    @ColumnInfo(name = "provider_id") val providerId: Int,
+    @ColumnInfo(name = "country_code") val countryCode: String,
+    @ColumnInfo(name = "standard_web_url") val standardWebUrl: String?,
+    @ColumnInfo(name = "fetched_at") val fetchedAt: Long,
 ) {
     companion object {
         const val NEGATIVE_TTL_MS = 30L * 24 * 60 * 60 * 1000

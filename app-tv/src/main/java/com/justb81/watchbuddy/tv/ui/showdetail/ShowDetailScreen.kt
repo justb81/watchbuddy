@@ -384,6 +384,11 @@ private fun ProviderChip(
     }
     val borderWidth = if (provider.isLastUsed) 2.dp else 0.dp
     val isEnabled = deepLinkState is DeepLinkState.Available || deepLinkState == null
+    val focusedContainerColor = if (isEnabled) {
+        MaterialTheme.colorScheme.surfaceVariant
+    } else {
+        MaterialTheme.colorScheme.surface
+    }
 
     Card(
         onClick = if (isEnabled) onClick else ({}),
@@ -393,8 +398,7 @@ private fun ProviderChip(
         shape = CardDefaults.shape(RoundedCornerShape(8.dp)),
         colors = CardDefaults.colors(
             containerColor = MaterialTheme.colorScheme.surface,
-            focusedContainerColor = if (isEnabled) MaterialTheme.colorScheme.surfaceVariant
-                else MaterialTheme.colorScheme.surface,
+            focusedContainerColor = focusedContainerColor,
         ),
         scale = if (isEnabled) CardDefaults.scale(focusedScale = 1.06f) else CardDefaults.scale(1f),
     ) {

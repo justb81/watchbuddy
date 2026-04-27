@@ -165,7 +165,6 @@ class ShowDetailViewModel @Inject constructor(
         val providerList = (providerState as? ProviderListUiState.Success)?.providers ?: return
         val countryCode = Locale.getDefault().country.takeIf { it.length == 2 } ?: "US"
         val showTitle = enriched.entry.show.title
-        val showYear = enriched.entry.show.year
 
         // Set all providers to Loading
         _deepLinks.value = providerList.associate { it.providerId to DeepLinkState.Loading }
@@ -182,7 +181,6 @@ class ShowDetailViewModel @Inject constructor(
                             providerId = provider.providerId,
                             countryCode = countryCode,
                             showTitle = showTitle,
-                            showYear = showYear,
                         )
                     } catch (e: CancellationException) {
                         throw e
