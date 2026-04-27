@@ -1,9 +1,11 @@
 import org.gradle.accessors.dm.LibrariesForLibs
 
+// Kotlin compiler plugins (compose, serialization) are NOT applied here because
+// their Gradle plugin JARs are split into separate Maven artifacts in Kotlin 2.x
+// and cannot be reliably discovered from the build-logic classpath without
+// hard-coding versions. Modules that need them add alias(libs.plugins.*) directly.
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.plugin.compose")
-    id("org.jetbrains.kotlin.plugin.serialization")
     id("com.google.dagger.hilt.android")
     id("com.google.devtools.ksp")
 }

@@ -3,6 +3,8 @@ import com.github.triplet.gradle.androidpublisher.ResolutionStrategy
 
 plugins {
     id("watchbuddy.android.application")
+    alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.gradle.play.publisher)
 }
 
