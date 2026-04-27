@@ -1,5 +1,6 @@
 package com.justb81.watchbuddy.core.network
 
+import com.justb81.watchbuddy.core.justwatch.JustWatchApiService
 import com.justb81.watchbuddy.core.tmdb.TmdbApiService
 import com.justb81.watchbuddy.core.trakt.NoOpTokenProxyService
 import com.justb81.watchbuddy.core.trakt.TokenProxyService
@@ -84,6 +85,35 @@ object NetworkModule {
     @Singleton
     fun provideTmdbApiService(@Named("tmdb") retrofit: Retrofit): TmdbApiService =
         retrofit.create(TmdbApiService::class.java)
+
+    /**
+     * Dedicated 5 s OkHttpClient for JustWatch GraphQL calls.
+     *
+     * TV-direct — the phone is never involved. Short timeout keeps the detail
+     * screen from hanging on slow connections; cache absorbs most latency after
+     * the first visit.
+     */
+    @Provides
+    @Singleton
+    @Named("justwatch")
+    fun provideJustWatchOkHttpClient(): OkHttpClient = OkHttpClient.Builder()
+        .connectTimeout(5, TimeUnit.SECONDS)
+        .readTimeout(5, TimeUnit.SECONDS)
+        .build()
+
+    @Provides
+    @Singleton
+    @Named("justwatch")
+    fun provideJustWatchRetrofit(@Named("justwatch") client: OkHttpClient): Retrofit = Retrofit.Builder()
+        .baseUrl("https://apis.justwatch.com/")
+        .client(client)
+        .addConverterFactory(WatchBuddyJson.asConverterFactory("application/json".toMediaType()))
+        .build()
+
+    @Provides
+    @Singleton
+    fun provideJustWatchApiService(@Named("justwatch") retrofit: Retrofit): JustWatchApiService =
+        retrofit.create(JustWatchApiService::class.java)
 
     /**
      * TokenProxyService for the WatchBuddy managed token proxy backend.

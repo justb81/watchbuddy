@@ -27,6 +27,7 @@ androidx-arch-core = "2.2.0"
 errorprone-annotations = "2.49.0"
 gradlePlayPublisher = "4.0.0"
 detekt = "1.23.8"
+room = "2.7.1"
 
 [libraries]
 # AndroidX Core
@@ -108,6 +109,12 @@ robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "
 androidx-test-core = { group = "androidx.test", name = "core-ktx", version.ref = "androidx-test-core" }
 androidx-arch-core-testing = { group = "androidx.arch.core", name = "core-testing", version.ref = "androidx-arch-core" }
 errorprone-annotations = { group = "com.google.errorprone", name = "error_prone_annotations", version.ref = "errorprone-annotations" }
+
+# Room (TV-side persistent cache for JustWatch deep links)
+room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
+room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
+room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
+room-testing = { group = "androidx.room", name = "room-testing", version.ref = "room" }
 
 # Static analysis
 detekt-formatting = { group = "io.gitlab.arturbosch.detekt", name = "detekt-formatting", version.ref = "detekt" }

@@ -14,6 +14,7 @@ import com.justb81.watchbuddy.core.model.TraktWatchedEpisode
 import com.justb81.watchbuddy.core.model.TraktWatchedSeason
 import com.justb81.watchbuddy.core.tmdb.TmdbApiService
 import com.justb81.watchbuddy.tv.MainDispatcherRule
+import com.justb81.watchbuddy.tv.data.JustWatchDeepLinkRepository
 import com.justb81.watchbuddy.tv.data.LastUsedProviderRepository
 import com.justb81.watchbuddy.tv.data.StreamingPreferencesRepository
 import com.justb81.watchbuddy.tv.data.WatchProvidersRepository
@@ -50,6 +51,7 @@ class ShowDetailViewModelTest {
     private val streamingPrefs: StreamingPreferencesRepository = mockk()
     private val phoneDiscovery: PhoneDiscoveryManager = mockk()
     private val tmdbApi: TmdbApiService = mockk()
+    private val justWatchRepo: JustWatchDeepLinkRepository = mockk()
     private lateinit var viewModel: ShowDetailViewModel
 
     private fun makeCapability(apiKey: String?) = DeviceCapability(
@@ -96,7 +98,6 @@ class ShowDetailViewModelTest {
     private fun makeProvider(
         providerId: Int = 8,
         name: String = "Netflix",
-        deepLinkTemplate: String? = "https://www.netflix.com/title/{tmdb_id}",
         tmdbPageUrl: String? = null,
         isInstalled: Boolean = true,
         isLastUsed: Boolean = false,
@@ -105,7 +106,6 @@ class ShowDetailViewModelTest {
         name = name,
         logoPath = null,
         packageName = "com.netflix.ninja",
-        deepLinkTemplate = deepLinkTemplate,
         isInstalled = isInstalled,
         isLastUsed = isLastUsed,
         tmdbPageUrl = tmdbPageUrl,
@@ -115,7 +115,10 @@ class ShowDetailViewModelTest {
     fun setUp() {
         coEvery { streamingPrefs.getShowNonInstalledProviders() } returns false
         coEvery { lastUsedRepo.recordUsed(any(), any()) } just runs
-        viewModel = ShowDetailViewModel(watchProviders, lastUsedRepo, streamingPrefs, phoneDiscovery, tmdbApi)
+        coEvery { justWatchRepo.resolveDeepLink(any(), any(), any(), any(), any(), any(), any()) } returns null
+        viewModel = ShowDetailViewModel(
+            watchProviders, lastUsedRepo, streamingPrefs, phoneDiscovery, tmdbApi, justWatchRepo
+        )
     }
 
     @Nested
@@ -274,152 +277,145 @@ class ShowDetailViewModelTest {
     }
 
     @Nested
-    @DisplayName("resolveDeepLink / onProviderSelected")
-    inner class ResolveDeepLinkTest {
+    @DisplayName("loadDeepLinks")
+    inner class LoadDeepLinksTest {
 
         @Test
-        fun `substitutes tmdb_id placeholder for Netflix`() {
-            val entry = TraktWatchedEntry(TraktShow("Test", 2024, TraktIds(tmdb = 42, slug = "test")))
-            val provider = makeProvider(deepLinkTemplate = "https://netflix.com/title/{tmdb_id}")
-            assertEquals("https://netflix.com/title/42", viewModel.onProviderSelected(provider, entry))
-        }
-
-        @Test
-        fun `substitutes id placeholder for ARD`() {
-            val entry = TraktWatchedEntry(TraktShow("Test", 2024, TraktIds(tmdb = 77, slug = "test")))
-            val provider = makeProvider(deepLinkTemplate = "https://ard.de/video/{id}")
-            assertEquals("https://ard.de/video/77", viewModel.onProviderSelected(provider, entry))
-        }
-
-        @Test
-        fun `substitutes both tmdb_id and slug for Disney+`() {
-            val entry = TraktWatchedEntry(TraktShow("Test", 2024, TraktIds(tmdb = 5, slug = "test-show")))
-            val provider = makeProvider(deepLinkTemplate = "https://disney.com/series/{slug}/{tmdb_id}")
-            assertEquals("https://disney.com/series/test-show/5", viewModel.onProviderSelected(provider, entry))
-        }
-
-        @Test
-        fun `Joyn generates slug link without tmdb_id`() {
-            val entry = TraktWatchedEntry(TraktShow("Test Show", 2024, TraktIds(tmdb = null, slug = "test-show")))
-            val provider = makeProvider(
-                deepLinkTemplate = "https://joyn.de/serien/{slug}",
-                tmdbPageUrl = "https://tmdb.org",
-            )
-            assertEquals("https://joyn.de/serien/test-show", viewModel.onProviderSelected(provider, entry))
-        }
-
-        @Test
-        fun `Prime Video generates search URL without tmdb_id`() {
-            val entry = TraktWatchedEntry(TraktShow("Breaking Bad", 2008, TraktIds(tmdb = null, slug = "breaking-bad")))
-            val provider = makeProvider(deepLinkTemplate = "https://www.primevideo.com/search?phrase={slug}")
-            assertEquals(
-                "https://www.primevideo.com/search?phrase=breaking-bad",
-                viewModel.onProviderSelected(provider, entry),
-            )
-        }
-
-        @Test
-        fun `ZDF generates slug link without tmdb_id`() {
-            val entry = TraktWatchedEntry(TraktShow("Tatort", 2024, TraktIds(tmdb = null, slug = "tatort")))
-            val provider = makeProvider(deepLinkTemplate = "https://www.zdf.de/serien/{slug}")
-            assertEquals("https://www.zdf.de/serien/tatort", viewModel.onProviderSelected(provider, entry))
-        }
-
-        @Test
-        fun `slug-only service still works when tmdb_id is present`() {
-            val entry = TraktWatchedEntry(TraktShow("Test", 2024, TraktIds(tmdb = 99, slug = "test")))
-            val provider = makeProvider(deepLinkTemplate = "https://joyn.de/serien/{slug}")
-            assertEquals("https://joyn.de/serien/test", viewModel.onProviderSelected(provider, entry))
-        }
-
-        @Test
-        fun `WaipuTV generates deep link without tmdb_id`() {
-            val entry = TraktWatchedEntry(TraktShow("Any Show", 2024, TraktIds(tmdb = null)))
-            val provider = makeProvider(deepLinkTemplate = "waipu://tv")
-            assertEquals("waipu://tv", viewModel.onProviderSelected(provider, entry))
-        }
-
-        @Test
-        fun `WaipuTV generates deep link even with tmdb_id present`() {
-            val entry = TraktWatchedEntry(TraktShow("Any Show", 2024, TraktIds(tmdb = 1)))
-            val provider = makeProvider(deepLinkTemplate = "waipu://tv")
-            assertEquals("waipu://tv", viewModel.onProviderSelected(provider, entry))
-        }
-
-        @Test
-        fun `derives slug from show title when slug field is null`() {
-            val entry = TraktWatchedEntry(TraktShow("My Show", 2024, TraktIds(tmdb = 1, slug = null)))
-            val provider = makeProvider(deepLinkTemplate = "https://test.com/{slug}")
-            assertEquals("https://test.com/my-show", viewModel.onProviderSelected(provider, entry))
-        }
-
-        @Test
-        fun `derives slug from title when both slug and tmdb_id are null`() {
-            val entry = TraktWatchedEntry(TraktShow("Breaking Bad", 2008, TraktIds(tmdb = null, slug = null)))
-            val provider = makeProvider(deepLinkTemplate = "https://joyn.de/serien/{slug}")
-            assertEquals("https://joyn.de/serien/breaking-bad", viewModel.onProviderSelected(provider, entry))
-        }
-
-        @Test
-        fun `falls back to tmdbPageUrl when template requires tmdb_id but none available`() {
-            val entry = TraktWatchedEntry(TraktShow("Test", 2024, TraktIds(tmdb = null)))
-            val provider = makeProvider(
-                deepLinkTemplate = "https://netflix.com/title/{tmdb_id}",
-                tmdbPageUrl = "https://www.themoviedb.org/tv/100/watch",
-            )
-            assertEquals("https://www.themoviedb.org/tv/100/watch", viewModel.onProviderSelected(provider, entry))
-        }
-
-        @Test
-        fun `returns null when template requires tmdb_id but none available and no page url`() {
-            val entry = TraktWatchedEntry(TraktShow("Test", 2024, TraktIds(tmdb = null)))
-            val provider = makeProvider(deepLinkTemplate = "https://netflix.com/title/{tmdb_id}", tmdbPageUrl = null)
-            assertNull(viewModel.onProviderSelected(provider, entry))
-        }
-
-        @Test
-        fun `returns null when no deepLinkTemplate and no tmdbPageUrl`() {
-            val entry = TraktWatchedEntry(TraktShow("Test", 2024, TraktIds(tmdb = 1)))
-            val provider = makeProvider(deepLinkTemplate = null, tmdbPageUrl = null)
-            assertNull(viewModel.onProviderSelected(provider, entry))
-        }
-
-        @Test
-        fun `resolveDeepLink uses first provider in Success state`() = runTest {
-            val provider = makeProvider(deepLinkTemplate = "https://netflix.com/title/{tmdb_id}")
+        fun `emits Available when JustWatch resolves a URL`() = runTest {
+            val provider = makeProvider(providerId = 8)
             every { phoneDiscovery.getBestPhone() } returns makePhone("api-key")
             coEvery { watchProviders.getResolvedProviders(100, any(), "api-key", false) } returns (listOf(provider) to null)
+            coEvery {
+                justWatchRepo.resolveDeepLink(100, 1, 2, 8, any(), "Test Show", 2023)
+            } returns "https://www.netflix.com/watch/12345"
 
             viewModel.loadProviders(makeEntry())
+            viewModel.loadDeepLinks(makeEntry())
 
-            val entry = TraktWatchedEntry(TraktShow("Test", 2024, TraktIds(tmdb = 100, slug = "test")))
-            assertEquals("https://netflix.com/title/100", viewModel.resolveDeepLink(entry))
+            val state = viewModel.deepLinks.value[8]
+            assert(state is DeepLinkState.Available)
+            assertEquals("https://www.netflix.com/watch/12345", (state as DeepLinkState.Available).url)
         }
 
         @Test
-        fun `resolveDeepLink returns null when providers not in Success state`() {
-            val entry = TraktWatchedEntry(TraktShow("Test", 2024, TraktIds(tmdb = 1)))
-            assertNull(viewModel.resolveDeepLink(entry))
+        fun `emits Unavailable when JustWatch returns null`() = runTest {
+            val provider = makeProvider(providerId = 8)
+            every { phoneDiscovery.getBestPhone() } returns makePhone("api-key")
+            coEvery { watchProviders.getResolvedProviders(100, any(), "api-key", false) } returns (listOf(provider) to null)
+            coEvery { justWatchRepo.resolveDeepLink(any(), any(), any(), any(), any(), any(), any()) } returns null
+
+            viewModel.loadProviders(makeEntry())
+            viewModel.loadDeepLinks(makeEntry())
+
+            val state = viewModel.deepLinks.value[8]
+            assertEquals(DeepLinkState.Unavailable, state)
         }
 
         @Test
-        fun `onProviderSelected records last-used when tmdb id available`() = runTest {
-            val entry = TraktWatchedEntry(TraktShow("Test", 2024, TraktIds(tmdb = 100)))
+        fun `no-ops when show has no TMDB id`() = runTest {
+            viewModel.loadDeepLinks(makeEntry(tmdbId = null))
+
+            assertEquals(emptyMap<Int, DeepLinkState>(), viewModel.deepLinks.value)
+        }
+
+        @Test
+        fun `no-ops when providers not in Success state`() = runTest {
+            viewModel.loadDeepLinks(makeEntry())
+
+            assertEquals(emptyMap<Int, DeepLinkState>(), viewModel.deepLinks.value)
+        }
+    }
+
+    @Nested
+    @DisplayName("onProviderSelected")
+    inner class OnProviderSelectedTest {
+
+        @Test
+        fun `returns JustWatch URL when Available`() = runTest {
+            val provider = makeProvider(providerId = 8, tmdbPageUrl = "https://tmdb.org")
+            every { phoneDiscovery.getBestPhone() } returns makePhone("api-key")
+            coEvery { watchProviders.getResolvedProviders(100, any(), "api-key", false) } returns (listOf(provider) to null)
+            coEvery {
+                justWatchRepo.resolveDeepLink(100, 1, 2, 8, any(), "Test Show", 2023)
+            } returns "https://www.netflix.com/watch/12345"
+
+            viewModel.loadProviders(makeEntry())
+            viewModel.loadDeepLinks(makeEntry())
+
+            val result = viewModel.onProviderSelected(provider, makeEntry())
+            assertEquals("https://www.netflix.com/watch/12345", result)
+        }
+
+        @Test
+        fun `falls back to tmdbPageUrl when Unavailable`() = runTest {
+            val provider = makeProvider(providerId = 8, tmdbPageUrl = "https://tmdb.org/watch")
+            every { phoneDiscovery.getBestPhone() } returns makePhone("api-key")
+            coEvery { watchProviders.getResolvedProviders(100, any(), "api-key", false) } returns (listOf(provider) to null)
+            coEvery { justWatchRepo.resolveDeepLink(any(), any(), any(), any(), any(), any(), any()) } returns null
+
+            viewModel.loadProviders(makeEntry())
+            viewModel.loadDeepLinks(makeEntry())
+
+            val result = viewModel.onProviderSelected(provider, makeEntry())
+            assertEquals("https://tmdb.org/watch", result)
+        }
+
+        @Test
+        fun `records last-used when tmdb id available`() = runTest {
+            val enriched = makeEntry()
             val provider = makeProvider(providerId = 8)
 
-            viewModel.onProviderSelected(provider, entry)
+            viewModel.onProviderSelected(provider, enriched)
 
             coVerify { lastUsedRepo.recordUsed(100, 8) }
         }
 
         @Test
-        fun `onProviderSelected does not record last-used when tmdb id is null`() = runTest {
-            val entry = TraktWatchedEntry(TraktShow("Test", 2024, TraktIds(tmdb = null)))
-            val provider = makeProvider(deepLinkTemplate = "waipu://tv")
+        fun `does not record last-used when tmdb id is null`() = runTest {
+            val enriched = makeEntry(tmdbId = null)
+            val provider = makeProvider()
 
-            viewModel.onProviderSelected(provider, entry)
+            viewModel.onProviderSelected(provider, enriched)
 
             coVerify(exactly = 0) { lastUsedRepo.recordUsed(any(), any()) }
+        }
+    }
+
+    @Nested
+    @DisplayName("resolveTopProviderDeepLink")
+    inner class ResolveTopProviderDeepLinkTest {
+
+        @Test
+        fun `returns JustWatch URL for first provider in Success state`() = runTest {
+            val provider = makeProvider(providerId = 8)
+            every { phoneDiscovery.getBestPhone() } returns makePhone("api-key")
+            coEvery { watchProviders.getResolvedProviders(100, any(), "api-key", false) } returns (listOf(provider) to null)
+            coEvery {
+                justWatchRepo.resolveDeepLink(100, 1, 2, 8, any(), "Test Show", 2023)
+            } returns "https://www.netflix.com/watch/99"
+
+            viewModel.loadProviders(makeEntry())
+            viewModel.loadDeepLinks(makeEntry())
+
+            assertEquals("https://www.netflix.com/watch/99", viewModel.resolveTopProviderDeepLink())
+        }
+
+        @Test
+        fun `returns null when providers not in Success state`() {
+            assertNull(viewModel.resolveTopProviderDeepLink())
+        }
+
+        @Test
+        fun `returns null when deep link is Unavailable`() = runTest {
+            val provider = makeProvider(providerId = 8)
+            every { phoneDiscovery.getBestPhone() } returns makePhone("api-key")
+            coEvery { watchProviders.getResolvedProviders(100, any(), "api-key", false) } returns (listOf(provider) to null)
+            coEvery { justWatchRepo.resolveDeepLink(any(), any(), any(), any(), any(), any(), any()) } returns null
+
+            viewModel.loadProviders(makeEntry())
+            viewModel.loadDeepLinks(makeEntry())
+
+            assertNull(viewModel.resolveTopProviderDeepLink())
         }
     }
 }

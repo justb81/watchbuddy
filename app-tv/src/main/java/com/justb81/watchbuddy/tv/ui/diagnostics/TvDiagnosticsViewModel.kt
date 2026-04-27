@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.justb81.watchbuddy.BuildConfig
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.scrobbler.MediaSessionScrobbler
+import com.justb81.watchbuddy.tv.data.JustWatchDeepLinkRepository
 import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -32,6 +33,9 @@ data class TvDiagnosticsUiState(
     val recentEvents: List<DiagnosticLog.Entry> = emptyList(),
     val versionName: String = BuildConfig.VERSION_NAME,
     val versionCode: Int = BuildConfig.VERSION_CODE,
+    val cachedDeepLinkCount: Int = 0,
+    val negativeDeepLinkCount: Int = 0,
+    val lastDeepLinkFetchMs: Long = 0L,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -40,6 +44,7 @@ class TvDiagnosticsViewModel @Inject constructor(
     private val application: Application,
     phoneDiscovery: PhoneDiscoveryManager,
     scrobbler: MediaSessionScrobbler,
+    private val justWatchRepo: JustWatchDeepLinkRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(TvDiagnosticsUiState())
@@ -47,6 +52,8 @@ class TvDiagnosticsViewModel @Inject constructor(
 
     init {
         refreshNotificationAccess()
+        refreshJustWatchCacheStats()
+
         val discoveryState = combine(
             phoneDiscovery.discoveryActive,
             phoneDiscovery.bleScanState,
@@ -74,12 +81,18 @@ class TvDiagnosticsViewModel @Inject constructor(
                     scrobblerListening = s.first,
                     lastCandidate = s.second,
                     lastObservedSession = s.third,
+                    cachedDeepLinkCount = _uiState.value.cachedDeepLinkCount,
+                    negativeDeepLinkCount = _uiState.value.negativeDeepLinkCount,
+                    lastDeepLinkFetchMs = _uiState.value.lastDeepLinkFetchMs,
                 )
             }.collect { snapshot ->
                 _uiState.update {
                     snapshot.copy(
                         notificationAccessGranted = it.notificationAccessGranted,
                         recentEvents = it.recentEvents,
+                        cachedDeepLinkCount = it.cachedDeepLinkCount,
+                        negativeDeepLinkCount = it.negativeDeepLinkCount,
+                        lastDeepLinkFetchMs = it.lastDeepLinkFetchMs,
                     )
                 }
             }
@@ -104,6 +117,28 @@ class TvDiagnosticsViewModel @Inject constructor(
                 .contains(application.packageName)
         }.getOrDefault(false)
         _uiState.update { it.copy(notificationAccessGranted = granted) }
+    }
+
+    fun refreshJustWatchCacheStats() {
+        viewModelScope.launch {
+            val count = justWatchRepo.count()
+            val negCount = justWatchRepo.negativeCount()
+            val lastFetch = justWatchRepo.lastFetchedAt() ?: 0L
+            _uiState.update {
+                it.copy(
+                    cachedDeepLinkCount = count,
+                    negativeDeepLinkCount = negCount,
+                    lastDeepLinkFetchMs = lastFetch,
+                )
+            }
+        }
+    }
+
+    fun clearJustWatchCache() {
+        viewModelScope.launch {
+            justWatchRepo.clearAll()
+            refreshJustWatchCacheStats()
+        }
     }
 
     companion object {

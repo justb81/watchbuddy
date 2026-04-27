@@ -184,6 +184,15 @@ fun TvDiagnosticsScreen(
             }
 
             item {
+                StreamingDeepLinksSection(
+                    cachedCount = uiState.cachedDeepLinkCount,
+                    negativeCount = uiState.negativeDeepLinkCount,
+                    lastFetchMs = uiState.lastDeepLinkFetchMs,
+                    onClearCache = { viewModel.clearJustWatchCache() },
+                )
+            }
+
+            item {
                 Text(
                     text = stringResource(R.string.tv_diagnostics_section_recent_events).uppercase(),
                     fontSize = 14.sp,
@@ -412,6 +421,53 @@ private fun formatAge(timestampMs: Long): String {
         seconds < 60 -> "${seconds}s ago"
         seconds < 3_600 -> "${seconds / 60}m ago"
         else -> "${seconds / 3_600}h ago"
+    }
+}
+
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+private fun StreamingDeepLinksSection(
+    cachedCount: Int,
+    negativeCount: Int,
+    lastFetchMs: Long,
+    onClearCache: () -> Unit,
+) {
+    Text(
+        text = stringResource(R.string.tv_diagnostics_section_streaming_links).uppercase(),
+        fontSize = 14.sp,
+        fontWeight = FontWeight.Bold,
+        color = Color.White.copy(alpha = 0.7f),
+        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp, start = 4.dp),
+    )
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = CardDefaults.shape(RoundedCornerShape(12.dp)),
+        onClick = {},
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            listOf(
+                DiagRow(stringResource(R.string.tv_diagnostics_row_cached_urls), cachedCount.toString(), Status.NEUTRAL),
+                DiagRow(stringResource(R.string.tv_diagnostics_row_negative_entries), negativeCount.toString(), Status.NEUTRAL),
+                DiagRow(stringResource(R.string.tv_diagnostics_row_last_fetch), formatAge(lastFetchMs), Status.NEUTRAL),
+            ).forEach { row ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(10.dp).background(statusColor(row.status), RoundedCornerShape(2.dp)))
+                        Spacer(Modifier.width(12.dp))
+                        Text(row.label, fontSize = 14.sp, color = Color.White)
+                    }
+                    Text(row.value, fontSize = 13.sp, color = Color.White.copy(alpha = 0.7f))
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(onClick = onClearCache) {
+                Text(stringResource(R.string.tv_diagnostics_action_clear_streaming_cache), fontSize = 13.sp)
+            }
+        }
     }
 }
 

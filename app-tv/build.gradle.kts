@@ -57,6 +57,11 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
 
+    // Room — persistent cache for JustWatch deep links
+    implementation(libs.room.runtime)
+    implementation(libs.room.ktx)
+    ksp(libs.room.compiler)
+
     // Error-prone annotations — compileOnly so R8 can resolve references from Tink
     // without bundling the annotation library in the APK.
     compileOnly(libs.errorprone.annotations)

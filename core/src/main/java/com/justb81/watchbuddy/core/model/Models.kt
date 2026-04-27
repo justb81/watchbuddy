@@ -278,13 +278,15 @@ data class WatchProviderResponse(
  * A fully resolved streaming provider for a show, ready for the UI.
  * Combines TMDB provider data with the [ProviderCatalog] mapping and
  * TV-local state (installed app, last-used tracking).
+ *
+ * Deep links are resolved at runtime by JustWatch (see `JustWatchDeepLinkRepository`),
+ * not from a static template.
  */
 data class ResolvedProvider(
     val providerId: Int,
     val name: String,
     val logoPath: String?,
     val packageName: String?,
-    val deepLinkTemplate: String?,
     val isInstalled: Boolean,
     val isLastUsed: Boolean,
     val tmdbPageUrl: String?,

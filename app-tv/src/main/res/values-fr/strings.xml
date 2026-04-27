@@ -64,6 +64,17 @@
     <string name="tv_not_available_region">Non disponible en streaming dans votre région.</string>
     <string name="tv_providers_retry">Impossible de charger les infos streaming. Appuyer pour réessayer.</string>
     <string name="tv_provider_last_used_label">Dernière utilisation</string>
+    <string name="tv_provider_last_used_cd">Dernière utilisation : %1$s</string>
+    <!-- JustWatch deep links (#476) -->
+    <string name="tv_provider_no_deep_link">Pas de lien direct</string>
+    <string name="tv_watch_now_unavailable">Lien direct indisponible</string>
+    <string name="tv_justwatch_attribution">Données streaming par JustWatch</string>
+    <!-- Diagnostics — streaming deep links (#476) -->
+    <string name="tv_diagnostics_section_streaming_links">Liens directs streaming</string>
+    <string name="tv_diagnostics_row_cached_urls">URLs en cache</string>
+    <string name="tv_diagnostics_row_negative_entries">Entrées négatives</string>
+    <string name="tv_diagnostics_row_last_fetch">Dernier téléchargement</string>
+    <string name="tv_diagnostics_action_clear_streaming_cache">Vider le cache des liens streaming</string>
 
     <!-- TV Settings hub (#344 / #367) -->
     <string name="tv_settings_title">Paramètres</string>

@@ -93,7 +93,6 @@ class WatchProvidersRepository @Inject constructor(
                 name = entry.providerName,
                 logoPath = TmdbImageHelper.logo(entry.logoPath),
                 packageName = pkgName,
-                deepLinkTemplate = catalog?.deepLinkTemplate,
                 isInstalled = isInstalled,
                 isLastUsed = entry.providerId == lastUsedId,
                 tmdbPageUrl = pageUrl,
