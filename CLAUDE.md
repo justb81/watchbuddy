@@ -216,25 +216,28 @@ The `release-please--` prefix is reserved for the automated release-please bot �
 
 ### Monitoring PR checks & accessing build logs
 
-To close workflow gaps where raw GitHub Actions log URLs require auth, `build-android.yml` and `test-backend.yml` each have an `if: failure()` step that posts a filtered failure excerpt as a PR comment — agents read it through `gh` like any other comment. Most failures are caught locally before this matters (see § "Local pre-commit checks").
-
 **1. Check overall CI status with `gh`:**
 
 - `gh pr checks <pr-number> --repo justb81/watchbuddy` → per-job `status` / `conclusion`. Expect `Test & Build` (from `build-android.yml`) and `Backend Tests` (from `test-backend.yml`); the `changes` path-filter jobs may legitimately be skipped.
 - `gh pr view <pr-number> --repo justb81/watchbuddy` → shows PR status and linked CI runs.
 
-**2. Read the filtered failure excerpt via PR comments:**
+**2. Access full build logs with `gh`:**
 
-- `gh pr view <pr-number> --repo justb81/watchbuddy --comments` or `gh pr comment -N <pr-number> --repo justb81/watchbuddy`. Match by marker at the start of the comment body:
-  - `<!-- watchbuddy-build-log -->` — Android build / detekt / Android Lint / unit-test failure from `build-android.yml`.
-  - `<!-- watchbuddy-backend-log -->` — ESLint / Prettier / Jest failure from `test-backend.yml`.
-  - `<!-- watchbuddy-lint-report -->` — per-module detekt + Android Lint finding counts (separate concern, see § Static analysis); useful when CI is green-but-noisy rather than red.
-- Excerpts are upserted per run — always read the latest comment with the marker.
-- The excerpt is a regex-filtered slice (gradle `FAILED` / detekt violations / Android Lint `Error:` / JUnit `<failure>` / ESLint error lines / Prettier mismatches / JVM stack traces) with ~20 lines of surrounding context per match, capped at ~55 000 chars.
+- `gh run view <run-id> --log --repo justb81/watchbuddy` → outputs the **full log** for the entire workflow run.
+- `gh run view <run-id> --job <job-id> --log --repo justb81/watchbuddy` → outputs the **full log for a specific job** (e.g., `Test & Build` or `Backend Tests`).
+- `gh run view <run-id> --log-failed --repo justb81/watchbuddy` → outputs logs for **failed steps only**.
+- To find the run ID: use `gh pr view <pr-number> --repo justb81/watchbuddy --json statusCheckRollup` and extract the workflow run URL, or check `gh run list --repo justb81/watchbuddy` and filter by PR number.
 
-**3. Wait for CI without polling:** Poll `gh pr checks` in a loop with a reasonable interval, or check back after a few minutes. For production workflows requiring webhook subscriptions, the `mcp__github__subscribe_pr_activity` tool remains available.
+**3. Read filtered failure excerpts (optional fallback):**
 
-**4. Last-resort fallback:** if the filtered excerpt doesn't explain the failure, open the PR in a browser or surface the failing check's `details_url` to the user and stop — do not attempt to scrape GitHub Actions HTML.
+`build-android.yml` and `test-backend.yml` post filtered failure excerpts as PR comments for convenience:
+- `gh pr view <pr-number> --repo justb81/watchbuddy --comments`. Match by marker:
+  - `<!-- watchbuddy-build-log -->` — Android build / detekt / Android Lint / unit-test failure.
+  - `<!-- watchbuddy-backend-log -->` — ESLint / Prettier / Jest failure.
+  - `<!-- watchbuddy-lint-report -->` — per-module finding counts (see § Static analysis).
+- These excerpts are regex-filtered slices with ~20 lines of context per match, capped at ~55 000 chars — useful for quick diagnostics before diving into full logs.
+
+**4. Wait for CI without polling:** Poll `gh pr checks` in a loop with a reasonable interval, or check back after a few minutes. For production workflows requiring webhook subscriptions, the `mcp__github__subscribe_pr_activity` tool remains available.
 
 ### Versioning
 - release-please with Conventional Commits (`feat:`, `fix:`, `chore:`, etc.)
