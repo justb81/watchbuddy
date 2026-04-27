@@ -1,14 +1,9 @@
 plugins {
-    alias(libs.plugins.android.application)
-    alias(libs.plugins.compose.compiler)
-    alias(libs.plugins.kotlin.serialization)
-    alias(libs.plugins.hilt)
-    alias(libs.plugins.ksp)
+    id("watchbuddy.android.application")
 }
 
 android {
     namespace = "com.justb81.watchbuddy"
-    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.justb81.watchbuddy"   // same package as phone app!
@@ -25,83 +20,6 @@ android {
         // versionName: release-please sets VERSION_NAME, fallback to hardcoded value
         versionName = providers.environmentVariable("VERSION_NAME")
             .orElse("0.29.0").get() // x-release-please-version
-
-        // Package native debug symbols into the AAB so Google Play Console can
-        // symbolicate any native stack traces picked up by future transitive
-        // dependencies.  FULL is required — SYMBOL_TABLE strips line numbers and
-        // Play Console still flags the bundle as "no symbols for debugging"
-        // (#262).  AGP also emits native-debug-symbols.zip alongside the AAB,
-        // which CI uploads to Play and attaches to the GitHub Release.
-        ndk {
-            debugSymbolLevel = "FULL"
-        }
-    }
-
-    // CI signing: keystore path + credentials via environment variables.
-    // takeIf guards against KEYSTORE_FILE being set to an empty string (e.g. when
-    // the secret is absent and the workflow sets the variable to '' as a fallback).
-    val keystoreFile = providers.environmentVariable("KEYSTORE_FILE").orNull?.takeIf { it.isNotBlank() }
-    if (keystoreFile != null) {
-        signingConfigs {
-            create("release") {
-                storeFile = file(keystoreFile)
-                storePassword = providers.environmentVariable("KEYSTORE_PASSWORD").orNull
-                keyAlias = providers.environmentVariable("KEY_ALIAS").orNull
-                keyPassword = providers.environmentVariable("KEY_PASSWORD").orNull
-            }
-        }
-    }
-
-    buildTypes {
-        debug {
-            // Use the release keystore for debug builds when available so that debug
-            // and release APKs share the same signing certificate.  Without this,
-            // upgrading from a CI debug APK to a release APK fails with
-            // INSTALL_FAILED_UPDATE_INCOMPATIBLE because each runner generates a
-            // different ephemeral debug.keystore.
-            if (keystoreFile != null) {
-                signingConfig = signingConfigs.getByName("release")
-            }
-        }
-        release {
-            isMinifyEnabled = true
-            isShrinkResources = true
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = if (keystoreFile != null) {
-                signingConfigs.getByName("release")
-            } else {
-                signingConfigs.getByName("debug")
-            }
-        }
-    }
-
-    testOptions {
-        unitTests.isReturnDefaultValues = true
-        unitTests.isIncludeAndroidResources = true
-    }
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
-
-    buildFeatures {
-        compose = true
-        buildConfig = true
-    }
-
-    // Android Lint: SARIF output is consumed by the GitHub code-scanning upload
-    // in .github/workflows/build-android.yml. abortOnError makes the job fail
-    // on any new finding; the committed lint-baseline.xml covers pre-existing
-    // issues so they don't block new PRs.
-    lint {
-        sarifReport = true
-        htmlReport = true
-        xmlReport = false
-        baseline = file("lint-baseline.xml")
-        abortOnError = true
-        warningsAsErrors = false
-        checkDependencies = true
     }
 }
 
@@ -131,8 +49,6 @@ dependencies {
     implementation(libs.navigation.compose)
 
     // Hilt
-    implementation(libs.hilt.android)
-    ksp(libs.hilt.compiler)
     implementation(libs.hilt.lifecycle.viewmodel.compose)
 
     // Image loading
@@ -142,30 +58,6 @@ dependencies {
     // Error-prone annotations — compileOnly so R8 can resolve references from Tink
     // without bundling the annotation library in the APK.
     compileOnly(libs.errorprone.annotations)
-
-    // Testing
-    testImplementation(libs.junit5.api)
-    testImplementation(libs.junit5.params)
-    testRuntimeOnly(libs.junit5.engine)
-    testRuntimeOnly(libs.junit5.platform.launcher)
-    testImplementation(libs.mockk)
-    testImplementation(libs.mockk.android)
-    testImplementation(libs.kotlinx.coroutines.test)
-    testImplementation(libs.turbine)
-    testImplementation(libs.robolectric)
-    testImplementation(libs.androidx.test.core)
-    testImplementation(libs.androidx.arch.core.testing)
-    testImplementation(libs.okhttp.mockwebserver)
-}
-
-kotlin {
-    compilerOptions {
-        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-    }
-}
-
-tasks.withType<Test> {
-    useJUnitPlatform()
 }
 
 // The TV app does not use WorkManager. If a transitive dep brings in
