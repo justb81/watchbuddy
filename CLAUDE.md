@@ -108,6 +108,10 @@ Single source of truth for all versions: `gradle/libs.versions.toml` (Android) a
   - Do NOT use the outdated Apiary docs (`trakt.docs.apiary.io`) — they reference deprecated endpoints.
 - **TMDB API:** https://developer.themoviedb.org/docs
 
+## GitHub CLI Availability
+
+The `gh` CLI tool (GitHub CLI) is available in this environment (version 2.45.0+). Both the `gh` command-line tool and the GitHub MCP server tools (prefixed with `mcp__github__`) can be used for GitHub operations. The MCP tools are the primary interface for programmatic GitHub interactions, but `gh` can be used for quick interactive queries or operations when needed.
+
 ## Key Conventions
 
 ### Language — MANDATORY
