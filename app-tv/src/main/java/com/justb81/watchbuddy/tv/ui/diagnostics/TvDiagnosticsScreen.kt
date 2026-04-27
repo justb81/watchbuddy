@@ -116,11 +116,7 @@ fun TvDiagnosticsScreen(
                         DiagRow(
                             stringResource(R.string.tv_diagnostics_row_scrobbler_listening),
                             yesNoStr(uiState.scrobblerListening),
-                            when {
-                                uiState.scrobblerListening -> Status.OK
-                                uiState.notificationAccessGranted -> Status.WARN
-                                else -> Status.NEUTRAL
-                            },
+                            if (uiState.scrobblerListening) Status.OK else Status.FAIL,
                         ),
                         DiagRow(
                             stringResource(R.string.tv_diagnostics_row_last_candidate),

@@ -5,6 +5,7 @@ import android.content.Context
 import android.media.session.MediaSessionManager
 import android.media.session.PlaybackState
 import android.util.Log
+import androidx.core.app.NotificationManagerCompat
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.model.MediaMetadataSnapshot
 import com.justb81.watchbuddy.core.model.ScrobbleCandidate
@@ -115,6 +116,14 @@ class MediaSessionScrobbler @Inject constructor(
     private var currentlySessionKey: String? = null
 
     /**
+     * Returns true when this app currently holds notification-listener access.
+     * Overridable in tests to avoid a real Android framework call.
+     */
+    internal var notificationAccessChecker: () -> Boolean = {
+        NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName)
+    }
+
+    /**
      * Debug firehose toggle. When true, every poll tick writes a per-session breadcrumb
      * to [DiagnosticLog] (package, title, state, position, duration) regardless of
      * confidence, plus a near-miss line when a title fails to clear [OVERLAY_THRESHOLD].
@@ -134,14 +143,36 @@ class MediaSessionScrobbler @Inject constructor(
      */
     private val lastProgressBySessionKey = ConcurrentHashMap<String, LastKnownProgress>()
 
+    /**
+     * Checks notification-listener access on every poll tick, updates [_isListening],
+     * and emits a breadcrumb when the state flips. Returns true when access is granted
+     * and session polling should proceed.
+     */
+    private fun updateListeningState(): Boolean {
+        val granted = notificationAccessChecker()
+        val wasListening = _isListening.value
+        _isListening.value = granted
+        if (wasListening != granted) {
+            if (granted) {
+                DiagnosticLog.event(TAG, "notification access granted — scrobbler resumed")
+            } else {
+                DiagnosticLog.warn(TAG, "notification access revoked — scrobbler paused")
+            }
+        }
+        return granted
+    }
+
     fun startListening(notificationListenerComponent: ComponentName) {
         scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-        _isListening.value = true
         val sessionManager = context.getSystemService(Context.MEDIA_SESSION_SERVICE)
                 as MediaSessionManager
 
         pollingJob = scope.launch {
             while (isActive) {
+                if (!updateListeningState()) {
+                    delay(30_000)
+                    continue
+                }
                 try {
                     val sessions = sessionManager.getActiveSessions(notificationListenerComponent)
                     val liveKeys = mutableSetOf<String>()
