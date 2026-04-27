@@ -111,7 +111,6 @@ class MediaSessionScrobblerLifecycleTest {
             assertFalse(scrobbler.isListening.value)
             scrobbler.stopListening()
         }
-
     }
 
     // ── autoScrobble() ───────────────────────────────────────────────────────
