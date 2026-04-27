@@ -11,6 +11,7 @@ import com.justb81.watchbuddy.tv.discovery.PhoneScrobbleRequest
 import io.mockk.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.*
@@ -69,7 +70,7 @@ class TvScrobbleDispatcherTest {
     inner class StalenessFilteringTest {
 
         @Test
-        fun `dispatches to a fresh phone`() = runTest {
+        fun `dispatches to a fresh phone`() = runTest(UnconfinedTestDispatcher()) {
             dispatcher = TvScrobbleDispatcher(phoneDiscovery, phoneApiClientFactory, backgroundScope) { fakeNow }
             val phone = makePhone()
             phonesFlow.value = listOf(phone)
@@ -86,7 +87,7 @@ class TvScrobbleDispatcherTest {
         }
 
         @Test
-        fun `skips a stale phone whose lastSuccessfulCheck exceeds PRESENCE_STALENESS_MS`() = runTest {
+        fun `skips a stale phone whose lastSuccessfulCheck exceeds PRESENCE_STALENESS_MS`() = runTest(UnconfinedTestDispatcher()) {
             dispatcher = TvScrobbleDispatcher(phoneDiscovery, phoneApiClientFactory, backgroundScope) { fakeNow }
             val staleTime = fakeNow - DiscoveryConstants.PRESENCE_STALENESS_MS - 1_000L
             val phone = makePhone(lastSuccessfulCheck = staleTime)
@@ -102,7 +103,7 @@ class TvScrobbleDispatcherTest {
         }
 
         @Test
-        fun `includes a phone whose lastSuccessfulCheck is exactly at the staleness boundary`() = runTest {
+        fun `includes a phone whose lastSuccessfulCheck is exactly at the staleness boundary`() = runTest(UnconfinedTestDispatcher()) {
             dispatcher = TvScrobbleDispatcher(phoneDiscovery, phoneApiClientFactory, backgroundScope) { fakeNow }
             // A check that happened exactly at the boundary should still be considered fresh.
             val boundaryTime = fakeNow - DiscoveryConstants.PRESENCE_STALENESS_MS + 100L
@@ -121,7 +122,7 @@ class TvScrobbleDispatcherTest {
         }
 
         @Test
-        fun `skips a phone marked as unavailable even when fresh`() = runTest {
+        fun `skips a phone marked as unavailable even when fresh`() = runTest(UnconfinedTestDispatcher()) {
             dispatcher = TvScrobbleDispatcher(phoneDiscovery, phoneApiClientFactory, backgroundScope) { fakeNow }
             val phone = makePhone(isAvailable = false)
             phonesFlow.value = listOf(phone)
@@ -136,7 +137,7 @@ class TvScrobbleDispatcherTest {
         }
 
         @Test
-        fun `skips dispatch when phone list is empty`() = runTest {
+        fun `skips dispatch when phone list is empty`() = runTest(UnconfinedTestDispatcher()) {
             dispatcher = TvScrobbleDispatcher(phoneDiscovery, phoneApiClientFactory, backgroundScope) { fakeNow }
             phonesFlow.value = emptyList()
 
@@ -150,7 +151,7 @@ class TvScrobbleDispatcherTest {
         }
 
         @Test
-        fun `dispatches to all fresh phones in parallel`() = runTest {
+        fun `dispatches to all fresh phones in parallel`() = runTest(UnconfinedTestDispatcher()) {
             dispatcher = TvScrobbleDispatcher(phoneDiscovery, phoneApiClientFactory, backgroundScope) { fakeNow }
             val apiService1: PhoneApiService = mockk()
             val apiService2: PhoneApiService = mockk()
@@ -173,7 +174,7 @@ class TvScrobbleDispatcherTest {
         }
 
         @Test
-        fun `IOException on one phone does not prevent dispatch to others`() = runTest {
+        fun `IOException on one phone does not prevent dispatch to others`() = runTest(UnconfinedTestDispatcher()) {
             dispatcher = TvScrobbleDispatcher(phoneDiscovery, phoneApiClientFactory, backgroundScope) { fakeNow }
             val apiService1: PhoneApiService = mockk()
             val apiService2: PhoneApiService = mockk()
@@ -203,7 +204,7 @@ class TvScrobbleDispatcherTest {
     inner class ActionRoutingTest {
 
         @Test
-        fun `dispatchPause calls scrobblePause on available phones`() = runTest {
+        fun `dispatchPause calls scrobblePause on available phones`() = runTest(UnconfinedTestDispatcher()) {
             dispatcher = TvScrobbleDispatcher(phoneDiscovery, phoneApiClientFactory, backgroundScope) { fakeNow }
             val phone = makePhone()
             phonesFlow.value = listOf(phone)
@@ -222,7 +223,7 @@ class TvScrobbleDispatcherTest {
         }
 
         @Test
-        fun `dispatchStop calls scrobbleStop on available phones`() = runTest {
+        fun `dispatchStop calls scrobbleStop on available phones`() = runTest(UnconfinedTestDispatcher()) {
             dispatcher = TvScrobbleDispatcher(phoneDiscovery, phoneApiClientFactory, backgroundScope) { fakeNow }
             val phone = makePhone()
             phonesFlow.value = listOf(phone)
@@ -241,7 +242,7 @@ class TvScrobbleDispatcherTest {
         }
 
         @Test
-        fun `dispatchPause skips dispatch when phone list is empty`() = runTest {
+        fun `dispatchPause skips dispatch when phone list is empty`() = runTest(UnconfinedTestDispatcher()) {
             dispatcher = TvScrobbleDispatcher(phoneDiscovery, phoneApiClientFactory, backgroundScope) { fakeNow }
             phonesFlow.value = emptyList()
 
@@ -255,7 +256,7 @@ class TvScrobbleDispatcherTest {
         }
 
         @Test
-        fun `dispatchStop skips dispatch when phone list is empty`() = runTest {
+        fun `dispatchStop skips dispatch when phone list is empty`() = runTest(UnconfinedTestDispatcher()) {
             dispatcher = TvScrobbleDispatcher(phoneDiscovery, phoneApiClientFactory, backgroundScope) { fakeNow }
             phonesFlow.value = emptyList()
 
@@ -269,7 +270,7 @@ class TvScrobbleDispatcherTest {
         }
 
         @Test
-        fun `dispatchStart calls scrobbleStart not pause or stop`() = runTest {
+        fun `dispatchStart calls scrobbleStart not pause or stop`() = runTest(UnconfinedTestDispatcher()) {
             dispatcher = TvScrobbleDispatcher(phoneDiscovery, phoneApiClientFactory, backgroundScope) { fakeNow }
             val phone = makePhone()
             phonesFlow.value = listOf(phone)
@@ -295,7 +296,7 @@ class TvScrobbleDispatcherTest {
     inner class RetryQueueTest {
 
         @Test
-        fun `dropped START is dispatched when a phone later appears on discoveredPhones`() = runTest {
+        fun `dropped START is dispatched when a phone later appears on discoveredPhones`() = runTest(UnconfinedTestDispatcher()) {
             dispatcher = TvScrobbleDispatcher(phoneDiscovery, phoneApiClientFactory, backgroundScope) { fakeNow }
             coEvery { phoneApiClientFactory.createClient(any()) } returns phoneApiService
             coEvery { phoneApiService.scrobbleStart(any()) } returns mockk()
@@ -312,7 +313,7 @@ class TvScrobbleDispatcherTest {
         }
 
         @Test
-        fun `dropped PAUSE is replayed on the next phone emission`() = runTest {
+        fun `dropped PAUSE is replayed on the next phone emission`() = runTest(UnconfinedTestDispatcher()) {
             dispatcher = TvScrobbleDispatcher(phoneDiscovery, phoneApiClientFactory, backgroundScope) { fakeNow }
             coEvery { phoneApiClientFactory.createClient(any()) } returns phoneApiService
             coEvery { phoneApiService.scrobblePause(any()) } returns mockk()
@@ -327,7 +328,7 @@ class TvScrobbleDispatcherTest {
         }
 
         @Test
-        fun `dropped STOP is replayed on the next phone emission`() = runTest {
+        fun `dropped STOP is replayed on the next phone emission`() = runTest(UnconfinedTestDispatcher()) {
             dispatcher = TvScrobbleDispatcher(phoneDiscovery, phoneApiClientFactory, backgroundScope) { fakeNow }
             coEvery { phoneApiClientFactory.createClient(any()) } returns phoneApiService
             coEvery { phoneApiService.scrobbleStop(any()) } returns mockk()
@@ -342,7 +343,7 @@ class TvScrobbleDispatcherTest {
         }
 
         @Test
-        fun `queue is drained in FIFO order`() = runTest {
+        fun `queue is drained in FIFO order`() = runTest(UnconfinedTestDispatcher()) {
             dispatcher = TvScrobbleDispatcher(phoneDiscovery, phoneApiClientFactory, backgroundScope) { fakeNow }
             coEvery { phoneApiClientFactory.createClient(any()) } returns phoneApiService
             val callOrder = mutableListOf<String>()
@@ -361,7 +362,7 @@ class TvScrobbleDispatcherTest {
         }
 
         @Test
-        fun `stale queued events older than QUEUE_TTL_MS are discarded on drain`() = runTest {
+        fun `stale queued events older than QUEUE_TTL_MS are discarded on drain`() = runTest(UnconfinedTestDispatcher()) {
             dispatcher = TvScrobbleDispatcher(phoneDiscovery, phoneApiClientFactory, backgroundScope) { fakeNow }
             coEvery { phoneApiClientFactory.createClient(any()) } returns phoneApiService
             coEvery { phoneApiService.scrobbleStart(any()) } returns mockk()
@@ -379,7 +380,7 @@ class TvScrobbleDispatcherTest {
         }
 
         @Test
-        fun `queue caps at QUEUE_MAX_SIZE and drops the oldest entry`() = runTest {
+        fun `queue caps at QUEUE_MAX_SIZE and drops the oldest entry`() = runTest(UnconfinedTestDispatcher()) {
             dispatcher = TvScrobbleDispatcher(phoneDiscovery, phoneApiClientFactory, backgroundScope) { fakeNow }
             coEvery { phoneApiClientFactory.createClient(any()) } returns phoneApiService
             val dispatchedProgress = mutableListOf<Float>()
@@ -402,7 +403,7 @@ class TvScrobbleDispatcherTest {
         }
 
         @Test
-        fun `queue is empty after successful drain so second phone emission dispatches nothing`() = runTest {
+        fun `queue is empty after successful drain so second phone emission dispatches nothing`() = runTest(UnconfinedTestDispatcher()) {
             dispatcher = TvScrobbleDispatcher(phoneDiscovery, phoneApiClientFactory, backgroundScope) { fakeNow }
             coEvery { phoneApiClientFactory.createClient(any()) } returns phoneApiService
             coEvery { phoneApiService.scrobbleStart(any()) } returns mockk()
