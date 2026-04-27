@@ -8,7 +8,11 @@ import android.app.Service
 import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.database.ContentObserver
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
+import android.provider.Settings
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.justb81.watchbuddy.R
@@ -44,6 +48,7 @@ class TvDiscoveryService : Service() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var observerJob: Job? = null
+    private var notificationAccessObserver: ContentObserver? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -75,6 +80,7 @@ class TvDiscoveryService : Service() {
                     if (discovery) {
                         phoneDiscovery.setEnabled(true)
                         startScrobblerIfPermitted()
+                        registerNotificationAccessObserver()
                     } else {
                         DiagnosticLog.event(TAG, "phone discovery disabled — stopping self")
                         scrobbler.stopListening()
@@ -116,8 +122,45 @@ class TvDiscoveryService : Service() {
         super.onDestroy()
         DiagnosticLog.event(TAG, "service destroyed")
         scrobbler.stopListening()
+        notificationAccessObserver?.let { contentResolver.unregisterContentObserver(it) }
+        notificationAccessObserver = null
         observerJob?.cancel()
         scope.cancel()
+    }
+
+    /**
+     * Registers a [ContentObserver] on [Settings.Secure.ENABLED_NOTIFICATION_LISTENERS]
+     * so the service can react to permission changes without requiring the user to
+     * toggle Phone discovery. Idempotent — subsequent calls while already registered
+     * are no-ops.
+     */
+    private fun registerNotificationAccessObserver() {
+        if (notificationAccessObserver != null) return
+        val uri = Settings.Secure.getUriFor(Settings.Secure.ENABLED_NOTIFICATION_LISTENERS)
+        notificationAccessObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
+            override fun onChange(selfChange: Boolean) {
+                onNotificationAccessChanged()
+            }
+        }
+        contentResolver.registerContentObserver(uri, false, notificationAccessObserver!!)
+    }
+
+    /**
+     * Called whenever the system notification-listener allowlist changes.
+     * Starts the scrobbler if access was just granted and it isn't running yet;
+     * stops it immediately when access is revoked so [isListening] reflects reality
+     * before the next per-tick poll in [MediaSessionScrobbler].
+     */
+    private fun onNotificationAccessChanged() {
+        val granted = NotificationManagerCompat.getEnabledListenerPackages(this)
+            .contains(packageName)
+        if (granted && !scrobbler.isListening.value) {
+            DiagnosticLog.warn(TAG, "notification access granted — starting scrobbler")
+            startScrobblerIfPermitted()
+        } else if (!granted && scrobbler.isListening.value) {
+            DiagnosticLog.warn(TAG, "notification access revoked — stopping scrobbler")
+            scrobbler.stopListening()
+        }
     }
 
     private fun ensureNotificationChannel() {

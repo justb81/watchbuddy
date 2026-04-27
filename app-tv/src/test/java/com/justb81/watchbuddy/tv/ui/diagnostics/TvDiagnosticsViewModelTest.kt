@@ -15,6 +15,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -93,5 +94,40 @@ class TvDiagnosticsViewModelTest {
         assertEquals(100, events.size)
         assertEquals("msg 149", events[0].message)
         assertEquals("msg 50", events[99].message)
+    }
+
+    @Test
+    fun `scrobblerListening reflects true when scrobbler isListening emits true`() = runTest {
+        val isListeningFlow = MutableStateFlow(false)
+        every { scrobbler.isListening } returns isListeningFlow
+        val vm = TvDiagnosticsViewModel(application, phoneDiscovery, scrobbler, justWatchRepo)
+        advanceUntilIdle()
+
+        isListeningFlow.value = true
+        advanceUntilIdle()
+
+        assertTrue(vm.uiState.value.scrobblerListening)
+    }
+
+    @Test
+    fun `scrobblerListening reflects false when scrobbler isListening emits false`() = runTest {
+        val isListeningFlow = MutableStateFlow(true)
+        every { scrobbler.isListening } returns isListeningFlow
+        val vm = TvDiagnosticsViewModel(application, phoneDiscovery, scrobbler, justWatchRepo)
+        advanceUntilIdle()
+
+        isListeningFlow.value = false
+        advanceUntilIdle()
+
+        assertFalse(vm.uiState.value.scrobblerListening)
+    }
+
+    @Test
+    fun `scrobblerListening starts as false when scrobbler is not listening`() = runTest {
+        every { scrobbler.isListening } returns MutableStateFlow(false)
+        val vm = TvDiagnosticsViewModel(application, phoneDiscovery, scrobbler, justWatchRepo)
+        advanceUntilIdle()
+
+        assertFalse(vm.uiState.value.scrobblerListening)
     }
 }

@@ -79,14 +79,39 @@ class MediaSessionScrobblerLifecycleTest {
         }
 
         @Test
-        fun `isListening reflects start and stop transitions`() {
+        fun `isListening is false before startListening and after stopListening`() {
             val component = mockk<ComponentName>()
             assertFalse(scrobbler.isListening.value)
+            scrobbler.notificationAccessChecker = { true }
             scrobbler.startListening(component)
+            // isListening is set by the polling coroutine on the first tick, not synchronously
+            scrobbler.stopListening()
+            assertFalse(scrobbler.isListening.value)
+        }
+
+        @Test
+        fun `isListening becomes true after first poll tick when access is granted`() {
+            val component = mockk<ComponentName>()
+            scrobbler.notificationAccessChecker = { true }
+            assertFalse(scrobbler.isListening.value)
+            scrobbler.startListening(component)
+            // First tick runs immediately on IO dispatcher; 200 ms is ample
+            Thread.sleep(200)
             assertTrue(scrobbler.isListening.value)
             scrobbler.stopListening()
             assertFalse(scrobbler.isListening.value)
         }
+
+        @Test
+        fun `isListening stays false when notification access is not granted`() {
+            val component = mockk<ComponentName>()
+            scrobbler.notificationAccessChecker = { false }
+            scrobbler.startListening(component)
+            Thread.sleep(200)
+            assertFalse(scrobbler.isListening.value)
+            scrobbler.stopListening()
+        }
+
     }
 
     // ── autoScrobble() ───────────────────────────────────────────────────────
