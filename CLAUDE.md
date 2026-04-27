@@ -108,9 +108,15 @@ Single source of truth for all versions: `gradle/libs.versions.toml` (Android) a
   - Do NOT use the outdated Apiary docs (`trakt.docs.apiary.io`) — they reference deprecated endpoints.
 - **TMDB API:** https://developer.themoviedb.org/docs
 
-## GitHub CLI Availability
+## GitHub Tools — `gh` CLI vs MCP
 
-The `gh` CLI tool (GitHub CLI) is available in this environment (version 2.45.0+). For this project, use the GitHub MCP server tools (prefixed with `mcp__github__`) for all workflow-critical operations: checking for concurrent work, creating/updating PRs, posting comments, and monitoring CI status (see "Git Workflow — IMPORTANT" and "Monitoring PR checks & accessing build logs" below). The `gh` CLI is available for ad-hoc queries when convenient, but the MCP tools are the prescribed interface for programmatic GitHub interactions in this codebase.
+The `gh` CLI tool (GitHub CLI, version 2.45.0+) is available in this environment and is the **primary interface for GitHub operations** — it is more efficient and direct than the MCP abstraction layer. Use `gh` for:
+- Checking for concurrent agent work (`gh pr list --state open`)
+- Creating and updating PRs (`gh pr create`, `gh pr edit`)
+- Posting comments (`gh pr comment`, `gh issue comment`)
+- Monitoring CI status (`gh pr checks`, `gh run view`)
+
+The GitHub MCP server tools (prefixed with `mcp__github__`) remain available as a fallback when `gh` output doesn't provide the needed information or when MCP-specific features are required (e.g., subscribing to PR activity webhooks).
 
 ## Key Conventions
 
@@ -184,14 +190,14 @@ If you change either workflow's `paths-filter`, update `scripts/precommit.sh` in
 
 1. **Check for concurrent agent work — MANDATORY first step.** Before doing anything else, verify that no other Claude Code session is already working on the same issue:
    - Identify the target issue number from the triggering context (initial prompt, linked issue, or branch-name hint).
-   - Call `mcp__github__list_pull_requests` with `state: "open"` on `justb81/watchbuddy` and scan each PR's title **and** body for a closing keyword referencing the target issue: `Closes #N`, `Fixes #N`, `Resolves #N`, `Closes GH-N`, `Fixes GH-N`, `Resolves GH-N` (case-insensitive).
-   - If any open PR matches, post a single comment on the issue via `mcp__github__add_issue_comment` — e.g. *"Another Claude Code session is already working on this issue — see #\<PR-number\>. Aborting this session to avoid parallel work."* — and stop immediately. Do not create a branch, do not edit files, do not commit.
+   - Run `gh pr list --state open --repo justb81/watchbuddy` and scan each PR's title and body for a closing keyword referencing the target issue: `Closes #N`, `Fixes #N`, `Resolves #N`, `Closes GH-N`, `Fixes GH-N`, `Resolves GH-N` (case-insensitive).
+   - If any open PR matches, post a comment with `gh issue comment <issue-number> --body "Another Claude Code session is already working on this issue — see #<PR-number>. Aborting this session to avoid parallel work."` and stop immediately. Do not create a branch, do not edit files, do not commit.
    - Exception: skip this check when the session is explicitly invoked to continue work on a specific existing PR (e.g. responding to review comments on that PR).
 2. Create a feature branch from `main`
 3. Make changes. Before **every** commit run `./scripts/precommit.sh` (or enable `git config core.hooksPath .githooks` once so the shared hook runs automatically) — see "Local pre-commit checks" above. Commit using Conventional Commits (see below)
-4. Push the branch and open a PR against `main`
+4. Push the branch and open a PR with `gh pr create --title "..." --body "..." --repo justb81/watchbuddy` (or use the interactive `gh pr create` with no args)
 5. **Wait for a green CI build** (`build-android.yml`) — do not continue if the build is red; fix the issue first (see "Monitoring PR checks & accessing build logs" below)
-6. **Auto-merge when green.** Once every required build step on the PR has completed successfully, the agent may merge the PR into `main` automatically (e.g. via `enable_pr_auto_merge` or by merging directly after CI passes). Use a squash merge and delete the branch after merge.
+6. **Auto-merge when green.** Once every required build step on the PR has completed successfully, the agent may merge the PR into `main` automatically with `gh pr merge <pr-number> --squash --delete-branch --repo justb81/watchbuddy`. Use a squash merge and delete the branch after merge.
 7. If CI fails or a required check is still pending, do NOT merge — fix the failure or wait.
 
 > One PR per task. Never merge with red or missing required checks. If a reviewer has requested changes, wait for their approval before merging even if CI is green.
@@ -210,25 +216,25 @@ The `release-please--` prefix is reserved for the automated release-please bot �
 
 ### Monitoring PR checks & accessing build logs
 
-The MCP toolset has **no** `get_workflow_run_logs` / `list_workflow_runs` / `download_artifact` tool, and raw GitHub Actions log URLs require auth that agents do not have. To close that gap, `build-android.yml` and `test-backend.yml` each have an `if: failure()` step that posts a filtered failure excerpt as a PR comment — agents read it through MCP like any other comment. Most failures are caught locally before this matters (see § "Local pre-commit checks").
+To close workflow gaps where raw GitHub Actions log URLs require auth, `build-android.yml` and `test-backend.yml` each have an `if: failure()` step that posts a filtered failure excerpt as a PR comment — agents read it through `gh` like any other comment. Most failures are caught locally before this matters (see § "Local pre-commit checks").
 
-**1. Check overall CI status first:**
+**1. Check overall CI status with `gh`:**
 
-- `mcp__github__pull_request_read` with `method: "get_check_runs"` → per-job `status` / `conclusion` / `details_url`. Expect `Test & Build` (from `build-android.yml`) and `Backend Tests` (from `test-backend.yml`); the `changes` path-filter jobs may legitimately be skipped.
-- `mcp__github__pull_request_read` with `method: "get_status"` → compact combined commit status.
+- `gh pr checks <pr-number> --repo justb81/watchbuddy` → per-job `status` / `conclusion`. Expect `Test & Build` (from `build-android.yml`) and `Backend Tests` (from `test-backend.yml`); the `changes` path-filter jobs may legitimately be skipped.
+- `gh pr view <pr-number> --repo justb81/watchbuddy` → shows PR status and linked CI runs.
 
 **2. Read the filtered failure excerpt via PR comments:**
 
-- `mcp__github__pull_request_read` with `method: "get_comments"`. Match by marker at the start of `body`:
+- `gh pr view <pr-number> --repo justb81/watchbuddy --comments` or `gh pr comment -N <pr-number> --repo justb81/watchbuddy`. Match by marker at the start of the comment body:
   - `<!-- watchbuddy-build-log -->` — Android build / detekt / Android Lint / unit-test failure from `build-android.yml`.
   - `<!-- watchbuddy-backend-log -->` — ESLint / Prettier / Jest failure from `test-backend.yml`.
   - `<!-- watchbuddy-lint-report -->` — per-module detekt + Android Lint finding counts (separate concern, see § Static analysis); useful when CI is green-but-noisy rather than red.
 - Excerpts are upserted per run — always read the latest comment with the marker.
 - The excerpt is a regex-filtered slice (gradle `FAILED` / detekt violations / Android Lint `Error:` / JUnit `<failure>` / ESLint error lines / Prettier mismatches / JVM stack traces) with ~20 lines of surrounding context per match, capped at ~55 000 chars.
 
-**3. Wait for CI without polling:** subscribe with `mcp__github__subscribe_pr_activity` and react to the CI completion webhook event instead of polling `get_check_runs`.
+**3. Wait for CI without polling:** Poll `gh pr checks` in a loop with a reasonable interval, or check back after a few minutes. For production workflows requiring webhook subscriptions, the `mcp__github__subscribe_pr_activity` tool remains available.
 
-**4. Last-resort fallback:** if the filtered excerpt doesn't explain the failure, surface the failing check's `details_url` (or the `Actions log:` link at the top of the comment) to the user and stop — do not attempt to scrape GitHub Actions HTML.
+**4. Last-resort fallback:** if the filtered excerpt doesn't explain the failure, open the PR in a browser or surface the failing check's `details_url` to the user and stop — do not attempt to scrape GitHub Actions HTML.
 
 ### Versioning
 - release-please with Conventional Commits (`feat:`, `fix:`, `chore:`, etc.)
