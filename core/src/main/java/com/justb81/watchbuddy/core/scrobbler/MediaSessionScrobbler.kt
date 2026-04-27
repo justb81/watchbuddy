@@ -154,8 +154,11 @@ class MediaSessionScrobbler @Inject constructor(
                 val wasListening = _isListening.value
                 _isListening.value = granted
                 if (wasListening != granted) {
-                    if (granted) DiagnosticLog.event(TAG, "notification access granted — scrobbler resumed")
-                    else DiagnosticLog.warn(TAG, "notification access revoked — scrobbler paused")
+                    if (granted) {
+                        DiagnosticLog.event(TAG, "notification access granted — scrobbler resumed")
+                    } else {
+                        DiagnosticLog.warn(TAG, "notification access revoked — scrobbler paused")
+                    }
                 }
                 if (!granted) {
                     delay(30_000)
