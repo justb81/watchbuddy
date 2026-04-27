@@ -70,13 +70,6 @@ fun ShowDetailScreen(
         }
     }
 
-    val fallbackCode = remember(entry) {
-        val lastSeason = entry.seasons.maxByOrNull { it.number }
-        val lastEpisode = lastSeason?.episodes?.maxByOrNull { it.number }
-        "S%02dE%02d".format(lastSeason?.number ?: 1, (lastEpisode?.number ?: 0) + 1)
-    }
-    val episodeCode = nextEpisodeUi.episodeCode ?: fallbackCode
-    val episodeTitle = nextEpisodeUi.episodeName
     val imageUrl = nextEpisodeUi.stillUrl ?: TmdbImageHelper.poster(enriched.posterPath, TMDB_POSTER_WIDTH)
 
     val topProviderDeepLink = viewModel.resolveTopProviderDeepLink()
@@ -89,8 +82,7 @@ fun ShowDetailScreen(
         ShowDetailGradient()
         ShowDetailContent(
             enriched = enriched,
-            episodeTitle = episodeTitle,
-            episodeCode = episodeCode,
+            nextEpisode = nextEpisodeUi,
             providerState = providerState,
             deepLinks = deepLinks,
             topProviderDeepLinkState = topProviderState,
@@ -200,8 +192,7 @@ private fun ShowDetailGradient() {
 @Composable
 private fun ShowDetailContent(
     enriched: EnrichedShowEntry,
-    episodeTitle: String?,
-    episodeCode: String,
+    nextEpisode: NextEpisodeUiState,
     providerState: ProviderListUiState,
     deepLinks: Map<Int, DeepLinkState>,
     topProviderDeepLinkState: DeepLinkState?,
@@ -210,6 +201,13 @@ private fun ShowDetailContent(
     modifier: Modifier = Modifier,
 ) {
     val entry = enriched.entry
+    val fallbackCode = remember(entry) {
+        val lastSeason = entry.seasons.maxByOrNull { it.number }
+        val lastEpisode = lastSeason?.episodes?.maxByOrNull { it.number }
+        "S%02dE%02d".format(lastSeason?.number ?: 1, (lastEpisode?.number ?: 0) + 1)
+    }
+    val episodeCode = nextEpisode.episodeCode ?: fallbackCode
+    val episodeTitle = nextEpisode.episodeName
     Column(
         modifier = modifier.fillMaxWidth(0.55f).padding(end = 64.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -371,6 +369,34 @@ private fun AvailableOnSection(
     }
 }
 
+@Composable
+private fun ProviderLogo(provider: ResolvedProvider) {
+    if (provider.logoPath != null) {
+        AsyncImage(
+            model = provider.logoPath,
+            contentDescription = provider.name,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier
+                .size(48.dp)
+                .clip(RoundedCornerShape(4.dp))
+        )
+    } else {
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(4.dp)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = provider.name.take(2).uppercase(),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+            )
+        }
+    }
+}
+
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun ProviderChip(
@@ -408,30 +434,7 @@ private fun ProviderChip(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                if (provider.logoPath != null) {
-                    AsyncImage(
-                        model = provider.logoPath,
-                        contentDescription = provider.name,
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier
-                            .size(48.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                    )
-                } else {
-                    Box(
-                        modifier = Modifier
-                            .size(48.dp)
-                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(4.dp)),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            text = provider.name.take(2).uppercase(),
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                        )
-                    }
-                }
+                ProviderLogo(provider)
                 val labelText = when (deepLinkState) {
                     is DeepLinkState.Unavailable -> stringResource(R.string.tv_provider_no_deep_link)
                     else -> provider.name
