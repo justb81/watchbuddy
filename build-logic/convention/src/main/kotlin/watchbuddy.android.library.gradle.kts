@@ -1,5 +1,3 @@
-import org.gradle.accessors.dm.LibrariesForLibs
-
 // Kotlin compiler plugins (serialization) are NOT applied here because their
 // Gradle plugin JARs are split into separate Maven artifacts in Kotlin 2.x
 // and cannot be reliably discovered from the build-logic classpath without
@@ -9,8 +7,6 @@ plugins {
     id("com.google.dagger.hilt.android")
     id("com.google.devtools.ksp")
 }
-
-val libs = the<LibrariesForLibs>()
 
 android {
     compileSdk = 37
