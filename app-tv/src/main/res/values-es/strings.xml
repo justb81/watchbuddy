@@ -64,7 +64,6 @@
     <string name="tv_not_available_region">No disponible para streaming en tu región.</string>
     <string name="tv_providers_retry">No se pudo cargar la información de streaming. Toca para reintentar.</string>
     <string name="tv_provider_last_used_label">Última vez usado</string>
-    <string name="tv_provider_last_used_cd">Última vez usado: %1$s</string>
     <!-- JustWatch deep links (#476) -->
     <string name="tv_provider_no_deep_link">Sin enlace directo</string>
     <string name="tv_watch_now_unavailable">Enlace directo no disponible</string>
