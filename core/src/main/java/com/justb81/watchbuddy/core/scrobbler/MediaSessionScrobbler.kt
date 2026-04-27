@@ -650,16 +650,18 @@ class MediaSessionScrobbler @Inject constructor(
         progress: Float? = null,
     ) {
         if (sessionKey != currentlySessionKey) return
-        if (progress == null) {
-            Log.w(TAG, "Scrobble stop skipped — playback position/duration unavailable for '$sessionKey'")
-            currentlySessionKey = null
-            return
+        val effectiveProgress = progress ?: run {
+            DiagnosticLog.warn(
+                TAG,
+                "scrobble stop: duration/position unavailable for '$sessionKey' — assuming 100% (watched)"
+            )
+            100f
         }
         val candidate = matchSnapshot(snapshot)
         val show = candidate?.matchedShow
         val episode = candidate?.matchedEpisode
         if (show == null || episode == null) return
-        scrobbleDispatcher.dispatchStop(show, episode, progress)
+        scrobbleDispatcher.dispatchStop(show, episode, effectiveProgress)
         currentlySessionKey = null
         Log.i(TAG, "Scrobble stopped: ${show.title} S${episode.season}E${episode.number}")
     }
