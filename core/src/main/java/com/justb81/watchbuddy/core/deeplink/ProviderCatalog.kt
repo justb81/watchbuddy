@@ -1,42 +1,36 @@
 package com.justb81.watchbuddy.core.deeplink
 
 /**
- * Central mapping from TMDB [providerId] to the streaming app's package name and
- * deep-link template. Keyed by the TMDB provider_id integer so it can be
- * cross-referenced against [WatchProviderResponse] results without any manual
- * service-selection UI.
+ * Central mapping from TMDB [providerId] to the streaming app's package name.
  *
- * Templates support three placeholders substituted at runtime:
- *   {tmdb_id}  — TMDB series ID (Int)
- *   {slug}     — Trakt slug (or title-derived fallback)
- *   {id}       — alias for {tmdb_id} (legacy compat)
+ * The static deep-link template catalog has been removed — per-episode deep links
+ * are now sourced live from JustWatch (see `JustWatchDeepLinkRepository`).
  *
- * Services not present here are still shown from TMDB data (with name + logo),
- * but launch falls back to the TMDB watch-providers page URL.
+ * [byId] and [knownPackageNames] are still used to:
+ *   - Drive [InstalledAppsProbe]'s PackageManager lookups.
+ *   - Populate the `<queries>` block in `app-tv/AndroidManifest.xml`.
  */
 data class ProviderEntry(
     val providerId: Int,
-    val name: String,
     val packageName: String,
-    val deepLinkTemplate: String,
 )
 
 object ProviderCatalog {
 
     val entries: List<ProviderEntry> = listOf(
-        ProviderEntry(8, "Netflix", "com.netflix.ninja", "https://www.netflix.com/title/{tmdb_id}"),
-        ProviderEntry(9, "Amazon Prime", "com.amazon.amazonvideo.livingroom", "https://www.primevideo.com/search?phrase={slug}"),
-        ProviderEntry(119, "Prime Video", "com.amazon.amazonvideo.livingroom", "https://www.primevideo.com/search?phrase={slug}"),
-        ProviderEntry(337, "Disney+", "com.disney.disneyplus", "https://www.disneyplus.com/series/{slug}/{tmdb_id}"),
-        ProviderEntry(350, "Apple TV+", "com.apple.atve.androidtv.appletv", "https://tv.apple.com/show/{tmdb_id}"),
-        ProviderEntry(531, "Paramount+", "com.cbs.app", "https://www.paramountplus.com/shows/{slug}/"),
-        ProviderEntry(1899, "Max", "com.hbo.hbonow", "https://play.max.com/show/{tmdb_id}"),
-        ProviderEntry(2187, "WaipuTV", "de.exaring.waipu", "waipu://tv"),
-        ProviderEntry(2184, "Joyn", "de.prosiebensat1digital.seventv", "https://www.joyn.de/serien/{slug}"),
-        ProviderEntry(195, "ARD Mediathek", "de.swr.avp.ard.tv", "https://www.ardmediathek.de/video/{id}"),
-        ProviderEntry(231, "ZDF Mediathek", "com.zdf.android.mediathek", "https://www.zdf.de/serien/{slug}"),
-        ProviderEntry(192, "YouTube", "com.google.android.youtube.tv", ""),
-        ProviderEntry(35, "Rakuten TV", "tv.wuaki.apptv", ""),
+        ProviderEntry(8, "com.netflix.ninja"),
+        ProviderEntry(9, "com.amazon.amazonvideo.livingroom"),
+        ProviderEntry(119, "com.amazon.amazonvideo.livingroom"),
+        ProviderEntry(337, "com.disney.disneyplus"),
+        ProviderEntry(350, "com.apple.atve.androidtv.appletv"),
+        ProviderEntry(531, "com.cbs.app"),
+        ProviderEntry(1899, "com.hbo.hbonow"),
+        ProviderEntry(2187, "de.exaring.waipu"),
+        ProviderEntry(2184, "de.prosiebensat1digital.seventv"),
+        ProviderEntry(195, "de.swr.avp.ard.tv"),
+        ProviderEntry(231, "com.zdf.android.mediathek"),
+        ProviderEntry(192, "com.google.android.youtube.tv"),
+        ProviderEntry(35, "tv.wuaki.apptv"),
     )
 
     /** Fast lookup by provider_id. */

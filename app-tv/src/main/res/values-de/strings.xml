@@ -61,6 +61,16 @@
     <string name="tv_not_available_region">In deiner Region nicht zum Streaming verfügbar.</string>
     <string name="tv_providers_retry">Streaming-Infos konnten nicht geladen werden. Tippen zum Wiederholen.</string>
     <string name="tv_provider_last_used_label">Zuletzt genutzt</string>
+    <!-- JustWatch deep links (#476) -->
+    <string name="tv_provider_no_deep_link">Kein Deep Link</string>
+    <string name="tv_watch_now_unavailable">Deep Link nicht verfügbar</string>
+    <string name="tv_justwatch_attribution">Streaming-Daten von JustWatch</string>
+    <!-- Diagnostics — streaming deep links (#476) -->
+    <string name="tv_diagnostics_section_streaming_links">Streaming-Deep-Links</string>
+    <string name="tv_diagnostics_row_cached_urls">Gespeicherte URLs</string>
+    <string name="tv_diagnostics_row_negative_entries">Negative Einträge</string>
+    <string name="tv_diagnostics_row_last_fetch">Letzter Abruf</string>
+    <string name="tv_diagnostics_action_clear_streaming_cache">Streaming-Link-Cache löschen</string>
 
     <!-- TV Settings hub (#344 / #367) -->
     <string name="tv_settings_title">Einstellungen</string>

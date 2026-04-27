@@ -305,20 +305,43 @@ Release AABs likewise enable R8 (`isMinifyEnabled = true`), and AGP embeds the r
 
 The available-provider list for each show is fetched from TMDB `/tv/{id}/watch/providers` (region-aware, keyed by device locale country code). No manual service selection is needed.
 
-`core/deeplink/ProviderCatalog.kt` maps TMDB `provider_id` integers to package names and deep-link templates. For providers not in the catalog, WatchBuddy still shows them from TMDB data but falls back to the TMDB watch-providers page URL (`results.{CC}.link`) on tap.
+`core/deeplink/ProviderCatalog.kt` maps TMDB `provider_id` integers to Android package names only. Deep-link URLs are sourced from JustWatch's unofficial GraphQL API rather than hard-coded templates.
 
-| TMDB provider_id | Service | Package | Link Template |
-|-----------------|---------|---------|---------------|
-| 8 | Netflix | `com.netflix.ninja` | `https://www.netflix.com/title/{tmdb_id}` |
-| 9 / 119 | Prime Video | `com.amazon.amazonvideo.livingroom` | `https://www.primevideo.com/search?phrase={slug}` |
-| 337 | Disney+ | `com.disney.disneyplus` | `https://www.disneyplus.com/series/{slug}/{tmdb_id}` |
-| 350 | Apple TV+ | `com.apple.atve.androidtv.appletv` | `https://tv.apple.com/show/{tmdb_id}` |
-| 531 | Paramount+ | `com.cbs.app` | `https://www.paramountplus.com/shows/{slug}/` |
-| 1899 | Max | `com.hbo.hbonow` | `https://play.max.com/show/{tmdb_id}` |
-| 2187 | WaipuTV | `tv.waipu.app` | `waipu://tv` |
-| 2184 | Joyn | `de.prosiebensat1digital.android.joyn` | `https://www.joyn.de/serien/{slug}` |
-| 195 | ARD Mediathek | `de.swr.avp.ard.phone` | `https://www.ardmediathek.de/video/{id}` |
-| 231 | ZDF Mediathek | `de.zdf.android.app` | `https://www.zdf.de/serien/{slug}` |
+| TMDB provider_id | Service | Package |
+|-----------------|---------|---------|
+| 8 | Netflix | `com.netflix.ninja` |
+| 119 | Prime Video | `com.amazon.amazonvideo.livingroom` |
+| 337 | Disney+ | `com.disney.disneyplus` |
+| 350 | Apple TV+ | `com.apple.atve.androidtv.appletv` |
+| 531 | Paramount+ | `com.cbs.app` |
+| 1899 | Max / HBO | `com.hbo.hbonow` |
+| 2187 | WaipuTV | `tv.waipu.app` |
+| 2184 | Joyn | `de.prosiebensat1digital.android.joyn` |
+| 192 | YouTube | `com.google.android.youtube.tv` |
+| 35 | Rakuten TV | `com.rakuten.tv` |
+| 195 | ARD Mediathek | `de.swr.avp.ard.phone` |
+| 231 | ZDF Mediathek | `de.zdf.android.app` |
+
+### JustWatch-powered per-episode deep links
+
+`JustWatchDeepLinkRepository` resolves streaming URLs by querying JustWatch's unofficial GraphQL API (`https://apis.justwatch.com/graphql`) and caching results in a Room database (`justwatch_deep_links.db`) on the TV device.
+
+**Resolution cascade** for each `(tmdbShowId, season, episode, providerId, countryCode)`:
+1. Episode-level Room cache lookup (positive hit: return URL immediately)
+2. If miss or expired negative: live JustWatch call via three sequential GraphQL queries — `SEARCH_QUERY` (find show by title, verify TMDB ID), `SEASONS_QUERY` (get season node IDs), `EPISODES_QUERY` (get episode offers). Caches all providers found and negatives for known providers not returned.
+3. Show-level Room cache lookup (season=0, episode=0)
+4. Show-level live JustWatch call (single search query, no episode drill-down)
+5. Returns `null` → caller treats as `DeepLinkState.Unavailable`
+
+**Caching policy:** Positive hits cached permanently. Negative entries (no offer found) expire after 30 days (`NEGATIVE_TTL_MS`). Network exceptions do not write negatives — the next call retries the API.
+
+**Batch dedup:** A `Mutex`-protected `Map<FetchKey, Mutex>` prevents duplicate in-flight JustWatch API calls when multiple coroutines request the same `(showId, season, episode, countryCode)` simultaneously. After acquiring the per-key lock, the cache is re-checked before calling the API.
+
+**Provider mapping:** `JustWatchPackageMap` (`core/justwatch/`) maps JustWatch `technicalName` strings (e.g. `nfx`, `prv`, `dnp`) to TMDB `provider_id` integers. The same map drives negative-cache writes for known-but-absent providers.
+
+**ViewModel integration:** `ShowDetailViewModel.loadDeepLinks()` is triggered once `ProviderListUiState.Success` arrives. Each provider gets a `viewModelScope.async` backed by `JustWatchDeepLinkRepository`; in-flight dedup at the ViewModel level prevents duplicate `Deferred` jobs per key. State is `deepLinks: StateFlow<Map<Int, DeepLinkState>>` with `DeepLinkState = Loading | Available(url) | Unavailable`. The UI shows a spinner overlay on loading chips, disables unavailable chips, and displays a JustWatch attribution badge when any link is `Available`.
+
+**Diagnostics:** `TvDiagnosticsScreen` shows a "Streaming Links" section with cached URL count, negative entry count, last-fetch timestamp, and a "Clear cache" button.
 
 ### Provider ordering on ShowDetail
 

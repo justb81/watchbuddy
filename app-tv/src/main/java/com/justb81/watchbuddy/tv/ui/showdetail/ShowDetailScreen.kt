@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -30,7 +31,6 @@ import coil3.compose.AsyncImage
 import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.core.model.EnrichedShowEntry
 import com.justb81.watchbuddy.core.model.ResolvedProvider
-import com.justb81.watchbuddy.core.model.TraktWatchedEntry
 import com.justb81.watchbuddy.core.tmdb.TmdbImageHelper
 
 private const val TMDB_POSTER_WIDTH = 500
@@ -54,6 +54,7 @@ fun ShowDetailScreen(
     val entry = enriched.entry
     val nextEpisodeUi by viewModel.nextEpisode.collectAsState()
     val providerState by viewModel.providers.collectAsState()
+    val deepLinks by viewModel.deepLinks.collectAsState()
     val watchNowFocus = remember { FocusRequester() }
 
     LaunchedEffect(entry.show.ids.trakt) {
@@ -62,33 +63,38 @@ fun ShowDetailScreen(
         watchNowFocus.requestFocus()
     }
 
-    val fallbackCode = remember(entry) {
-        val lastSeason = entry.seasons.maxByOrNull { it.number }
-        val lastEpisode = lastSeason?.episodes?.maxByOrNull { it.number }
-        "S%02dE%02d".format(lastSeason?.number ?: 1, (lastEpisode?.number ?: 0) + 1)
+    // Trigger deep link resolution once providers are loaded
+    LaunchedEffect(providerState) {
+        if (providerState is ProviderListUiState.Success) {
+            viewModel.loadDeepLinks(enriched)
+        }
     }
-    val episodeCode = nextEpisodeUi.episodeCode ?: fallbackCode
-    val episodeTitle = nextEpisodeUi.episodeName
+
     val imageUrl = nextEpisodeUi.stillUrl ?: TmdbImageHelper.poster(enriched.posterPath, TMDB_POSTER_WIDTH)
+
+    val topProviderDeepLink = viewModel.resolveTopProviderDeepLink()
+    val topProviderState = (providerState as? ProviderListUiState.Success)
+        ?.providers?.firstOrNull()
+        ?.let { deepLinks[it.providerId] }
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         ShowDetailImagePanel(imageUrl, modifier = Modifier.align(Alignment.CenterStart))
         ShowDetailGradient()
         ShowDetailContent(
-            entry = entry,
-            episodeTitle = episodeTitle,
-            episodeCode = episodeCode,
+            enriched = enriched,
+            nextEpisode = nextEpisodeUi,
             providerState = providerState,
+            deepLinks = deepLinks,
+            topProviderDeepLinkState = topProviderState,
             watchNowFocus = watchNowFocus,
             actions = ShowDetailActions(
                 onWatchNow = {
                     val firstProvider = (providerState as? ProviderListUiState.Success)
                         ?.providers?.firstOrNull()
-                    val deepLink = viewModel.resolveDeepLink(entry)
-                    launchProvider(context, firstProvider, deepLink)
+                    launchProvider(context, firstProvider, topProviderDeepLink)
                 },
                 onProviderClick = { provider ->
-                    val link = viewModel.onProviderSelected(provider, entry)
+                    val link = viewModel.onProviderSelected(provider, enriched)
                     launchProvider(context, provider, link)
                 },
                 onRetryProviders = { viewModel.loadProviders(enriched) },
@@ -111,8 +117,6 @@ fun ShowDetailScreen(
  *   2. If the provider is detected as installed, fall through to the app's main
  *      activity via [android.content.pm.PackageManager.getLaunchIntentForPackage].
  *   3. Otherwise open [ResolvedProvider.tmdbPageUrl] in the system browser.
- *
- * Stops at the first stage that resolves to an activity.
  */
 private fun launchProvider(context: Context, provider: ResolvedProvider?, deepLink: String?) {
     val pm = context.packageManager
@@ -187,14 +191,23 @@ private fun ShowDetailGradient() {
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun ShowDetailContent(
-    entry: TraktWatchedEntry,
-    episodeTitle: String?,
-    episodeCode: String,
+    enriched: EnrichedShowEntry,
+    nextEpisode: NextEpisodeUiState,
     providerState: ProviderListUiState,
+    deepLinks: Map<Int, DeepLinkState>,
+    topProviderDeepLinkState: DeepLinkState?,
     watchNowFocus: FocusRequester,
     actions: ShowDetailActions,
     modifier: Modifier = Modifier,
 ) {
+    val entry = enriched.entry
+    val fallbackCode = remember(entry) {
+        val lastSeason = entry.seasons.maxByOrNull { it.number }
+        val lastEpisode = lastSeason?.episodes?.maxByOrNull { it.number }
+        "S%02dE%02d".format(lastSeason?.number ?: 1, (lastEpisode?.number ?: 0) + 1)
+    }
+    val episodeCode = nextEpisode.episodeCode ?: fallbackCode
+    val episodeTitle = nextEpisode.episodeName
     Column(
         modifier = modifier.fillMaxWidth(0.55f).padding(end = 64.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -226,18 +239,17 @@ private fun ShowDetailContent(
         Text(text = episodeCode, fontSize = 14.sp, color = Color.White.copy(alpha = 0.6f))
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            Button(
+            WatchNowButton(
+                deepLinkState = topProviderDeepLinkState,
                 onClick = actions.onWatchNow,
-                modifier = Modifier.focusRequester(watchNowFocus),
-                colors = ButtonDefaults.colors(containerColor = MaterialTheme.colorScheme.primary)
-            ) {
-                Text(text = stringResource(R.string.tv_watch_now), fontWeight = FontWeight.Bold)
-            }
+                focusRequester = watchNowFocus,
+            )
             OutlinedButton(onClick = actions.onRecapClick) { Text(stringResource(R.string.tv_recap)) }
         }
 
         AvailableOnSection(
             state = providerState,
+            deepLinks = deepLinks,
             onProviderClick = actions.onProviderClick,
             onRetry = actions.onRetryProviders,
         )
@@ -246,8 +258,64 @@ private fun ShowDetailContent(
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
+private fun WatchNowButton(
+    deepLinkState: DeepLinkState?,
+    onClick: () -> Unit,
+    focusRequester: FocusRequester,
+) {
+    when (deepLinkState) {
+        is DeepLinkState.Loading -> {
+            Button(
+                onClick = {},
+                enabled = false,
+                modifier = Modifier.focusRequester(focusRequester),
+                colors = ButtonDefaults.colors(containerColor = MaterialTheme.colorScheme.primary),
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    color = Color.White,
+                    strokeWidth = 2.dp,
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(text = stringResource(R.string.tv_watch_now), fontWeight = FontWeight.Bold)
+            }
+        }
+        is DeepLinkState.Available -> {
+            Button(
+                onClick = onClick,
+                modifier = Modifier.focusRequester(focusRequester),
+                colors = ButtonDefaults.colors(containerColor = MaterialTheme.colorScheme.primary),
+            ) {
+                Text(text = stringResource(R.string.tv_watch_now), fontWeight = FontWeight.Bold)
+            }
+        }
+        is DeepLinkState.Unavailable -> {
+            Button(
+                onClick = {},
+                enabled = false,
+                modifier = Modifier.focusRequester(focusRequester),
+                colors = ButtonDefaults.colors(containerColor = MaterialTheme.colorScheme.primary),
+            ) {
+                Text(text = stringResource(R.string.tv_watch_now_unavailable), fontWeight = FontWeight.Bold)
+            }
+        }
+        null -> {
+            Button(
+                onClick = onClick,
+                modifier = Modifier.focusRequester(focusRequester),
+                colors = ButtonDefaults.colors(containerColor = MaterialTheme.colorScheme.primary),
+            ) {
+                Text(text = stringResource(R.string.tv_watch_now), fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
 private fun AvailableOnSection(
     state: ProviderListUiState,
+    deepLinks: Map<Int, DeepLinkState>,
     onProviderClick: (ResolvedProvider) -> Unit,
     onRetry: () -> Unit,
 ) {
@@ -268,8 +336,17 @@ private fun AvailableOnSection(
             )
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(state.providers, key = { it.providerId }) { provider ->
-                    ProviderChip(provider = provider, onClick = { onProviderClick(provider) })
+                    val linkState = deepLinks[provider.providerId]
+                    ProviderChip(
+                        provider = provider,
+                        deepLinkState = linkState,
+                        onClick = { onProviderClick(provider) },
+                    )
                 }
+            }
+            val hasAnyDeepLink = deepLinks.values.any { it is DeepLinkState.Available }
+            if (hasAnyDeepLink) {
+                JustWatchAttributionBadge()
             }
         }
 
@@ -292,10 +369,39 @@ private fun AvailableOnSection(
     }
 }
 
+@Composable
+private fun ProviderLogo(provider: ResolvedProvider) {
+    if (provider.logoPath != null) {
+        AsyncImage(
+            model = provider.logoPath,
+            contentDescription = provider.name,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier
+                .size(48.dp)
+                .clip(RoundedCornerShape(4.dp))
+        )
+    } else {
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(4.dp)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = provider.name.take(2).uppercase(),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+            )
+        }
+    }
+}
+
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun ProviderChip(
     provider: ResolvedProvider,
+    deepLinkState: DeepLinkState?,
     onClick: () -> Unit,
 ) {
     val borderColor = when {
@@ -303,66 +409,80 @@ private fun ProviderChip(
         else -> Color.Transparent
     }
     val borderWidth = if (provider.isLastUsed) 2.dp else 0.dp
+    val isEnabled = deepLinkState is DeepLinkState.Available || deepLinkState == null
+    val focusedContainerColor = if (isEnabled) {
+        MaterialTheme.colorScheme.surfaceVariant
+    } else {
+        MaterialTheme.colorScheme.surface
+    }
 
     Card(
-        onClick = onClick,
+        onClick = if (isEnabled) onClick else ({}),
         modifier = Modifier
             .width(88.dp)
             .border(borderWidth, borderColor, RoundedCornerShape(8.dp)),
         shape = CardDefaults.shape(RoundedCornerShape(8.dp)),
         colors = CardDefaults.colors(
             containerColor = MaterialTheme.colorScheme.surface,
-            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+            focusedContainerColor = focusedContainerColor,
         ),
-        scale = CardDefaults.scale(focusedScale = 1.06f),
+        scale = if (isEnabled) CardDefaults.scale(focusedScale = 1.06f) else CardDefaults.scale(1f),
     ) {
-        Column(
-            modifier = Modifier.padding(8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            if (provider.logoPath != null) {
-                AsyncImage(
-                    model = provider.logoPath,
-                    contentDescription = provider.name,
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(RoundedCornerShape(4.dp))
+        Box {
+            Column(
+                modifier = Modifier.padding(8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                ProviderLogo(provider)
+                val labelText = when (deepLinkState) {
+                    is DeepLinkState.Unavailable -> stringResource(R.string.tv_provider_no_deep_link)
+                    else -> provider.name
+                }
+                Text(
+                    text = labelText,
+                    fontSize = 10.sp,
+                    color = if (isEnabled) Color.White.copy(alpha = 0.8f) else Color.White.copy(alpha = 0.4f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(4.dp)),
-                    contentAlignment = Alignment.Center,
-                ) {
+                if (provider.isLastUsed) {
                     Text(
-                        text = provider.name.take(2).uppercase(),
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
+                        text = stringResource(R.string.tv_provider_last_used_label),
+                        fontSize = 9.sp,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
                     )
                 }
             }
-            Text(
-                text = provider.name,
-                fontSize = 10.sp,
-                color = Color.White.copy(alpha = 0.8f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (provider.isLastUsed) {
-                Text(
-                    text = stringResource(R.string.tv_provider_last_used_label),
-                    fontSize = 9.sp,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 1,
-                )
+            // Spinner overlay while deep link is being resolved
+            if (deepLinkState is DeepLinkState.Loading) {
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(8.dp)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        color = Color.White,
+                        strokeWidth = 2.dp,
+                    )
+                }
             }
         }
     }
+}
+
+@Composable
+private fun JustWatchAttributionBadge() {
+    Text(
+        text = stringResource(R.string.tv_justwatch_attribution),
+        fontSize = 10.sp,
+        color = Color.White.copy(alpha = 0.4f),
+        modifier = Modifier.padding(top = 4.dp),
+    )
 }
 
 @Composable
