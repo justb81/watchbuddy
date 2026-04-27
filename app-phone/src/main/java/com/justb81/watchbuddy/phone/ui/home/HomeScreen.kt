@@ -50,6 +50,7 @@ import com.justb81.watchbuddy.phone.permissions.BluetoothAdvertisePermission
 import com.justb81.watchbuddy.phone.permissions.NotificationPermission
 import com.justb81.watchbuddy.phone.permissions.rememberBluetoothAdvertisePermissionRequest
 import com.justb81.watchbuddy.phone.permissions.rememberNotificationPermissionRequest
+import com.justb81.watchbuddy.phone.ui.theme.watchBuddyShapes
 import com.justb81.watchbuddy.phone.ui.util.relativeDate
 import com.justb81.watchbuddy.phone.ui.util.relativeTime
 
@@ -57,7 +58,6 @@ private val NewSeasonBorderWidth = 1.5.dp
 private val NewSeasonBadgeCorner = 10.dp
 private val NewSeasonBadgePadding = 4.dp
 private val NewSeasonBadgeIconSize = 12.dp
-private val ShowCardCorner = 12.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -408,7 +408,7 @@ private fun DiagnosticsBanner(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp),
-        shape = RoundedCornerShape(12.dp),
+        shape = MaterialTheme.watchBuddyShapes.banner,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.errorContainer
         )
@@ -463,7 +463,7 @@ private fun WatchingTvToggle(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = MaterialTheme.watchBuddyShapes.card,
         colors = CardDefaults.cardColors(
             containerColor = if (isWatching)
                 MaterialTheme.colorScheme.primaryContainer
@@ -525,7 +525,7 @@ private fun NowWatchingCard(event: ScrobbleDisplayEvent) {
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = MaterialTheme.watchBuddyShapes.card,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.tertiaryContainer
         )
@@ -578,7 +578,7 @@ private fun ShowRowCard(
 ) {
     val entry = enriched.entry
     val posterUrl = TmdbImageHelper.poster(enriched.posterPath, 300)
-    val cardShape = RoundedCornerShape(ShowCardCorner)
+    val cardShape = MaterialTheme.watchBuddyShapes.banner
 
     Card(
         modifier = Modifier
@@ -593,7 +593,7 @@ private fun ShowRowCard(
             .clickable { entry.show.ids.trakt?.let(onShowClick) },
         shape    = cardShape,
         colors   = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
         )
     ) {
         Row(
@@ -608,13 +608,13 @@ private fun ShowRowCard(
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .size(56.dp, 80.dp)
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(MaterialTheme.watchBuddyShapes.thumbnail)
                 )
             } else {
                 Box(
                     modifier = Modifier
                         .size(56.dp, 80.dp)
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(MaterialTheme.watchBuddyShapes.thumbnail)
                         .background(MaterialTheme.colorScheme.outline)
                 )
             }
@@ -654,14 +654,15 @@ private fun ShelfCard(
     val entry = enriched.entry
     val posterUrl = TmdbImageHelper.poster(enriched.posterPath, 500)
 
+    val shelfShape = MaterialTheme.watchBuddyShapes.banner
     Box(
         modifier = Modifier
             .width(180.dp)
             .aspectRatio(2f / 3f)
-            .clip(RoundedCornerShape(12.dp))
+            .clip(shelfShape)
             .then(
                 if (hasNewSeason) {
-                    Modifier.border(NewSeasonBorderWidth, MaterialTheme.colorScheme.primary, RoundedCornerShape(ShowCardCorner))
+                    Modifier.border(NewSeasonBorderWidth, MaterialTheme.colorScheme.primary, shelfShape)
                 } else {
                     Modifier
                 }
@@ -877,7 +878,7 @@ private fun BadgePill(
 ) {
     Row(
         modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
+            .clip(MaterialTheme.watchBuddyShapes.pill)
             .background(container)
             .padding(horizontal = 8.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
