@@ -221,10 +221,13 @@ The `release-please--` prefix is reserved for the automated release-please bot �
 - `gh pr checks <pr-number> --repo justb81/watchbuddy` → per-job `status` / `conclusion`. Expect `Test & Build` (from `build-android.yml`) and `Backend Tests` (from `test-backend.yml`); the `changes` path-filter jobs may legitimately be skipped.
 - `gh pr view <pr-number> --repo justb81/watchbuddy` → shows PR status and linked CI runs.
 
-**2. Access full build logs with `gh`:**
+**2. Access build logs with `gh` (with efficient filtering):**
 
-- `gh run view <run-id> --job <job-id> --log --repo justb81/watchbuddy` → outputs the **full log for a specific job** (e.g., `Test & Build` or `Backend Tests`). **Always specify a job** to avoid timeouts on large runs; get job IDs from `gh pr view <pr-number> --repo justb81/watchbuddy --json statusCheckRollup` or `gh run view <run-id> --verbose`.
-- `gh run view <run-id> --job <job-id> --log-failed --repo justb81/watchbuddy` → outputs logs for **failed steps only**.
+- `gh run view <run-id> --job <job-id> --log --repo justb81/watchbuddy` → outputs the **full log for a specific job**. **Always specify a job** to avoid timeouts on large runs; get job IDs from `gh pr view <pr-number> --repo justb81/watchbuddy --json statusCheckRollup` or `gh run view <run-id> --verbose`.
+- **Filter for errors to keep context small:** pipe to `grep` to extract only relevant failures:
+  - `gh run view <run-id> --job <job-id> --log --repo justb81/watchbuddy | grep -i "error\|failed\|exception"` — extracts error lines.
+  - `gh run view <run-id> --job <job-id> --log --repo justb81/watchbuddy | grep -B5 -A5 "FAILED"` — shows 5 lines of context around failures.
+- `gh run view <run-id> --job <job-id> --log-failed --repo justb81/watchbuddy` → outputs logs for **failed steps only** (no filtering needed).
 - To find the run ID: use `gh pr view <pr-number> --repo justb81/watchbuddy --json statusCheckRollup`, or check `gh run list --repo justb81/watchbuddy` and filter by PR number.
 
 **3. Read filtered failure excerpts (optional fallback):**
