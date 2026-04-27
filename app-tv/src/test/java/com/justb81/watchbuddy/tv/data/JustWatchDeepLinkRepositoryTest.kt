@@ -94,6 +94,7 @@ class JustWatchDeepLinkRepositoryTest {
 
     @BeforeEach
     fun setUp() {
+        coEvery { dao.get(any(), any(), any(), any(), any()) } returns null
         coEvery { dao.upsert(any()) } just runs
         repository = JustWatchDeepLinkRepository(dao, api)
     }

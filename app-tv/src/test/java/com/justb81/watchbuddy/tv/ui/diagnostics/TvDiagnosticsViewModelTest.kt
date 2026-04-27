@@ -4,7 +4,9 @@ import android.app.Application
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.scrobbler.MediaSessionScrobbler
 import com.justb81.watchbuddy.tv.MainDispatcherRule
+import com.justb81.watchbuddy.tv.data.JustWatchDeepLinkRepository
 import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
+import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -32,6 +34,7 @@ class TvDiagnosticsViewModelTest {
     private val application: Application = mockk(relaxed = true)
     private val phoneDiscovery: PhoneDiscoveryManager = mockk(relaxed = true)
     private val scrobbler: MediaSessionScrobbler = mockk(relaxed = true)
+    private val justWatchRepo: JustWatchDeepLinkRepository = mockk(relaxed = true)
 
     @BeforeEach
     fun setUp() {
@@ -44,6 +47,10 @@ class TvDiagnosticsViewModelTest {
         every { phoneDiscovery.discoveredPhones } returns MutableStateFlow(emptyList())
         every { scrobbler.isListening } returns MutableStateFlow(false)
         every { scrobbler.lastCandidate } returns MutableStateFlow(null)
+        every { scrobbler.lastObservedSession } returns MutableStateFlow(null)
+        coEvery { justWatchRepo.count() } returns 0
+        coEvery { justWatchRepo.negativeCount() } returns 0
+        coEvery { justWatchRepo.lastFetchedAt() } returns null
     }
 
     @AfterEach
@@ -53,7 +60,7 @@ class TvDiagnosticsViewModelTest {
 
     @Test
     fun `recentEvents is empty on fresh VM`() = runTest {
-        val vm = TvDiagnosticsViewModel(application, phoneDiscovery, scrobbler)
+        val vm = TvDiagnosticsViewModel(application, phoneDiscovery, scrobbler, justWatchRepo)
         advanceUntilIdle()
 
         assertTrue(vm.uiState.value.recentEvents.isEmpty())
@@ -61,7 +68,7 @@ class TvDiagnosticsViewModelTest {
 
     @Test
     fun `single event is projected with correct level and newest-first order`() = runTest {
-        val vm = TvDiagnosticsViewModel(application, phoneDiscovery, scrobbler)
+        val vm = TvDiagnosticsViewModel(application, phoneDiscovery, scrobbler, justWatchRepo)
         advanceUntilIdle()
 
         DiagnosticLog.event("TAG", "hello")
@@ -76,7 +83,7 @@ class TvDiagnosticsViewModelTest {
 
     @Test
     fun `recentEvents is truncated to 100 entries newest first`() = runTest {
-        val vm = TvDiagnosticsViewModel(application, phoneDiscovery, scrobbler)
+        val vm = TvDiagnosticsViewModel(application, phoneDiscovery, scrobbler, justWatchRepo)
         advanceUntilIdle()
 
         repeat(150) { i -> DiagnosticLog.event("TAG", "msg $i") }
