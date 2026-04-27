@@ -47,6 +47,11 @@ watchbuddy/
 │       │   ├── settings/   TvSettingsScreen + TvSettingsViewModel (settings hub — discovery, autostart, show-non-installed toggle, diagnostics)
 │       │   ├── showdetail/ ShowDetailScreen, ShowDetailViewModel (next-episode still + TMDB watch providers + installed-app filter + last-used ranking; `NextEpisodeUiState`, `ProviderListUiState` flows)
 │       │   └── theme/      TV Material theme
+├── build-logic/        Gradle convention plugins (included build)
+│   └── convention/
+│       └── src/main/kotlin/
+│           ├── watchbuddy.android.library.gradle.kts    Shared library config: compileSdk, Java 17, Kotlin JVM target, Hilt/KSP plugins, common test deps
+│           └── watchbuddy.android.application.gradle.kts  Everything above + compose-compiler, signing config, NDK debugSymbolLevel, build types, Lint SARIF
 ├── core/               Shared library module
 │   └── src/main/java/com/justb81/watchbuddy/core/
 │       ├── deeplink/   ProviderCatalog (TMDB provider_id → packageName + deep-link template; central source of truth)
@@ -147,6 +152,7 @@ The only exceptions are **localization string resources** (`values-de/`, `values
 - `./gradlew :app-phone:assembleDebug` — phone only
 - `./gradlew :app-tv:assembleDebug` — TV only
 - Secrets via `local.properties` (not checked in) or environment variables for CI
+- Convention plugins live in `build-logic/convention/`. `watchbuddy.android.library` is applied by `core`; `watchbuddy.android.application` is applied by `app-phone` and `app-tv`. Both plugins centralise `compileSdk`, Java/Kotlin 17 options, Hilt/KSP wiring, and test dependencies so module `build.gradle.kts` files declare only what is unique to that module.
 
 ### Static analysis
 - `./gradlew detektAll` — runs detekt (Kotlin static analysis) on every module. Config: `config/detekt/detekt.yml`. Baselines: `<module>/detekt-baseline.xml`.

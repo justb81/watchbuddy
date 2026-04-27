@@ -2,17 +2,14 @@ import com.github.triplet.gradle.androidpublisher.ReleaseStatus
 import com.github.triplet.gradle.androidpublisher.ResolutionStrategy
 
 plugins {
-    alias(libs.plugins.android.application)
+    id("watchbuddy.android.application")
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.kotlin.serialization)
-    alias(libs.plugins.hilt)
-    alias(libs.plugins.ksp)
     alias(libs.plugins.gradle.play.publisher)
 }
 
 android {
     namespace = "com.justb81.watchbuddy"
-    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.justb81.watchbuddy"
@@ -31,9 +28,6 @@ android {
             .orElse("0.29.0").get() // x-release-please-version
 
         // ── Trakt configuration ───────────────────────────────────────────────
-        // Leave empty → app does not use token proxy / does not show Trakt login.
-        // Values can also be set via CI environment variables TRAKT_CLIENT_ID and
-        // TOKEN_BACKEND_URL (recommended for release builds).
         buildConfigField(
             "String", "TRAKT_CLIENT_ID",
             "\"${providers.environmentVariable("TRAKT_CLIENT_ID").orElse("").get()}\""
@@ -44,91 +38,10 @@ android {
         )
 
         // ── TMDB configuration ────────────────────────────────────────────────
-        // A default TMDB API v3 key bundled at build time so the app works out of
-        // the box without requiring users to supply their own key.  Users can still
-        // override it in Settings.  Set via the TMDB_API_KEY CI secret; leave empty
-        // in development builds to force users through the settings flow.
         buildConfigField(
             "String", "DEFAULT_TMDB_API_KEY",
             "\"${providers.environmentVariable("TMDB_API_KEY").orElse("").get()}\""
         )
-
-        // Package native debug symbols into the AAB so Google Play Console can
-        // symbolicate native stack traces.  LiteRT-LM, AICore and Tink all ship
-        // .so libraries.  FULL is required — SYMBOL_TABLE strips line numbers
-        // and Play Console still flags the bundle as "no symbols for debugging"
-        // (#262).  AGP also emits native-debug-symbols.zip alongside the AAB,
-        // which CI uploads to Play and attaches to the GitHub Release.
-        ndk {
-            debugSymbolLevel = "FULL"
-        }
-    }
-
-    // CI signing: keystore path + credentials via environment variables.
-    // takeIf guards against KEYSTORE_FILE being set to an empty string (e.g. when
-    // the secret is absent and the workflow sets the variable to '' as a fallback).
-    val keystoreFile = providers.environmentVariable("KEYSTORE_FILE").orNull?.takeIf { it.isNotBlank() }
-    if (keystoreFile != null) {
-        signingConfigs {
-            create("release") {
-                storeFile = file(keystoreFile)
-                storePassword = providers.environmentVariable("KEYSTORE_PASSWORD").orNull
-                keyAlias = providers.environmentVariable("KEY_ALIAS").orNull
-                keyPassword = providers.environmentVariable("KEY_PASSWORD").orNull
-            }
-        }
-    }
-
-    buildTypes {
-        debug {
-            // Use the release keystore for debug builds when available so that debug
-            // and release APKs share the same signing certificate.  Without this,
-            // upgrading from a CI debug APK to a release APK fails with
-            // INSTALL_FAILED_UPDATE_INCOMPATIBLE because each runner generates a
-            // different ephemeral debug.keystore.
-            if (keystoreFile != null) {
-                signingConfig = signingConfigs.getByName("release")
-            }
-        }
-        release {
-            isMinifyEnabled = true
-            isShrinkResources = true
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = if (keystoreFile != null) {
-                signingConfigs.getByName("release")
-            } else {
-                signingConfigs.getByName("debug")
-            }
-        }
-    }
-
-    testOptions {
-        unitTests.isReturnDefaultValues = true
-        unitTests.isIncludeAndroidResources = true
-    }
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
-
-    buildFeatures {
-        compose = true
-        buildConfig = true
-    }
-
-    // Android Lint: SARIF output is consumed by the GitHub code-scanning upload
-    // in .github/workflows/build-android.yml. abortOnError makes the job fail
-    // on any new finding; the committed lint-baseline.xml covers pre-existing
-    // issues so they don't block new PRs.
-    lint {
-        sarifReport = true
-        htmlReport = true
-        xmlReport = false
-        baseline = file("lint-baseline.xml")
-        abortOnError = true
-        warningsAsErrors = false
-        checkDependencies = true
     }
 
     // Ktor + Netty bring multiple META-INF files — exclude duplicates
@@ -168,8 +81,6 @@ dependencies {
     implementation(libs.navigation.compose)
 
     // Hilt
-    implementation(libs.hilt.android)
-    ksp(libs.hilt.compiler)
     implementation(libs.hilt.lifecycle.viewmodel.compose)
     implementation(libs.hilt.work)
     ksp(libs.hilt.work.compiler)
@@ -197,29 +108,7 @@ dependencies {
     implementation(libs.coil.network.okhttp)
 
     // Testing
-    testImplementation(libs.junit5.api)
-    testImplementation(libs.junit5.params)
-    testRuntimeOnly(libs.junit5.engine)
-    testRuntimeOnly(libs.junit5.platform.launcher)
-    testImplementation(libs.mockk)
-    testImplementation(libs.mockk.android)
-    testImplementation(libs.kotlinx.coroutines.test)
-    testImplementation(libs.turbine)
-    testImplementation(libs.okhttp.mockwebserver)
     testImplementation(libs.ktor.server.test.host)
-    testImplementation(libs.robolectric)
-    testImplementation(libs.androidx.test.core)
-    testImplementation(libs.androidx.arch.core.testing)
-}
-
-kotlin {
-    compilerOptions {
-        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-    }
-}
-
-tasks.withType<Test> {
-    useJUnitPlatform()
 }
 
 // Gradle Play Publisher — uploads phone + TV AABs as one atomic Play edit.
