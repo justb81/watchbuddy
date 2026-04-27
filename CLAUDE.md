@@ -223,10 +223,9 @@ The `release-please--` prefix is reserved for the automated release-please bot �
 
 **2. Access full build logs with `gh`:**
 
-- `gh run view <run-id> --log --repo justb81/watchbuddy` → outputs the **full log** for the entire workflow run.
-- `gh run view <run-id> --job <job-id> --log --repo justb81/watchbuddy` → outputs the **full log for a specific job** (e.g., `Test & Build` or `Backend Tests`).
-- `gh run view <run-id> --log-failed --repo justb81/watchbuddy` → outputs logs for **failed steps only**.
-- To find the run ID: use `gh pr view <pr-number> --repo justb81/watchbuddy --json statusCheckRollup` and extract the workflow run URL, or check `gh run list --repo justb81/watchbuddy` and filter by PR number.
+- `gh run view <run-id> --job <job-id> --log --repo justb81/watchbuddy` → outputs the **full log for a specific job** (e.g., `Test & Build` or `Backend Tests`). **Always specify a job** to avoid timeouts on large runs; get job IDs from `gh pr view <pr-number> --repo justb81/watchbuddy --json statusCheckRollup` or `gh run view <run-id> --verbose`.
+- `gh run view <run-id> --job <job-id> --log-failed --repo justb81/watchbuddy` → outputs logs for **failed steps only**.
+- To find the run ID: use `gh pr view <pr-number> --repo justb81/watchbuddy --json statusCheckRollup`, or check `gh run list --repo justb81/watchbuddy` and filter by PR number.
 
 **3. Read filtered failure excerpts (optional fallback):**
 
