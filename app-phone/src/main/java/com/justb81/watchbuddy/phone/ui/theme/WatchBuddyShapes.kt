@@ -17,8 +17,8 @@ internal data class WatchBuddyShapes(
 
 internal val MaterialTheme.watchBuddyShapes: WatchBuddyShapes
     @Composable get() = WatchBuddyShapes(
-        card      = shapes.large,
-        banner    = shapes.medium,
-        pill      = shapes.medium,
+        card = shapes.large,
+        banner = shapes.medium,
+        pill = shapes.medium,
         thumbnail = shapes.small,
     )

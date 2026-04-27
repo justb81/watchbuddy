@@ -11,9 +11,9 @@ import org.junit.jupiter.api.Test
 class WatchBuddyShapesTest {
 
     private val shapes = WatchBuddyShapes(
-        card      = RoundedCornerShape(16.dp),
-        banner    = RoundedCornerShape(12.dp),
-        pill      = RoundedCornerShape(12.dp),
+        card = RoundedCornerShape(16.dp),
+        banner = RoundedCornerShape(12.dp),
+        pill = RoundedCornerShape(12.dp),
         thumbnail = RoundedCornerShape(8.dp),
     )
 
