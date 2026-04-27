@@ -143,6 +143,25 @@ class MediaSessionScrobbler @Inject constructor(
      */
     private val lastProgressBySessionKey = ConcurrentHashMap<String, LastKnownProgress>()
 
+    /**
+     * Checks notification-listener access on every poll tick, updates [_isListening],
+     * and emits a breadcrumb when the state flips. Returns true when access is granted
+     * and session polling should proceed.
+     */
+    private fun updateListeningState(): Boolean {
+        val granted = notificationAccessChecker()
+        val wasListening = _isListening.value
+        _isListening.value = granted
+        if (wasListening != granted) {
+            if (granted) {
+                DiagnosticLog.event(TAG, "notification access granted — scrobbler resumed")
+            } else {
+                DiagnosticLog.warn(TAG, "notification access revoked — scrobbler paused")
+            }
+        }
+        return granted
+    }
+
     fun startListening(notificationListenerComponent: ComponentName) {
         scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
         val sessionManager = context.getSystemService(Context.MEDIA_SESSION_SERVICE)
@@ -150,17 +169,7 @@ class MediaSessionScrobbler @Inject constructor(
 
         pollingJob = scope.launch {
             while (isActive) {
-                val granted = notificationAccessChecker()
-                val wasListening = _isListening.value
-                _isListening.value = granted
-                if (wasListening != granted) {
-                    if (granted) {
-                        DiagnosticLog.event(TAG, "notification access granted — scrobbler resumed")
-                    } else {
-                        DiagnosticLog.warn(TAG, "notification access revoked — scrobbler paused")
-                    }
-                }
-                if (!granted) {
+                if (!updateListeningState()) {
                     delay(30_000)
                     continue
                 }
