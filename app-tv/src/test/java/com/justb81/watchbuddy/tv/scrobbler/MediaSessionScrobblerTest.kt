@@ -165,4 +165,65 @@ class MediaSessionScrobblerTest {
             assertTrue(enrichedSnapshot.sources.contains("watchNext"))
         }
     }
+
+    // ── NotificationMetadataSource enricher integration ───────────────────────
+
+    @Nested
+    @DisplayName("NotificationMetadataSource enricher — snapshot contains notification lines")
+    inner class NotificationEnricherTest {
+
+        @Test
+        fun `notification lines appear in snapshot when enricher holds a fresh snippet`() = runTest {
+            val notificationSource = NotificationMetadataSource()
+            notificationSource.onPosted(
+                NotificationSnippet(
+                    packageName = "com.netflix.ninja",
+                    title = "Stranger Things",
+                    text = "S4:E1 Chapter One: The Hellfire Club",
+                    subText = "Netflix",
+                    bigText = null,
+                    infoText = null,
+                    postedAtMs = System.currentTimeMillis(),
+                ),
+            )
+
+            val builder = MediaSnapshotBuilder("com.netflix.ninja")
+            notificationSource.enrich(
+                "com.netflix.ninja",
+                PlaybackTick(PlaybackTick.STATE_PLAYING, 60_000, 2_700_000, System.currentTimeMillis()),
+                builder,
+            )
+            val snapshot = builder.build()
+
+            assertTrue(snapshot.text.contains("notification.title: Stranger Things"))
+            assertTrue(snapshot.text.contains("notification.text: S4:E1 Chapter One: The Hellfire Club"))
+            assertTrue(snapshot.text.contains("notification.subText: Netflix"))
+            assertTrue(snapshot.sources.contains("notification"))
+        }
+
+        @Test
+        fun `notification enricher produces no lines when session is not playing`() = runTest {
+            val notificationSource = NotificationMetadataSource()
+            notificationSource.onPosted(
+                NotificationSnippet(
+                    packageName = "com.netflix.ninja",
+                    title = "Stranger Things",
+                    text = "S4:E1",
+                    subText = null,
+                    bigText = null,
+                    infoText = null,
+                    postedAtMs = System.currentTimeMillis(),
+                ),
+            )
+
+            val builder = MediaSnapshotBuilder("com.netflix.ninja")
+            notificationSource.enrich(
+                "com.netflix.ninja",
+                PlaybackTick(PlaybackTick.STATE_PAUSED, 60_000, 2_700_000, System.currentTimeMillis()),
+                builder,
+            )
+
+            assertFalse(builder.build().text.contains("notification."))
+        }
+    }
 }

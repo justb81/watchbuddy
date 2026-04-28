@@ -9,6 +9,7 @@ import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.scrobbler.MediaSessionScrobbler
 import com.justb81.watchbuddy.tv.data.JustWatchDeepLinkRepository
 import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
+import com.justb81.watchbuddy.tv.scrobbler.NotificationMetadataSource
 import com.justb81.watchbuddy.tv.scrobbler.WatchNextMetadataSource
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -41,6 +42,11 @@ data class TvDiagnosticsUiState(
     val lastDeepLinkFetchMs: Long = 0L,
     /** null = not yet checked, PermissionDenied or Success from the WatchNext provider query. */
     val watchNextCountResult: WatchNextMetadataSource.CountResult? = null,
+    /**
+     * Count of distinct packages with a media notification observed in the last
+     * [NotificationMetadataSource.DIAGNOSTICS_WINDOW_MS] (10 min), or null before first refresh.
+     */
+    val notificationTrackedCount: Int? = null,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -51,6 +57,7 @@ class TvDiagnosticsViewModel @Inject constructor(
     scrobbler: MediaSessionScrobbler,
     private val justWatchRepo: JustWatchDeepLinkRepository,
     private val watchNextSource: WatchNextMetadataSource,
+    private val notificationSource: NotificationMetadataSource,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(TvDiagnosticsUiState())
@@ -60,6 +67,7 @@ class TvDiagnosticsViewModel @Inject constructor(
         refreshNotificationAccess()
         refreshJustWatchCacheStats()
         refreshWatchNextStats()
+        refreshNotificationStats()
 
         val discoveryState = combine(
             phoneDiscovery.discoveryActive,
@@ -92,6 +100,7 @@ class TvDiagnosticsViewModel @Inject constructor(
                     negativeDeepLinkCount = _uiState.value.negativeDeepLinkCount,
                     lastDeepLinkFetchMs = _uiState.value.lastDeepLinkFetchMs,
                     watchNextCountResult = _uiState.value.watchNextCountResult,
+                    notificationTrackedCount = _uiState.value.notificationTrackedCount,
                 )
             }.collect { snapshot ->
                 _uiState.update {
@@ -102,6 +111,7 @@ class TvDiagnosticsViewModel @Inject constructor(
                         negativeDeepLinkCount = it.negativeDeepLinkCount,
                         lastDeepLinkFetchMs = it.lastDeepLinkFetchMs,
                         watchNextCountResult = it.watchNextCountResult,
+                        notificationTrackedCount = it.notificationTrackedCount,
                     )
                 }
             }
@@ -159,6 +169,15 @@ class TvDiagnosticsViewModel @Inject constructor(
             val result = withContext(Dispatchers.IO) { watchNextSource.countPublishingApps() }
             _uiState.update { it.copy(watchNextCountResult = result) }
         }
+    }
+
+    /**
+     * Reads the in-memory notification snippet map and updates
+     * [TvDiagnosticsUiState.notificationTrackedCount]. This is a fast in-memory
+     * read — no IO dispatcher required. Call on [Lifecycle.Event.ON_RESUME].
+     */
+    fun refreshNotificationStats() {
+        _uiState.update { it.copy(notificationTrackedCount = notificationSource.recentlyObservedCount()) }
     }
 
     companion object {

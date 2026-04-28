@@ -25,6 +25,7 @@ import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.model.PlaybackTick
 import com.justb81.watchbuddy.core.scrobbler.MediaSessionScrobbler
 import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
+import com.justb81.watchbuddy.tv.scrobbler.NotificationMetadataSource
 import com.justb81.watchbuddy.tv.scrobbler.WatchNextMetadataSource
 
 @OptIn(ExperimentalTvMaterial3Api::class)
@@ -41,6 +42,7 @@ fun TvDiagnosticsScreen(
             if (event == Lifecycle.Event.ON_RESUME) {
                 viewModel.refreshNotificationAccess()
                 viewModel.refreshWatchNextStats()
+                viewModel.refreshNotificationStats()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -191,6 +193,13 @@ fun TvDiagnosticsScreen(
 
             item {
                 WatchNextSection(uiState.watchNextCountResult)
+            }
+
+            item {
+                MediaNotificationsSection(
+                    notificationAccessGranted = uiState.notificationAccessGranted,
+                    trackedCount = uiState.notificationTrackedCount,
+                )
             }
 
             item {
@@ -479,6 +488,33 @@ private fun StreamingDeepLinksSection(
             }
         }
     }
+}
+
+@Composable
+private fun MediaNotificationsSection(
+    notificationAccessGranted: Boolean,
+    trackedCount: Int?,
+) {
+    val (valueStr, status) = when {
+        !notificationAccessGranted -> stringResource(R.string.tv_diagnostics_value_notification_listener_not_connected) to Status.FAIL
+        trackedCount == null -> "—" to Status.NEUTRAL
+        trackedCount > 0 -> pluralStringResource(
+            R.plurals.tv_diagnostics_value_notification_tracked_count,
+            trackedCount,
+            trackedCount,
+        ) to Status.OK
+        else -> stringResource(R.string.tv_diagnostics_value_notification_no_data) to Status.WARN
+    }
+    DiagnosticsSection(
+        title = stringResource(R.string.tv_diagnostics_section_media_notifications),
+        rows = listOf(
+            DiagRow(
+                label = stringResource(R.string.tv_diagnostics_row_notification_tracked),
+                value = valueStr,
+                status = status,
+            ),
+        ),
+    )
 }
 
 @Composable

@@ -5,6 +5,7 @@ import com.justb81.watchbuddy.core.scrobbler.ScrobbleDispatcher
 import com.justb81.watchbuddy.core.scrobbler.TitleExtractor
 import com.justb81.watchbuddy.core.scrobbler.WatchedShowSource
 import com.justb81.watchbuddy.tv.discovery.PhoneTitleExtractionClient
+import com.justb81.watchbuddy.tv.scrobbler.NotificationMetadataSource
 import com.justb81.watchbuddy.tv.scrobbler.TvScrobbleDispatcher
 import com.justb81.watchbuddy.tv.scrobbler.TvWatchedShowSource
 import com.justb81.watchbuddy.tv.scrobbler.WatchNextMetadataSource
@@ -49,10 +50,12 @@ abstract class AppModule {
         @Named("traktClientId")
         fun provideTraktClientId(): String = ""
 
-        /** WatchNextMetadataSource is the first enricher; add future enrichers here. */
+        /** Ordered enricher list: WatchNext first, then media notifications. */
         @Provides
         @Singleton
-        fun provideMetadataEnrichers(watchNext: WatchNextMetadataSource): List<MetadataEnricher> =
-            listOf(watchNext)
+        fun provideMetadataEnrichers(
+            watchNext: WatchNextMetadataSource,
+            notification: NotificationMetadataSource,
+        ): List<MetadataEnricher> = listOf(watchNext, notification)
     }
 }
