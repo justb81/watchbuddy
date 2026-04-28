@@ -7,8 +7,8 @@ import com.justb81.watchbuddy.core.model.ScrobbleCandidate
 import com.justb81.watchbuddy.core.model.TraktEpisode
 import com.justb81.watchbuddy.core.model.TraktIds
 import com.justb81.watchbuddy.core.model.TraktShow
-import com.justb81.watchbuddy.core.scrobbler.MediaSnapshotBuilder
 import com.justb81.watchbuddy.core.scrobbler.MediaSessionScrobbler
+import com.justb81.watchbuddy.core.scrobbler.MediaSnapshotBuilder
 import com.justb81.watchbuddy.core.scrobbler.MetadataEnricher
 import com.justb81.watchbuddy.core.scrobbler.NoOpTitleExtractor
 import com.justb81.watchbuddy.core.scrobbler.ScrobbleDispatcher

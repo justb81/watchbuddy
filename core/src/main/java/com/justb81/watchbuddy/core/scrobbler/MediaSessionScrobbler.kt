@@ -515,9 +515,7 @@ class MediaSessionScrobbler @Inject constructor(
             .onFailure { DiagnosticLog.warn(TAG, "Title extractor threw", it) }
             .getOrNull()
         val llmHit = extraction?.let { resolveExtraction(snapshot, it, cachedShows, mediaTitle) }
-        if (llmHit != null) return llmHit
-
-        return tmdbFallback(snapshot, extraction, bestCheap, mediaTitle)
+        return llmHit ?: tmdbFallback(snapshot, extraction, bestCheap, mediaTitle)
     }
 
     /**
