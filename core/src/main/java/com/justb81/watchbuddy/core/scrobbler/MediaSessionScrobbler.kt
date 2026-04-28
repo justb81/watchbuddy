@@ -532,6 +532,20 @@ class MediaSessionScrobbler @Inject constructor(
         val contentIdHit = resolveByContentId(snapshot, mediaTitle, cachedShows)
         if (contentIdHit != null) return contentIdHit
 
+        return runMatchCascade(snapshot, profile, candidates, cachedShows, mediaTitle)
+    }
+
+    /**
+     * Runs Phases 1–3 of the match cascade after the content-ID short-circuit.
+     * Extracted to keep [matchSnapshot] within the ReturnCount detekt limit.
+     */
+    private suspend fun runMatchCascade(
+        snapshot: MediaMetadataSnapshot,
+        profile: AppProfile?,
+        candidates: List<String>,
+        cachedShows: List<TraktWatchedEntry>,
+        mediaTitle: String,
+    ): ScrobbleCandidate? {
         // skipPhase1: bypass the cheap cache-match and go straight to LLM for apps
         // known to publish only the app name (or similarly useless) metadata.
         if (profile?.skipPhase1 == true) {
