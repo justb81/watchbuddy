@@ -45,6 +45,8 @@ class MediaSessionScrobbler @Inject constructor(
     private val watchedShowSource: WatchedShowSource,
     private val scrobbleDispatcher: ScrobbleDispatcher,
     private val titleExtractor: TitleExtractor,
+    /** Enrichers append additional evidence lines; populated per-app via Hilt. */
+    private val metadataEnrichers: List<MetadataEnricher> = emptyList(),
 ) {
     companion object {
         private const val TAG = "MediaSessionScrobbler"
@@ -65,14 +67,22 @@ class MediaSessionScrobbler @Inject constructor(
      * view so the user can see exactly which evidence lines the streaming app
      * published — `METADATA_KEY_TITLE` is frequently null on Plex, Jellyfin,
      * and some Netflix skins, so surfacing only the title row hides everything.
+     *
+     * [observedAtMs] is kept separately from [tick.capturedAtMs] because it drives
+     * the staleness check for implicit-stop reconciliation (5-minute presence timeout).
      */
     data class LastObservedSession(
         val snapshot: MediaMetadataSnapshot,
-        val playbackState: Int,
-        val positionMs: Long,
-        val durationMs: Long,
+        val tick: PlaybackTick,
         val observedAtMs: Long,
-    )
+    ) {
+        @Deprecated("Use tick.state", ReplaceWith("tick.state"))
+        val playbackState: Int get() = tick.state
+        @Deprecated("Use tick.positionMs", ReplaceWith("tick.positionMs"))
+        val positionMs: Long get() = tick.positionMs
+        @Deprecated("Use tick.durationMs", ReplaceWith("tick.durationMs"))
+        val durationMs: Long get() = tick.durationMs
+    }
 
     /** Strips the `"<tag>: "` prefix from a text-blob line and returns the bare value. */
     private fun String.stripTag(): String = substringAfter(": ", missingDelimiterValue = this).trim()
@@ -184,27 +194,24 @@ class MediaSessionScrobbler @Inject constructor(
                         val packageName = controller.packageName
                         val metadata = controller.metadata
                         val playbackState = controller.playbackState
+                        val tick = buildTick(playbackState, metadata)
                         val snapshot = if (metadata != null) {
-                            buildSnapshot(packageName, metadata)
+                            buildSnapshotWithEnrichers(packageName, metadata, tick)
                         } else {
                             MediaMetadataSnapshot(packageName = packageName)
                         }
-                        val durationMs = metadata
-                            ?.getLong(android.media.MediaMetadata.METADATA_KEY_DURATION) ?: -1L
-                        val state = playbackState?.state ?: -1
-                        val positionMs = playbackState?.position ?: -1L
                         if (!publishedDiagnostics) {
-                            publishObservedSession(snapshot, state, positionMs, durationMs)
+                            publishObservedSession(snapshot, tick)
                             publishedDiagnostics = true
                         }
-                        logSessionIfDebug(snapshot, state, positionMs, durationMs)
+                        logSessionIfDebug(snapshot, tick.state, tick.positionMs, tick.durationMs)
                         val key = snapshot.sessionKey() ?: return@forEach
                         liveKeys.add(key)
                         if (metadata == null || playbackState == null) return@forEach
                         val progress = computeProgress(playbackState, metadata)
                         if (progress != null) recordProgress(key, snapshot, progress)
                         when (playbackState.state) {
-                            PlaybackState.STATE_PLAYING -> processPlayingMedia(snapshot, key, progress)
+                            PlaybackState.STATE_PLAYING -> processPlayingMedia(snapshot, key, progress, tick)
                             PlaybackState.STATE_PAUSED -> handleScrobblePause(snapshot, key, progress)
                             PlaybackState.STATE_STOPPED,
                             PlaybackState.STATE_NONE -> handleScrobbleStop(snapshot, key, progress)
@@ -242,16 +249,30 @@ class MediaSessionScrobbler @Inject constructor(
 
     internal fun publishObservedSession(
         snapshot: MediaMetadataSnapshot,
+        tick: PlaybackTick,
+    ) {
+        _lastObservedSession.value = LastObservedSession(
+            snapshot = snapshot,
+            tick = tick,
+            observedAtMs = System.currentTimeMillis(),
+        )
+    }
+
+    /** Compat overload used by tests that still pass raw state/position/duration ints. */
+    internal fun publishObservedSession(
+        snapshot: MediaMetadataSnapshot,
         playbackState: Int,
         positionMs: Long,
         durationMs: Long,
     ) {
-        _lastObservedSession.value = LastObservedSession(
-            snapshot = snapshot,
-            playbackState = playbackState,
-            positionMs = positionMs,
-            durationMs = durationMs,
-            observedAtMs = System.currentTimeMillis(),
+        publishObservedSession(
+            snapshot,
+            PlaybackTick(
+                state = playbackState,
+                positionMs = positionMs,
+                durationMs = durationMs,
+                capturedAtMs = System.currentTimeMillis(),
+            ),
         )
     }
 
@@ -276,6 +297,40 @@ class MediaSessionScrobbler @Inject constructor(
         builder.add("mediaSession.displaySubtitle", metadata.getString(android.media.MediaMetadata.METADATA_KEY_DISPLAY_SUBTITLE))
         builder.add("mediaSession.title", metadata.getString(android.media.MediaMetadata.METADATA_KEY_TITLE))
         builder.add("mediaSession.displayDescription", metadata.getString(android.media.MediaMetadata.METADATA_KEY_DISPLAY_DESCRIPTION))
+        return builder.build()
+    }
+
+    /** Samples the Android [PlaybackState] and metadata duration into a [PlaybackTick]. */
+    private fun buildTick(
+        playbackState: android.media.session.PlaybackState?,
+        metadata: android.media.MediaMetadata?,
+    ) = PlaybackTick(
+        state = playbackState?.state ?: -1,
+        positionMs = playbackState?.position ?: -1L,
+        durationMs = metadata?.getLong(android.media.MediaMetadata.METADATA_KEY_DURATION) ?: -1L,
+        capturedAtMs = System.currentTimeMillis(),
+    )
+
+    /**
+     * Calls [buildSnapshot] then lets every registered [MetadataEnricher] append
+     * additional evidence lines. Enrichers should short-circuit when [tick] is
+     * not actively playing to avoid querying providers for stale sessions.
+     */
+    private suspend fun buildSnapshotWithEnrichers(
+        packageName: String,
+        metadata: android.media.MediaMetadata,
+        tick: PlaybackTick,
+    ): MediaMetadataSnapshot {
+        if (metadataEnrichers.isEmpty()) return buildSnapshot(packageName, metadata)
+        val builder = MediaSnapshotBuilder(packageName)
+        builder.add("mediaSession.albumArtist", metadata.getString(android.media.MediaMetadata.METADATA_KEY_ALBUM_ARTIST))
+        builder.add("mediaSession.album", metadata.getString(android.media.MediaMetadata.METADATA_KEY_ALBUM))
+        builder.add("mediaSession.artist", metadata.getString(android.media.MediaMetadata.METADATA_KEY_ARTIST))
+        builder.add("mediaSession.displayTitle", metadata.getString(android.media.MediaMetadata.METADATA_KEY_DISPLAY_TITLE))
+        builder.add("mediaSession.displaySubtitle", metadata.getString(android.media.MediaMetadata.METADATA_KEY_DISPLAY_SUBTITLE))
+        builder.add("mediaSession.title", metadata.getString(android.media.MediaMetadata.METADATA_KEY_TITLE))
+        builder.add("mediaSession.displayDescription", metadata.getString(android.media.MediaMetadata.METADATA_KEY_DISPLAY_DESCRIPTION))
+        metadataEnrichers.forEach { it.enrich(packageName, tick, builder) }
         return builder.build()
     }
 
@@ -360,9 +415,10 @@ class MediaSessionScrobbler @Inject constructor(
         snapshot: MediaMetadataSnapshot,
         sessionKey: String,
         progress: Float?,
+        tick: PlaybackTick = PlaybackTick.UNKNOWN,
     ) {
         if (sessionKey == currentlySessionKey) return
-        val candidate = matchSnapshot(snapshot)
+        val candidate = matchSnapshot(snapshot, tick)
         if (candidate == null) {
             if (debugLogMediaSession) {
                 DiagnosticLog.debug(TAG, "no match for '$sessionKey' — best confidence null")
@@ -419,7 +475,15 @@ class MediaSessionScrobbler @Inject constructor(
      *      with the best-scoring candidate (cheap-path best or extractor
      *      output).
      */
-    internal suspend fun matchSnapshot(snapshot: MediaMetadataSnapshot): ScrobbleCandidate? {
+    /**
+     * [tick] is threaded through for future consumers (#474 duration tiebreaker,
+     * #471/#472 freshness gates inside enrichers) but does not influence Phase 1/2/3
+     * scoring in this issue.
+     */
+    internal suspend fun matchSnapshot(
+        snapshot: MediaMetadataSnapshot,
+        tick: PlaybackTick = PlaybackTick.UNKNOWN,
+    ): ScrobbleCandidate? {
         val candidates = snapshot.text.lines().map { it.stripTag() }.filter { it.isNotBlank() }.distinct()
         if (candidates.isEmpty()) return null
         val mediaTitle = candidates.first()

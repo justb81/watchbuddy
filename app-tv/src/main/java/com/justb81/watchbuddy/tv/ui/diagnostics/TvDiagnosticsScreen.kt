@@ -499,17 +499,17 @@ private fun MediaSessionSection(last: MediaSessionScrobbler.LastObservedSession?
         }
         add(DiagRow(
             stringResource(R.string.tv_diagnostics_row_media_session_playback_state),
-            last?.playbackState?.toString() ?: "—",
+            last?.tick?.state?.toString() ?: "—",
             Status.NEUTRAL,
         ))
         add(DiagRow(
             stringResource(R.string.tv_diagnostics_row_media_session_position),
-            last?.positionMs?.let { "${it}ms" } ?: "—",
+            last?.tick?.positionMs?.let { "${it}ms" } ?: "—",
             Status.NEUTRAL,
         ))
         add(DiagRow(
             stringResource(R.string.tv_diagnostics_row_media_session_duration),
-            last?.durationMs?.let { "${it}ms" } ?: "—",
+            last?.tick?.durationMs?.let { "${it}ms" } ?: "—",
             Status.NEUTRAL,
         ))
         add(DiagRow(
