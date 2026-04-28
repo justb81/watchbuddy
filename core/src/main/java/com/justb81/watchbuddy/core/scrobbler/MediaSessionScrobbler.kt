@@ -496,12 +496,14 @@ class MediaSessionScrobbler @Inject constructor(
         if (candidates.isEmpty()) return null
         val mediaTitle = candidates.first()
 
+        // Fetch once — shared by Phase 0.5 and Phase 1 to avoid a double round-trip.
+        val cachedShows = watchedShowSource.getCachedShows()
+
         // Phase 0.5: content-ID short-circuit for trusted prefixes (only `tmdb:` on day one)
-        val contentIdHit = resolveByContentId(snapshot, mediaTitle)
+        val contentIdHit = resolveByContentId(snapshot, mediaTitle, cachedShows)
         if (contentIdHit != null) return contentIdHit
 
         val (globalSeason, globalEpisode) = findGlobalEpisodeMarker(candidates)
-        val cachedShows = watchedShowSource.getCachedShows()
         val bestCheap = candidates
             .map { field -> scoreCandidate(field, cachedShows) }
             .maxByOrNull { it.score }
@@ -526,14 +528,14 @@ class MediaSessionScrobbler @Inject constructor(
      * the user's library. Other prefixes (opaque Netflix/YouTube IDs) fall through to
      * Phase 1 so the snapshot's `watchNext.title` line can still contribute evidence.
      */
-    private suspend fun resolveByContentId(
+    private fun resolveByContentId(
         snapshot: MediaMetadataSnapshot,
         mediaTitle: String,
+        cachedShows: List<TraktWatchedEntry>,
     ): ScrobbleCandidate? {
         val contentId = findSnapshotTag(snapshot, "watchNext.contentId")
             ?.takeIf { it.startsWith("tmdb:") } ?: return null
         val tmdbId = contentId.removePrefix("tmdb:").toIntOrNull() ?: return null
-        val cachedShows = watchedShowSource.getCachedShows()
         val entry = cachedShows.firstOrNull { it.show.ids.tmdb == tmdbId } ?: return null
         val season = findSnapshotTag(snapshot, "watchNext.season")?.toIntOrNull()
         val episode = findSnapshotTag(snapshot, "watchNext.episode")?.toIntOrNull()

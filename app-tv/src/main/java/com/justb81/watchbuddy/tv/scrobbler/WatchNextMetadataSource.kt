@@ -45,7 +45,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class WatchNextMetadataSource @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
 ) : MetadataEnricher {
 
     /** Result of a diagnostic count of apps currently publishing to the WatchNext provider. */
