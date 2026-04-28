@@ -47,7 +47,7 @@ class MediaSessionScrobbler @Inject constructor(
     private val scrobbleDispatcher: ScrobbleDispatcher,
     private val titleExtractor: TitleExtractor,
     /** Enrichers append additional evidence lines; populated per-app via Hilt. */
-    private val metadataEnrichers: List<MetadataEnricher> = emptyList(),
+    private val metadataEnrichers: List<@JvmSuppressWildcards MetadataEnricher> = emptyList(),
 ) {
     companion object {
         private const val TAG = "MediaSessionScrobbler"
