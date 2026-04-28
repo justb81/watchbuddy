@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.30.0](https://github.com/justb81/watchbuddy/compare/v0.29.0...v0.30.0) (2026-04-28)
+
+
+### Features
+
+* **tv:** JustWatch-powered per-episode deep links with persistent cache ([#478](https://github.com/justb81/watchbuddy/issues/478)) ([d1a3202](https://github.com/justb81/watchbuddy/commit/d1a320243b5cd82f57a4a2b52af58c8464c5db95))
+* **tv:** retry dropped scrobbles when phones become reachable again ([#484](https://github.com/justb81/watchbuddy/issues/484)) ([39ad52d](https://github.com/justb81/watchbuddy/commit/39ad52d77d1ba3da9272f4bf65467d17d2387cc9))
+
+
+### Bug Fixes
+
+* **core:** assume 100% progress when duration/position unavailable on scrobble stop ([#482](https://github.com/justb81/watchbuddy/issues/482)) ([0075cab](https://github.com/justb81/watchbuddy/commit/0075cab88417587671ea34c99115184395dfdbca))
+* **tv:** track real notification access in MediaSessionScrobbler per poll tick ([#483](https://github.com/justb81/watchbuddy/issues/483)) ([2f5ac84](https://github.com/justb81/watchbuddy/commit/2f5ac847c32831066f9b7e0546c76163c738e4f6)), closes [#404](https://github.com/justb81/watchbuddy/issues/404)
+
 ## [0.29.0](https://github.com/justb81/watchbuddy/compare/v0.28.3...v0.29.0) (2026-04-23)
 
 
