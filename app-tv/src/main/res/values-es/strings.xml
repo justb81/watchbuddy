@@ -181,6 +181,12 @@
     <string name="tv_diagnostics_section_app_profiles">Perfiles de aplicaciones</string>
     <string name="tv_diagnostics_row_app_profiles_matched">Aplicaciones con perfil</string>
 
+    <!-- Diagnostics — match quality (#474) -->
+    <string name="tv_diagnostics_section_match_quality">Calidad de coincidencia</string>
+    <string name="tv_diagnostics_row_ambiguous_emitted">Solicitudes ambiguas enviadas</string>
+    <string name="tv_diagnostics_row_ambiguous_resolved">Solicitudes resueltas</string>
+    <string name="tv_diagnostics_row_ambiguous_dismissed">Solicitudes descartadas</string>
+
     <!-- Version footer -->
     <string name="settings_version_footer">WatchBuddy v%1$s (build %2$d)</string>
 </resources>

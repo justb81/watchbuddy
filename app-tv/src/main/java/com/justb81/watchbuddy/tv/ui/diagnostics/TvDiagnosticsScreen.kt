@@ -43,6 +43,7 @@ fun TvDiagnosticsScreen(
                 viewModel.refreshWatchNextStats()
                 viewModel.refreshNotificationStats()
                 viewModel.refreshAppProfileStats()
+                viewModel.refreshAmbiguousPromptStats()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -204,6 +205,10 @@ fun TvDiagnosticsScreen(
 
             item {
                 AppProfilesSection(stats = uiState.appProfileStats)
+            }
+
+            item {
+                AmbiguousPromptStatsSection(stats = uiState.ambiguousPromptStats)
             }
 
             item {
@@ -468,6 +473,35 @@ private fun AppProfilesSection(stats: MediaSessionScrobbler.ObservedPackageStats
                 status = status,
             ),
         ),
+    )
+}
+
+@Composable
+private fun AmbiguousPromptStatsSection(stats: MediaSessionScrobbler.AmbiguousPromptStats?) {
+    val rows = if (stats == null) {
+        listOf(DiagRow(label = "—", value = "—", status = Status.NEUTRAL))
+    } else {
+        listOf(
+            DiagRow(
+                label = stringResource(R.string.tv_diagnostics_row_ambiguous_emitted),
+                value = stats.emitted.toString(),
+                status = if (stats.emitted > 0) Status.OK else Status.NEUTRAL,
+            ),
+            DiagRow(
+                label = stringResource(R.string.tv_diagnostics_row_ambiguous_resolved),
+                value = stats.resolved.toString(),
+                status = if (stats.resolved > 0) Status.OK else Status.NEUTRAL,
+            ),
+            DiagRow(
+                label = stringResource(R.string.tv_diagnostics_row_ambiguous_dismissed),
+                value = stats.dismissed.toString(),
+                status = Status.NEUTRAL,
+            ),
+        )
+    }
+    DiagnosticsSection(
+        title = stringResource(R.string.tv_diagnostics_section_match_quality),
+        rows = rows,
     )
 }
 

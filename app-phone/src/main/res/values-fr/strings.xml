@@ -140,6 +140,15 @@
     <string name="companion_notification_permission_rationale_body">WatchBuddy affiche une notification persistante pendant que le service compagnon fonctionne, afin qu\'Android ne l\'arrête pas en silence. Active les notifications dans les réglages de l\'application pour continuer.</string>
     <string name="companion_notification_permission_open_settings">Ouvrir les réglages</string>
 
+    <!-- Ambiguous Scrobble Prompt -->
+    <string name="scrobble_prompt_channel_name">Qu\'est-ce que tu regardes ?</string>
+    <string name="scrobble_prompt_channel_description">Affiche une invite quand le scrobbler ne peut pas identifier ce que vous regardez</string>
+    <string name="scrobble_prompt_title">Qu\'est-ce que tu regardes ?</string>
+    <string name="scrobble_prompt_body_with_app">Tu regardes sur %1$s — choisis la série ci-dessous.</string>
+    <string name="scrobble_prompt_action_not_watching">Ce n\'est pas ce que je regarde</string>
+    <string name="scrobble_prompt_card_title">Qu\'est-ce que tu regardes ?</string>
+    <string name="scrobble_prompt_candidate_cd">Sélectionner %1$s</string>
+
     <!-- Model Download -->
     <string name="model_download_channel_name">Téléchargement du modèle</string>
     <string name="model_download_channel_description">Affiche la progression du téléchargement du modèle IA</string>

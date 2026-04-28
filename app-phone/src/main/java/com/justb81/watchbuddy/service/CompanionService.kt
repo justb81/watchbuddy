@@ -16,6 +16,7 @@ import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
+import com.justb81.watchbuddy.core.model.AmbiguousScrobbleEvent
 import com.justb81.watchbuddy.phone.llm.LlmOrchestrator
 import com.justb81.watchbuddy.phone.server.CompanionHttpServer
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
@@ -38,7 +39,9 @@ class CompanionService : Service() {
     companion object {
         private const val TAG = "CompanionService"
         const val CHANNEL_ID = "companion_service"
+        const val SCROBBLE_PROMPT_CHANNEL_ID = "scrobble_prompts"
         private const val NOTIFICATION_ID = 1
+        private const val SCROBBLE_PROMPT_NOTIFICATION_ID = 2
 
         /** How often to check whether the TV is still polling us. */
         private const val PRESENCE_CHECK_INTERVAL_MS = 60_000L
@@ -52,6 +55,14 @@ class CompanionService : Service() {
          * delay we stop; otherwise the service keeps running (#278).
          */
         private const val WIFI_LOSS_GRACE_MS = 3_000L
+
+        /** Auto-dismiss ambiguous prompt notifications after this many millis. */
+        internal const val PROMPT_TTL_MS = 10 * 60_000L
+        private const val PROMPT_MAX_CANDIDATES = 3
+
+        const val ACTION_SELECT_CANDIDATE = "com.justb81.watchbuddy.ACTION_SELECT_CANDIDATE"
+        const val EXTRA_SESSION_KEY = "extra_session_key"
+        const val EXTRA_TRAKT_ID = "extra_trakt_id"
 
         fun start(context: Context) {
             val intent = Intent(context, CompanionService::class.java)
@@ -110,6 +121,8 @@ class CompanionService : Service() {
         stateManager.setServiceRunning(true)
         registerNetworkCallback()
         startPresenceMonitor()
+        ensureScrobblePromptChannel()
+        observeAmbiguousPrompts()
         return START_STICKY
     }
 
@@ -241,6 +254,85 @@ class CompanionService : Service() {
             .setContentIntent(contentIntent)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .build()
+    }
+
+    // ── Ambiguous scrobble prompt ─────────────────────────────────────────────
+
+    private fun ensureScrobblePromptChannel() {
+        val manager = getSystemService(NotificationManager::class.java)
+        if (manager.getNotificationChannel(SCROBBLE_PROMPT_CHANNEL_ID) == null) {
+            val channel = NotificationChannel(
+                SCROBBLE_PROMPT_CHANNEL_ID,
+                getString(R.string.scrobble_prompt_channel_name),
+                NotificationManager.IMPORTANCE_HIGH,
+            )
+            channel.description = getString(R.string.scrobble_prompt_channel_description)
+            manager.createNotificationChannel(channel)
+        }
+    }
+
+    private fun observeAmbiguousPrompts() {
+        serviceScope.launch {
+            stateManager.pendingPrompt.collect { event ->
+                val nm = getSystemService(NotificationManager::class.java)
+                if (event == null) {
+                    nm.cancel(SCROBBLE_PROMPT_NOTIFICATION_ID)
+                    return@collect
+                }
+                nm.notify(SCROBBLE_PROMPT_NOTIFICATION_ID, buildPromptNotification(event))
+                // TTL: auto-dismiss after PROMPT_TTL_MS
+                serviceScope.launch {
+                    delay(PROMPT_TTL_MS)
+                    stateManager.clearPrompt(event.sessionKey)
+                }
+            }
+        }
+    }
+
+    private fun buildPromptNotification(event: AmbiguousScrobbleEvent): Notification {
+        val appName = runCatching {
+            packageManager.getApplicationLabel(
+                packageManager.getApplicationInfo(event.packageName, 0)
+            ).toString()
+        }.getOrDefault(event.packageName)
+
+        val contentText = getString(R.string.scrobble_prompt_body_with_app, appName)
+        val contentIntent = PendingIntent.getActivity(
+            this,
+            SCROBBLE_PROMPT_NOTIFICATION_ID,
+            Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+            },
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+
+        val builder = NotificationCompat.Builder(this, SCROBBLE_PROMPT_CHANNEL_ID)
+            .setContentTitle(getString(R.string.scrobble_prompt_title))
+            .setContentText(contentText)
+            .setSmallIcon(R.drawable.ic_companion_notification)
+            .setAutoCancel(false)
+            .setCategory(NotificationCompat.CATEGORY_RECOMMENDATION)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setContentIntent(contentIntent)
+
+        event.candidates.take(PROMPT_MAX_CANDIDATES).forEach { candidate ->
+            val label = buildString {
+                append(candidate.show.title)
+                candidate.episode?.let { ep -> append(" — S%02dE%02d".format(ep.season, ep.number)) }
+            }
+            val actionIntent = PendingIntent.getBroadcast(
+                this,
+                candidate.show.ids.trakt ?: candidate.show.title.hashCode(),
+                Intent(ACTION_SELECT_CANDIDATE).apply {
+                    setPackage(packageName)
+                    putExtra(EXTRA_SESSION_KEY, event.sessionKey)
+                    putExtra(EXTRA_TRAKT_ID, candidate.show.ids.trakt)
+                },
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+            )
+            builder.addAction(0, label, actionIntent)
+        }
+        return builder.build()
     }
 
     // ── BLE advertising (sole discovery channel) ─────────────────────────────

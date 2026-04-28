@@ -2,6 +2,7 @@ package com.justb81.watchbuddy.tv.scrobbler
 
 import android.util.Log
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
+import com.justb81.watchbuddy.core.model.AmbiguousScrobbleEvent
 import com.justb81.watchbuddy.core.model.TraktEpisode
 import com.justb81.watchbuddy.core.model.TraktShow
 import com.justb81.watchbuddy.core.scrobbler.ScrobbleDispatcher
@@ -19,6 +20,8 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import retrofit2.HttpException
 import java.io.IOException
+import java.util.Collections
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -72,6 +75,10 @@ class TvScrobbleDispatcher(
 
     private val queueMutex = Mutex()
     private val pendingQueue = ArrayDeque<QueuedScrobble>()
+
+    /** Session keys for which an ambiguous prompt has already been dispatched. Cleared on resolution. */
+    private val dispatchedAmbiguousKeys: MutableSet<String> =
+        Collections.newSetFromMap(ConcurrentHashMap())
 
     init {
         replayScope.launch {
@@ -176,4 +183,41 @@ class TvScrobbleDispatcher(
 
     override suspend fun dispatchStop(show: TraktShow, episode: TraktEpisode, progress: Float) =
         dispatch(ScrobbleAction.STOP, show, episode, progress)
+
+    /**
+     * Fans [event] to every reachable phone in parallel. Idempotent on [AmbiguousScrobbleEvent.sessionKey]:
+     * if the same session key has been dispatched already (and not yet resolved via
+     * [clearResolvedPrompt]), this is a no-op so repeated poll cycles don't stack notifications.
+     */
+    suspend fun dispatchAmbiguous(event: AmbiguousScrobbleEvent) {
+        if (!dispatchedAmbiguousKeys.add(event.sessionKey)) return
+        val phones = availablePhones()
+        if (phones.isEmpty()) {
+            DiagnosticLog.warn(TAG, "ambiguous prompt dropped — no phones reachable for '${event.sessionKey}'")
+            dispatchedAmbiguousKeys.remove(event.sessionKey)
+            return
+        }
+        coroutineScope {
+            phones.forEach { phone ->
+                launch {
+                    try {
+                        val client = phoneApiClientFactory.createClient(phone.baseUrl)
+                        client.scrobblePrompt(event)
+                        Log.i(TAG, "Ambiguous prompt sent to ${phone.baseUrl}: ${event.sessionKey}")
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: IOException) {
+                        Log.e(TAG, "Ambiguous prompt failed for ${phone.baseUrl}", e)
+                    } catch (e: HttpException) {
+                        Log.e(TAG, "Ambiguous prompt HTTP error for ${phone.baseUrl}: ${e.code()}", e)
+                    }
+                }
+            }
+        }
+    }
+
+    /** Call when the phone reports that [sessionKey] has been resolved, so it won't be re-dispatched. */
+    fun clearResolvedPrompt(sessionKey: String) {
+        dispatchedAmbiguousKeys.remove(sessionKey)
+    }
 }

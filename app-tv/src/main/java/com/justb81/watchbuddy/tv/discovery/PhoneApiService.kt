@@ -1,5 +1,6 @@
 package com.justb81.watchbuddy.tv.discovery
 
+import com.justb81.watchbuddy.core.model.AmbiguousScrobbleEvent
 import com.justb81.watchbuddy.core.model.EnrichedShowEntry
 import com.justb81.watchbuddy.core.model.TitleExtractionRequest
 import com.justb81.watchbuddy.core.model.TitleExtractionResponse
@@ -38,6 +39,13 @@ interface PhoneApiService {
 
     @POST("/scrobble/extract")
     suspend fun extractTitle(@Body body: TitleExtractionRequest): TitleExtractionResponse
+
+    /**
+     * Delivers an ambiguous scrobble prompt to the phone. Returns 204 No Content
+     * when accepted; the prompt is consumed via state streams on the phone side.
+     */
+    @POST("/scrobble/prompt")
+    suspend fun scrobblePrompt(@Body body: AmbiguousScrobbleEvent): PhoneScrobbleActionResponse
 }
 
 @Serializable

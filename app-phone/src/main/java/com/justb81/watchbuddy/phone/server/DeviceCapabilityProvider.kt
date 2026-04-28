@@ -63,7 +63,9 @@ class DeviceCapabilityProvider @Inject constructor(
             isAvailable = true,
             tmdbConfigured = tmdbKey.isNotBlank(),
             tmdbApiKey = tmdbKey.ifBlank { null },
-            avatarSource = settings.avatarSource
+            avatarSource = settings.avatarSource,
+            lastResolvedSessionKey = stateManager.lastResolvedSessionKey.value,
+            lastResolvedTraktId = stateManager.lastResolvedTraktId.value,
         )
     }
 

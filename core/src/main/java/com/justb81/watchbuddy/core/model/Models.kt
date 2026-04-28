@@ -9,7 +9,9 @@ import kotlinx.serialization.Serializable
 data class TraktShow(
     val title: String,
     val year: Int? = null,
-    val ids: TraktIds
+    val ids: TraktIds,
+    /** Episode runtime in minutes. Populated when fetched with extended=full; null otherwise. */
+    val runtime: Int? = null,
 )
 
 @Serializable
@@ -141,7 +143,20 @@ data class DeviceCapability(
      * GENERATED → TV renders deterministic initials from [userName]; [userAvatarUrl] is null.
      * CUSTOM → [userAvatarUrl] points at this phone's `/avatar?v=N` endpoint.
      */
-    val avatarSource: AvatarSource = AvatarSource.TRAKT
+    val avatarSource: AvatarSource = AvatarSource.TRAKT,
+    /**
+     * Session key of the most recently resolved ambiguous prompt, or null when no prompt
+     * has been resolved since service start. The TV reads this to stop re-dispatching the
+     * same ambiguous prompt (#474). Null-safe: old phone builds without this field default
+     * it to null via WatchBuddyJson's lenient decoding.
+     */
+    val lastResolvedSessionKey: String? = null,
+    /**
+     * Trakt ID of the show the user selected for [lastResolvedSessionKey], or null
+     * when no prompt has been resolved. Used by the TV to record evidence hints in
+     * [TvShowCache] so the same metadata shape short-circuits Phase 1 next time.
+     */
+    val lastResolvedTraktId: Int? = null,
 )
 
 enum class LlmBackend { AICORE, LITERT, NONE }
@@ -269,6 +284,42 @@ data class ScrobbleDisplayEvent(
     val episode: TraktEpisode,
     val progress: Float,
     val timestamp: Long
+)
+
+// ── Ambiguous Scrobble Prompt ─────────────────────────────────────────────────
+
+/**
+ * One candidate show suggested to the user in an ambiguous-scrobble prompt.
+ * [sourceLabel] is "library", "tmdb", or "llm-hint" for UI grouping / diagnostics.
+ * [score] is the runtimeAffinity-weighted fuzzy score (0.40–0.69 for prompt candidates).
+ */
+@Serializable
+data class AmbiguousCandidate(
+    val show: TraktShow,
+    val episode: TraktEpisode? = null,
+    val score: Float,
+    val sourceLabel: String,
+)
+
+/**
+ * Emitted by [MediaSessionScrobbler] when Phase 1/2/3 all fail to clear the
+ * [OVERLAY_THRESHOLD] but at least one candidate scores ≥ [AMBIGUOUS_THRESHOLD].
+ *
+ * The TV fans this to every connected phone via `POST /scrobble/prompt`. The phone
+ * presents a notification and/or in-app card so the user can pick the correct show.
+ *
+ * [sessionKey] identifies the MediaSession that triggered this prompt; it is used
+ * for dedup (the TV won't re-dispatch the same session) and for clearing the prompt
+ * after resolution (the phone reports back via [DeviceCapability.lastResolvedSessionKey]).
+ */
+@Serializable
+data class AmbiguousScrobbleEvent(
+    val sessionKey: String,
+    val packageName: String,
+    /** Top-3 candidates sorted DESC by score. */
+    val candidates: List<AmbiguousCandidate>,
+    val tick: PlaybackTick,
+    val capturedAtMs: Long,
 )
 
 // ── TMDB Watch Providers ──────────────────────────────────────────────────────

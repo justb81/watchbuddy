@@ -6,8 +6,10 @@ import com.justb81.watchbuddy.core.model.TmdbProgressHint
 import com.justb81.watchbuddy.core.model.TmdbSeasonSummary
 import com.justb81.watchbuddy.core.model.TraktWatchedEpisode
 import com.justb81.watchbuddy.core.model.TraktWatchedSeason
+import com.justb81.watchbuddy.core.trakt.TraktApiService
 import com.justb81.watchbuddy.phone.MainDispatcherRule
 import com.justb81.watchbuddy.phone.TestFixtures
+import com.justb81.watchbuddy.phone.auth.TokenRefreshManager
 import com.justb81.watchbuddy.phone.auth.TokenRepository
 import com.justb81.watchbuddy.phone.network.WifiStateProvider
 import com.justb81.watchbuddy.phone.server.ShowRepository
@@ -48,6 +50,8 @@ class HomeViewModelTest {
     private val application: Application = mockk(relaxed = true)
     private val showRepository: ShowRepository = mockk(relaxed = true)
     private val tokenRepository: TokenRepository = mockk(relaxed = true)
+    private val tokenRefreshManager: TokenRefreshManager = mockk(relaxed = true)
+    private val traktApiService: TraktApiService = mockk(relaxed = true)
     private val settingsRepository: SettingsRepository = mockk(relaxed = true)
     private val companionStateManager = CompanionStateManager()
     private val wifiStateProvider: WifiStateProvider = mockk(relaxed = true)
@@ -86,6 +90,8 @@ class HomeViewModelTest {
         application = application,
         showRepository = showRepository,
         tokenRepository = tokenRepository,
+        tokenRefreshManager = tokenRefreshManager,
+        traktApiService = traktApiService,
         settingsRepository = settingsRepository,
         companionStateManager = companionStateManager,
         wifiStateProvider = wifiStateProvider

@@ -148,6 +148,15 @@
     <string name="companion_notification_permission_rationale_body">WatchBuddy shows a persistent notification while the companion service is running so Android doesn\'t silently stop it. Enable notifications in the app settings to start watching.</string>
     <string name="companion_notification_permission_open_settings">Open settings</string>
 
+    <!-- Ambiguous Scrobble Prompt -->
+    <string name="scrobble_prompt_channel_name">What Are You Watching?</string>
+    <string name="scrobble_prompt_channel_description">Shows a prompt when the scrobbler can\'t identify what you\'re watching</string>
+    <string name="scrobble_prompt_title">What are you watching?</string>
+    <string name="scrobble_prompt_body_with_app">Watching on %1$s — pick the show below.</string>
+    <string name="scrobble_prompt_action_not_watching">Not what I\'m watching</string>
+    <string name="scrobble_prompt_card_title">What are you watching?</string>
+    <string name="scrobble_prompt_candidate_cd">Select %1$s</string>
+
     <!-- Model Download -->
     <string name="model_download_channel_name">Model Download</string>
     <string name="model_download_channel_description">Shows progress while downloading the AI model</string>

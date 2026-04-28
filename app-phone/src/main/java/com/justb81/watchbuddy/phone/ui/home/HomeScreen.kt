@@ -41,6 +41,8 @@ import coil3.compose.AsyncImage
 import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.core.logging.CrashReporter
 import com.justb81.watchbuddy.core.logging.DiagnosticShare
+import com.justb81.watchbuddy.core.model.AmbiguousCandidate
+import com.justb81.watchbuddy.core.model.AmbiguousScrobbleEvent
 import com.justb81.watchbuddy.core.model.EnrichedShowEntry
 import com.justb81.watchbuddy.core.model.ScrobbleAction
 import com.justb81.watchbuddy.core.model.ScrobbleDisplayEvent
@@ -226,6 +228,9 @@ fun HomeScreen(
                             state = uiState,
                             onShowClick = onShowClick,
                             onToggleWatchingTv = handleToggleWatchingTv,
+                            onSelectCandidate = { event, candidate ->
+                                viewModel.selectCandidate(event, candidate)
+                            },
                             isRefreshing = uiState.isSyncing,
                             onRefresh = { viewModel.sync() }
                         )
@@ -236,12 +241,14 @@ fun HomeScreen(
     }
 }
 
+@Suppress("LongMethod")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun HomeContent(
     state: HomeUiState,
     onShowClick: (Int) -> Unit,
     onToggleWatchingTv: (Boolean) -> Unit,
+    onSelectCandidate: (AmbiguousScrobbleEvent, AmbiguousCandidate) -> Unit,
     isRefreshing: Boolean,
     onRefresh: () -> Unit
 ) {
@@ -276,8 +283,16 @@ private fun HomeContent(
                 onToggle = onToggleWatchingTv
             )
         }
-        state.latestScrobbleEvent?.let { event ->
-            item { NowWatchingCard(event = event) }
+        when {
+            state.latestScrobbleEvent != null ->
+                item { NowWatchingCard(event = state.latestScrobbleEvent) }
+            state.pendingAmbiguousPrompt != null ->
+                item {
+                    AmbiguousScrobbleCard(
+                        event = state.pendingAmbiguousPrompt,
+                        onSelectCandidate = onSelectCandidate,
+                    )
+                }
         }
 
         if (continueWatching.isNotEmpty()) {
@@ -564,6 +579,55 @@ private fun NowWatchingCard(event: ScrobbleDisplayEvent) {
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.7f)
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AmbiguousScrobbleCard(
+    event: AmbiguousScrobbleEvent,
+    onSelectCandidate: (AmbiguousScrobbleEvent, AmbiguousCandidate) -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.watchBuddyShapes.card,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                text = stringResource(R.string.scrobble_prompt_card_title),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.7f),
+            )
+            event.candidates.forEach { candidate ->
+                val label = buildString {
+                    append(candidate.show.title)
+                    candidate.episode?.let { ep ->
+                        append(" — S%02dE%02d".format(ep.season, ep.number))
+                    }
+                }
+                val cd = stringResource(R.string.scrobble_prompt_candidate_cd, candidate.show.title)
+                OutlinedButton(
+                    onClick = { onSelectCandidate(event, candidate) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .semantics { contentDescription = cd },
+                    shape = MaterialTheme.shapes.small,
+                ) {
+                    Text(
+                        text = label,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
     }

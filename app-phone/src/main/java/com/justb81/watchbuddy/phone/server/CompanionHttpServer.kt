@@ -2,12 +2,14 @@ package com.justb81.watchbuddy.phone.server
 
 import com.justb81.watchbuddy.core.locale.LocaleHelper
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
+import com.justb81.watchbuddy.core.model.AmbiguousScrobbleEvent
 import com.justb81.watchbuddy.core.model.ScrobbleAction
 import com.justb81.watchbuddy.core.model.ScrobbleDisplayEvent
 import com.justb81.watchbuddy.core.model.TitleExtractionRequest
 import com.justb81.watchbuddy.core.model.TitleExtractionResponse
 import com.justb81.watchbuddy.core.model.TraktEpisode
 import com.justb81.watchbuddy.core.model.TraktShow
+import com.justb81.watchbuddy.core.network.WatchBuddyJson
 import com.justb81.watchbuddy.core.tmdb.TmdbApiService
 import com.justb81.watchbuddy.core.tmdb.TmdbCache
 import com.justb81.watchbuddy.core.trakt.ScrobbleBody
@@ -19,11 +21,8 @@ import com.justb81.watchbuddy.phone.llm.RecapGenerator
 import com.justb81.watchbuddy.phone.settings.AvatarImageStore
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import com.justb81.watchbuddy.service.CompanionStateManager
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.flow.first
 import io.ktor.http.*
+import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
@@ -31,8 +30,10 @@ import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import com.justb81.watchbuddy.core.network.WatchBuddyJson
-import io.ktor.serialization.kotlinx.json.*
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.first
 import kotlinx.serialization.Serializable
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -55,6 +56,7 @@ private const val MAX_PAGE_SIZE = 200
  *   POST /scrobble/stop        → Forward scrobble stop to this user's Trakt account
  *   POST /scrobble/extract     → LLM fallback — normalize raw MediaSession
  *                                metadata into (showTitle, season?, episode?)
+ *   POST /scrobble/prompt      → Deliver ambiguous-scrobble prompt; consumed via state stream
  */
 @Singleton
 class CompanionHttpServer @Inject constructor(
@@ -300,6 +302,20 @@ internal fun Application.configureCompanionRoutes(
                 DiagnosticLog.warn(TAG, "title extraction failed", e)
                 call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("Extraction failed"))
             }
+        }
+
+        post("/scrobble/prompt") {
+            val event = try {
+                call.receive<AmbiguousScrobbleEvent>()
+            } catch (_: Exception) {
+                return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid request body"))
+            }
+            stateManager.onAmbiguousPrompt(event)
+            DiagnosticLog.event(
+                TAG,
+                "ambiguous prompt received sessionKey='${event.sessionKey}' candidates=${event.candidates.size}",
+            )
+            call.respond(HttpStatusCode.NoContent)
         }
     }
 }
