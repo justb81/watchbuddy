@@ -48,7 +48,7 @@ class LiteRtLlmProviderTest {
 
     private fun throwingHandle(message: String = "Engine failure"): LiteRtLlmProvider.EngineHandle =
         object : LiteRtLlmProvider.EngineHandle {
-            override fun sendMessage(prompt: String): String = throw RuntimeException(message)
+            override fun sendMessage(prompt: String): String = throw IllegalStateException(message)
         }
 
     private fun provider(factory: LiteRtLlmProvider.EngineFactory): LiteRtLlmProvider =
@@ -83,8 +83,11 @@ class LiteRtLlmProviderTest {
             var callCount = 0
             val factory = LiteRtLlmProvider.EngineFactory { _, useGpu ->
                 callCount++
-                if (useGpu) throw RuntimeException("GPU init failed")
-                else fakeHandle("CPU response")
+                if (useGpu) {
+                    throw IllegalStateException("GPU init failed")
+                } else {
+                    fakeHandle("CPU response")
+                }
             }
             val result = provider(factory).generate("test prompt")
             assertEquals("CPU response", result)
@@ -125,7 +128,7 @@ class LiteRtLlmProviderTest {
         fun `exception propagates when GPU and CPU both fail`() = runTest {
             createModelFile()
             val factory = LiteRtLlmProvider.EngineFactory { _, _ -> throwingHandle("all failed") }
-            assertThrows<RuntimeException> {
+            assertThrows<IllegalStateException> {
                 provider(factory).generate("test prompt")
             }
         }
