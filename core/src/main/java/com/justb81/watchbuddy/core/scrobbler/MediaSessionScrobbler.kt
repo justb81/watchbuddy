@@ -910,7 +910,7 @@ class MediaSessionScrobbler @Inject constructor(
      * show-title slice of this field; [cacheEntry] is the winning entry (null
      * when the library is empty or the field was unusable).
      */
-    private data class CheapMatch(
+    internal data class CheapMatch(
         val rawField: String,
         val normalizedTitle: String,
         val season: Int?,
