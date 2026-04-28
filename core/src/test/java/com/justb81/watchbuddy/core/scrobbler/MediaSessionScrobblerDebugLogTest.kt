@@ -42,10 +42,7 @@ class MediaSessionScrobblerDebugLogTest {
         scrobbler.debugLogMediaSession = false
 
         scrobbler.logSessionIfDebug(
-            snapshot = MediaMetadataSnapshot(
-                packageName = "com.netflix.ninja",
-                title = "Breaking Bad S01E01",
-            ),
+            snapshot = snapshotOf("com.netflix.ninja", "title" to "Breaking Bad S01E01"),
             state = 3,
             positionMs = 1234L,
             durationMs = 2600000L,
@@ -61,10 +58,7 @@ class MediaSessionScrobblerDebugLogTest {
         scrobbler.debugLogMediaSession = true
 
         scrobbler.logSessionIfDebug(
-            snapshot = MediaMetadataSnapshot(
-                packageName = "com.netflix.ninja",
-                title = "Breaking Bad S01E01",
-            ),
+            snapshot = snapshotOf("com.netflix.ninja", "title" to "Breaking Bad S01E01"),
             state = 3,
             positionMs = 1234L,
             durationMs = 2600000L,
@@ -76,14 +70,14 @@ class MediaSessionScrobblerDebugLogTest {
         val entry = sessionEntries.single()
         assertEquals(DiagnosticLog.Level.INFO, entry.level)
         assertTrue(entry.message.contains("pkg=com.netflix.ninja"))
-        assertTrue(entry.message.contains("title='Breaking Bad S01E01'"))
+        assertTrue(entry.message.contains("Breaking Bad S01E01"))
         assertTrue(entry.message.contains("state=3"))
         assertTrue(entry.message.contains("pos=1234ms"))
         assertTrue(entry.message.contains("dur=2600000ms"))
     }
 
     @Test
-    fun `renders null title as literal placeholder`() {
+    fun `renders blank snapshot as no-evidence placeholder`() {
         scrobbler.debugLogMediaSession = true
 
         scrobbler.logSessionIfDebug(
@@ -95,21 +89,19 @@ class MediaSessionScrobblerDebugLogTest {
 
         val entry = DiagnosticLog.snapshot()
             .single { it.message.startsWith("session pkg=") }
-        assertTrue(entry.message.contains("title='(null)'"))
+        assertTrue(entry.message.contains("(no evidence)"))
     }
 
     @Test
-    fun `breadcrumb includes every non-null MediaMetadata field`() {
+    fun `breadcrumb includes all evidence lines joined with pipe`() {
         scrobbler.debugLogMediaSession = true
 
         scrobbler.logSessionIfDebug(
-            snapshot = MediaMetadataSnapshot(
-                packageName = "com.plexapp.android",
-                title = null,
-                displayTitle = "Pilot",
-                displaySubtitle = "S01E01",
-                albumArtist = "Breaking Bad",
-                album = null,
+            snapshot = snapshotOf(
+                "com.plexapp.android",
+                "albumArtist" to "Breaking Bad",
+                "displaySubtitle" to "S01E01",
+                "displayTitle" to "Pilot",
             ),
             state = 3,
             positionMs = 100L,
@@ -119,10 +111,8 @@ class MediaSessionScrobblerDebugLogTest {
         val entry = DiagnosticLog.snapshot()
             .single { it.message.startsWith("session pkg=") }
         assertTrue(entry.message.contains("pkg=com.plexapp.android"))
-        assertTrue(entry.message.contains("title='(null)'"))
-        assertTrue(entry.message.contains("displayTitle='Pilot'"))
-        assertTrue(entry.message.contains("displaySubtitle='S01E01'"))
-        assertTrue(entry.message.contains("albumArtist='Breaking Bad'"))
-        assertTrue(entry.message.contains("album='(null)'"))
+        assertTrue(entry.message.contains("Breaking Bad"))
+        assertTrue(entry.message.contains("S01E01"))
+        assertTrue(entry.message.contains("Pilot"))
     }
 }

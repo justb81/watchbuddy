@@ -3,6 +3,7 @@ package com.justb81.watchbuddy.phone.di
 import android.content.Context
 import androidx.work.WorkManager
 import com.justb81.watchbuddy.BuildConfig
+import com.justb81.watchbuddy.core.scrobbler.MetadataEnricher
 import com.justb81.watchbuddy.core.scrobbler.NoOpTitleExtractor
 import com.justb81.watchbuddy.core.scrobbler.TitleExtractor
 import dagger.Module
@@ -78,4 +79,9 @@ object AppModule {
     @Provides
     @Singleton
     fun provideTitleExtractor(): TitleExtractor = NoOpTitleExtractor
+
+    /** No enrichers registered in the phone app yet; populated per-app via Hilt. */
+    @Provides
+    @Singleton
+    fun provideMetadataEnrichers(): List<MetadataEnricher> = emptyList()
 }

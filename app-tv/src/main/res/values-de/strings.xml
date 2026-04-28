@@ -134,6 +134,11 @@
     <string name="tv_diagnostics_value_no_phones">Noch keine Telefone gefunden.</string>
     <string name="tv_diagnostics_section_recent_events">Letzte Ereignisse</string>
     <string name="tv_diagnostics_value_no_events">Noch keine Ereignisse</string>
+    <string name="tv_diagnostics_section_now_playing">Jetzt läuft</string>
+    <string name="tv_diagnostics_row_now_playing_package">App</string>
+    <string name="tv_diagnostics_row_now_playing_title">Titel</string>
+    <string name="tv_diagnostics_row_now_playing_state">Status</string>
+    <string name="tv_diagnostics_row_now_playing_progress">Fortschritt</string>
     <string name="tv_diagnostics_section_media_session">Letzte Mediensitzung</string>
     <string name="tv_diagnostics_row_media_session_package">Paket</string>
     <string name="tv_diagnostics_row_media_session_title">Titel</string>

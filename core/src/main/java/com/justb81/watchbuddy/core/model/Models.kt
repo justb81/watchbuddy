@@ -151,6 +151,39 @@ enum class AvatarSource { TRAKT, GENERATED, CUSTOM }
 
 // ── Scrobble / Session ────────────────────────────────────────────────────────
 
+/**
+ * Fast-changing playback state sampled once per poll tick, kept separate from
+ * [MediaMetadataSnapshot] which is invariant for the duration of an episode.
+ *
+ * [state] mirrors Android's `PlaybackState.STATE_*` integer constants.
+ * [positionMs] and [durationMs] are -1 when the streaming app does not report them.
+ */
+@Serializable
+data class PlaybackTick(
+    val state: Int,
+    val positionMs: Long,
+    val durationMs: Long,
+    val capturedAtMs: Long,
+) {
+    val progress: Float
+        get() = if (durationMs > 0 && positionMs >= 0) {
+            (positionMs.toFloat() / durationMs).coerceIn(0f, 1f)
+        } else {
+            0f
+        }
+
+    val isPlaying: Boolean get() = state == STATE_PLAYING
+    val isStopped: Boolean get() = state == STATE_STOPPED || state == STATE_NONE
+
+    companion object {
+        const val STATE_NONE = 0
+        const val STATE_STOPPED = 1
+        const val STATE_PAUSED = 2
+        const val STATE_PLAYING = 3
+        val UNKNOWN = PlaybackTick(state = -1, positionMs = -1L, durationMs = -1L, capturedAtMs = 0L)
+    }
+}
+
 @Serializable
 data class ScrobbleCandidate(
     val packageName: String,
@@ -161,36 +194,26 @@ data class ScrobbleCandidate(
 )
 
 /**
- * Structured view of the MediaMetadata fields a streaming app publishes for the
- * currently-playing session. Streaming apps distribute signal across several
- * fields (Plex puts the show in ALBUM_ARTIST, Jellyfin in ALBUM, some Netflix
- * skins use DISPLAY_SUBTITLE for SxxExx) so the scrobbler tries them all before
- * falling back to the LLM extractor.
+ * One stable string of evidence per session tick, plus the package name.
+ *
+ * [text] is a newline-joined sequence of `"<sourceTag>: <value>"` lines written
+ * in priority order by [com.justb81.watchbuddy.core.scrobbler.MediaSnapshotBuilder].
+ * For the MediaSession-only case the tag prefix is `mediaSession.*`. Additional
+ * enrichers (#471, #472) append their own prefixed lines without changing the schema.
+ *
+ * Wire-format note: [text] defaults to an empty string so that a TV client built
+ * against the old schema (which sent 8 named fields instead of [text]) is
+ * deserialized gracefully by a new phone — [WatchBuddyJson] ignores unknown keys,
+ * and an empty [text] naturally yields confidence 0 from the extraction cascade.
+ *
+ * [sources] records which enrichers contributed; used for diagnostics only.
  */
 @Serializable
 data class MediaMetadataSnapshot(
     val packageName: String,
-    val title: String? = null,
-    val displayTitle: String? = null,
-    val displaySubtitle: String? = null,
-    val displayDescription: String? = null,
-    val artist: String? = null,
-    val albumArtist: String? = null,
-    val album: String? = null,
-) {
-    /**
-     * Candidate strings to try for SxxExx parsing + fuzzy matching, ordered by
-     * how likely they are to hold the show title: `ALBUM_ARTIST` > `ALBUM` >
-     * `ARTIST` > `DISPLAY_TITLE` > `DISPLAY_SUBTITLE` > `TITLE` >
-     * `DISPLAY_DESCRIPTION`. Empty / blank values are filtered; duplicates are
-     * collapsed so the fuzzy cascade doesn't redo the same scoring twice.
-     */
-    fun candidateStrings(): List<String> =
-        listOfNotNull(albumArtist, album, artist, displayTitle, displaySubtitle, title, displayDescription)
-            .map { it.trim() }
-            .filter { it.isNotBlank() }
-            .distinct()
-}
+    val text: String = "",
+    val sources: Set<String> = emptySet(),
+)
 
 /**
  * Minimal show reference shipped to the LLM extractor so it can prefer a library

@@ -26,15 +26,11 @@ import org.junit.jupiter.api.Test
 /**
  * Regression tests for the null-`METADATA_KEY_TITLE` scrobble cascade. Previously
  * the polling loop early-returned when TITLE was null, dropping every Plex,
- * Jellyfin, and Netflix-skin session that ships the show in another field. The
- * fix identifies sessions by the first non-blank `candidateStrings()` entry
- * instead of raw title, so pause/stop dedup + vanished-stop reconciliation keep
- * working when TITLE is unavailable.
+ * Jellyfin, and Netflix-skin session that ships the show in another field.
  *
- * Also covers the `lastObservedSession` diagnostics StateFlow that surfaces the
- * full `MediaMetadataSnapshot` in the TV diagnostics view regardless of whether
- * a scrobble fired — so the user can see exactly what each streaming app is
- * publishing, rather than just a single "title='(null)'" row.
+ * With the text-blob snapshot shape the cascade iterates evidence lines in
+ * builder-insertion order, so albumArtist comes first regardless of whether
+ * the `title` field is present.
  */
 @DisplayName("MediaSessionScrobbler — null TITLE cascade + lastObservedSession")
 class MediaSessionScrobblerNullTitleTest {
@@ -52,15 +48,13 @@ class MediaSessionScrobblerNullTitleTest {
     )
     private val breakingBadEntry = TraktWatchedEntry(show = breakingBadShow)
 
-    // Plex: TITLE = episode name, ALBUM_ARTIST = show, DISPLAY_SUBTITLE = S##E##
-    // sessionKey = "${packageName}:${candidateStrings().first()}" — priority order
-    // is: albumArtist > album > artist > displayTitle > displaySubtitle > title >
-    // displayDescription, so the Plex snapshot below keys on "Breaking Bad".
-    private val plexPlayingSnapshot = MediaMetadataSnapshot(
-        packageName = "com.plexapp.android",
-        title = null,
-        albumArtist = "Breaking Bad",
-        displaySubtitle = "S01E01",
+    // Plex: ALBUM_ARTIST = show, DISPLAY_SUBTITLE = S##E##, no TITLE
+    // Builder priority: albumArtist > album > ... so first line = "Breaking Bad"
+    // sessionKey = "com.plexapp.android:Breaking Bad"
+    private val plexPlayingSnapshot = snapshotOf(
+        "com.plexapp.android",
+        "albumArtist" to "Breaking Bad",
+        "displaySubtitle" to "S01E01",
     )
     private val plexSessionKey = "com.plexapp.android:Breaking Bad"
 
@@ -99,7 +93,7 @@ class MediaSessionScrobblerNullTitleTest {
     }
 
     @Test
-    fun `publishObservedSession populates even when every string field is null`() {
+    fun `publishObservedSession populates even when text is blank`() {
         val emptySnapshot = MediaMetadataSnapshot(packageName = "com.example.splash")
 
         scrobbler.publishObservedSession(
@@ -112,7 +106,7 @@ class MediaSessionScrobblerNullTitleTest {
         val observed = scrobbler.lastObservedSession.value
         assertNotNull(observed)
         assertEquals(emptySnapshot, observed!!.snapshot)
-        assertTrue(emptySnapshot.candidateStrings().isEmpty())
+        assertTrue(emptySnapshot.text.isBlank())
     }
 
     @Test
@@ -125,10 +119,10 @@ class MediaSessionScrobblerNullTitleTest {
         assertNull(scrobbler.lastObservedSession.value)
     }
 
-    // ── Pause/stop dedup keyed by sessionKey, not raw title ───────────────────
+    // ── Pause/stop dedup keyed by sessionKey ──────────────────────────────────
 
     @Test
-    fun `Plex-shape pause deduped by session key when TITLE is null`() = runTest {
+    fun `Plex-shape pause deduped by session key when TITLE is absent`() = runTest {
         coEvery { watchedShowSource.getCachedShows() } returns listOf(breakingBadEntry)
         val candidate = scrobbler.matchSnapshot(plexPlayingSnapshot)
         assertNotNull(candidate)
@@ -136,14 +130,13 @@ class MediaSessionScrobblerNullTitleTest {
         clearMocks(scrobbleDispatcher, answers = false)
         coEvery { scrobbleDispatcher.dispatchPause(any(), any(), any()) } just runs
 
-        // Same session key → dispatchPause fires.
         scrobbler.handleScrobblePause(plexPlayingSnapshot, plexSessionKey, progress = 42f)
 
         coVerify { scrobbleDispatcher.dispatchPause(breakingBadShow, any(), 42f) }
     }
 
     @Test
-    fun `Plex-shape stop deduped by session key when TITLE is null`() = runTest {
+    fun `Plex-shape stop deduped by session key when TITLE is absent`() = runTest {
         coEvery { watchedShowSource.getCachedShows() } returns listOf(breakingBadEntry)
         val candidate = scrobbler.matchSnapshot(plexPlayingSnapshot)
         assertNotNull(candidate)
@@ -172,7 +165,7 @@ class MediaSessionScrobblerNullTitleTest {
         coVerify(exactly = 0) { scrobbleDispatcher.dispatchPause(any(), any(), any()) }
     }
 
-    // ── Vanished-stop uses the stashed snapshot (multi-field cascade) ──────────
+    // ── Vanished-stop uses the stashed snapshot ───────────────────────────────
 
     @Test
     fun `vanished session with stashed snapshot dispatches stop via matchSnapshot`() = runTest {
@@ -185,7 +178,6 @@ class MediaSessionScrobblerNullTitleTest {
             matchedEpisode = TraktEpisode(season = 1, number = 1),
         )
         scrobbler.autoScrobble(candidate, progress = 10f, sessionKey = plexSessionKey)
-        // Poll once — stash the snapshot alongside the progress so vanish can re-match.
         scrobbler.recordProgress(plexSessionKey, plexPlayingSnapshot, 55f)
 
         scrobbler.reconcileVanished(liveKeys = emptySet())
@@ -196,7 +188,7 @@ class MediaSessionScrobblerNullTitleTest {
     // ── sessionKey identity derivation ────────────────────────────────────────
 
     @Test
-    fun `sessionKey for snapshot with empty candidate strings is null`() {
+    fun `sessionKey for snapshot with blank text is null`() {
         val emptySnapshot = MediaMetadataSnapshot(packageName = "com.example.splash")
         with(scrobbler) {
             assertNull(emptySnapshot.sessionKey())
@@ -205,12 +197,12 @@ class MediaSessionScrobblerNullTitleTest {
 
     @Test
     fun `sessionKey derives from highest-priority non-blank field`() {
-        val plexSnapshot = MediaMetadataSnapshot(
-            packageName = "com.plexapp.android",
-            title = "Pilot",
-            albumArtist = "Breaking Bad",
+        val plexSnapshot = snapshotOf(
+            "com.plexapp.android",
+            "albumArtist" to "Breaking Bad",
+            "title" to "Pilot",
         )
-        // candidateStrings order: albumArtist > album > artist > displayTitle > displaySubtitle > title > displayDescription
+        // albumArtist is first line (highest priority), so key derives from it
         with(scrobbler) {
             assertEquals("com.plexapp.android:Breaking Bad", plexSnapshot.sessionKey())
         }

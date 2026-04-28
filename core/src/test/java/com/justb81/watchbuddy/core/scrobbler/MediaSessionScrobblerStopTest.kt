@@ -2,7 +2,6 @@ package com.justb81.watchbuddy.core.scrobbler
 
 import android.content.Context
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
-import com.justb81.watchbuddy.core.model.MediaMetadataSnapshot
 import com.justb81.watchbuddy.core.model.ScrobbleCandidate
 import com.justb81.watchbuddy.core.model.TraktEpisode
 import com.justb81.watchbuddy.core.model.TraktIds
@@ -24,9 +23,6 @@ import org.junit.jupiter.api.Test
  * Regression tests for issue #403: handleScrobbleStop silently dropped stop events when
  * duration/position was unavailable (e.g. streaming apps that report duration=0 on the
  * last tick during credits or livestream segmentation).
- *
- * The fix treats a missing progress as "watched" and sends progress=100f, matching
- * the lenient fallback already used by handleScrobblePause (which defaults to 50f).
  */
 @DisplayName("MediaSessionScrobbler — Stop with unavailable progress (#403)")
 class MediaSessionScrobblerStopTest {
@@ -42,10 +38,7 @@ class MediaSessionScrobblerStopTest {
     private val testCandidate = ScrobbleCandidate(
         "com.netflix", "Breaking Bad S01E01", 0.95f, testShow, testEpisode
     )
-    private val testSnapshot = MediaMetadataSnapshot(
-        packageName = "com.netflix",
-        title = "Breaking Bad S01E01",
-    )
+    private val testSnapshot = snapshotOf("com.netflix", "title" to "Breaking Bad S01E01")
     private val testSessionKey = "com.netflix:Breaking Bad S01E01"
 
     @BeforeEach
@@ -79,7 +72,6 @@ class MediaSessionScrobblerStopTest {
 
         scrobbler.handleScrobbleStop(testSnapshot, testSessionKey, progress = null)
 
-        // autoScrobble must succeed for the same session key after the stop cleared state
         scrobbler.autoScrobble(testCandidate)
         coVerify { scrobbleDispatcher.dispatchStart(testShow, testEpisode, any()) }
     }
@@ -113,7 +105,7 @@ class MediaSessionScrobblerStopTest {
     fun `no dispatch when session key does not match currently scrobbling`() = runTest {
         primeScrobbling()
         val otherKey = "com.netflix:Other Show"
-        val otherSnapshot = MediaMetadataSnapshot(packageName = "com.netflix", title = "Other Show")
+        val otherSnapshot = snapshotOf("com.netflix", "title" to "Other Show")
 
         scrobbler.handleScrobbleStop(otherSnapshot, otherKey, progress = null)
 
@@ -144,7 +136,6 @@ class MediaSessionScrobblerStopTest {
         primeScrobbling()
 
         scrobbler.handleScrobbleStop(testSnapshot, testSessionKey, progress = null)
-        // Second call — currentlySessionKey is already null, so it should be a no-op
         scrobbler.handleScrobbleStop(testSnapshot, testSessionKey, progress = null)
 
         coVerify(exactly = 1) { scrobbleDispatcher.dispatchStop(any(), any(), any()) }

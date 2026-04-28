@@ -51,6 +51,7 @@ class PhoneTitleExtractionClient @Inject constructor(
 
     companion object {
         private const val TAG = "PhoneTitleExtractor"
+        private const val DEDUP_KEY_HEX_LENGTH = 32
         internal const val MAX_HINTS = 50
         internal const val CLIENT_TIMEOUT_SECONDS = 90L
         internal const val CALL_TIMEOUT_SECONDS = 95L
@@ -145,11 +146,15 @@ class PhoneTitleExtractionClient @Inject constructor(
     }
 
     /**
-     * Dedup key — same raw `packageName + TITLE` should hit one inference even
-     * if the rest of the MediaMetadata drifts slightly between polls. Using
-     * [MediaMetadataSnapshot.title] keeps the key stable across richer-field
-     * additions in subsequent polls.
+     * Dedup key — same evidence text should hit one inference even if minor
+     * positional drift occurs between polls. Hashes [MediaMetadataSnapshot.text]
+     * so the key is stable regardless of field additions or source-tag changes,
+     * and position/duration data never influences the dedup window.
      */
-    private fun dedupKey(snapshot: MediaMetadataSnapshot): String =
-        "${snapshot.packageName}:${snapshot.title.orEmpty()}"
+    private fun dedupKey(snapshot: MediaMetadataSnapshot): String {
+        val digest = java.security.MessageDigest.getInstance("SHA-256")
+            .digest(snapshot.text.toByteArray(Charsets.UTF_8))
+        val hex = digest.joinToString("") { "%02x".format(it) }.take(DEDUP_KEY_HEX_LENGTH)
+        return "${snapshot.packageName}:$hex"
+    }
 }

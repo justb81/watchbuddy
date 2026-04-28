@@ -8,6 +8,7 @@ import android.util.Log
 import androidx.core.app.NotificationManagerCompat
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.model.MediaMetadataSnapshot
+import com.justb81.watchbuddy.core.model.PlaybackTick
 import com.justb81.watchbuddy.core.model.ScrobbleCandidate
 import com.justb81.watchbuddy.core.model.TitleExtractionResponse
 import com.justb81.watchbuddy.core.model.TraktEpisode
@@ -45,6 +46,8 @@ class MediaSessionScrobbler @Inject constructor(
     private val watchedShowSource: WatchedShowSource,
     private val scrobbleDispatcher: ScrobbleDispatcher,
     private val titleExtractor: TitleExtractor,
+    /** Enrichers append additional evidence lines; populated per-app via Hilt. */
+    private val metadataEnrichers: List<@JvmSuppressWildcards MetadataEnricher> = emptyList(),
 ) {
     companion object {
         private const val TAG = "MediaSessionScrobbler"
@@ -62,17 +65,30 @@ class MediaSessionScrobbler @Inject constructor(
     /**
      * Full dump of the most recent `MediaSession` the scrobbler polled, regardless
      * of whether it produced a scrobble candidate. Intended for the TV diagnostics
-     * view so the user can see exactly which `MediaMetadata` fields the streaming
-     * app published — `METADATA_KEY_TITLE` is frequently null on Plex, Jellyfin,
+     * view so the user can see exactly which evidence lines the streaming app
+     * published — `METADATA_KEY_TITLE` is frequently null on Plex, Jellyfin,
      * and some Netflix skins, so surfacing only the title row hides everything.
+     *
+     * [observedAtMs] is kept separately from [tick.capturedAtMs] because it drives
+     * the staleness check for implicit-stop reconciliation (5-minute presence timeout).
      */
     data class LastObservedSession(
         val snapshot: MediaMetadataSnapshot,
-        val playbackState: Int,
-        val positionMs: Long,
-        val durationMs: Long,
+        val tick: PlaybackTick,
         val observedAtMs: Long,
-    )
+    ) {
+        @Deprecated("Use tick.state", ReplaceWith("tick.state"))
+        val playbackState: Int get() = tick.state
+
+        @Deprecated("Use tick.positionMs", ReplaceWith("tick.positionMs"))
+        val positionMs: Long get() = tick.positionMs
+
+        @Deprecated("Use tick.durationMs", ReplaceWith("tick.durationMs"))
+        val durationMs: Long get() = tick.durationMs
+    }
+
+    /** Strips the `"<tag>: "` prefix from a text-blob line and returns the bare value. */
+    private fun String.stripTag(): String = substringAfter(": ", missingDelimiterValue = this).trim()
 
     /**
      * Per-session progress snapshot kept around so `reconcileVanished` can dispatch
@@ -181,27 +197,24 @@ class MediaSessionScrobbler @Inject constructor(
                         val packageName = controller.packageName
                         val metadata = controller.metadata
                         val playbackState = controller.playbackState
+                        val tick = buildTick(playbackState, metadata)
                         val snapshot = if (metadata != null) {
-                            buildSnapshot(packageName, metadata)
+                            buildSnapshotWithEnrichers(packageName, metadata, tick)
                         } else {
                             MediaMetadataSnapshot(packageName = packageName)
                         }
-                        val durationMs = metadata
-                            ?.getLong(android.media.MediaMetadata.METADATA_KEY_DURATION) ?: -1L
-                        val state = playbackState?.state ?: -1
-                        val positionMs = playbackState?.position ?: -1L
                         if (!publishedDiagnostics) {
-                            publishObservedSession(snapshot, state, positionMs, durationMs)
+                            publishObservedSession(snapshot, tick)
                             publishedDiagnostics = true
                         }
-                        logSessionIfDebug(snapshot, state, positionMs, durationMs)
+                        logSessionIfDebug(snapshot, tick.state, tick.positionMs, tick.durationMs)
                         val key = snapshot.sessionKey() ?: return@forEach
                         liveKeys.add(key)
                         if (metadata == null || playbackState == null) return@forEach
                         val progress = computeProgress(playbackState, metadata)
                         if (progress != null) recordProgress(key, snapshot, progress)
                         when (playbackState.state) {
-                            PlaybackState.STATE_PLAYING -> processPlayingMedia(snapshot, key, progress)
+                            PlaybackState.STATE_PLAYING -> processPlayingMedia(snapshot, key, progress, tick)
                             PlaybackState.STATE_PAUSED -> handleScrobblePause(snapshot, key, progress)
                             PlaybackState.STATE_STOPPED,
                             PlaybackState.STATE_NONE -> handleScrobbleStop(snapshot, key, progress)
@@ -218,55 +231,111 @@ class MediaSessionScrobbler @Inject constructor(
     }
 
     /**
-     * Stable identity for a media session across polls. Uses the first non-blank
-     * field from [MediaMetadataSnapshot.candidateStrings] so sessions where
-     * `METADATA_KEY_TITLE` is null (Plex ships the show in `ALBUM_ARTIST`,
-     * Jellyfin in `ALBUM`) still get a durable key instead of being dropped.
-     * Returns null when every string field is blank — caller skips scrobble but
-     * still publishes the snapshot to [lastObservedSession] for diagnostics.
+     * Stable identity for a media session across polls. Reads the first non-blank
+     * line of [MediaMetadataSnapshot.text] (stripping the `tag: ` prefix) so
+     * sessions where `METADATA_KEY_TITLE` is null (Plex ships the show in
+     * `ALBUM_ARTIST`, Jellyfin in `ALBUM`) still get a durable key. The builder
+     * writes lines in the same priority order as the old `candidateStrings()` so
+     * behaviour is identical for the MediaSession-only case.
+     * Returns null when [text] is blank — caller skips scrobble but still
+     * publishes the snapshot to [lastObservedSession] for diagnostics.
      */
     internal fun MediaMetadataSnapshot.sessionKey(): String? =
-        candidateStrings().firstOrNull()?.let { "$packageName:$it" }
+        text.lineSequence()
+            .firstOrNull { it.isNotBlank() }
+            ?.stripTag()
+            ?.takeIf { it.isNotBlank() }
+            ?.let { "$packageName:$it" }
 
     internal fun sessionKey(candidate: ScrobbleCandidate): String =
         "${candidate.packageName}:${candidate.mediaTitle}"
 
     internal fun publishObservedSession(
         snapshot: MediaMetadataSnapshot,
+        tick: PlaybackTick,
+    ) {
+        _lastObservedSession.value = LastObservedSession(
+            snapshot = snapshot,
+            tick = tick,
+            observedAtMs = System.currentTimeMillis(),
+        )
+    }
+
+    /** Compat overload used by tests that still pass raw state/position/duration ints. */
+    internal fun publishObservedSession(
+        snapshot: MediaMetadataSnapshot,
         playbackState: Int,
         positionMs: Long,
         durationMs: Long,
     ) {
-        _lastObservedSession.value = LastObservedSession(
-            snapshot = snapshot,
-            playbackState = playbackState,
-            positionMs = positionMs,
-            durationMs = durationMs,
-            observedAtMs = System.currentTimeMillis(),
+        publishObservedSession(
+            snapshot,
+            PlaybackTick(
+                state = playbackState,
+                positionMs = positionMs,
+                durationMs = durationMs,
+                capturedAtMs = System.currentTimeMillis(),
+            ),
         )
     }
 
     /**
      * Reads every MediaMetadata field a streaming app might use to ship the show
-     * name or `S##E##` marker. Netflix/Prime/Disney+ ship only the episode title
-     * in `METADATA_KEY_TITLE`; Plex publishes the show in `ALBUM_ARTIST`;
-     * Jellyfin uses `ALBUM`; some Netflix skins use `DISPLAY_SUBTITLE`. Pulling
-     * all of them up front lets the match cascade score each candidate and keep
-     * the best one without round-tripping back to the controller.
+     * name or `S##E##` marker and emits them as prioritised `"tag: value"` lines.
+     * Netflix/Prime/Disney+ ship only the episode title in `METADATA_KEY_TITLE`;
+     * Plex publishes the show in `ALBUM_ARTIST`; Jellyfin uses `ALBUM`; some
+     * Netflix skins use `DISPLAY_SUBTITLE`. The builder insertion order is the
+     * field-priority ranking (albumArtist first), preserved through to the
+     * cascade that strips tag prefixes and tries each line as a candidate title.
      */
     internal fun buildSnapshot(
         packageName: String,
         metadata: android.media.MediaMetadata,
-    ): MediaMetadataSnapshot = MediaMetadataSnapshot(
-        packageName = packageName,
-        title = metadata.getString(android.media.MediaMetadata.METADATA_KEY_TITLE),
-        displayTitle = metadata.getString(android.media.MediaMetadata.METADATA_KEY_DISPLAY_TITLE),
-        displaySubtitle = metadata.getString(android.media.MediaMetadata.METADATA_KEY_DISPLAY_SUBTITLE),
-        displayDescription = metadata.getString(android.media.MediaMetadata.METADATA_KEY_DISPLAY_DESCRIPTION),
-        artist = metadata.getString(android.media.MediaMetadata.METADATA_KEY_ARTIST),
-        albumArtist = metadata.getString(android.media.MediaMetadata.METADATA_KEY_ALBUM_ARTIST),
-        album = metadata.getString(android.media.MediaMetadata.METADATA_KEY_ALBUM),
+    ): MediaMetadataSnapshot {
+        val builder = MediaSnapshotBuilder(packageName)
+        builder.add("mediaSession.albumArtist", metadata.getString(android.media.MediaMetadata.METADATA_KEY_ALBUM_ARTIST))
+        builder.add("mediaSession.album", metadata.getString(android.media.MediaMetadata.METADATA_KEY_ALBUM))
+        builder.add("mediaSession.artist", metadata.getString(android.media.MediaMetadata.METADATA_KEY_ARTIST))
+        builder.add("mediaSession.displayTitle", metadata.getString(android.media.MediaMetadata.METADATA_KEY_DISPLAY_TITLE))
+        builder.add("mediaSession.displaySubtitle", metadata.getString(android.media.MediaMetadata.METADATA_KEY_DISPLAY_SUBTITLE))
+        builder.add("mediaSession.title", metadata.getString(android.media.MediaMetadata.METADATA_KEY_TITLE))
+        builder.add("mediaSession.displayDescription", metadata.getString(android.media.MediaMetadata.METADATA_KEY_DISPLAY_DESCRIPTION))
+        return builder.build()
+    }
+
+    /** Samples the Android [PlaybackState] and metadata duration into a [PlaybackTick]. */
+    private fun buildTick(
+        playbackState: android.media.session.PlaybackState?,
+        metadata: android.media.MediaMetadata?,
+    ) = PlaybackTick(
+        state = playbackState?.state ?: -1,
+        positionMs = playbackState?.position ?: -1L,
+        durationMs = metadata?.getLong(android.media.MediaMetadata.METADATA_KEY_DURATION) ?: -1L,
+        capturedAtMs = System.currentTimeMillis(),
     )
+
+    /**
+     * Calls [buildSnapshot] then lets every registered [MetadataEnricher] append
+     * additional evidence lines. Enrichers should short-circuit when [tick] is
+     * not actively playing to avoid querying providers for stale sessions.
+     */
+    private suspend fun buildSnapshotWithEnrichers(
+        packageName: String,
+        metadata: android.media.MediaMetadata,
+        tick: PlaybackTick,
+    ): MediaMetadataSnapshot {
+        if (metadataEnrichers.isEmpty()) return buildSnapshot(packageName, metadata)
+        val builder = MediaSnapshotBuilder(packageName)
+        builder.add("mediaSession.albumArtist", metadata.getString(android.media.MediaMetadata.METADATA_KEY_ALBUM_ARTIST))
+        builder.add("mediaSession.album", metadata.getString(android.media.MediaMetadata.METADATA_KEY_ALBUM))
+        builder.add("mediaSession.artist", metadata.getString(android.media.MediaMetadata.METADATA_KEY_ARTIST))
+        builder.add("mediaSession.displayTitle", metadata.getString(android.media.MediaMetadata.METADATA_KEY_DISPLAY_TITLE))
+        builder.add("mediaSession.displaySubtitle", metadata.getString(android.media.MediaMetadata.METADATA_KEY_DISPLAY_SUBTITLE))
+        builder.add("mediaSession.title", metadata.getString(android.media.MediaMetadata.METADATA_KEY_TITLE))
+        builder.add("mediaSession.displayDescription", metadata.getString(android.media.MediaMetadata.METADATA_KEY_DISPLAY_DESCRIPTION))
+        metadataEnrichers.forEach { it.enrich(packageName, tick, builder) }
+        return builder.build()
+    }
 
     internal fun recordProgress(sessionKey: String, snapshot: MediaMetadataSnapshot?, progress: Float) {
         lastProgressBySessionKey[sessionKey] = LastKnownProgress(snapshot, progress)
@@ -277,13 +346,11 @@ class MediaSessionScrobbler @Inject constructor(
     }
 
     /**
-     * Writes a breadcrumb listing every non-null `MediaMetadata` string field
-     * the streaming app published, plus playback state / position / duration.
-     * Previous versions only logged `title`, which hid the fact that Plex /
-     * Jellyfin / some Netflix skins ship the show in other fields and leave
-     * `METADATA_KEY_TITLE` null — the "Debug: log every media session" toggle
-     * needs to surface the full picture so the user can see which field
-     * actually carries signal.
+     * Writes a breadcrumb listing the full evidence text blob the streaming app
+     * published, plus playback state / position / duration. The text lines show
+     * which field actually carries signal (Plex/Jellyfin/Netflix-skin metadata
+     * shapes differ widely), making the "Debug: log every media session" toggle
+     * useful for diagnosing missed scrobbles.
      */
     internal fun logSessionIfDebug(
         snapshot: MediaMetadataSnapshot,
@@ -292,21 +359,11 @@ class MediaSessionScrobbler @Inject constructor(
         durationMs: Long,
     ) {
         if (!debugLogMediaSession) return
-        val head = "session pkg=${snapshot.packageName} state=$state " +
-            "pos=${positionMs}ms dur=${durationMs}ms"
-        val fields = buildList {
-            add("title" to snapshot.title)
-            add("displayTitle" to snapshot.displayTitle)
-            add("displaySubtitle" to snapshot.displaySubtitle)
-            add("displayDescription" to snapshot.displayDescription)
-            add("artist" to snapshot.artist)
-            add("albumArtist" to snapshot.albumArtist)
-            add("album" to snapshot.album)
-        }
-        val tail = fields.joinToString(" ") { (name, value) ->
-            "$name='${value ?: "(null)"}'"
-        }
-        DiagnosticLog.event(TAG, "$head $tail")
+        val evidence = if (snapshot.text.isBlank()) "(no evidence)" else snapshot.text.replace("\n", " | ")
+        DiagnosticLog.event(
+            TAG,
+            "session pkg=${snapshot.packageName} state=$state pos=${positionMs}ms dur=${durationMs}ms $evidence",
+        )
     }
 
     /**
@@ -361,9 +418,10 @@ class MediaSessionScrobbler @Inject constructor(
         snapshot: MediaMetadataSnapshot,
         sessionKey: String,
         progress: Float?,
+        tick: PlaybackTick = PlaybackTick.UNKNOWN,
     ) {
         if (sessionKey == currentlySessionKey) return
-        val candidate = matchSnapshot(snapshot)
+        val candidate = matchSnapshot(snapshot, tick)
         if (candidate == null) {
             if (debugLogMediaSession) {
                 DiagnosticLog.debug(TAG, "no match for '$sessionKey' — best confidence null")
@@ -402,8 +460,11 @@ class MediaSessionScrobbler @Inject constructor(
      * runs through [matchSnapshot] — always prefer that entry point when the
      * full `MediaMetadata` is available.
      */
-    internal suspend fun matchTitle(packageName: String, rawTitle: String): ScrobbleCandidate? =
-        matchSnapshot(MediaMetadataSnapshot(packageName = packageName, title = rawTitle))
+    internal suspend fun matchTitle(packageName: String, rawTitle: String): ScrobbleCandidate? {
+        val builder = MediaSnapshotBuilder(packageName)
+        builder.add("mediaSession.title", rawTitle)
+        return matchSnapshot(builder.build())
+    }
 
     /**
      * Full match cascade:
@@ -417,10 +478,19 @@ class MediaSessionScrobbler @Inject constructor(
      *      with the best-scoring candidate (cheap-path best or extractor
      *      output).
      */
-    internal suspend fun matchSnapshot(snapshot: MediaMetadataSnapshot): ScrobbleCandidate? {
-        val candidates = snapshot.candidateStrings()
+    /**
+     * [tick] is threaded through for future consumers (#474 duration tiebreaker,
+     * #471/#472 freshness gates inside enrichers) but does not influence Phase 1/2/3
+     * scoring in this issue.
+     */
+    @Suppress("UnusedParameter")
+    internal suspend fun matchSnapshot(
+        snapshot: MediaMetadataSnapshot,
+        tick: PlaybackTick = PlaybackTick.UNKNOWN,
+    ): ScrobbleCandidate? {
+        val candidates = snapshot.text.lines().map { it.stripTag() }.filter { it.isNotBlank() }.distinct()
         if (candidates.isEmpty()) return null
-        val mediaTitle = snapshot.title ?: candidates.first()
+        val mediaTitle = candidates.first()
 
         val (globalSeason, globalEpisode) = findGlobalEpisodeMarker(candidates)
         val cachedShows = watchedShowSource.getCachedShows()
@@ -573,7 +643,8 @@ class MediaSessionScrobbler @Inject constructor(
         )
         DiagnosticLog.event(
             TAG,
-            "LLM fallback resolved '${snapshot.title}' → '${bestCacheMatch.show.title}' " +
+            "LLM fallback resolved '${snapshot.text.lines().firstOrNull()?.stripTag()}' " +
+                "→ '${bestCacheMatch.show.title}' " +
                 "S${matchedEpisode?.season}E${matchedEpisode?.number} score=$score",
         )
         return ScrobbleCandidate(

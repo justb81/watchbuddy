@@ -21,6 +21,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.tv.material3.*
 import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
+import com.justb81.watchbuddy.core.model.PlaybackTick
 import com.justb81.watchbuddy.core.scrobbler.MediaSessionScrobbler
 import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
 
@@ -125,6 +126,10 @@ fun TvDiagnosticsScreen(
                         ),
                     ),
                 )
+            }
+
+            item {
+                NowPlayingSection(uiState.lastObservedSession)
             }
 
             item {
@@ -475,81 +480,101 @@ private fun formatLastCandidate(last: MediaSessionScrobbler.LastCandidate?): Str
     return "$title @ ${pct}% · $marker · ${formatAge(last.observedAtMs)}"
 }
 
-@Composable
-private fun MediaSessionSection(last: MediaSessionScrobbler.LastObservedSession?) {
-    val title = stringResource(R.string.tv_diagnostics_section_media_session)
-    val snapshot = last?.snapshot
-    val headerStatus = when {
-        last == null -> Status.NEUTRAL
-        snapshot != null && snapshot.candidateStrings().isNotEmpty() -> Status.OK
-        else -> Status.WARN
-    }
-    val rows = buildMediaSessionRows(last, headerStatus)
-    DiagnosticsSection(title = title, rows = rows)
+private fun tickStateName(state: Int): String = when (state) {
+    PlaybackTick.STATE_PLAYING -> "Playing"
+    PlaybackTick.STATE_PAUSED -> "Paused"
+    PlaybackTick.STATE_STOPPED -> "Stopped"
+    PlaybackTick.STATE_NONE -> "None"
+    -1 -> "—"
+    else -> state.toString()
 }
 
 @Composable
-private fun buildMediaSessionRows(
-    last: MediaSessionScrobbler.LastObservedSession?,
-    headerStatus: Status,
-): List<DiagRow> {
-    val em = "—"
-    val snapshot = last?.snapshot
-    return listOf(
+private fun NowPlayingSection(last: MediaSessionScrobbler.LastObservedSession?) {
+    val tick = last?.tick
+    val isActive = tick != null && tick.isPlaying
+    val headerStatus = when {
+        last == null -> Status.NEUTRAL
+        isActive -> Status.OK
+        else -> Status.WARN
+    }
+    val firstTitle = last?.snapshot?.text?.lines()
+        ?.firstOrNull { it.isNotBlank() }
+        ?.substringAfter(": ", "")
+        ?.trim()
+        ?.takeIf { it.isNotBlank() }
+    val progressStr = if (tick != null && tick.durationMs > 0) {
+        "${(tick.progress * 100).toInt()}%"
+    } else {
+        "—"
+    }
+    val rows = listOf(
         DiagRow(
-            stringResource(R.string.tv_diagnostics_row_media_session_package),
-            snapshot?.packageName ?: em,
+            stringResource(R.string.tv_diagnostics_row_now_playing_package),
+            last?.snapshot?.packageName ?: "—",
             headerStatus,
         ),
-        stringRow(R.string.tv_diagnostics_row_media_session_title, snapshot, snapshot?.title),
-        stringRow(R.string.tv_diagnostics_row_media_session_display_title, snapshot, snapshot?.displayTitle),
-        stringRow(R.string.tv_diagnostics_row_media_session_display_subtitle, snapshot, snapshot?.displaySubtitle),
-        stringRow(
-            R.string.tv_diagnostics_row_media_session_display_description,
-            snapshot,
-            snapshot?.displayDescription,
-        ),
-        stringRow(R.string.tv_diagnostics_row_media_session_artist, snapshot, snapshot?.artist),
-        stringRow(R.string.tv_diagnostics_row_media_session_album_artist, snapshot, snapshot?.albumArtist),
-        stringRow(R.string.tv_diagnostics_row_media_session_album, snapshot, snapshot?.album),
         DiagRow(
-            stringResource(R.string.tv_diagnostics_row_media_session_playback_state),
-            last?.playbackState?.toString() ?: em,
-            Status.NEUTRAL,
+            stringResource(R.string.tv_diagnostics_row_now_playing_title),
+            firstTitle ?: "—",
+            if (firstTitle != null) Status.OK else Status.NEUTRAL,
         ),
         DiagRow(
-            stringResource(R.string.tv_diagnostics_row_media_session_position),
-            last?.positionMs?.let { "${it}ms" } ?: em,
-            Status.NEUTRAL,
+            stringResource(R.string.tv_diagnostics_row_now_playing_state),
+            tickStateName(tick?.state ?: -1),
+            if (isActive) Status.OK else Status.NEUTRAL,
         ),
         DiagRow(
-            stringResource(R.string.tv_diagnostics_row_media_session_duration),
-            last?.durationMs?.let { "${it}ms" } ?: em,
-            Status.NEUTRAL,
-        ),
-        DiagRow(
-            stringResource(R.string.tv_diagnostics_row_media_session_observed_age),
-            formatAge(last?.observedAtMs ?: 0L),
+            stringResource(R.string.tv_diagnostics_row_now_playing_progress),
+            progressStr,
             Status.NEUTRAL,
         ),
     )
+    DiagnosticsSection(title = stringResource(R.string.tv_diagnostics_section_now_playing), rows = rows)
 }
 
 @Composable
-private fun stringRow(
-    labelRes: Int,
-    snapshot: com.justb81.watchbuddy.core.model.MediaMetadataSnapshot?,
-    value: String?,
-): DiagRow {
-    val display = when {
-        value != null -> value
-        snapshot == null -> "—"
-        else -> stringResource(R.string.tv_diagnostics_value_null)
+private fun MediaSessionSection(last: MediaSessionScrobbler.LastObservedSession?) {
+    val snapshot = last?.snapshot
+    val hasEvidence = snapshot != null && snapshot.text.isNotBlank()
+    val headerStatus = when {
+        last == null -> Status.NEUTRAL
+        hasEvidence -> Status.OK
+        else -> Status.WARN
     }
-    val status = when {
-        snapshot == null -> Status.NEUTRAL
-        value.isNullOrBlank() -> Status.WARN
-        else -> Status.OK
+    val rows = buildList {
+        add(DiagRow(
+            stringResource(R.string.tv_diagnostics_row_media_session_package),
+            snapshot?.packageName ?: "—",
+            headerStatus,
+        ))
+        if (snapshot != null && snapshot.text.isNotBlank()) {
+            snapshot.text.lines().filter { it.isNotBlank() }.forEach { line ->
+                val tag = line.substringBefore(": ", "")
+                val value = line.substringAfter(": ", line)
+                add(DiagRow(tag, value, Status.OK))
+            }
+        }
+        add(DiagRow(
+            stringResource(R.string.tv_diagnostics_row_media_session_playback_state),
+            last?.tick?.state?.toString() ?: "—",
+            Status.NEUTRAL,
+        ))
+        add(DiagRow(
+            stringResource(R.string.tv_diagnostics_row_media_session_position),
+            last?.tick?.positionMs?.let { "${it}ms" } ?: "—",
+            Status.NEUTRAL,
+        ))
+        add(DiagRow(
+            stringResource(R.string.tv_diagnostics_row_media_session_duration),
+            last?.tick?.durationMs?.let { "${it}ms" } ?: "—",
+            Status.NEUTRAL,
+        ))
+        add(DiagRow(
+            stringResource(R.string.tv_diagnostics_row_media_session_observed_age),
+            formatAge(last?.observedAtMs ?: 0L),
+            Status.NEUTRAL,
+        ))
     }
-    return DiagRow(stringResource(labelRes), display, status)
+    DiagnosticsSection(title = stringResource(R.string.tv_diagnostics_section_media_session), rows = rows)
 }

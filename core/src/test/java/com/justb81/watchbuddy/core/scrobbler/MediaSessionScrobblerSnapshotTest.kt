@@ -1,7 +1,6 @@
 package com.justb81.watchbuddy.core.scrobbler
 
 import android.content.Context
-import com.justb81.watchbuddy.core.model.MediaMetadataSnapshot
 import com.justb81.watchbuddy.core.model.TitleExtractionResponse
 import com.justb81.watchbuddy.core.model.TraktIds
 import com.justb81.watchbuddy.core.model.TraktShow
@@ -55,11 +54,11 @@ class MediaSessionScrobblerSnapshotTest {
     fun `Plex-shape snapshot resolves show via ALBUM_ARTIST when TITLE is just the episode title`() = runTest {
         coEvery { watchedShowSource.getCachedShows() } returns listOf(breakingBadEntry)
 
-        val snapshot = MediaMetadataSnapshot(
-            packageName = "com.plexapp.android",
-            title = "Pilot",
-            albumArtist = "Breaking Bad",
-            displaySubtitle = "S01E01",
+        val snapshot = snapshotOf(
+            "com.plexapp.android",
+            "albumArtist" to "Breaking Bad",
+            "displaySubtitle" to "S01E01",
+            "title" to "Pilot",
         )
         val result = scrobbler.matchSnapshot(snapshot)
 
@@ -74,12 +73,12 @@ class MediaSessionScrobblerSnapshotTest {
     fun `Jellyfin-shape snapshot resolves show via ALBUM when ARTIST has the episode`() = runTest {
         coEvery { watchedShowSource.getCachedShows() } returns listOf(breakingBadEntry)
 
-        val snapshot = MediaMetadataSnapshot(
-            packageName = "org.jellyfin.mobile",
-            title = "Cat's in the Bag",
-            artist = "Cat's in the Bag",
-            album = "Breaking Bad",
-            displaySubtitle = "S01E02",
+        val snapshot = snapshotOf(
+            "org.jellyfin.mobile",
+            "album" to "Breaking Bad",
+            "artist" to "Cat's in the Bag",
+            "displaySubtitle" to "S01E02",
+            "title" to "Cat's in the Bag",
         )
         val result = scrobbler.matchSnapshot(snapshot)
 
@@ -99,10 +98,7 @@ class MediaSessionScrobblerSnapshotTest {
             confidence = 0.9f,
         )
 
-        val snapshot = MediaMetadataSnapshot(
-            packageName = "com.netflix.ninja",
-            title = "Chapter Seven",
-        )
+        val snapshot = snapshotOf("com.netflix.ninja", "title" to "Chapter Seven")
         val result = scrobbler.matchSnapshot(snapshot)
 
         assertNotNull(result)
@@ -133,10 +129,7 @@ class MediaSessionScrobblerSnapshotTest {
             confidence = 0.8f,
         )
 
-        val snapshot = MediaMetadataSnapshot(
-            packageName = "com.disney.disneyplus",
-            title = "System",
-        )
+        val snapshot = snapshotOf("com.disney.disneyplus", "title" to "System")
         val result = scrobbler.matchSnapshot(snapshot)
 
         assertNotNull(result)
@@ -150,7 +143,7 @@ class MediaSessionScrobblerSnapshotTest {
         coEvery { watchedShowSource.getCachedShows() } returns listOf(breakingBadEntry)
 
         val result = scrobbler.matchSnapshot(
-            MediaMetadataSnapshot(packageName = "com.netflix.ninja")
+            MediaSnapshotBuilder("com.netflix.ninja").build()
         )
 
         assertNull(result)
@@ -162,18 +155,17 @@ class MediaSessionScrobblerSnapshotTest {
     fun `SxxExx harvested from DISPLAY_SUBTITLE is honored even when show match comes from ALBUM_ARTIST`() = runTest {
         coEvery { watchedShowSource.getCachedShows() } returns listOf(breakingBadEntry)
 
-        val snapshot = MediaMetadataSnapshot(
-            packageName = "com.plexapp.android",
-            title = "Ozymandias",
-            albumArtist = "Breaking Bad",
-            displaySubtitle = "S05E14",
+        val snapshot = snapshotOf(
+            "com.plexapp.android",
+            "albumArtist" to "Breaking Bad",
+            "displaySubtitle" to "S05E14",
+            "title" to "Ozymandias",
         )
         val result = scrobbler.matchSnapshot(snapshot)
 
         assertNotNull(result)
         assertEquals(5, result!!.matchedEpisode?.season)
         assertEquals(14, result.matchedEpisode?.number)
-        // high-confidence cache match should skip the hint fallback path
         coVerify(exactly = 0) { watchedShowSource.getShowHint(any()) }
     }
 
@@ -183,13 +175,10 @@ class MediaSessionScrobblerSnapshotTest {
         coEvery { watchedShowSource.getTmdbApiKey() } returns null
         coEvery { titleExtractor.extract(any()) } returns null
 
-        val snapshot = MediaMetadataSnapshot(
-            packageName = "com.example.unknown",
-            title = "Mystery Episode",
-        )
+        val snapshot = snapshotOf("com.example.unknown", "title" to "Mystery Episode")
         val result = scrobbler.matchSnapshot(snapshot)
 
         assertNull(result)
-        assertTrue(true) // reached end of cascade without throwing
+        assertTrue(true)
     }
 }
