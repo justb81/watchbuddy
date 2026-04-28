@@ -87,7 +87,7 @@
     <string name="tv_settings_debug_log_media_session_title">Depuración: registrar cada sesión multimedia</string>
     <string name="tv_settings_debug_log_media_session_subtitle">Registra cada sesión multimedia detectada en el registro de eventos</string>
     <string name="tv_settings_notification_access_title">Acceso a notificaciones</string>
-    <string name="tv_settings_notification_access_subtitle">Necesario para el scrobble: permite a WatchBuddy detectar lo que se reproduce en el televisor</string>
+    <string name="tv_settings_notification_access_subtitle">Necesario para el scrobble: WatchBuddy lee las notificaciones multimedia y las sesiones activas para identificar lo que se reproduce en tu televisor</string>
     <string name="tv_settings_status_granted">Concedido</string>
     <string name="tv_settings_status_not_granted">No concedido</string>
     <string name="tv_discovery_notification_channel_name">Descubrimiento de teléfonos</string>
@@ -165,6 +165,17 @@
         <item quantity="other">%d aplicaciones</item>
     </plurals>
     <string name="tv_diagnostics_value_watch_next_permission_denied">Permiso denegado</string>
+
+    <!-- Diagnostics — media notifications (#472) -->
+    <string name="tv_diagnostics_section_media_notifications">Notificaciones multimedia</string>
+    <string name="tv_diagnostics_row_notification_tracked">Aplicaciones rastreadas</string>
+    <string name="tv_diagnostics_value_notification_listener_not_connected">Escucha no conectada</string>
+    <string name="tv_diagnostics_value_notification_no_data">Conectado, sin datos aún</string>
+    <plurals name="tv_diagnostics_value_notification_tracked_count">
+        <item quantity="one">%d aplicación rastreada</item>
+        <item quantity="many">%d aplicaciones rastreadas</item>
+        <item quantity="other">%d aplicaciones rastreadas</item>
+    </plurals>
 
     <!-- Version footer -->
     <string name="settings_version_footer">WatchBuddy v%1$s (build %2$d)</string>

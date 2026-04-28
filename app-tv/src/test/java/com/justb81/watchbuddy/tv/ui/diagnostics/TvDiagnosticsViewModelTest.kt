@@ -6,6 +6,7 @@ import com.justb81.watchbuddy.core.scrobbler.MediaSessionScrobbler
 import com.justb81.watchbuddy.tv.MainDispatcherRule
 import com.justb81.watchbuddy.tv.data.JustWatchDeepLinkRepository
 import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
+import com.justb81.watchbuddy.tv.scrobbler.NotificationMetadataSource
 import com.justb81.watchbuddy.tv.scrobbler.WatchNextMetadataSource
 import io.mockk.coEvery
 import io.mockk.every
@@ -38,6 +39,7 @@ class TvDiagnosticsViewModelTest {
     private val scrobbler: MediaSessionScrobbler = mockk(relaxed = true)
     private val justWatchRepo: JustWatchDeepLinkRepository = mockk(relaxed = true)
     private val watchNextSource: WatchNextMetadataSource = mockk(relaxed = true)
+    private val notificationSource: NotificationMetadataSource = NotificationMetadataSource()
 
     @BeforeEach
     fun setUp() {
@@ -64,7 +66,9 @@ class TvDiagnosticsViewModelTest {
 
     @Test
     fun `recentEvents is empty on fresh VM`() = runTest {
-        val vm = TvDiagnosticsViewModel(application, phoneDiscovery, scrobbler, justWatchRepo, watchNextSource)
+        val vm = TvDiagnosticsViewModel(
+            application, phoneDiscovery, scrobbler, justWatchRepo, watchNextSource, notificationSource,
+        )
         advanceUntilIdle()
 
         assertTrue(vm.uiState.value.recentEvents.isEmpty())
@@ -72,7 +76,9 @@ class TvDiagnosticsViewModelTest {
 
     @Test
     fun `single event is projected with correct level and newest-first order`() = runTest {
-        val vm = TvDiagnosticsViewModel(application, phoneDiscovery, scrobbler, justWatchRepo, watchNextSource)
+        val vm = TvDiagnosticsViewModel(
+            application, phoneDiscovery, scrobbler, justWatchRepo, watchNextSource, notificationSource,
+        )
         advanceUntilIdle()
 
         DiagnosticLog.event("TAG", "hello")
@@ -87,7 +93,9 @@ class TvDiagnosticsViewModelTest {
 
     @Test
     fun `recentEvents is truncated to 100 entries newest first`() = runTest {
-        val vm = TvDiagnosticsViewModel(application, phoneDiscovery, scrobbler, justWatchRepo, watchNextSource)
+        val vm = TvDiagnosticsViewModel(
+            application, phoneDiscovery, scrobbler, justWatchRepo, watchNextSource, notificationSource,
+        )
         advanceUntilIdle()
 
         repeat(150) { i -> DiagnosticLog.event("TAG", "msg $i") }
@@ -103,7 +111,9 @@ class TvDiagnosticsViewModelTest {
     fun `scrobblerListening reflects true when scrobbler isListening emits true`() = runTest {
         val isListeningFlow = MutableStateFlow(false)
         every { scrobbler.isListening } returns isListeningFlow
-        val vm = TvDiagnosticsViewModel(application, phoneDiscovery, scrobbler, justWatchRepo, watchNextSource)
+        val vm = TvDiagnosticsViewModel(
+            application, phoneDiscovery, scrobbler, justWatchRepo, watchNextSource, notificationSource,
+        )
         advanceUntilIdle()
 
         isListeningFlow.value = true
@@ -116,7 +126,9 @@ class TvDiagnosticsViewModelTest {
     fun `scrobblerListening reflects false when scrobbler isListening emits false`() = runTest {
         val isListeningFlow = MutableStateFlow(true)
         every { scrobbler.isListening } returns isListeningFlow
-        val vm = TvDiagnosticsViewModel(application, phoneDiscovery, scrobbler, justWatchRepo, watchNextSource)
+        val vm = TvDiagnosticsViewModel(
+            application, phoneDiscovery, scrobbler, justWatchRepo, watchNextSource, notificationSource,
+        )
         advanceUntilIdle()
 
         isListeningFlow.value = false
@@ -128,9 +140,36 @@ class TvDiagnosticsViewModelTest {
     @Test
     fun `scrobblerListening starts as false when scrobbler is not listening`() = runTest {
         every { scrobbler.isListening } returns MutableStateFlow(false)
-        val vm = TvDiagnosticsViewModel(application, phoneDiscovery, scrobbler, justWatchRepo, watchNextSource)
+        val vm = TvDiagnosticsViewModel(
+            application, phoneDiscovery, scrobbler, justWatchRepo, watchNextSource, notificationSource,
+        )
         advanceUntilIdle()
 
         assertFalse(vm.uiState.value.scrobblerListening)
+    }
+
+    @Test
+    fun `notificationTrackedCount reflects snippets in NotificationMetadataSource`() = runTest {
+        val vm = TvDiagnosticsViewModel(
+            application, phoneDiscovery, scrobbler, justWatchRepo, watchNextSource, notificationSource,
+        )
+        advanceUntilIdle()
+        assertEquals(0, vm.uiState.value.notificationTrackedCount)
+
+        notificationSource.onPosted(
+            com.justb81.watchbuddy.tv.scrobbler.NotificationSnippet(
+                packageName = "com.netflix.ninja",
+                title = "Stranger Things",
+                text = null,
+                subText = null,
+                bigText = null,
+                infoText = null,
+                postedAtMs = System.currentTimeMillis(),
+            ),
+        )
+        vm.refreshNotificationStats()
+        advanceUntilIdle()
+
+        assertEquals(1, vm.uiState.value.notificationTrackedCount)
     }
 }

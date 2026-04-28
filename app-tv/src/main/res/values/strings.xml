@@ -84,7 +84,7 @@
     <string name="tv_settings_debug_log_media_session_title">Debug: log every media session</string>
     <string name="tv_settings_debug_log_media_session_subtitle">Writes every detected media session to the event log</string>
     <string name="tv_settings_notification_access_title">Notification access</string>
-    <string name="tv_settings_notification_access_subtitle">Required for scrobbling — lets WatchBuddy see what\'s playing on the TV</string>
+    <string name="tv_settings_notification_access_subtitle">Required for scrobbling — WatchBuddy reads media notifications and active sessions to identify what\'s playing on your TV</string>
     <string name="tv_settings_status_granted">Granted</string>
     <string name="tv_settings_status_not_granted">Not granted</string>
     <string name="tv_discovery_notification_channel_name">Phone discovery</string>
@@ -160,6 +160,16 @@
         <item quantity="other">%d apps</item>
     </plurals>
     <string name="tv_diagnostics_value_watch_next_permission_denied">Permission denied</string>
+
+    <!-- Diagnostics — media notifications (#472) -->
+    <string name="tv_diagnostics_section_media_notifications">Media notifications</string>
+    <string name="tv_diagnostics_row_notification_tracked">Tracked apps</string>
+    <string name="tv_diagnostics_value_notification_listener_not_connected">Listener not connected</string>
+    <string name="tv_diagnostics_value_notification_no_data">Connected, no data yet</string>
+    <plurals name="tv_diagnostics_value_notification_tracked_count">
+        <item quantity="one">%d app tracked</item>
+        <item quantity="other">%d apps tracked</item>
+    </plurals>
 
     <!-- Version footer -->
     <string name="settings_version_footer">WatchBuddy v%1$s (build %2$d)</string>

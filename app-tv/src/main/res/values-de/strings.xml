@@ -84,7 +84,7 @@
     <string name="tv_settings_debug_log_media_session_title">Debug: jede Mediensitzung protokollieren</string>
     <string name="tv_settings_debug_log_media_session_subtitle">Schreibt jede erkannte Mediensitzung ins Ereignisprotokoll</string>
     <string name="tv_settings_notification_access_title">Benachrichtigungszugriff</string>
-    <string name="tv_settings_notification_access_subtitle">Erforderlich für Scrobbling – damit WatchBuddy erkennt, was am TV läuft</string>
+    <string name="tv_settings_notification_access_subtitle">Erforderlich für Scrobbling – WatchBuddy liest Medienbenachrichtigungen und aktive Sitzungen, um zu erkennen, was auf dem Fernseher läuft</string>
     <string name="tv_settings_status_granted">Erteilt</string>
     <string name="tv_settings_status_not_granted">Nicht erteilt</string>
     <string name="tv_discovery_notification_channel_name">Telefonsuche</string>
@@ -160,6 +160,16 @@
         <item quantity="other">%d Apps</item>
     </plurals>
     <string name="tv_diagnostics_value_watch_next_permission_denied">Berechtigung verweigert</string>
+
+    <!-- Diagnostics — media notifications (#472) -->
+    <string name="tv_diagnostics_section_media_notifications">Medienbenachrichtigungen</string>
+    <string name="tv_diagnostics_row_notification_tracked">Verfolgte Apps</string>
+    <string name="tv_diagnostics_value_notification_listener_not_connected">Listener nicht verbunden</string>
+    <string name="tv_diagnostics_value_notification_no_data">Verbunden, noch keine Daten</string>
+    <plurals name="tv_diagnostics_value_notification_tracked_count">
+        <item quantity="one">%d App verfolgt</item>
+        <item quantity="other">%d Apps verfolgt</item>
+    </plurals>
 
     <!-- Version footer -->
     <string name="settings_version_footer">WatchBuddy v%1$s (Build %2$d)</string>

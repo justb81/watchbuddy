@@ -87,7 +87,7 @@
     <string name="tv_settings_debug_log_media_session_title">Débogage : consigner chaque session média</string>
     <string name="tv_settings_debug_log_media_session_subtitle">Consigne chaque session média détectée dans le journal d\'événements</string>
     <string name="tv_settings_notification_access_title">Accès aux notifications</string>
-    <string name="tv_settings_notification_access_subtitle">Requis pour le scrobble — permet à WatchBuddy de détecter ce qui est lu sur le téléviseur</string>
+    <string name="tv_settings_notification_access_subtitle">Requis pour le scrobble — WatchBuddy lit les notifications multimédias et les sessions actives pour identifier ce qui est en cours de lecture sur votre téléviseur</string>
     <string name="tv_settings_status_granted">Accordé</string>
     <string name="tv_settings_status_not_granted">Non accordé</string>
     <string name="tv_discovery_notification_channel_name">Recherche de téléphones</string>
@@ -165,6 +165,17 @@
         <item quantity="other">%d applis</item>
     </plurals>
     <string name="tv_diagnostics_value_watch_next_permission_denied">Permission refusée</string>
+
+    <!-- Diagnostics — media notifications (#472) -->
+    <string name="tv_diagnostics_section_media_notifications">Notifications multimédias</string>
+    <string name="tv_diagnostics_row_notification_tracked">Applications suivies</string>
+    <string name="tv_diagnostics_value_notification_listener_not_connected">Écouteur non connecté</string>
+    <string name="tv_diagnostics_value_notification_no_data">Connecté, aucune donnée</string>
+    <plurals name="tv_diagnostics_value_notification_tracked_count">
+        <item quantity="one">%d appli suivie</item>
+        <item quantity="many">%d applis suivies</item>
+        <item quantity="other">%d applis suivies</item>
+    </plurals>
 
     <!-- Version footer -->
     <string name="settings_version_footer">WatchBuddy v%1$s (build %2$d)</string>
