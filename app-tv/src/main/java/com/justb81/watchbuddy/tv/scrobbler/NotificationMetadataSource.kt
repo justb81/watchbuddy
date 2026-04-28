@@ -45,11 +45,11 @@ class NotificationMetadataSource @Inject constructor() : MetadataEnricher {
 
     internal val byPackage = ConcurrentHashMap<String, NotificationSnippet>()
 
-    fun onPosted(snippet: NotificationSnippet) {
+    internal fun onPosted(snippet: NotificationSnippet) {
         byPackage[snippet.packageName] = snippet
     }
 
-    fun onRemoved(packageName: String) {
+    internal fun onRemoved(packageName: String) {
         byPackage.remove(packageName)
     }
 
