@@ -51,6 +51,7 @@ class PhoneTitleExtractionClient @Inject constructor(
 
     companion object {
         private const val TAG = "PhoneTitleExtractor"
+        private const val DEDUP_KEY_HEX_LENGTH = 32
         internal const val MAX_HINTS = 50
         internal const val CLIENT_TIMEOUT_SECONDS = 90L
         internal const val CALL_TIMEOUT_SECONDS = 95L
@@ -153,7 +154,7 @@ class PhoneTitleExtractionClient @Inject constructor(
     private fun dedupKey(snapshot: MediaMetadataSnapshot): String {
         val digest = java.security.MessageDigest.getInstance("SHA-256")
             .digest(snapshot.text.toByteArray(Charsets.UTF_8))
-        val hex = digest.joinToString("") { "%02x".format(it) }.take(32)
+        val hex = digest.joinToString("") { "%02x".format(it) }.take(DEDUP_KEY_HEX_LENGTH)
         return "${snapshot.packageName}:$hex"
     }
 }

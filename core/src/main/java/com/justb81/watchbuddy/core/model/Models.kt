@@ -166,8 +166,11 @@ data class PlaybackTick(
     val capturedAtMs: Long,
 ) {
     val progress: Float
-        get() = if (durationMs > 0 && positionMs >= 0)
-            (positionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
+        get() = if (durationMs > 0 && positionMs >= 0) {
+            (positionMs.toFloat() / durationMs).coerceIn(0f, 1f)
+        } else {
+            0f
+        }
 
     val isPlaying: Boolean get() = state == STATE_PLAYING
     val isStopped: Boolean get() = state == STATE_STOPPED || state == STATE_NONE

@@ -79,8 +79,10 @@ class MediaSessionScrobbler @Inject constructor(
     ) {
         @Deprecated("Use tick.state", ReplaceWith("tick.state"))
         val playbackState: Int get() = tick.state
+
         @Deprecated("Use tick.positionMs", ReplaceWith("tick.positionMs"))
         val positionMs: Long get() = tick.positionMs
+
         @Deprecated("Use tick.durationMs", ReplaceWith("tick.durationMs"))
         val durationMs: Long get() = tick.durationMs
     }
@@ -481,6 +483,7 @@ class MediaSessionScrobbler @Inject constructor(
      * #471/#472 freshness gates inside enrichers) but does not influence Phase 1/2/3
      * scoring in this issue.
      */
+    @Suppress("UnusedParameter")
     internal suspend fun matchSnapshot(
         snapshot: MediaMetadataSnapshot,
         tick: PlaybackTick = PlaybackTick.UNKNOWN,
