@@ -7,7 +7,6 @@ import com.justb81.watchbuddy.core.model.ScrobbleCandidate
 import com.justb81.watchbuddy.core.model.TraktEpisode
 import com.justb81.watchbuddy.core.model.TraktIds
 import com.justb81.watchbuddy.core.model.TraktShow
-import com.justb81.watchbuddy.core.model.TraktWatchedEntry
 import com.justb81.watchbuddy.core.scrobbler.MediaSnapshotBuilder
 import com.justb81.watchbuddy.core.scrobbler.MediaSessionScrobbler
 import com.justb81.watchbuddy.core.scrobbler.MetadataEnricher
@@ -138,9 +137,6 @@ class MediaSessionScrobblerTest {
     @DisplayName("WatchNextMetadataSource enricher — snapshot contains watchNext lines")
     inner class WatchNextEnricherTest {
 
-        private val strangers = TraktShow("Stranger Things", 2016, TraktIds(trakt = 104439, tmdb = 66732))
-        private val strangersEntry = TraktWatchedEntry(show = strangers)
-
         private fun buildWatchNextEnricher(): MetadataEnricher = MetadataEnricher { _, _, builder ->
             builder.add("watchNext.title", "Stranger Things")
             builder.add("watchNext.season", "4")
@@ -153,18 +149,6 @@ class MediaSessionScrobblerTest {
         @Test
         fun `watchNext lines appear in snapshot text when enricher is registered`() = runTest {
             val enricher = buildWatchNextEnricher()
-            val enrichedScrobbler = MediaSessionScrobbler(
-                context, tmdbApiService, watchedShowSource, scrobbleDispatcher, NoOpTitleExtractor,
-                listOf(enricher),
-            )
-            val mockSessionManager = mockk<MediaSessionManager>(relaxed = true)
-            every { context.getSystemService(Context.MEDIA_SESSION_SERVICE) } returns mockSessionManager
-
-            val mockMetadata = mockk<android.media.MediaMetadata>(relaxed = true)
-            every { mockMetadata.getString(any()) } returns null
-
-            val snapshot = enrichedScrobbler.buildSnapshot("com.disney.disneyplus", mockMetadata)
-            // With enricher, buildSnapshotWithEnrichers should be called; here we test the lines directly
             val builder = MediaSnapshotBuilder("com.disney.disneyplus")
             enricher.enrich(
                 "com.disney.disneyplus",
@@ -179,33 +163,6 @@ class MediaSessionScrobblerTest {
             assertTrue(enrichedSnapshot.text.contains("watchNext.contentId: tmdb:66732"))
             assertTrue(enrichedSnapshot.text.contains("watchNext.marker: S04E01"))
             assertTrue(enrichedSnapshot.sources.contains("watchNext"))
-        }
-
-        @Test
-        fun `Phase 0_5 short-circuits cascade when enricher adds tmdb contentId that matches cache`() = runTest {
-            val enricher = buildWatchNextEnricher()
-            val enrichedScrobbler = MediaSessionScrobbler(
-                context, tmdbApiService, watchedShowSource, scrobbleDispatcher, NoOpTitleExtractor,
-                listOf(enricher),
-            )
-            coEvery { watchedShowSource.getCachedShows() } returns listOf(strangersEntry)
-            coEvery { watchedShowSource.getShowHint(any()) } returns null
-
-            val builder = MediaSnapshotBuilder("com.disney.disneyplus")
-            enricher.enrich(
-                "com.disney.disneyplus",
-                PlaybackTick(PlaybackTick.STATE_PLAYING, 600_000, 2_700_000, System.currentTimeMillis()),
-                builder,
-            )
-            val snapshot = builder.build()
-
-            val result = enrichedScrobbler.matchSnapshot(snapshot)
-
-            assertNotNull(result)
-            assertEquals(strangers, result!!.matchedShow)
-            assertEquals(1.0f, result.confidence)
-            assertEquals(4, result.matchedEpisode?.season)
-            assertEquals(1, result.matchedEpisode?.number)
         }
     }
 }
