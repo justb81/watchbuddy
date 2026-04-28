@@ -2,7 +2,7 @@ package com.justb81.watchbuddy.tv.scrobbler
 
 import android.content.ContentResolver
 import android.content.Context
-import android.database.MatrixCursor
+import android.database.Cursor
 import androidx.tvprovider.media.tv.TvContractCompat
 import com.justb81.watchbuddy.core.model.PlaybackTick
 import com.justb81.watchbuddy.core.scrobbler.MediaSnapshotBuilder
@@ -12,7 +12,6 @@ import io.mockk.verify
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
-import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -22,7 +21,8 @@ import org.junit.jupiter.api.Test
 /**
  * Unit tests for [WatchNextMetadataSource].
  *
- * ContentResolver is mocked with [MatrixCursor] fixtures so no Android runtime is required.
+ * ContentResolver is mocked with a mock [Cursor] so no Android runtime is required.
+ * (MatrixCursor is an Android stub in unit tests — its methods return default values.)
  */
 @DisplayName("WatchNextMetadataSource")
 class WatchNextMetadataSourceTest {
@@ -35,29 +35,76 @@ class WatchNextMetadataSourceTest {
 
     private val freshMs = System.currentTimeMillis() - 30_000L  // 30 s ago — well within 5 min
 
-    private val PROJECTION = arrayOf(
-        TvContractCompat.WatchNextPrograms.COLUMN_TITLE,
-        TvContractCompat.WatchNextPrograms.COLUMN_SEASON_DISPLAY_NUMBER,
-        TvContractCompat.WatchNextPrograms.COLUMN_EPISODE_DISPLAY_NUMBER,
-        TvContractCompat.WatchNextPrograms.COLUMN_EPISODE_TITLE,
-        TvContractCompat.WatchNextPrograms.COLUMN_SHORT_DESCRIPTION,
-        TvContractCompat.WatchNextPrograms.COLUMN_CONTENT_ID,
-        TvContractCompat.WatchNextPrograms.COLUMN_LAST_ENGAGEMENT_TIME_UTC_MILLIS,
-    )
+    // Column indices matching the PROJECTION in WatchNextMetadataSource
+    private val COL_TITLE = 0
+    private val COL_SEASON = 1
+    private val COL_EPISODE = 2
+    private val COL_EPISODE_TITLE = 3
+    private val COL_SHORT_DESC = 4
+    private val COL_CONTENT_ID = 5
+    private val COL_LAST_ENGAGEMENT = 6
 
-    private fun buildCursor(vararg rows: Array<Any?>): MatrixCursor =
-        MatrixCursor(PROJECTION).apply {
-            rows.forEach { addRow(it) }
+    /**
+     * Builds a mock Cursor for the episode-lookup query (PROJECTION with 7 columns).
+     * Pass [empty] = true to simulate an empty cursor (moveToFirst returns false).
+     */
+    private fun buildEpisodeCursor(
+        title: String?,
+        season: String?,
+        episode: String?,
+        episodeTitle: String?,
+        shortDesc: String?,
+        contentId: String?,
+        lastEngagementMs: Long?,
+        empty: Boolean = false,
+    ): Cursor {
+        val cursor = mockk<Cursor>(relaxed = true)
+        every { cursor.moveToFirst() } returns !empty
+        every { cursor.getColumnIndex(TvContractCompat.WatchNextPrograms.COLUMN_TITLE) } returns COL_TITLE
+        every { cursor.getColumnIndex(TvContractCompat.WatchNextPrograms.COLUMN_SEASON_DISPLAY_NUMBER) } returns COL_SEASON
+        every { cursor.getColumnIndex(TvContractCompat.WatchNextPrograms.COLUMN_EPISODE_DISPLAY_NUMBER) } returns COL_EPISODE
+        every { cursor.getColumnIndex(TvContractCompat.WatchNextPrograms.COLUMN_EPISODE_TITLE) } returns COL_EPISODE_TITLE
+        every { cursor.getColumnIndex(TvContractCompat.WatchNextPrograms.COLUMN_SHORT_DESCRIPTION) } returns COL_SHORT_DESC
+        every { cursor.getColumnIndex(TvContractCompat.WatchNextPrograms.COLUMN_CONTENT_ID) } returns COL_CONTENT_ID
+        every { cursor.getColumnIndex(TvContractCompat.WatchNextPrograms.COLUMN_LAST_ENGAGEMENT_TIME_UTC_MILLIS) } returns COL_LAST_ENGAGEMENT
+        every { cursor.getString(COL_TITLE) } returns title
+        every { cursor.getString(COL_SEASON) } returns season
+        every { cursor.getString(COL_EPISODE) } returns episode
+        every { cursor.getString(COL_EPISODE_TITLE) } returns episodeTitle
+        every { cursor.getString(COL_SHORT_DESC) } returns shortDesc
+        every { cursor.getString(COL_CONTENT_ID) } returns contentId
+        every { cursor.isNull(COL_LAST_ENGAGEMENT) } returns (lastEngagementMs == null)
+        every { cursor.getLong(COL_LAST_ENGAGEMENT) } returns (lastEngagementMs ?: 0L)
+        return cursor
+    }
+
+    /**
+     * Builds a mock Cursor for the package-count query (single COLUMN_PACKAGE_NAME column).
+     */
+    private fun buildPackageCursor(vararg packageNames: String): Cursor {
+        val cursor = mockk<Cursor>(relaxed = true)
+        val callCount = intArrayOf(0)
+        every { cursor.moveToNext() } answers { callCount[0]++ < packageNames.size }
+        if (packageNames.isNotEmpty()) {
+            every { cursor.getString(0) } answers { packageNames[callCount[0] - 1] }
         }
+        return cursor
+    }
 
-    private fun givenQuery(cursor: MatrixCursor) {
+    private fun givenEpisodeQuery(cursor: Cursor) {
         every {
             contentResolver.query(
                 TvContractCompat.WatchNextPrograms.CONTENT_URI,
-                any(),
-                any(),
-                any(),
-                any(),
+                any(), any(), any(), any(),
+            )
+        } returns cursor
+    }
+
+    private fun givenCountQuery(cursor: Cursor) {
+        every {
+            contentResolver.query(
+                TvContractCompat.WatchNextPrograms.CONTENT_URI,
+                any(), any(), any(), null,
             )
         } returns cursor
     }
@@ -107,18 +154,17 @@ class WatchNextMetadataSourceTest {
 
         @Test
         fun `adds watchNext lines for a fresh episode row`() = runTest {
-            val cursor = buildCursor(
-                arrayOf(
-                    "Stranger Things",       // COLUMN_TITLE
-                    "4",                     // COLUMN_SEASON_DISPLAY_NUMBER
-                    "1",                     // COLUMN_EPISODE_DISPLAY_NUMBER
-                    "Chapter One",           // COLUMN_EPISODE_TITLE
-                    "A short description",   // COLUMN_SHORT_DESCRIPTION
-                    "tmdb:66732",            // COLUMN_CONTENT_ID
-                    freshMs,                 // COLUMN_LAST_ENGAGEMENT_TIME_UTC_MILLIS
+            givenEpisodeQuery(
+                buildEpisodeCursor(
+                    title = "Stranger Things",
+                    season = "4",
+                    episode = "1",
+                    episodeTitle = "Chapter One",
+                    shortDesc = "A short description",
+                    contentId = "tmdb:66732",
+                    lastEngagementMs = freshMs,
                 ),
             )
-            givenQuery(cursor)
             val tick = PlaybackTick(
                 state = PlaybackTick.STATE_PLAYING,
                 positionMs = 60_000L,
@@ -140,18 +186,17 @@ class WatchNextMetadataSourceTest {
 
         @Test
         fun `synthesises S##E## marker only when both numbers are integer-parseable`() = runTest {
-            val cursor = buildCursor(
-                arrayOf(
-                    "Some Show",
-                    "Season 4",              // not a bare integer — marker should be omitted
-                    "E1",                    // not a bare integer — marker should be omitted
-                    null,
-                    null,
-                    null,
-                    freshMs,
+            givenEpisodeQuery(
+                buildEpisodeCursor(
+                    title = "Some Show",
+                    season = "Season 4",  // not a bare integer — marker should be omitted
+                    episode = "E1",       // not a bare integer — marker should be omitted
+                    episodeTitle = null,
+                    shortDesc = null,
+                    contentId = null,
+                    lastEngagementMs = freshMs,
                 ),
             )
-            givenQuery(cursor)
             val tick = PlaybackTick(
                 state = PlaybackTick.STATE_PLAYING,
                 positionMs = 0L,
@@ -162,16 +207,26 @@ class WatchNextMetadataSourceTest {
             source.enrich("com.example.streaming", tick, builder)
 
             val snapshot = builder.build()
-            assertFalse(snapshot.text.contains("watchNext.marker:"), "marker should not be synthesised for non-integer season/episode")
+            assertFalse(
+                snapshot.text.contains("watchNext.marker:"),
+                "marker should not be synthesised for non-integer season/episode",
+            )
         }
 
         @Test
         fun `ignores stale row older than ROW_FRESHNESS_MS`() = runTest {
             val staleMs = System.currentTimeMillis() - WatchNextMetadataSource.ROW_FRESHNESS_MS - 1_000L
-            val cursor = buildCursor(
-                arrayOf("Old Show", "3", "5", null, null, null, staleMs),
+            givenEpisodeQuery(
+                buildEpisodeCursor(
+                    title = "Old Show",
+                    season = "3",
+                    episode = "5",
+                    episodeTitle = null,
+                    shortDesc = null,
+                    contentId = null,
+                    lastEngagementMs = staleMs,
+                ),
             )
-            givenQuery(cursor)
             val tick = PlaybackTick(
                 state = PlaybackTick.STATE_PLAYING,
                 positionMs = 0L,
@@ -187,7 +242,12 @@ class WatchNextMetadataSourceTest {
 
         @Test
         fun `produces no watchNext lines when no rows exist for package`() = runTest {
-            givenQuery(buildCursor())   // empty cursor
+            givenEpisodeQuery(
+                buildEpisodeCursor(
+                    title = null, season = null, episode = null, episodeTitle = null,
+                    shortDesc = null, contentId = null, lastEngagementMs = null, empty = true,
+                ),
+            )
             val tick = PlaybackTick(
                 state = PlaybackTick.STATE_PLAYING,
                 positionMs = 0L,
@@ -202,18 +262,17 @@ class WatchNextMetadataSourceTest {
 
         @Test
         fun `handles missing season column gracefully — no marker emitted`() = runTest {
-            val cursor = buildCursor(
-                arrayOf(
-                    "My Show",
-                    null,     // no season
-                    "3",
-                    "Episode Title",
-                    null,
-                    null,
-                    freshMs,
+            givenEpisodeQuery(
+                buildEpisodeCursor(
+                    title = "My Show",
+                    season = null,
+                    episode = "3",
+                    episodeTitle = "Episode Title",
+                    shortDesc = null,
+                    contentId = null,
+                    lastEngagementMs = freshMs,
                 ),
             )
-            givenQuery(cursor)
             val tick = PlaybackTick(
                 state = PlaybackTick.STATE_PLAYING,
                 positionMs = 0L,
@@ -252,25 +311,6 @@ class WatchNextMetadataSourceTest {
     @Nested
     @DisplayName("countPublishingApps()")
     inner class CountPublishingAppsTest {
-
-        private val PKG_COLUMN = arrayOf(TvContractCompat.WatchNextPrograms.COLUMN_PACKAGE_NAME)
-
-        private fun buildPackageCursor(vararg packageNames: String): MatrixCursor =
-            MatrixCursor(PKG_COLUMN).apply {
-                packageNames.forEach { addRow(arrayOf(it)) }
-            }
-
-        private fun givenCountQuery(cursor: MatrixCursor) {
-            every {
-                contentResolver.query(
-                    TvContractCompat.WatchNextPrograms.CONTENT_URI,
-                    PKG_COLUMN,
-                    any(),
-                    any(),
-                    null,
-                )
-            } returns cursor
-        }
 
         @Test
         fun `returns Success with count of distinct publishing packages`() {
