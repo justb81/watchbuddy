@@ -46,9 +46,13 @@ class LiteRtLlmProvider internal constructor(
      * LiteRT-LM [Engine] plus a per-call [com.google.ai.edge.litertlm.Conversation].
      * Unit tests supply a pure-Kotlin fake so the JNI-backed LiteRT-LM classes
      * never have to load in the JVM test classpath.
+     *
+     * Parameters are plain Kotlin types (no LiteRT-LM imports) so the seam is
+     * safe to reference from JVM-only unit tests without risking native-library
+     * class-load failures during JUnit discovery.
      */
     internal fun interface EngineFactory {
-        fun create(config: EngineConfig): EngineHandle
+        fun create(modelPath: String, useGpu: Boolean): EngineHandle
     }
 
     /** Opaque handle over an initialized LiteRT-LM engine. */
@@ -96,11 +100,8 @@ class LiteRtLlmProvider internal constructor(
         return newHandle
     }
 
-    private fun createHandle(modelPath: String, useGpu: Boolean): EngineHandle {
-        val backend = if (useGpu) Backend.GPU() else Backend.CPU()
-        val config = EngineConfig(modelPath = modelPath, backend = backend)
-        return engineFactory.create(config)
-    }
+    private fun createHandle(modelPath: String, useGpu: Boolean): EngineHandle =
+        engineFactory.create(modelPath, useGpu)
 
     private fun resolveModelPath(): String {
         val modelDir = File(context.filesDir, "llm_models")
@@ -123,7 +124,9 @@ class LiteRtLlmProvider internal constructor(
     }
 
     private object DefaultEngineFactory : EngineFactory {
-        override fun create(config: EngineConfig): EngineHandle {
+        override fun create(modelPath: String, useGpu: Boolean): EngineHandle {
+            val backend = if (useGpu) Backend.GPU() else Backend.CPU()
+            val config = EngineConfig(modelPath = modelPath, backend = backend)
             val engine = Engine(config).also { it.initialize() }
             return RealEngineHandle(engine)
         }
