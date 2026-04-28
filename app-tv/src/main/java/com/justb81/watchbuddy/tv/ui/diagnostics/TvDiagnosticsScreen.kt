@@ -25,7 +25,6 @@ import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.model.PlaybackTick
 import com.justb81.watchbuddy.core.scrobbler.MediaSessionScrobbler
 import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
-import com.justb81.watchbuddy.tv.scrobbler.NotificationMetadataSource
 import com.justb81.watchbuddy.tv.scrobbler.WatchNextMetadataSource
 
 @OptIn(ExperimentalTvMaterial3Api::class)

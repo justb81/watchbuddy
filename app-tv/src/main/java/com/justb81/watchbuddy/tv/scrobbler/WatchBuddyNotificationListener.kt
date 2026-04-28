@@ -77,7 +77,7 @@ class WatchBuddyNotificationListener : NotificationListenerService() {
         notificationSource.onPosted(snippet)
         DiagnosticLog.event(
             TAG,
-            "ingest pkg=${sbn.packageName} title=${title?.take(60)}",
+            "ingest pkg=${sbn.packageName} title=${title?.take(NotificationMetadataSource.LOG_TITLE_MAX_CHARS)}",
         )
     }
 

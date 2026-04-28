@@ -71,7 +71,7 @@ class NotificationMetadataSource @Inject constructor() : MetadataEnricher {
         builder.addSource("notification")
         DiagnosticLog.event(
             TAG,
-            "enrich pkg=$packageName title=${snip.title?.take(60)}",
+            "enrich pkg=$packageName title=${snip.title?.take(LOG_TITLE_MAX_CHARS)}",
         )
     }
 
@@ -91,6 +91,9 @@ class NotificationMetadataSource @Inject constructor() : MetadataEnricher {
 
         /** Window used by [recentlyObservedCount] for the diagnostics green-dot threshold. */
         const val DIAGNOSTICS_WINDOW_MS = 10L * 60_000L
+
+        /** Max chars of a snippet title written to the diagnostic log to avoid privacy bleed. */
+        const val LOG_TITLE_MAX_CHARS = 60
 
         private const val TAG = "NotifListener"
     }
