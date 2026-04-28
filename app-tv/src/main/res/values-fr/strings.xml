@@ -177,6 +177,10 @@
         <item quantity="other">%d applis suivies</item>
     </plurals>
 
+    <!-- Diagnostics — app profiles (#473) -->
+    <string name="tv_diagnostics_section_app_profiles">Profils d\'applications</string>
+    <string name="tv_diagnostics_row_app_profiles_matched">Applications avec profil</string>
+
     <!-- Version footer -->
     <string name="settings_version_footer">WatchBuddy v%1$s (build %2$d)</string>
 </resources>

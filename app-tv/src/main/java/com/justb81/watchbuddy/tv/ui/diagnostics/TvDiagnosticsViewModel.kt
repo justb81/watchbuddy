@@ -47,6 +47,12 @@ data class TvDiagnosticsUiState(
      * [NotificationMetadataSource.DIAGNOSTICS_WINDOW_MS] (10 min), or null before first refresh.
      */
     val notificationTrackedCount: Int? = null,
+    /**
+     * Observed-package stats since [MediaSessionScrobbler.startListening]: how many
+     * distinct packages have been seen in `getActiveSessions` and how many of those
+     * have an entry in [AppProfiles]. Null before the first refresh.
+     */
+    val appProfileStats: MediaSessionScrobbler.ObservedPackageStats? = null,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -54,7 +60,7 @@ data class TvDiagnosticsUiState(
 class TvDiagnosticsViewModel @Inject constructor(
     private val application: Application,
     phoneDiscovery: PhoneDiscoveryManager,
-    scrobbler: MediaSessionScrobbler,
+    private val scrobbler: MediaSessionScrobbler,
     private val justWatchRepo: JustWatchDeepLinkRepository,
     private val watchNextSource: WatchNextMetadataSource,
     private val notificationSource: NotificationMetadataSource,
@@ -68,6 +74,7 @@ class TvDiagnosticsViewModel @Inject constructor(
         refreshJustWatchCacheStats()
         refreshWatchNextStats()
         refreshNotificationStats()
+        refreshAppProfileStats()
 
         val discoveryState = combine(
             phoneDiscovery.discoveryActive,
@@ -112,6 +119,7 @@ class TvDiagnosticsViewModel @Inject constructor(
                         lastDeepLinkFetchMs = it.lastDeepLinkFetchMs,
                         watchNextCountResult = it.watchNextCountResult,
                         notificationTrackedCount = it.notificationTrackedCount,
+                        appProfileStats = it.appProfileStats,
                     )
                 }
             }
@@ -178,6 +186,15 @@ class TvDiagnosticsViewModel @Inject constructor(
      */
     fun refreshNotificationStats() {
         _uiState.update { it.copy(notificationTrackedCount = notificationSource.recentlyObservedCount()) }
+    }
+
+    /**
+     * Reads the in-memory observed-package map and updates
+     * [TvDiagnosticsUiState.appProfileStats]. This is a fast in-memory read —
+     * no IO dispatcher required. Call on [Lifecycle.Event.ON_RESUME].
+     */
+    fun refreshAppProfileStats() {
+        _uiState.update { it.copy(appProfileStats = scrobbler.observedPackageStats()) }
     }
 
     companion object {

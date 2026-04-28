@@ -42,6 +42,7 @@ fun TvDiagnosticsScreen(
                 viewModel.refreshNotificationAccess()
                 viewModel.refreshWatchNextStats()
                 viewModel.refreshNotificationStats()
+                viewModel.refreshAppProfileStats()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -199,6 +200,10 @@ fun TvDiagnosticsScreen(
                     notificationAccessGranted = uiState.notificationAccessGranted,
                     trackedCount = uiState.notificationTrackedCount,
                 )
+            }
+
+            item {
+                AppProfilesSection(stats = uiState.appProfileStats)
             }
 
             item {
@@ -440,6 +445,30 @@ private fun formatAge(timestampMs: Long): String {
         seconds < 3_600 -> "${seconds / 60}m ago"
         else -> "${seconds / 3_600}h ago"
     }
+}
+
+@Composable
+private fun AppProfilesSection(stats: MediaSessionScrobbler.ObservedPackageStats?) {
+    val valueStr = when {
+        stats == null -> "—"
+        stats.totalCount == 0 -> "—"
+        else -> "${stats.profiledCount} / ${stats.totalCount}"
+    }
+    val status = when {
+        stats == null || stats.totalCount == 0 -> Status.NEUTRAL
+        stats.profiledCount > 0 -> Status.OK
+        else -> Status.WARN
+    }
+    DiagnosticsSection(
+        title = stringResource(R.string.tv_diagnostics_section_app_profiles),
+        rows = listOf(
+            DiagRow(
+                label = stringResource(R.string.tv_diagnostics_row_app_profiles_matched),
+                value = valueStr,
+                status = status,
+            ),
+        ),
+    )
 }
 
 @OptIn(ExperimentalTvMaterial3Api::class)
