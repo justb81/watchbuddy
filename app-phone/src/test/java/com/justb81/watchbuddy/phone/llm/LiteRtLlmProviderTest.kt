@@ -84,7 +84,7 @@ class LiteRtLlmProviderTest {
             val factory = LiteRtLlmProvider.EngineFactory { _, useGpu ->
                 callCount++
                 if (useGpu) {
-                    throw IllegalStateException("GPU init failed")
+                    error("GPU init failed")
                 } else {
                     fakeHandle("CPU response")
                 }
