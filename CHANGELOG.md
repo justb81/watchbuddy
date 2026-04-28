@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.31.0](https://github.com/justb81/watchbuddy/compare/v0.30.0...v0.31.0) (2026-04-28)
+
+
+### Features
+
+* **core:** AppProfiles registry — per-app field priority, marker regex, source gating ([#492](https://github.com/justb81/watchbuddy/issues/492)) ([6560f7b](https://github.com/justb81/watchbuddy/commit/6560f7bc47951ac276aa21cd37b2fdc726c0f762))
+* **scrobbler:** ambiguous-scrobble prompt with top-3 candidates and runtime-affinity scoring ([#474](https://github.com/justb81/watchbuddy/issues/474)) ([#493](https://github.com/justb81/watchbuddy/issues/493)) ([b6e7c82](https://github.com/justb81/watchbuddy/commit/b6e7c8228ce838e9931b9f0016dbfa0bfffda320))
+* **tv:** NotificationMetadataSource — harvest title/episode evidence from media notifications ([#491](https://github.com/justb81/watchbuddy/issues/491)) ([f984491](https://github.com/justb81/watchbuddy/commit/f98449152af0d683307bda7768b175fa37274fbf))
+* **tv:** WatchNextMetadataSource — harvest currently-playing metadata from TvContract WatchNext provider ([#489](https://github.com/justb81/watchbuddy/issues/489)) ([54711e8](https://github.com/justb81/watchbuddy/commit/54711e8b5c3e9fcfdb082f32100a26a4ee71b48b))
+
 ## [0.30.0](https://github.com/justb81/watchbuddy/compare/v0.29.0...v0.30.0) (2026-04-28)
 
 
