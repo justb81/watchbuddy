@@ -62,6 +62,9 @@ dependencies {
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
 
+    // TV Provider — WatchNext content-provider access for WatchNextMetadataSource
+    implementation(libs.androidx.tvprovider)
+
     // Error-prone annotations — compileOnly so R8 can resolve references from Tink
     // without bundling the annotation library in the APK.
     compileOnly(libs.errorprone.annotations)

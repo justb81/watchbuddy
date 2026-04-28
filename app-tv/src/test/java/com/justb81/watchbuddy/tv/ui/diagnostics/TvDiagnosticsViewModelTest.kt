@@ -6,6 +6,7 @@ import com.justb81.watchbuddy.core.scrobbler.MediaSessionScrobbler
 import com.justb81.watchbuddy.tv.MainDispatcherRule
 import com.justb81.watchbuddy.tv.data.JustWatchDeepLinkRepository
 import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
+import com.justb81.watchbuddy.tv.scrobbler.WatchNextMetadataSource
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -36,6 +37,7 @@ class TvDiagnosticsViewModelTest {
     private val phoneDiscovery: PhoneDiscoveryManager = mockk(relaxed = true)
     private val scrobbler: MediaSessionScrobbler = mockk(relaxed = true)
     private val justWatchRepo: JustWatchDeepLinkRepository = mockk(relaxed = true)
+    private val watchNextSource: WatchNextMetadataSource = mockk(relaxed = true)
 
     @BeforeEach
     fun setUp() {
@@ -52,6 +54,7 @@ class TvDiagnosticsViewModelTest {
         coEvery { justWatchRepo.count() } returns 0
         coEvery { justWatchRepo.negativeCount() } returns 0
         coEvery { justWatchRepo.lastFetchedAt() } returns null
+        every { watchNextSource.countPublishingApps() } returns WatchNextMetadataSource.CountResult.Success(0)
     }
 
     @AfterEach
@@ -61,7 +64,7 @@ class TvDiagnosticsViewModelTest {
 
     @Test
     fun `recentEvents is empty on fresh VM`() = runTest {
-        val vm = TvDiagnosticsViewModel(application, phoneDiscovery, scrobbler, justWatchRepo)
+        val vm = TvDiagnosticsViewModel(application, phoneDiscovery, scrobbler, justWatchRepo, watchNextSource)
         advanceUntilIdle()
 
         assertTrue(vm.uiState.value.recentEvents.isEmpty())
@@ -69,7 +72,7 @@ class TvDiagnosticsViewModelTest {
 
     @Test
     fun `single event is projected with correct level and newest-first order`() = runTest {
-        val vm = TvDiagnosticsViewModel(application, phoneDiscovery, scrobbler, justWatchRepo)
+        val vm = TvDiagnosticsViewModel(application, phoneDiscovery, scrobbler, justWatchRepo, watchNextSource)
         advanceUntilIdle()
 
         DiagnosticLog.event("TAG", "hello")
@@ -84,7 +87,7 @@ class TvDiagnosticsViewModelTest {
 
     @Test
     fun `recentEvents is truncated to 100 entries newest first`() = runTest {
-        val vm = TvDiagnosticsViewModel(application, phoneDiscovery, scrobbler, justWatchRepo)
+        val vm = TvDiagnosticsViewModel(application, phoneDiscovery, scrobbler, justWatchRepo, watchNextSource)
         advanceUntilIdle()
 
         repeat(150) { i -> DiagnosticLog.event("TAG", "msg $i") }
@@ -100,7 +103,7 @@ class TvDiagnosticsViewModelTest {
     fun `scrobblerListening reflects true when scrobbler isListening emits true`() = runTest {
         val isListeningFlow = MutableStateFlow(false)
         every { scrobbler.isListening } returns isListeningFlow
-        val vm = TvDiagnosticsViewModel(application, phoneDiscovery, scrobbler, justWatchRepo)
+        val vm = TvDiagnosticsViewModel(application, phoneDiscovery, scrobbler, justWatchRepo, watchNextSource)
         advanceUntilIdle()
 
         isListeningFlow.value = true
@@ -113,7 +116,7 @@ class TvDiagnosticsViewModelTest {
     fun `scrobblerListening reflects false when scrobbler isListening emits false`() = runTest {
         val isListeningFlow = MutableStateFlow(true)
         every { scrobbler.isListening } returns isListeningFlow
-        val vm = TvDiagnosticsViewModel(application, phoneDiscovery, scrobbler, justWatchRepo)
+        val vm = TvDiagnosticsViewModel(application, phoneDiscovery, scrobbler, justWatchRepo, watchNextSource)
         advanceUntilIdle()
 
         isListeningFlow.value = false
@@ -125,7 +128,7 @@ class TvDiagnosticsViewModelTest {
     @Test
     fun `scrobblerListening starts as false when scrobbler is not listening`() = runTest {
         every { scrobbler.isListening } returns MutableStateFlow(false)
-        val vm = TvDiagnosticsViewModel(application, phoneDiscovery, scrobbler, justWatchRepo)
+        val vm = TvDiagnosticsViewModel(application, phoneDiscovery, scrobbler, justWatchRepo, watchNextSource)
         advanceUntilIdle()
 
         assertFalse(vm.uiState.value.scrobblerListening)

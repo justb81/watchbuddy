@@ -9,6 +9,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -24,6 +25,7 @@ import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.model.PlaybackTick
 import com.justb81.watchbuddy.core.scrobbler.MediaSessionScrobbler
 import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
+import com.justb81.watchbuddy.tv.scrobbler.WatchNextMetadataSource
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
@@ -36,7 +38,10 @@ fun TvDiagnosticsScreen(
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) viewModel.refreshNotificationAccess()
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.refreshNotificationAccess()
+                viewModel.refreshWatchNextStats()
+            }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
@@ -182,6 +187,10 @@ fun TvDiagnosticsScreen(
                         ),
                     ),
                 )
+            }
+
+            item {
+                WatchNextSection(uiState.watchNextCountResult)
             }
 
             item {
@@ -470,6 +479,28 @@ private fun StreamingDeepLinksSection(
             }
         }
     }
+}
+
+@Composable
+private fun WatchNextSection(countResult: WatchNextMetadataSource.CountResult?) {
+    val (valueStr, status) = when (countResult) {
+        null -> "—" to Status.NEUTRAL
+        is WatchNextMetadataSource.CountResult.PermissionDenied ->
+            stringResource(R.string.tv_diagnostics_value_watch_next_permission_denied) to Status.FAIL
+        is WatchNextMetadataSource.CountResult.Success ->
+            pluralStringResource(R.plurals.tv_diagnostics_value_watch_next_count, countResult.count, countResult.count) to
+                if (countResult.count > 0) Status.OK else Status.WARN
+    }
+    DiagnosticsSection(
+        title = stringResource(R.string.tv_diagnostics_section_watch_next),
+        rows = listOf(
+            DiagRow(
+                label = stringResource(R.string.tv_diagnostics_row_watch_next_publishing),
+                value = valueStr,
+                status = status,
+            ),
+        ),
+    )
 }
 
 private fun formatLastCandidate(last: MediaSessionScrobbler.LastCandidate?): String {

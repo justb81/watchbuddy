@@ -2,11 +2,14 @@ package com.justb81.watchbuddy.tv.scrobbler
 
 import android.content.Context
 import android.media.session.MediaSessionManager
+import com.justb81.watchbuddy.core.model.PlaybackTick
 import com.justb81.watchbuddy.core.model.ScrobbleCandidate
 import com.justb81.watchbuddy.core.model.TraktEpisode
 import com.justb81.watchbuddy.core.model.TraktIds
 import com.justb81.watchbuddy.core.model.TraktShow
 import com.justb81.watchbuddy.core.scrobbler.MediaSessionScrobbler
+import com.justb81.watchbuddy.core.scrobbler.MediaSnapshotBuilder
+import com.justb81.watchbuddy.core.scrobbler.MetadataEnricher
 import com.justb81.watchbuddy.core.scrobbler.NoOpTitleExtractor
 import com.justb81.watchbuddy.core.scrobbler.ScrobbleDispatcher
 import com.justb81.watchbuddy.core.scrobbler.WatchedShowSource
@@ -125,6 +128,41 @@ class MediaSessionScrobblerTest {
         fun `stopListening is idempotent when never started`() {
             scrobbler.stopListening()
             scrobbler.stopListening()
+        }
+    }
+
+    // ── WatchNextMetadataSource enricher integration ──────────────────────────
+
+    @Nested
+    @DisplayName("WatchNextMetadataSource enricher — snapshot contains watchNext lines")
+    inner class WatchNextEnricherTest {
+
+        private fun buildWatchNextEnricher(): MetadataEnricher = MetadataEnricher { _, _, builder ->
+            builder.add("watchNext.title", "Stranger Things")
+            builder.add("watchNext.season", "4")
+            builder.add("watchNext.episode", "1")
+            builder.add("watchNext.contentId", "tmdb:66732")
+            builder.add("watchNext.marker", "S04E01")
+            builder.addSource("watchNext")
+        }
+
+        @Test
+        fun `watchNext lines appear in snapshot text when enricher is registered`() = runTest {
+            val enricher = buildWatchNextEnricher()
+            val builder = MediaSnapshotBuilder("com.disney.disneyplus")
+            enricher.enrich(
+                "com.disney.disneyplus",
+                PlaybackTick(PlaybackTick.STATE_PLAYING, 600_000, 2_700_000, System.currentTimeMillis()),
+                builder,
+            )
+            val enrichedSnapshot = builder.build()
+
+            assertTrue(enrichedSnapshot.text.contains("watchNext.title: Stranger Things"))
+            assertTrue(enrichedSnapshot.text.contains("watchNext.season: 4"))
+            assertTrue(enrichedSnapshot.text.contains("watchNext.episode: 1"))
+            assertTrue(enrichedSnapshot.text.contains("watchNext.contentId: tmdb:66732"))
+            assertTrue(enrichedSnapshot.text.contains("watchNext.marker: S04E01"))
+            assertTrue(enrichedSnapshot.sources.contains("watchNext"))
         }
     }
 }

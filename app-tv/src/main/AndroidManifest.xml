@@ -28,6 +28,15 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Watch Next TV provider — used by WatchNextMetadataSource to harvest
+         currently-playing program metadata (title, season, episode, contentId)
+         from the system TV provider that streaming apps populate for the
+         Android TV launcher's "Continue Watching" row.
+         Granted automatically on Android TV form-factor; no runtime prompt
+         needed. On non-TV form-factor the query returns an empty cursor, which
+         WatchNextMetadataSource handles gracefully. -->
+    <uses-permission android:name="android.permission.READ_TV_LISTINGS" />
+
     <!-- Scrobble detection — WatchBuddyNotificationListener is declared as a
          NotificationListenerService so that MediaSessionManager.getActiveSessions()
          returns the TV's active media controllers. Without this the scrobbler
