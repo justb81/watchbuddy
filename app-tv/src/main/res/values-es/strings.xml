@@ -159,7 +159,10 @@
     <string name="tv_diagnostics_value_null">(null)</string>
     <string name="tv_diagnostics_section_watch_next">Proveedor Watch Next</string>
     <string name="tv_diagnostics_row_watch_next_publishing">Aplicaciones publicando</string>
-    <string name="tv_diagnostics_value_watch_next_count">%d aplicaciones</string>
+    <plurals name="tv_diagnostics_value_watch_next_count">
+        <item quantity="one">%d aplicación</item>
+        <item quantity="other">%d aplicaciones</item>
+    </plurals>
     <string name="tv_diagnostics_value_watch_next_permission_denied">Permiso denegado</string>
 
     <!-- Version footer -->

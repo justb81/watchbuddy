@@ -155,7 +155,10 @@
     <string name="tv_diagnostics_value_null">(null)</string>
     <string name="tv_diagnostics_section_watch_next">Watch Next provider</string>
     <string name="tv_diagnostics_row_watch_next_publishing">Apps publishing</string>
-    <string name="tv_diagnostics_value_watch_next_count">%d apps</string>
+    <plurals name="tv_diagnostics_value_watch_next_count">
+        <item quantity="one">%d app</item>
+        <item quantity="other">%d apps</item>
+    </plurals>
     <string name="tv_diagnostics_value_watch_next_permission_denied">Permission denied</string>
 
     <!-- Version footer -->

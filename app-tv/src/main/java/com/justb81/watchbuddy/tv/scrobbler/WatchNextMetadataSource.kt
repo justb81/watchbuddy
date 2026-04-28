@@ -1,5 +1,6 @@
 package com.justb81.watchbuddy.tv.scrobbler
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.database.Cursor
 import androidx.tvprovider.media.tv.TvContractCompat
@@ -43,6 +44,10 @@ import javax.inject.Singleton
  * cursor, which is handled gracefully. A [SecurityException] is caught and surfaced as a
  * yellow/red dot in TV Diagnostics.
  */
+// TvContractCompat.WatchNextPrograms inherits column-name constants from internal
+// ProgramColumns / PreviewProgramColumns interfaces annotated @RestrictTo(LIBRARY_GROUP).
+// There is no public alternative — these are the only column names for WatchNext queries.
+@SuppressLint("RestrictedApi")
 @Singleton
 class WatchNextMetadataSource @Inject constructor(
     @param:ApplicationContext private val context: Context,

@@ -155,7 +155,10 @@
     <string name="tv_diagnostics_value_null">(null)</string>
     <string name="tv_diagnostics_section_watch_next">Watch-Next-Anbieter</string>
     <string name="tv_diagnostics_row_watch_next_publishing">Veröffentlichende Apps</string>
-    <string name="tv_diagnostics_value_watch_next_count">%d Apps</string>
+    <plurals name="tv_diagnostics_value_watch_next_count">
+        <item quantity="one">%d App</item>
+        <item quantity="other">%d Apps</item>
+    </plurals>
     <string name="tv_diagnostics_value_watch_next_permission_denied">Berechtigung verweigert</string>
 
     <!-- Version footer -->

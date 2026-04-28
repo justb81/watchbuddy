@@ -28,7 +28,7 @@ errorprone-annotations = "2.49.0"
 gradlePlayPublisher = "4.0.0"
 detekt = "1.23.8"
 room = "2.8.4"
-androidx-tvprovider = "1.0.0"
+androidx-tvprovider = "1.1.0"
 
 [libraries]
 # AndroidX Core

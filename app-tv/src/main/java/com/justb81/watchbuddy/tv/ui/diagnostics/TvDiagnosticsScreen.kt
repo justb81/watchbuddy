@@ -9,6 +9,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -487,7 +488,7 @@ private fun WatchNextSection(countResult: WatchNextMetadataSource.CountResult?) 
         is WatchNextMetadataSource.CountResult.PermissionDenied ->
             stringResource(R.string.tv_diagnostics_value_watch_next_permission_denied) to Status.FAIL
         is WatchNextMetadataSource.CountResult.Success ->
-            stringResource(R.string.tv_diagnostics_value_watch_next_count, countResult.count) to
+            pluralStringResource(R.plurals.tv_diagnostics_value_watch_next_count, countResult.count, countResult.count) to
                 if (countResult.count > 0) Status.OK else Status.WARN
     }
     DiagnosticsSection(
