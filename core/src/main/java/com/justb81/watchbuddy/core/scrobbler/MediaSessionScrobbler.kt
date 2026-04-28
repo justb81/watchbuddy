@@ -8,6 +8,7 @@ import android.util.Log
 import androidx.core.app.NotificationManagerCompat
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.model.MediaMetadataSnapshot
+import com.justb81.watchbuddy.core.model.PlaybackTick
 import com.justb81.watchbuddy.core.model.ScrobbleCandidate
 import com.justb81.watchbuddy.core.model.TitleExtractionResponse
 import com.justb81.watchbuddy.core.model.TraktEpisode
