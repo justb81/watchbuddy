@@ -151,6 +151,36 @@ enum class AvatarSource { TRAKT, GENERATED, CUSTOM }
 
 // ── Scrobble / Session ────────────────────────────────────────────────────────
 
+/**
+ * Fast-changing playback state sampled once per poll tick, kept separate from
+ * [MediaMetadataSnapshot] which is invariant for the duration of an episode.
+ *
+ * [state] mirrors Android's `PlaybackState.STATE_*` integer constants.
+ * [positionMs] and [durationMs] are -1 when the streaming app does not report them.
+ */
+@Serializable
+data class PlaybackTick(
+    val state: Int,
+    val positionMs: Long,
+    val durationMs: Long,
+    val capturedAtMs: Long,
+) {
+    val progress: Float
+        get() = if (durationMs > 0 && positionMs >= 0)
+            (positionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
+
+    val isPlaying: Boolean get() = state == STATE_PLAYING
+    val isStopped: Boolean get() = state == STATE_STOPPED || state == STATE_NONE
+
+    companion object {
+        const val STATE_NONE = 0
+        const val STATE_STOPPED = 1
+        const val STATE_PAUSED = 2
+        const val STATE_PLAYING = 3
+        val UNKNOWN = PlaybackTick(state = -1, positionMs = -1L, durationMs = -1L, capturedAtMs = 0L)
+    }
+}
+
 @Serializable
 data class ScrobbleCandidate(
     val packageName: String,
