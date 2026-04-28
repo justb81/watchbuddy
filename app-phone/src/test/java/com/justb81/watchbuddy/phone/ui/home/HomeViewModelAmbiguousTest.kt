@@ -215,7 +215,7 @@ class HomeViewModelAmbiguousTest {
         }
 
         @Test
-        fun `selectCandidate does nothing when no valid access token`() = runTest {
+        fun `selectCandidate clears prompt even when no valid access token`() = runTest {
             coEvery { tokenRefreshManager.getValidAccessToken() } returns null
 
             val vm = createViewModel()
@@ -228,8 +228,8 @@ class HomeViewModelAmbiguousTest {
             vm.selectCandidate(event, event.candidates.first())
             advanceUntilIdle()
 
-            // When token is null, selectCandidate returns early with prompt still visible
-            assertNotNull(vm.uiState.value.pendingAmbiguousPrompt)
+            // return@launch inside try-finally still triggers finally, so resolvePrompt clears the prompt
+            assertNull(vm.uiState.value.pendingAmbiguousPrompt)
         }
     }
 }
