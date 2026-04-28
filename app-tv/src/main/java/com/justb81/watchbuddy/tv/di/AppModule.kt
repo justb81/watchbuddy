@@ -1,5 +1,6 @@
 package com.justb81.watchbuddy.tv.di
 
+import com.justb81.watchbuddy.core.scrobbler.MetadataEnricher
 import com.justb81.watchbuddy.core.scrobbler.ScrobbleDispatcher
 import com.justb81.watchbuddy.core.scrobbler.TitleExtractor
 import com.justb81.watchbuddy.core.scrobbler.WatchedShowSource
@@ -46,5 +47,10 @@ abstract class AppModule {
         @Singleton
         @Named("traktClientId")
         fun provideTraktClientId(): String = ""
+
+        /** No enrichers registered in the TV app yet; populated per-app via Hilt. */
+        @Provides
+        @Singleton
+        fun provideMetadataEnrichers(): List<MetadataEnricher> = emptyList()
     }
 }
