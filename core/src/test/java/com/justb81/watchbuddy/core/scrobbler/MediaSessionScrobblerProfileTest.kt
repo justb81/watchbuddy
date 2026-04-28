@@ -15,7 +15,9 @@ import io.mockk.mockkObject
 import io.mockk.unmockkObject
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
@@ -357,4 +359,10 @@ class MediaSessionScrobblerProfileTest {
         lines: List<String>,
     ): MediaMetadataSnapshot =
         MediaMetadataSnapshot(packageName = packageName, text = lines.joinToString("\n"))
+
+    private fun snapshotOf(packageName: String, vararg pairs: Pair<String, String>): MediaMetadataSnapshot =
+        MediaMetadataSnapshot(
+            packageName = packageName,
+            text = pairs.joinToString("\n") { (tag, value) -> "$tag: $value" },
+        )
 }
