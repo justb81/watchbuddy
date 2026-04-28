@@ -55,6 +55,23 @@ class MediaSessionScrobbler @Inject constructor(
         internal const val OVERLAY_THRESHOLD = 0.70f
     }
 
+    /**
+     * Snapshot of observed-package counts for the TV Diagnostics screen.
+     * [profiledCount] is how many of the observed packages have an entry in
+     * [AppProfiles.ALL]; [totalCount] is the total distinct packages seen
+     * since [startListening].
+     */
+    data class ObservedPackageStats(val profiledCount: Int, val totalCount: Int)
+
+    /**
+     * Returns the current [ObservedPackageStats] — a fast in-memory read with no
+     * I/O. Call from the TV Diagnostics ViewModel on `ON_RESUME`.
+     */
+    fun observedPackageStats(): ObservedPackageStats = ObservedPackageStats(
+        profiledCount = observedPackages.keys.count { AppProfiles.forPackage(it) != null },
+        totalCount = observedPackages.size,
+    )
+
     /** Diagnostic snapshot of a candidate the scrobbler recently saw. */
     data class LastCandidate(
         val candidate: ScrobbleCandidate,
@@ -89,6 +106,13 @@ class MediaSessionScrobbler @Inject constructor(
 
     /** Strips the `"<tag>: "` prefix from a text-blob line and returns the bare value. */
     private fun String.stripTag(): String = substringAfter(": ", missingDelimiterValue = this).trim()
+
+    /**
+     * Packages seen in `getActiveSessions` since [startListening] was called.
+     * Used to compute the "observed vs. profiled" counter shown in TV Diagnostics.
+     * Cleared by [stopListening].
+     */
+    private val observedPackages = ConcurrentHashMap<String, Long>()
 
     /**
      * Per-session progress snapshot kept around so `reconcileVanished` can dispatch
@@ -195,6 +219,7 @@ class MediaSessionScrobbler @Inject constructor(
                     var publishedDiagnostics = false
                     sessions.forEach { controller ->
                         val packageName = controller.packageName
+                        trackObservedPackage(packageName)
                         val metadata = controller.metadata
                         val playbackState = controller.playbackState
                         val tick = buildTick(playbackState, metadata)
@@ -411,6 +436,7 @@ class MediaSessionScrobbler @Inject constructor(
         _isListening.value = false
         currentlySessionKey = null
         lastProgressBySessionKey.clear()
+        observedPackages.clear()
         _lastObservedSession.value = null
     }
 
@@ -492,7 +518,10 @@ class MediaSessionScrobbler @Inject constructor(
         snapshot: MediaMetadataSnapshot,
         tick: PlaybackTick = PlaybackTick.UNKNOWN,
     ): ScrobbleCandidate? {
-        val candidates = snapshot.text.lines().map { it.stripTag() }.filter { it.isNotBlank() }.distinct()
+        val profile = AppProfiles.forPackage(snapshot.packageName)
+
+        // Profile-aware candidate ordering: preferred tags first, then the rest.
+        val candidates = orderedCandidates(snapshot, profile)
         if (candidates.isEmpty()) return null
         val mediaTitle = candidates.first()
 
@@ -503,9 +532,33 @@ class MediaSessionScrobbler @Inject constructor(
         val contentIdHit = resolveByContentId(snapshot, mediaTitle, cachedShows)
         if (contentIdHit != null) return contentIdHit
 
-        val (globalSeason, globalEpisode) = findGlobalEpisodeMarker(candidates)
+        return runMatchCascade(snapshot, profile, candidates, cachedShows, mediaTitle)
+    }
+
+    /**
+     * Runs Phases 1–3 of the match cascade after the content-ID short-circuit.
+     * Extracted to keep [matchSnapshot] within the ReturnCount detekt limit.
+     */
+    private suspend fun runMatchCascade(
+        snapshot: MediaMetadataSnapshot,
+        profile: AppProfile?,
+        candidates: List<String>,
+        cachedShows: List<TraktWatchedEntry>,
+        mediaTitle: String,
+    ): ScrobbleCandidate? {
+        // skipPhase1: bypass the cheap cache-match and go straight to LLM for apps
+        // known to publish only the app name (or similarly useless) metadata.
+        if (profile?.skipPhase1 == true) {
+            val extraction = runCatching { titleExtractor.extract(snapshot) }
+                .onFailure { DiagnosticLog.warn(TAG, "Title extractor threw (skipPhase1)", it) }
+                .getOrNull()
+            val llmHit = extraction?.let { resolveExtraction(snapshot, it, cachedShows, mediaTitle) }
+            return llmHit ?: tmdbFallback(snapshot, extraction, null, mediaTitle)
+        }
+
+        val (globalSeason, globalEpisode) = findGlobalEpisodeMarker(candidates, profile)
         val bestCheap = candidates
-            .map { field -> scoreCandidate(field, cachedShows) }
+            .map { field -> scoreCandidate(field, cachedShows, profile) }
             .maxByOrNull { it.score }
 
         val cheapHit = resolveCheapHit(snapshot, bestCheap, globalSeason, globalEpisode, mediaTitle)
@@ -516,6 +569,41 @@ class MediaSessionScrobbler @Inject constructor(
             .getOrNull()
         val llmHit = extraction?.let { resolveExtraction(snapshot, it, cachedShows, mediaTitle) }
         return llmHit ?: tmdbFallback(snapshot, extraction, bestCheap, mediaTitle)
+    }
+
+    /**
+     * Returns candidate strings in profile-aware priority order.
+     *
+     * Lines whose tag prefix appears in [AppProfile.preferredSourceTags] are moved
+     * to the front (preserving the registry order within the group); remaining
+     * lines follow in their original snapshot order. Tag prefixes are stripped
+     * before returning.
+     */
+    private fun orderedCandidates(snapshot: MediaMetadataSnapshot, profile: AppProfile?): List<String> {
+        val lines = snapshot.text.lines()
+        val tags = profile?.preferredSourceTags
+        if (tags.isNullOrEmpty()) {
+            return lines.map { it.stripTag() }.filter { it.isNotBlank() }.distinct()
+        }
+        val preferred = tags.flatMap { tag -> lines.filter { it.startsWith("$tag: ") } }
+        val rest = lines.filter { line -> tags.none { tag -> line.startsWith("$tag: ") } }
+        return (preferred + rest).map { it.stripTag() }.filter { it.isNotBlank() }.distinct()
+    }
+
+    /**
+     * Records [pkg] in [observedPackages] and logs an `AppProfile` breadcrumb
+     * the first time each package is encountered, so "Recent events" in TV
+     * Diagnostics shows whether a profile was applied.
+     */
+    private fun trackObservedPackage(pkg: String) {
+        val isNew = observedPackages.putIfAbsent(pkg, System.currentTimeMillis()) == null
+        if (isNew) {
+            val profile = AppProfiles.forPackage(pkg)
+            DiagnosticLog.event(
+                TAG,
+                "AppProfile pkg=$pkg profile=${if (profile != null) "yes" else "no-default"}",
+            )
+        }
     }
 
     /**
@@ -564,12 +652,23 @@ class MediaSessionScrobbler @Inject constructor(
             ?.trim()
             ?.takeIf { it.isNotBlank() }
 
-    private fun findGlobalEpisodeMarker(candidates: List<String>): Pair<Int?, Int?> {
-        val episodePattern = Regex("""(?i)S(\d{1,2})E(\d{1,2})""")
-        val match = candidates.firstNotNullOfOrNull { episodePattern.find(it) }
-        val season = match?.groupValues?.get(1)?.toIntOrNull()
-        val episode = match?.groupValues?.get(2)?.toIntOrNull()
-        return season to episode
+    private fun findGlobalEpisodeMarker(
+        candidates: List<String>,
+        profile: AppProfile? = null,
+    ): Pair<Int?, Int?> {
+        val patterns = buildList {
+            profile?.markerRegexes?.let { addAll(it) }
+            add(Regex("""(?i)S(\d{1,2})E(\d{1,2})"""))
+        }
+        for (pattern in patterns) {
+            val match = candidates.firstNotNullOfOrNull { pattern.find(it) }
+            if (match != null) {
+                val season = match.groupValues.getOrNull(1)?.toIntOrNull()
+                val episode = match.groupValues.getOrNull(2)?.toIntOrNull()
+                if (season != null && episode != null) return season to episode
+            }
+        }
+        return null to null
     }
 
     private suspend fun resolveCheapHit(
@@ -655,12 +754,16 @@ class MediaSessionScrobbler @Inject constructor(
     private fun scoreCandidate(
         field: String,
         cachedShows: List<TraktWatchedEntry>,
+        profile: AppProfile? = null,
     ): CheapMatch {
-        val episodePattern = Regex("""(?i)S(\d{1,2})E(\d{1,2})""")
-        val match = episodePattern.find(field)
+        val patterns = buildList {
+            profile?.markerRegexes?.let { addAll(it) }
+            add(Regex("""(?i)S(\d{1,2})E(\d{1,2})"""))
+        }
+        val match = patterns.firstNotNullOfOrNull { it.find(field) }
         val showTitle = if (match != null) field.substringBefore(match.value).trim() else field.trim()
-        val season = match?.groupValues?.get(1)?.toIntOrNull()
-        val episode = match?.groupValues?.get(2)?.toIntOrNull()
+        val season = match?.groupValues?.getOrNull(1)?.toIntOrNull()
+        val episode = match?.groupValues?.getOrNull(2)?.toIntOrNull()
         if (showTitle.isBlank() || cachedShows.isEmpty()) {
             return CheapMatch(field, showTitle, season, episode, 0f, null)
         }
