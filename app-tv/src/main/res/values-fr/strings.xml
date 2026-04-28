@@ -161,6 +161,7 @@
     <string name="tv_diagnostics_row_watch_next_publishing">Applications publiant</string>
     <plurals name="tv_diagnostics_value_watch_next_count">
         <item quantity="one">%d appli</item>
+        <item quantity="many">%d applis</item>
         <item quantity="other">%d applis</item>
     </plurals>
     <string name="tv_diagnostics_value_watch_next_permission_denied">Permission refusée</string>
