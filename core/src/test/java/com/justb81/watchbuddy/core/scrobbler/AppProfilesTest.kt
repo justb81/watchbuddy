@@ -112,7 +112,7 @@ class AppProfilesTest {
         )
 
         @Test
-        fun `resolves show from notification text with S##:E## marker`() = runTest {
+        fun `resolves show from notification text with Netflix S colon E marker`() = runTest {
             coEvery { extractor.extract(any()) } returns null
             val scrobbler = makeScrobbler(listOf(strangerThings), extractor)
             // Netflix ships: notification.text = "Stranger Things S4:E1"
@@ -135,7 +135,7 @@ class AppProfilesTest {
         }
 
         @Test
-        fun `marker regex handles uppercase S##:E##`() {
+        fun `marker regex handles uppercase S hash hash colon E hash hash format`() {
             val profile = AppProfiles.forPackage("com.netflix.ninja")!!
             val regex = profile.markerRegexes.first()
             val match = regex.find("Stranger Things S04:E07")
@@ -145,7 +145,7 @@ class AppProfilesTest {
         }
 
         @Test
-        fun `marker regex handles lowercase s##:e##`() {
+        fun `marker regex handles lowercase s hash hash colon e hash hash format`() {
             val profile = AppProfiles.forPackage("com.netflix.ninja")!!
             val regex = profile.markerRegexes.first()
             val match = regex.find("breaking bad s03:e07")

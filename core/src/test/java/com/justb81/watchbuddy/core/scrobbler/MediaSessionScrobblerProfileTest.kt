@@ -152,7 +152,7 @@ class MediaSessionScrobblerProfileTest {
         }
 
         @Test
-        fun `Netflix S##:E## marker extracts season and episode`() = runTest {
+        fun `Netflix S hash hash colon E hash hash marker extracts season and episode`() = runTest {
             val show = TraktShow("Squid Game", ids = TraktIds(trakt = 194942))
             coEvery { watchedShowSource.getCachedShows() } returns
                 listOf(TraktWatchedEntry(show = show))
