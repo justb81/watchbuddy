@@ -139,8 +139,9 @@ class LlmTitleExtractorTest {
         assertNull(result!!.showTitle)
     }
 
-    private fun sampleSnapshot() = MediaMetadataSnapshot(
-        packageName = "com.netflix.ninja",
-        title = "Pilot",
-    )
+    private fun sampleSnapshot(): MediaMetadataSnapshot {
+        val builder = com.justb81.watchbuddy.core.scrobbler.MediaSnapshotBuilder("com.netflix.ninja")
+        builder.add("mediaSession.title", "Pilot")
+        return builder.build()
+    }
 }

@@ -812,11 +812,21 @@ class CompanionHttpServerTest {
             {
               "snapshot": {
                 "packageName": "com.netflix.ninja",
-                "title": "Pilot"
+                "text": "mediaSession.title: Pilot"
               },
               "libraryHints": [
                 {"traktId": 1, "tmdbId": 100, "title": "Breaking Bad", "year": 2008}
               ]
+            }
+        """.trimIndent()
+
+        private val oldFormatRequestBody = """
+            {
+              "snapshot": {
+                "packageName": "com.netflix.ninja",
+                "title": "Pilot"
+              },
+              "libraryHints": []
             }
         """.trimIndent()
 
@@ -880,6 +890,17 @@ class CompanionHttpServerTest {
                 setBody(extractRequestBody)
             }
             assertEquals(HttpStatusCode.ServiceUnavailable, response.status)
+        }
+
+        @Test
+        fun `returns 200 with confidence=0 for old-format client that omits text field`() = testApp {
+            val response = client.post("/scrobble/extract") {
+                contentType(ContentType.Application.Json)
+                setBody(oldFormatRequestBody)
+            }
+            assertEquals(HttpStatusCode.OK, response.status)
+            val body = response.bodyAsText()
+            assertEquals("{}", body)
         }
     }
 }

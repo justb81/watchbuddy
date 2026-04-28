@@ -145,11 +145,15 @@ class PhoneTitleExtractionClient @Inject constructor(
     }
 
     /**
-     * Dedup key — same raw `packageName + TITLE` should hit one inference even
-     * if the rest of the MediaMetadata drifts slightly between polls. Using
-     * [MediaMetadataSnapshot.title] keeps the key stable across richer-field
-     * additions in subsequent polls.
+     * Dedup key — same evidence text should hit one inference even if minor
+     * positional drift occurs between polls. Hashes [MediaMetadataSnapshot.text]
+     * so the key is stable regardless of field additions or source-tag changes,
+     * and position/duration data never influences the dedup window.
      */
-    private fun dedupKey(snapshot: MediaMetadataSnapshot): String =
-        "${snapshot.packageName}:${snapshot.title.orEmpty()}"
+    private fun dedupKey(snapshot: MediaMetadataSnapshot): String {
+        val digest = java.security.MessageDigest.getInstance("SHA-256")
+            .digest(snapshot.text.toByteArray(Charsets.UTF_8))
+        val hex = digest.joinToString("") { "%02x".format(it) }.take(32)
+        return "${snapshot.packageName}:$hex"
+    }
 }

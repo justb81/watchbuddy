@@ -3,8 +3,8 @@ package com.justb81.watchbuddy.tv.discovery
 import android.net.nsd.NsdServiceInfo
 import com.justb81.watchbuddy.core.model.DeviceCapability
 import com.justb81.watchbuddy.core.model.LlmBackend
-import com.justb81.watchbuddy.core.model.MediaMetadataSnapshot
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
+import com.justb81.watchbuddy.core.scrobbler.MediaSnapshotBuilder
 import com.justb81.watchbuddy.core.scrobbler.WatchedShowSource
 import io.mockk.coEvery
 import io.mockk.every
@@ -63,7 +63,7 @@ class PhoneTitleExtractionClientTest {
         )
 
         val result = client.extract(
-            MediaMetadataSnapshot(packageName = "com.netflix.ninja", title = "Pilot")
+            snapshotOf("com.netflix.ninja", "title" to "Pilot")
         )
 
         assertNull(result)
@@ -95,7 +95,7 @@ class PhoneTitleExtractionClientTest {
         )
 
         val result = client.extract(
-            MediaMetadataSnapshot(packageName = "com.netflix.ninja", title = "Pilot")
+            snapshotOf("com.netflix.ninja", "title" to "Pilot")
         )
 
         assertNotNull(result)
@@ -129,7 +129,7 @@ class PhoneTitleExtractionClientTest {
             )
         )
 
-        val snapshot = MediaMetadataSnapshot(packageName = "com.netflix.ninja", title = "Pilot")
+        val snapshot = snapshotOf("com.netflix.ninja", "title" to "Pilot")
         val results = (1..3)
             .map { async(Dispatchers.IO) { client.extract(snapshot) } }
             .awaitAll()
@@ -153,8 +153,8 @@ class PhoneTitleExtractionClientTest {
             )
         )
 
-        val s1 = MediaMetadataSnapshot(packageName = "com.netflix.ninja", title = "Pilot")
-        val s2 = MediaMetadataSnapshot(packageName = "com.netflix.ninja", title = "System")
+        val s1 = snapshotOf("com.netflix.ninja", "title" to "Pilot")
+        val s2 = snapshotOf("com.netflix.ninja", "title" to "System")
         val r1 = async(Dispatchers.IO) { client.extract(s1) }
         val r2 = async(Dispatchers.IO) { client.extract(s2) }
         val (a, b) = listOf(r1.await(), r2.await())
@@ -178,11 +178,17 @@ class PhoneTitleExtractionClientTest {
         )
 
         val result = client.extract(
-            MediaMetadataSnapshot(packageName = "com.netflix.ninja", title = "Pilot")
+            snapshotOf("com.netflix.ninja", "title" to "Pilot")
         )
 
         assertNull(result)
     }
+
+    private fun snapshotOf(packageName: String, vararg fields: Pair<String, String>) =
+        MediaSnapshotBuilder(packageName).also { b ->
+            listOf("albumArtist", "album", "artist", "displayTitle", "displaySubtitle", "title", "displayDescription")
+                .forEach { key -> fields.toMap()[key]?.let { b.add("mediaSession.$key", it) } }
+        }.build()
 
     private fun makeDiscoveredPhone(
         baseUrl: String,

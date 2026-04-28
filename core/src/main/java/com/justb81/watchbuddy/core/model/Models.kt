@@ -191,36 +191,26 @@ data class ScrobbleCandidate(
 )
 
 /**
- * Structured view of the MediaMetadata fields a streaming app publishes for the
- * currently-playing session. Streaming apps distribute signal across several
- * fields (Plex puts the show in ALBUM_ARTIST, Jellyfin in ALBUM, some Netflix
- * skins use DISPLAY_SUBTITLE for SxxExx) so the scrobbler tries them all before
- * falling back to the LLM extractor.
+ * One stable string of evidence per session tick, plus the package name.
+ *
+ * [text] is a newline-joined sequence of `"<sourceTag>: <value>"` lines written
+ * in priority order by [com.justb81.watchbuddy.core.scrobbler.MediaSnapshotBuilder].
+ * For the MediaSession-only case the tag prefix is `mediaSession.*`. Additional
+ * enrichers (#471, #472) append their own prefixed lines without changing the schema.
+ *
+ * Wire-format note: [text] defaults to an empty string so that a TV client built
+ * against the old schema (which sent 8 named fields instead of [text]) is
+ * deserialized gracefully by a new phone — [WatchBuddyJson] ignores unknown keys,
+ * and an empty [text] naturally yields confidence 0 from the extraction cascade.
+ *
+ * [sources] records which enrichers contributed; used for diagnostics only.
  */
 @Serializable
 data class MediaMetadataSnapshot(
     val packageName: String,
-    val title: String? = null,
-    val displayTitle: String? = null,
-    val displaySubtitle: String? = null,
-    val displayDescription: String? = null,
-    val artist: String? = null,
-    val albumArtist: String? = null,
-    val album: String? = null,
-) {
-    /**
-     * Candidate strings to try for SxxExx parsing + fuzzy matching, ordered by
-     * how likely they are to hold the show title: `ALBUM_ARTIST` > `ALBUM` >
-     * `ARTIST` > `DISPLAY_TITLE` > `DISPLAY_SUBTITLE` > `TITLE` >
-     * `DISPLAY_DESCRIPTION`. Empty / blank values are filtered; duplicates are
-     * collapsed so the fuzzy cascade doesn't redo the same scoring twice.
-     */
-    fun candidateStrings(): List<String> =
-        listOfNotNull(albumArtist, album, artist, displayTitle, displaySubtitle, title, displayDescription)
-            .map { it.trim() }
-            .filter { it.isNotBlank() }
-            .distinct()
-}
+    val text: String = "",
+    val sources: Set<String> = emptySet(),
+)
 
 /**
  * Minimal show reference shipped to the LLM extractor so it can prefer a library

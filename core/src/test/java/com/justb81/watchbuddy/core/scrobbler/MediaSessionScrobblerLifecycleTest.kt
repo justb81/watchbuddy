@@ -3,7 +3,6 @@ package com.justb81.watchbuddy.core.scrobbler
 import android.content.ComponentName
 import android.content.Context
 import android.media.session.MediaSessionManager
-import com.justb81.watchbuddy.core.model.MediaMetadataSnapshot
 import com.justb81.watchbuddy.core.model.ScrobbleCandidate
 import com.justb81.watchbuddy.core.model.TraktEpisode
 import com.justb81.watchbuddy.core.model.TraktIds
@@ -32,15 +31,9 @@ class MediaSessionScrobblerLifecycleTest {
     private val testCandidate = ScrobbleCandidate(
         "com.netflix", "Breaking Bad S01E01", 0.95f, testShow, testEpisode
     )
-    private val testSnapshot = MediaMetadataSnapshot(
-        packageName = "com.netflix",
-        title = "Breaking Bad S01E01",
-    )
+    private val testSnapshot = snapshotOf("com.netflix", "title" to "Breaking Bad S01E01")
     private val testSessionKey = "com.netflix:Breaking Bad S01E01"
-    private val otherSnapshot = MediaMetadataSnapshot(
-        packageName = "com.netflix",
-        title = "Other Show",
-    )
+    private val otherSnapshot = snapshotOf("com.netflix", "title" to "Other Show")
     private val otherSessionKey = "com.netflix:Other Show"
 
     @BeforeEach
@@ -84,7 +77,6 @@ class MediaSessionScrobblerLifecycleTest {
             assertFalse(scrobbler.isListening.value)
             scrobbler.notificationAccessChecker = { true }
             scrobbler.startListening(component)
-            // isListening is set by the polling coroutine on the first tick, not synchronously
             scrobbler.stopListening()
             assertFalse(scrobbler.isListening.value)
         }
@@ -95,7 +87,6 @@ class MediaSessionScrobblerLifecycleTest {
             scrobbler.notificationAccessChecker = { true }
             assertFalse(scrobbler.isListening.value)
             scrobbler.startListening(component)
-            // First tick runs immediately on IO dispatcher; 200 ms is ample
             Thread.sleep(200)
             assertTrue(scrobbler.isListening.value)
             scrobbler.stopListening()
@@ -256,7 +247,7 @@ class MediaSessionScrobblerLifecycleTest {
         fun `high confidence candidate triggers dispatchStart not pendingConfirmation`() = runTest {
             coEvery { scrobbleDispatcher.dispatchStart(any(), any(), any()) } just runs
 
-            scrobbler.autoScrobble(testCandidate) // confidence 0.95 → auto
+            scrobbler.autoScrobble(testCandidate)
 
             coVerify { scrobbleDispatcher.dispatchStart(any(), any(), any()) }
         }

@@ -147,23 +147,15 @@ class LlmTitleExtractor @Inject constructor(
             }
             "{${parts.joinToString(",")}}"
         }
-        val snapshotLines = buildString {
-            appendLine("packageName: ${snapshot.packageName}")
-            snapshot.title?.let { appendLine("TITLE: $it") }
-            snapshot.displayTitle?.let { appendLine("DISPLAY_TITLE: $it") }
-            snapshot.displaySubtitle?.let { appendLine("DISPLAY_SUBTITLE: $it") }
-            snapshot.displayDescription?.let { appendLine("DISPLAY_DESCRIPTION: $it") }
-            snapshot.artist?.let { appendLine("ARTIST: $it") }
-            snapshot.albumArtist?.let { appendLine("ALBUM_ARTIST: $it") }
-            snapshot.album?.let { appendLine("ALBUM: $it") }
-        }
         return """
 You extract TV-show metadata from Android MediaSession fields published by
 streaming apps (Netflix, Prime Video, Disney+, Plex, Jellyfin, YouTube, etc.).
 Different apps put the show name, season, and episode in different fields.
+Each input line has the format "sourceTag: value".
 
-Input fields from the currently-playing session:
-$snapshotLines
+Input evidence from the currently-playing session (package: ${snapshot.packageName}):
+${snapshot.text}
+
 Shows the user already watches (prefer matching one of these if plausible):
 [
 $hintsJson
