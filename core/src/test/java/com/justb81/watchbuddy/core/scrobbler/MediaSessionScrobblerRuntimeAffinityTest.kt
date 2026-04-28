@@ -3,7 +3,8 @@ package com.justb81.watchbuddy.core.scrobbler
 import android.content.Context
 import com.justb81.watchbuddy.core.tmdb.TmdbApiService
 import io.mockk.mockk
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested

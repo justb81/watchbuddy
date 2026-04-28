@@ -11,7 +11,6 @@ import com.justb81.watchbuddy.core.model.EnrichedShowEntry
 import com.justb81.watchbuddy.core.model.ScrobbleDisplayEvent
 import com.justb81.watchbuddy.core.progress.ShowProgress
 import com.justb81.watchbuddy.core.progress.ShowProgressCalculator
-import com.justb81.watchbuddy.core.model.TraktShow
 import com.justb81.watchbuddy.core.trakt.ScrobbleBody
 import com.justb81.watchbuddy.core.trakt.TraktApiService
 import com.justb81.watchbuddy.phone.auth.TokenRefreshManager

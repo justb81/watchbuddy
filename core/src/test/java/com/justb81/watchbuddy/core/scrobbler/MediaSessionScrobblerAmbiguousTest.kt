@@ -1,7 +1,6 @@
 package com.justb81.watchbuddy.core.scrobbler
 
 import android.content.Context
-import com.justb81.watchbuddy.core.model.AmbiguousScrobbleEvent
 import com.justb81.watchbuddy.core.model.PlaybackTick
 import com.justb81.watchbuddy.core.model.TraktIds
 import com.justb81.watchbuddy.core.model.TraktShow
@@ -10,10 +9,10 @@ import com.justb81.watchbuddy.core.tmdb.TmdbApiService
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.runTest
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested

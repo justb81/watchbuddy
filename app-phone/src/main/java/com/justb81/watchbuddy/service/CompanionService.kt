@@ -58,6 +58,7 @@ class CompanionService : Service() {
 
         /** Auto-dismiss ambiguous prompt notifications after this many millis. */
         internal const val PROMPT_TTL_MS = 10 * 60_000L
+        private const val PROMPT_MAX_CANDIDATES = 3
 
         const val ACTION_SELECT_CANDIDATE = "com.justb81.watchbuddy.ACTION_SELECT_CANDIDATE"
         const val EXTRA_SESSION_KEY = "extra_session_key"
@@ -314,7 +315,7 @@ class CompanionService : Service() {
             .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
             .setContentIntent(contentIntent)
 
-        event.candidates.take(3).forEach { candidate ->
+        event.candidates.take(PROMPT_MAX_CANDIDATES).forEach { candidate ->
             val label = buildString {
                 append(candidate.show.title)
                 candidate.episode?.let { ep -> append(" — S%02dE%02d".format(ep.season, ep.number)) }

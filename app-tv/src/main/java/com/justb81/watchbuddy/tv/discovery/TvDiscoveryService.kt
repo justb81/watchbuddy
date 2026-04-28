@@ -47,7 +47,9 @@ class TvDiscoveryService : Service() {
     @Inject lateinit var phoneDiscovery: PhoneDiscoveryManager
     @Inject lateinit var preferences: StreamingPreferencesRepository
     @Inject lateinit var scrobbler: MediaSessionScrobbler
+
     @Inject lateinit var scrobbleDispatcher: TvScrobbleDispatcher
+
     @Inject lateinit var tvShowCache: TvShowCache
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -117,10 +119,11 @@ class TvDiscoveryService : Service() {
     private suspend fun observeResolvedPrompts() {
         var lastSeenResolved: String? = null
         phoneDiscovery.discoveredPhones.collect { phones ->
-            for (phone in phones) {
-                val resolved = phone.capability?.lastResolvedSessionKey ?: continue
-                val traktId = phone.capability.lastResolvedTraktId ?: continue
-                if (resolved == lastSeenResolved) continue
+            phones.forEach { phone ->
+                val capability = phone.capability ?: return@forEach
+                val resolved = capability.lastResolvedSessionKey ?: return@forEach
+                val traktId = capability.lastResolvedTraktId ?: return@forEach
+                if (resolved == lastSeenResolved) return@forEach
                 lastSeenResolved = resolved
                 scrobbleDispatcher.clearResolvedPrompt(resolved)
                 tvShowCache.recordEvidenceHint(resolved, traktId)

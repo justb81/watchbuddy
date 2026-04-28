@@ -28,14 +28,17 @@ class CompanionStateManager @Inject constructor() {
     val lastScrobbleEvent: StateFlow<ScrobbleDisplayEvent?> = _lastScrobbleEvent.asStateFlow()
 
     private val _pendingPrompt = MutableStateFlow<AmbiguousScrobbleEvent?>(null)
+
     /** Currently active ambiguous-scrobble prompt, or null when none is pending. */
     val pendingPrompt: StateFlow<AmbiguousScrobbleEvent?> = _pendingPrompt.asStateFlow()
 
     private val _lastResolvedSessionKey = MutableStateFlow<String?>(null)
+
     /** Session key of the most recently resolved ambiguous prompt. Published in /capability responses. */
     val lastResolvedSessionKey: StateFlow<String?> = _lastResolvedSessionKey.asStateFlow()
 
     private val _lastResolvedTraktId = MutableStateFlow<Int?>(null)
+
     /** Trakt ID the user selected when resolving [lastResolvedSessionKey]. */
     val lastResolvedTraktId: StateFlow<Int?> = _lastResolvedTraktId.asStateFlow()
 

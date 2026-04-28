@@ -57,9 +57,19 @@ class MediaSessionScrobbler @Inject constructor(
         private const val TAG = "MediaSessionScrobbler"
         internal const val AUTO_SCROBBLE_THRESHOLD = 0.95f
         internal const val OVERLAY_THRESHOLD = 0.70f
+
         /** Minimum confidence to show the user an ambiguous-prompt with top-3 candidates. */
         internal const val AMBIGUOUS_THRESHOLD = 0.40f
         private const val AMBIGUOUS_CANDIDATES_MAX = 3
+
+        private const val MS_PER_MINUTE = 60_000.0
+        private const val RUNTIME_DELTA_CLOSE_MIN = 5
+        private const val RUNTIME_DELTA_MEDIUM_MIN = 10
+        private const val RUNTIME_DELTA_FAR_MIN = 20
+        private const val RUNTIME_AFFINITY_BOOST = 1.10f
+        private const val RUNTIME_AFFINITY_NEUTRAL = 1.00f
+        private const val RUNTIME_AFFINITY_PENALTY_FAR = 0.90f
+        private const val RUNTIME_AFFINITY_PENALTY_VERY_FAR = 0.75f
     }
 
     /**
@@ -159,6 +169,7 @@ class MediaSessionScrobbler @Inject constructor(
     val pendingConfirmation: SharedFlow<ScrobbleCandidate> = _pendingConfirmation
 
     private val _pendingAmbiguousEvent = MutableSharedFlow<AmbiguousScrobbleEvent>()
+
     /** Emits when a session's best score is in [AMBIGUOUS_THRESHOLD, OVERLAY_THRESHOLD). */
     val pendingAmbiguousEvent: SharedFlow<AmbiguousScrobbleEvent> = _pendingAmbiguousEvent
 
@@ -574,12 +585,12 @@ class MediaSessionScrobbler @Inject constructor(
             if (showTitle.isBlank()) continue
             val season = marker?.groupValues?.getOrNull(1)?.toIntOrNull()
             val episode = marker?.groupValues?.getOrNull(2)?.toIntOrNull()
-            for (entry in cachedShows) {
+            cachedShows.forEach { entry ->
                 val base = fuzzyScore(entry.show.title, showTitle)
                 val weighted = (base * runtimeAffinity(tick.durationMs, entry.show.runtime))
                     .coerceIn(0f, 1f)
-                if (weighted < AMBIGUOUS_THRESHOLD || weighted >= OVERLAY_THRESHOLD) continue
-                val key = entry.show.ids.trakt ?: continue
+                val key = entry.show.ids.trakt ?: return@forEach
+                if (weighted < AMBIGUOUS_THRESHOLD || weighted >= OVERLAY_THRESHOLD) return@forEach
                 val existing = bestByTraktId[key]
                 if (existing == null || weighted > existing.score) {
                     bestByTraktId[key] = ScoredEntry(
@@ -627,13 +638,13 @@ class MediaSessionScrobbler @Inject constructor(
      */
     internal fun runtimeAffinity(tickDurationMs: Long, candidateRuntimeMin: Int?): Float {
         if (tickDurationMs <= 0 || candidateRuntimeMin == null || candidateRuntimeMin <= 0) return 1f
-        val tickMin = tickDurationMs / 60_000.0
+        val tickMin = tickDurationMs / MS_PER_MINUTE
         val deltaMin = abs(tickMin - candidateRuntimeMin)
         return when {
-            deltaMin <= 5 -> 1.10f
-            deltaMin <= 10 -> 1.00f
-            deltaMin <= 20 -> 0.90f
-            else -> 0.75f
+            deltaMin <= RUNTIME_DELTA_CLOSE_MIN -> RUNTIME_AFFINITY_BOOST
+            deltaMin <= RUNTIME_DELTA_MEDIUM_MIN -> RUNTIME_AFFINITY_NEUTRAL
+            deltaMin <= RUNTIME_DELTA_FAR_MIN -> RUNTIME_AFFINITY_PENALTY_FAR
+            else -> RUNTIME_AFFINITY_PENALTY_VERY_FAR
         }.coerceAtMost(1.0f / AUTO_SCROBBLE_THRESHOLD)
     }
 
