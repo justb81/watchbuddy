@@ -1,9 +1,11 @@
 package com.justb81.watchbuddy.service
 
+import com.justb81.watchbuddy.core.model.AmbiguousScrobbleEvent
 import com.justb81.watchbuddy.core.model.ScrobbleDisplayEvent
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -24,6 +26,18 @@ class CompanionStateManager @Inject constructor() {
     private val _lastScrobbleEvent = MutableStateFlow<ScrobbleDisplayEvent?>(null)
     /** Most recent scrobble event received via the companion HTTP server. */
     val lastScrobbleEvent: StateFlow<ScrobbleDisplayEvent?> = _lastScrobbleEvent.asStateFlow()
+
+    private val _pendingPrompt = MutableStateFlow<AmbiguousScrobbleEvent?>(null)
+    /** Currently active ambiguous-scrobble prompt, or null when none is pending. */
+    val pendingPrompt: StateFlow<AmbiguousScrobbleEvent?> = _pendingPrompt.asStateFlow()
+
+    private val _lastResolvedSessionKey = MutableStateFlow<String?>(null)
+    /** Session key of the most recently resolved ambiguous prompt. Published in /capability responses. */
+    val lastResolvedSessionKey: StateFlow<String?> = _lastResolvedSessionKey.asStateFlow()
+
+    private val _lastResolvedTraktId = MutableStateFlow<Int?>(null)
+    /** Trakt ID the user selected when resolving [lastResolvedSessionKey]. */
+    val lastResolvedTraktId: StateFlow<Int?> = _lastResolvedTraktId.asStateFlow()
 
     private val _isServiceRunning = MutableStateFlow(false)
     /** Whether the [CompanionService] foreground service is currently active. */
@@ -59,6 +73,21 @@ class CompanionStateManager @Inject constructor() {
         _lastScrobbleEvent.value = event
     }
 
+    fun onAmbiguousPrompt(event: AmbiguousScrobbleEvent) {
+        _pendingPrompt.value = event
+    }
+
+    /** Clears the pending prompt when it matches [sessionKey]. No-op if already cleared or mismatched. */
+    fun clearPrompt(sessionKey: String) {
+        _pendingPrompt.update { current -> current?.takeUnless { it.sessionKey == sessionKey } }
+    }
+
+    fun resolvePrompt(sessionKey: String, traktId: Int) {
+        clearPrompt(sessionKey)
+        _lastResolvedSessionKey.value = sessionKey
+        _lastResolvedTraktId.value = traktId
+    }
+
     fun setServiceRunning(running: Boolean) {
         _isServiceRunning.value = running
         if (!running) {
@@ -69,6 +98,7 @@ class CompanionStateManager @Inject constructor() {
             _bleAdvertiseErrorCode.value = null
             _wifiIpv4.value = null
             _lastCapabilityCheck.value = 0L
+            _pendingPrompt.value = null
         }
     }
 

@@ -2,6 +2,7 @@ package com.justb81.watchbuddy.phone.server
 
 import com.justb81.watchbuddy.core.locale.LocaleHelper
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
+import com.justb81.watchbuddy.core.model.AmbiguousScrobbleEvent
 import com.justb81.watchbuddy.core.model.ScrobbleAction
 import com.justb81.watchbuddy.core.model.ScrobbleDisplayEvent
 import com.justb81.watchbuddy.core.model.TitleExtractionRequest
@@ -55,6 +56,7 @@ private const val MAX_PAGE_SIZE = 200
  *   POST /scrobble/stop        → Forward scrobble stop to this user's Trakt account
  *   POST /scrobble/extract     → LLM fallback — normalize raw MediaSession
  *                                metadata into (showTitle, season?, episode?)
+ *   POST /scrobble/prompt      → Deliver ambiguous-scrobble prompt; consumed via state stream
  */
 @Singleton
 class CompanionHttpServer @Inject constructor(
@@ -300,6 +302,20 @@ internal fun Application.configureCompanionRoutes(
                 DiagnosticLog.warn(TAG, "title extraction failed", e)
                 call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("Extraction failed"))
             }
+        }
+
+        post("/scrobble/prompt") {
+            val event = try {
+                call.receive<AmbiguousScrobbleEvent>()
+            } catch (_: Exception) {
+                return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid request body"))
+            }
+            stateManager.onAmbiguousPrompt(event)
+            DiagnosticLog.event(
+                TAG,
+                "ambiguous prompt received sessionKey='${event.sessionKey}' candidates=${event.candidates.size}",
+            )
+            call.respond(HttpStatusCode.NoContent)
         }
     }
 }

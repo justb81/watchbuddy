@@ -19,6 +19,8 @@ import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.scrobbler.MediaSessionScrobbler
 import com.justb81.watchbuddy.tv.data.StreamingPreferencesRepository
+import com.justb81.watchbuddy.tv.data.TvShowCache
+import com.justb81.watchbuddy.tv.scrobbler.TvScrobbleDispatcher
 import com.justb81.watchbuddy.tv.scrobbler.WatchBuddyNotificationListener
 import com.justb81.watchbuddy.tv.ui.TvMainActivity
 import dagger.hilt.android.AndroidEntryPoint
@@ -45,6 +47,8 @@ class TvDiscoveryService : Service() {
     @Inject lateinit var phoneDiscovery: PhoneDiscoveryManager
     @Inject lateinit var preferences: StreamingPreferencesRepository
     @Inject lateinit var scrobbler: MediaSessionScrobbler
+    @Inject lateinit var scrobbleDispatcher: TvScrobbleDispatcher
+    @Inject lateinit var tvShowCache: TvShowCache
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var observerJob: Job? = null
@@ -92,6 +96,35 @@ class TvDiscoveryService : Service() {
                 preferences.debugLogMediaSession.collect { enabled ->
                     scrobbler.debugLogMediaSession = enabled
                 }
+            }
+            launch { collectAmbiguousEvents() }
+            launch { observeResolvedPrompts() }
+        }
+    }
+
+    /** Fans ambiguous scrobble events to every connected phone. */
+    private suspend fun collectAmbiguousEvents() {
+        scrobbler.pendingAmbiguousEvent.collect { event ->
+            scrobbleDispatcher.dispatchAmbiguous(event)
+        }
+    }
+
+    /**
+     * Watches capability responses for [lastResolvedSessionKey]; when a phone reports
+     * a resolved prompt, clears the dispatcher dedup state and records an evidence hint
+     * in [TvShowCache] so the next identical metadata shape short-circuits Phase 1.
+     */
+    private suspend fun observeResolvedPrompts() {
+        var lastSeenResolved: String? = null
+        phoneDiscovery.discoveredPhones.collect { phones ->
+            for (phone in phones) {
+                val resolved = phone.capability?.lastResolvedSessionKey ?: continue
+                val traktId = phone.capability.lastResolvedTraktId ?: continue
+                if (resolved == lastSeenResolved) continue
+                lastSeenResolved = resolved
+                scrobbleDispatcher.clearResolvedPrompt(resolved)
+                tvShowCache.recordEvidenceHint(resolved, traktId)
+                DiagnosticLog.event(TAG, "resolved prompt sessionKey='$resolved' traktId=$traktId")
             }
         }
     }

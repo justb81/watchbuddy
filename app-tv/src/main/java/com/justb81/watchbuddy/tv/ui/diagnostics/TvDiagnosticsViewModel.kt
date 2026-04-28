@@ -53,6 +53,8 @@ data class TvDiagnosticsUiState(
      * have an entry in [AppProfiles]. Null before the first refresh.
      */
     val appProfileStats: MediaSessionScrobbler.ObservedPackageStats? = null,
+    /** Counters for ambiguous-prompt lifecycle (emitted / resolved / dismissed). Null before first refresh. */
+    val ambiguousPromptStats: MediaSessionScrobbler.AmbiguousPromptStats? = null,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -75,6 +77,7 @@ class TvDiagnosticsViewModel @Inject constructor(
         refreshWatchNextStats()
         refreshNotificationStats()
         refreshAppProfileStats()
+        refreshAmbiguousPromptStats()
 
         val discoveryState = combine(
             phoneDiscovery.discoveryActive,
@@ -120,6 +123,7 @@ class TvDiagnosticsViewModel @Inject constructor(
                         watchNextCountResult = it.watchNextCountResult,
                         notificationTrackedCount = it.notificationTrackedCount,
                         appProfileStats = it.appProfileStats,
+                        ambiguousPromptStats = it.ambiguousPromptStats,
                     )
                 }
             }
@@ -195,6 +199,15 @@ class TvDiagnosticsViewModel @Inject constructor(
      */
     fun refreshAppProfileStats() {
         _uiState.update { it.copy(appProfileStats = scrobbler.observedPackageStats()) }
+    }
+
+    /**
+     * Reads the in-memory ambiguous-prompt counters and updates
+     * [TvDiagnosticsUiState.ambiguousPromptStats]. Fast in-memory read.
+     * Call on [Lifecycle.Event.ON_RESUME].
+     */
+    fun refreshAmbiguousPromptStats() {
+        _uiState.update { it.copy(ambiguousPromptStats = scrobbler.ambiguousPromptStats()) }
     }
 
     companion object {

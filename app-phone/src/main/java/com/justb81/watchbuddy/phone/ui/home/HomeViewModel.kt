@@ -5,10 +5,16 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
+import com.justb81.watchbuddy.core.model.AmbiguousCandidate
+import com.justb81.watchbuddy.core.model.AmbiguousScrobbleEvent
 import com.justb81.watchbuddy.core.model.EnrichedShowEntry
 import com.justb81.watchbuddy.core.model.ScrobbleDisplayEvent
 import com.justb81.watchbuddy.core.progress.ShowProgress
 import com.justb81.watchbuddy.core.progress.ShowProgressCalculator
+import com.justb81.watchbuddy.core.model.TraktShow
+import com.justb81.watchbuddy.core.trakt.ScrobbleBody
+import com.justb81.watchbuddy.core.trakt.TraktApiService
+import com.justb81.watchbuddy.phone.auth.TokenRefreshManager
 import com.justb81.watchbuddy.phone.auth.TokenRepository
 import com.justb81.watchbuddy.phone.network.WifiStateProvider
 import com.justb81.watchbuddy.phone.server.ShowRepository
@@ -48,7 +54,9 @@ data class HomeUiState(
     // before the first WifiStateProvider emission arrives.
     val isOnWifi: Boolean = true,
     val isWatchingTv: Boolean = false,
-    val latestScrobbleEvent: ScrobbleDisplayEvent? = null
+    val latestScrobbleEvent: ScrobbleDisplayEvent? = null,
+    /** Non-null while an ambiguous scrobble prompt is awaiting the user's selection. */
+    val pendingAmbiguousPrompt: AmbiguousScrobbleEvent? = null,
 ) {
     val canStartCompanion: Boolean get() = canWatch && isOnWifi
 }
@@ -58,6 +66,8 @@ class HomeViewModel @Inject constructor(
     application: Application,
     private val showRepository: ShowRepository,
     private val tokenRepository: TokenRepository,
+    private val tokenRefreshManager: TokenRefreshManager,
+    private val traktApiService: TraktApiService,
     private val settingsRepository: SettingsRepository,
     private val companionStateManager: CompanionStateManager,
     private val wifiStateProvider: WifiStateProvider
@@ -84,6 +94,7 @@ class HomeViewModel @Inject constructor(
         observeCompanionState()
         observeScrobbleEvents()
         observeWifiState()
+        observePendingPrompt()
     }
 
     private fun assertTokenAccessible() {
@@ -215,6 +226,40 @@ class HomeViewModel @Inject constructor(
                 fetchShows()
             } finally {
                 _uiState.update { it.copy(isSyncing = false) }
+            }
+        }
+    }
+
+    private fun observePendingPrompt() {
+        viewModelScope.launch {
+            companionStateManager.pendingPrompt.collect { event ->
+                _uiState.update { it.copy(pendingAmbiguousPrompt = event) }
+            }
+        }
+    }
+
+    /**
+     * The user tapped [candidate] in the ambiguous-scrobble prompt for [event].
+     * Scrobbles to Trakt and resolves the prompt so the TV stops re-dispatching it.
+     */
+    fun selectCandidate(event: AmbiguousScrobbleEvent, candidate: AmbiguousCandidate) {
+        val show = candidate.show
+        val episode = candidate.episode ?: return
+        val traktId = show.ids.trakt ?: return
+        viewModelScope.launch {
+            try {
+                val token = tokenRefreshManager.getValidAccessToken() ?: return@launch
+                val scrobbleBody = ScrobbleBody(
+                    show = show,
+                    episode = episode,
+                    progress = event.tick.progress * 100f,
+                )
+                traktApiService.scrobbleStart("Bearer $token", scrobbleBody)
+                DiagnosticLog.event(TAG, "ambiguous prompt resolved: ${show.title} S${episode.season}E${episode.number}")
+            } catch (e: Exception) {
+                DiagnosticLog.warn(TAG, "selectCandidate scrobble failed", e)
+            } finally {
+                companionStateManager.resolvePrompt(event.sessionKey, traktId)
             }
         }
     }

@@ -7,6 +7,8 @@ import android.media.session.PlaybackState
 import android.util.Log
 import androidx.core.app.NotificationManagerCompat
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
+import com.justb81.watchbuddy.core.model.AmbiguousCandidate
+import com.justb81.watchbuddy.core.model.AmbiguousScrobbleEvent
 import com.justb81.watchbuddy.core.model.MediaMetadataSnapshot
 import com.justb81.watchbuddy.core.model.PlaybackTick
 import com.justb81.watchbuddy.core.model.ScrobbleCandidate
@@ -24,7 +26,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.math.abs
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -53,6 +57,9 @@ class MediaSessionScrobbler @Inject constructor(
         private const val TAG = "MediaSessionScrobbler"
         internal const val AUTO_SCROBBLE_THRESHOLD = 0.95f
         internal const val OVERLAY_THRESHOLD = 0.70f
+        /** Minimum confidence to show the user an ambiguous-prompt with top-3 candidates. */
+        internal const val AMBIGUOUS_THRESHOLD = 0.40f
+        private const val AMBIGUOUS_CANDIDATES_MAX = 3
     }
 
     /**
@@ -70,6 +77,30 @@ class MediaSessionScrobbler @Inject constructor(
     fun observedPackageStats(): ObservedPackageStats = ObservedPackageStats(
         profiledCount = observedPackages.keys.count { AppProfiles.forPackage(it) != null },
         totalCount = observedPackages.size,
+    )
+
+    /**
+     * Counters for the ambiguous-scrobble prompt lifecycle — surfaced in TV Diagnostics.
+     * [emitted] = prompts emitted to the phone; [resolved] = user picked a candidate;
+     * [dismissed] = TTL expired or user dismissed without picking.
+     */
+    data class AmbiguousPromptStats(val emitted: Int, val resolved: Int, val dismissed: Int)
+
+    private val ambiguousPromptsEmitted = java.util.concurrent.atomic.AtomicInteger(0)
+    private val ambiguousPromptsResolved = java.util.concurrent.atomic.AtomicInteger(0)
+    private val ambiguousPromptsDismissed = java.util.concurrent.atomic.AtomicInteger(0)
+
+    /** Records that the user resolved an ambiguous-prompt by picking a candidate. */
+    fun recordAmbiguousResolved() { ambiguousPromptsResolved.incrementAndGet() }
+
+    /** Records that an ambiguous-prompt was dismissed (TTL expired or user cancelled). */
+    fun recordAmbiguousDismissed() { ambiguousPromptsDismissed.incrementAndGet() }
+
+    /** Returns a snapshot of all ambiguous-prompt counters. Fast in-memory read. */
+    fun ambiguousPromptStats() = AmbiguousPromptStats(
+        emitted = ambiguousPromptsEmitted.get(),
+        resolved = ambiguousPromptsResolved.get(),
+        dismissed = ambiguousPromptsDismissed.get(),
     )
 
     /** Diagnostic snapshot of a candidate the scrobbler recently saw. */
@@ -126,6 +157,14 @@ class MediaSessionScrobbler @Inject constructor(
 
     private val _pendingConfirmation = MutableSharedFlow<ScrobbleCandidate>()
     val pendingConfirmation: SharedFlow<ScrobbleCandidate> = _pendingConfirmation
+
+    private val _pendingAmbiguousEvent = MutableSharedFlow<AmbiguousScrobbleEvent>()
+    /** Emits when a session's best score is in [AMBIGUOUS_THRESHOLD, OVERLAY_THRESHOLD). */
+    val pendingAmbiguousEvent: SharedFlow<AmbiguousScrobbleEvent> = _pendingAmbiguousEvent
+
+    /** Session keys for which an ambiguous prompt has already been emitted this session. */
+    private val emittedAmbiguousKeys: MutableSet<String> =
+        Collections.newSetFromMap(ConcurrentHashMap())
 
     private val _isListening = MutableStateFlow(false)
     /** True while [startListening] is active; flips back to false on [stopListening]. */
@@ -437,6 +476,7 @@ class MediaSessionScrobbler @Inject constructor(
         currentlySessionKey = null
         lastProgressBySessionKey.clear()
         observedPackages.clear()
+        emittedAmbiguousKeys.clear()
         _lastObservedSession.value = null
     }
 
@@ -449,6 +489,7 @@ class MediaSessionScrobbler @Inject constructor(
         if (sessionKey == currentlySessionKey) return
         val candidate = matchSnapshot(snapshot, tick)
         if (candidate == null) {
+            maybeEmitAmbiguousPrompt(snapshot, sessionKey, tick)
             if (debugLogMediaSession) {
                 DiagnosticLog.debug(TAG, "no match for '$sessionKey' — best confidence null")
             }
@@ -466,6 +507,134 @@ class MediaSessionScrobbler @Inject constructor(
                 "no match for '$sessionKey' — best confidence ${candidate.confidence}",
             )
         }
+    }
+
+    /**
+     * Collects up to [AMBIGUOUS_CANDIDATES_MAX] library entries scoring in
+     * [AMBIGUOUS_THRESHOLD, OVERLAY_THRESHOLD) and emits them as an [AmbiguousScrobbleEvent].
+     * Idempotent per session key — each key is only emitted once until [stopListening].
+     */
+    private suspend fun maybeEmitAmbiguousPrompt(
+        snapshot: MediaMetadataSnapshot,
+        sessionKey: String,
+        tick: PlaybackTick,
+    ) {
+        if (!emittedAmbiguousKeys.add(sessionKey)) return
+        val profile = AppProfiles.forPackage(snapshot.packageName)
+        val candidates = orderedCandidates(snapshot, profile)
+        if (candidates.isEmpty()) return
+        val cachedShows = watchedShowSource.getCachedShows()
+        if (cachedShows.isEmpty()) return
+        val (globalSeason, globalEpisode) = findGlobalEpisodeMarker(candidates, profile)
+        val ambiguous = collectAmbiguousCandidates(
+            candidates, cachedShows, globalSeason, globalEpisode, profile, tick,
+        )
+        if (ambiguous.isEmpty()) {
+            emittedAmbiguousKeys.remove(sessionKey)
+            return
+        }
+        ambiguousPromptsEmitted.incrementAndGet()
+        DiagnosticLog.event(
+            TAG,
+            "ambiguous prompt emitted sessionKey='$sessionKey' candidates=${ambiguous.size}",
+        )
+        _pendingAmbiguousEvent.emit(
+            AmbiguousScrobbleEvent(
+                sessionKey = sessionKey,
+                packageName = snapshot.packageName,
+                candidates = ambiguous,
+                tick = tick,
+                capturedAtMs = System.currentTimeMillis(),
+            ),
+        )
+    }
+
+    /**
+     * Returns up to [AMBIGUOUS_CANDIDATES_MAX] library entries whose runtimeAffinity-weighted
+     * fuzzy score falls in [AMBIGUOUS_THRESHOLD, OVERLAY_THRESHOLD), sorted DESC by score.
+     * Deduplicates by Trakt ID so the same show doesn't appear more than once.
+     */
+    internal fun collectAmbiguousCandidates(
+        candidates: List<String>,
+        cachedShows: List<TraktWatchedEntry>,
+        globalSeason: Int?,
+        globalEpisode: Int?,
+        profile: AppProfile?,
+        tick: PlaybackTick,
+    ): List<AmbiguousCandidate> {
+        val patterns = buildList {
+            profile?.markerRegexes?.let { addAll(it) }
+            add(Regex("""(?i)S(\d{1,2})E(\d{1,2})"""))
+        }
+        // Best score per Trakt ID across all candidate strings.
+        val bestByTraktId = mutableMapOf<Int, ScoredEntry>()
+        for (field in candidates) {
+            val marker = patterns.firstNotNullOfOrNull { it.find(field) }
+            val showTitle = if (marker != null) field.substringBefore(marker.value).trim() else field.trim()
+            if (showTitle.isBlank()) continue
+            val season = marker?.groupValues?.getOrNull(1)?.toIntOrNull()
+            val episode = marker?.groupValues?.getOrNull(2)?.toIntOrNull()
+            for (entry in cachedShows) {
+                val base = fuzzyScore(entry.show.title, showTitle)
+                val weighted = (base * runtimeAffinity(tick.durationMs, entry.show.runtime))
+                    .coerceIn(0f, 1f)
+                if (weighted < AMBIGUOUS_THRESHOLD || weighted >= OVERLAY_THRESHOLD) continue
+                val key = entry.show.ids.trakt ?: continue
+                val existing = bestByTraktId[key]
+                if (existing == null || weighted > existing.score) {
+                    bestByTraktId[key] = ScoredEntry(
+                        entry = entry,
+                        score = weighted,
+                        season = season ?: globalSeason,
+                        episode = episode ?: globalEpisode,
+                    )
+                }
+            }
+        }
+        return bestByTraktId.values
+            .sortedByDescending { it.score }
+            .take(AMBIGUOUS_CANDIDATES_MAX)
+            .map { se ->
+                AmbiguousCandidate(
+                    show = se.entry.show,
+                    episode = if (se.season != null && se.episode != null) {
+                        TraktEpisode(season = se.season, number = se.episode)
+                    } else null,
+                    score = se.score,
+                    sourceLabel = "library",
+                )
+            }
+    }
+
+    private data class ScoredEntry(
+        val entry: TraktWatchedEntry,
+        val score: Float,
+        val season: Int?,
+        val episode: Int?,
+    )
+
+    /**
+     * Runtime-affinity multiplier for duration-aware candidate tiebreaking.
+     *
+     * Returns a value > 1 when [tickDurationMs] closely matches [candidateRuntimeMin],
+     * ≤ 1 when mismatched, 1 when either input is unavailable. Applied in
+     * [collectAmbiguousCandidates] and [scoreCandidate] as a soft tiebreaker — not
+     * a hard filter — so noisy streaming durations (ads, recaps) don't cause
+     * incorrect auto-rejects.
+     *
+     * Clamped to ≤ `1/AUTO_SCROBBLE_THRESHOLD` so a borderline text score can't
+     * jump to auto-scrobble territory purely from a runtime boost.
+     */
+    internal fun runtimeAffinity(tickDurationMs: Long, candidateRuntimeMin: Int?): Float {
+        if (tickDurationMs <= 0 || candidateRuntimeMin == null || candidateRuntimeMin <= 0) return 1f
+        val tickMin = tickDurationMs / 60_000.0
+        val deltaMin = abs(tickMin - candidateRuntimeMin)
+        return when {
+            deltaMin <= 5 -> 1.10f
+            deltaMin <= 10 -> 1.00f
+            deltaMin <= 20 -> 0.90f
+            else -> 0.75f
+        }.coerceAtMost(1.0f / AUTO_SCROBBLE_THRESHOLD)
     }
 
     internal fun computeProgress(
@@ -509,11 +678,9 @@ class MediaSessionScrobbler @Inject constructor(
      *      output).
      */
     /**
-     * [tick] is threaded through for future consumers (#474 duration tiebreaker,
-     * #471/#472 freshness gates inside enrichers) but does not influence Phase 1/2/3
-     * scoring in this issue.
+     * Full match cascade (Phases 0.5 → 1 → 2 → 3). [tick] is used by
+     * Phase 1 for runtime-affinity scoring; enrichers may also gate on tick.isPlaying.
      */
-    @Suppress("UnusedParameter")
     internal suspend fun matchSnapshot(
         snapshot: MediaMetadataSnapshot,
         tick: PlaybackTick = PlaybackTick.UNKNOWN,
@@ -532,7 +699,7 @@ class MediaSessionScrobbler @Inject constructor(
         val contentIdHit = resolveByContentId(snapshot, mediaTitle, cachedShows)
         if (contentIdHit != null) return contentIdHit
 
-        return runMatchCascade(snapshot, profile, candidates, cachedShows, mediaTitle)
+        return runMatchCascade(snapshot, profile, candidates, cachedShows, mediaTitle, tick)
     }
 
     /**
@@ -545,6 +712,7 @@ class MediaSessionScrobbler @Inject constructor(
         candidates: List<String>,
         cachedShows: List<TraktWatchedEntry>,
         mediaTitle: String,
+        tick: PlaybackTick = PlaybackTick.UNKNOWN,
     ): ScrobbleCandidate? {
         // skipPhase1: bypass the cheap cache-match and go straight to LLM for apps
         // known to publish only the app name (or similarly useless) metadata.
@@ -558,7 +726,7 @@ class MediaSessionScrobbler @Inject constructor(
 
         val (globalSeason, globalEpisode) = findGlobalEpisodeMarker(candidates, profile)
         val bestCheap = candidates
-            .map { field -> scoreCandidate(field, cachedShows, profile) }
+            .map { field -> scoreCandidate(field, cachedShows, profile, tick) }
             .maxByOrNull { it.score }
 
         val cheapHit = resolveCheapHit(snapshot, bestCheap, globalSeason, globalEpisode, mediaTitle)
@@ -751,10 +919,11 @@ class MediaSessionScrobbler @Inject constructor(
         val cacheEntry: TraktWatchedEntry?,
     )
 
-    private fun scoreCandidate(
+    internal fun scoreCandidate(
         field: String,
         cachedShows: List<TraktWatchedEntry>,
         profile: AppProfile? = null,
+        tick: PlaybackTick = PlaybackTick.UNKNOWN,
     ): CheapMatch {
         val patterns = buildList {
             profile?.markerRegexes?.let { addAll(it) }
@@ -767,8 +936,14 @@ class MediaSessionScrobbler @Inject constructor(
         if (showTitle.isBlank() || cachedShows.isEmpty()) {
             return CheapMatch(field, showTitle, season, episode, 0f, null)
         }
-        val best = cachedShows.maxByOrNull { fuzzyScore(it.show.title, showTitle) }
-        val score = best?.let { fuzzyScore(it.show.title, showTitle) } ?: 0f
+        val best = cachedShows.maxByOrNull {
+            (fuzzyScore(it.show.title, showTitle) * runtimeAffinity(tick.durationMs, it.show.runtime))
+                .coerceIn(0f, 1f)
+        }
+        val score = best?.let {
+            (fuzzyScore(it.show.title, showTitle) * runtimeAffinity(tick.durationMs, it.show.runtime))
+                .coerceIn(0f, 1f)
+        } ?: 0f
         return CheapMatch(field, showTitle, season, episode, score, best)
     }
 
