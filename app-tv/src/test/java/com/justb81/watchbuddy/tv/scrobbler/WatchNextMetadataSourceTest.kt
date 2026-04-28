@@ -33,16 +33,16 @@ class WatchNextMetadataSourceTest {
     }
     private val source = WatchNextMetadataSource(context)
 
-    private val freshMs = System.currentTimeMillis() - 30_000L  // 30 s ago — well within 5 min
+    private val freshMs = System.currentTimeMillis() - 30_000L // 30 s ago — well within 5 min
 
     // Column indices matching the PROJECTION in WatchNextMetadataSource
-    private val COL_TITLE = 0
-    private val COL_SEASON = 1
-    private val COL_EPISODE = 2
-    private val COL_EPISODE_TITLE = 3
-    private val COL_SHORT_DESC = 4
-    private val COL_CONTENT_ID = 5
-    private val COL_LAST_ENGAGEMENT = 6
+    private val colTitle = 0
+    private val colSeason = 1
+    private val colEpisode = 2
+    private val colEpisodeTitle = 3
+    private val colShortDesc = 4
+    private val colContentId = 5
+    private val colLastEngagement = 6
 
     /**
      * Builds a mock Cursor for the episode-lookup query (PROJECTION with 7 columns).
@@ -60,21 +60,35 @@ class WatchNextMetadataSourceTest {
     ): Cursor {
         val cursor = mockk<Cursor>(relaxed = true)
         every { cursor.moveToFirst() } returns !empty
-        every { cursor.getColumnIndex(TvContractCompat.WatchNextPrograms.COLUMN_TITLE) } returns COL_TITLE
-        every { cursor.getColumnIndex(TvContractCompat.WatchNextPrograms.COLUMN_SEASON_DISPLAY_NUMBER) } returns COL_SEASON
-        every { cursor.getColumnIndex(TvContractCompat.WatchNextPrograms.COLUMN_EPISODE_DISPLAY_NUMBER) } returns COL_EPISODE
-        every { cursor.getColumnIndex(TvContractCompat.WatchNextPrograms.COLUMN_EPISODE_TITLE) } returns COL_EPISODE_TITLE
-        every { cursor.getColumnIndex(TvContractCompat.WatchNextPrograms.COLUMN_SHORT_DESCRIPTION) } returns COL_SHORT_DESC
-        every { cursor.getColumnIndex(TvContractCompat.WatchNextPrograms.COLUMN_CONTENT_ID) } returns COL_CONTENT_ID
-        every { cursor.getColumnIndex(TvContractCompat.WatchNextPrograms.COLUMN_LAST_ENGAGEMENT_TIME_UTC_MILLIS) } returns COL_LAST_ENGAGEMENT
-        every { cursor.getString(COL_TITLE) } returns title
-        every { cursor.getString(COL_SEASON) } returns season
-        every { cursor.getString(COL_EPISODE) } returns episode
-        every { cursor.getString(COL_EPISODE_TITLE) } returns episodeTitle
-        every { cursor.getString(COL_SHORT_DESC) } returns shortDesc
-        every { cursor.getString(COL_CONTENT_ID) } returns contentId
-        every { cursor.isNull(COL_LAST_ENGAGEMENT) } returns (lastEngagementMs == null)
-        every { cursor.getLong(COL_LAST_ENGAGEMENT) } returns (lastEngagementMs ?: 0L)
+        every { cursor.getColumnIndex(TvContractCompat.WatchNextPrograms.COLUMN_TITLE) } returns colTitle
+        every {
+            cursor.getColumnIndex(TvContractCompat.WatchNextPrograms.COLUMN_SEASON_DISPLAY_NUMBER)
+        } returns colSeason
+        every {
+            cursor.getColumnIndex(TvContractCompat.WatchNextPrograms.COLUMN_EPISODE_DISPLAY_NUMBER)
+        } returns colEpisode
+        every {
+            cursor.getColumnIndex(TvContractCompat.WatchNextPrograms.COLUMN_EPISODE_TITLE)
+        } returns colEpisodeTitle
+        every {
+            cursor.getColumnIndex(TvContractCompat.WatchNextPrograms.COLUMN_SHORT_DESCRIPTION)
+        } returns colShortDesc
+        every {
+            cursor.getColumnIndex(TvContractCompat.WatchNextPrograms.COLUMN_CONTENT_ID)
+        } returns colContentId
+        every {
+            cursor.getColumnIndex(
+                TvContractCompat.WatchNextPrograms.COLUMN_LAST_ENGAGEMENT_TIME_UTC_MILLIS,
+            )
+        } returns colLastEngagement
+        every { cursor.getString(colTitle) } returns title
+        every { cursor.getString(colSeason) } returns season
+        every { cursor.getString(colEpisode) } returns episode
+        every { cursor.getString(colEpisodeTitle) } returns episodeTitle
+        every { cursor.getString(colShortDesc) } returns shortDesc
+        every { cursor.getString(colContentId) } returns contentId
+        every { cursor.isNull(colLastEngagement) } returns (lastEngagementMs == null)
+        every { cursor.getLong(colLastEngagement) } returns (lastEngagementMs ?: 0L)
         return cursor
     }
 
@@ -189,8 +203,8 @@ class WatchNextMetadataSourceTest {
             givenEpisodeQuery(
                 buildEpisodeCursor(
                     title = "Some Show",
-                    season = "Season 4",  // not a bare integer — marker should be omitted
-                    episode = "E1",       // not a bare integer — marker should be omitted
+                    season = "Season 4", // not a bare integer — marker should be omitted
+                    episode = "E1", // not a bare integer — marker should be omitted
                     episodeTitle = null,
                     shortDesc = null,
                     contentId = null,
@@ -318,7 +332,7 @@ class WatchNextMetadataSourceTest {
                 buildPackageCursor(
                     "com.netflix.ninja",
                     "com.disney.disneyplus",
-                    "com.netflix.ninja",   // duplicate — should be deduplicated
+                    "com.netflix.ninja", // duplicate — should be deduplicated
                 ),
             )
 

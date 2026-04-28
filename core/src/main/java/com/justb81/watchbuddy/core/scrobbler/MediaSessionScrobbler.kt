@@ -547,7 +547,7 @@ class MediaSessionScrobbler @Inject constructor(
         DiagnosticLog.event(
             TAG,
             "WatchNext: content-ID short-circuit tmdbId=$tmdbId " +
-                "show=${entry.show.title} S${season}E${episode} confidence=1.0",
+                "show=${entry.show.title} S${season}E$episode confidence=1.0",
         )
         return ScrobbleCandidate(
             packageName = snapshot.packageName,

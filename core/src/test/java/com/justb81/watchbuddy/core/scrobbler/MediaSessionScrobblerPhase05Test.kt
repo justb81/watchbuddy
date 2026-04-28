@@ -121,7 +121,7 @@ class MediaSessionScrobblerPhase05Test {
                 title = "The Bear",
                 season = "1",
                 episode = "1",
-                contentId = "tmdb:99999",  // unknown ID
+                contentId = "tmdb:99999", // unknown ID
             )
 
             // Phase 1 won't match either (no "The Bear" in cache) — result is null
@@ -182,7 +182,7 @@ class MediaSessionScrobblerPhase05Test {
                 title = "Stranger Things",
                 season = "4",
                 episode = "2",
-                contentId = "netflix:81231234",  // opaque Netflix ID — not trusted
+                contentId = "netflix:81231234", // opaque Netflix ID — not trusted
             )
 
             val result = scrobbler.matchSnapshot(snapshot)

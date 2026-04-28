@@ -117,17 +117,19 @@ class WatchNextMetadataSource @Inject constructor(
                 "${TvContractCompat.WatchNextPrograms.COLUMN_LAST_ENGAGEMENT_TIME_UTC_MILLIS} > ?",
                 arrayOf(cutoffMs.toString()),
                 null,
-            )?.use { cursor ->
-                val packages = mutableSetOf<String>()
-                while (cursor.moveToNext()) {
-                    cursor.getString(0)?.let { packages += it }
-                }
-                CountResult.Success(packages.size)
-            } ?: CountResult.Success(0)
+            )?.use(::readDistinctPackageCount) ?: CountResult.Success(0)
         } catch (e: SecurityException) {
             DiagnosticLog.warn(TAG, "WatchNext: READ_TV_LISTINGS denied for diagnostics", e)
             CountResult.PermissionDenied
         }
+    }
+
+    private fun readDistinctPackageCount(cursor: Cursor): CountResult.Success {
+        val packages = mutableSetOf<String>()
+        while (cursor.moveToNext()) {
+            cursor.getString(0)?.let { packages += it }
+        }
+        return CountResult.Success(packages.size)
     }
 
     private fun Cursor.toSnippet(): WatchNextSnippet {
