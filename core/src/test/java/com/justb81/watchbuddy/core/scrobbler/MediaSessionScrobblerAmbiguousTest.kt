@@ -8,17 +8,13 @@ import com.justb81.watchbuddy.core.model.TraktWatchedEntry
 import com.justb81.watchbuddy.core.tmdb.TmdbApiService
 import io.mockk.coEvery
 import io.mockk.mockk
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNotNull
-import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 
-@OptIn(ExperimentalCoroutinesApi::class)
 @DisplayName("MediaSessionScrobbler — Ambiguous scrobble prompt (#474)")
 class MediaSessionScrobblerAmbiguousTest {
 

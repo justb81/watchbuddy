@@ -241,6 +241,7 @@ fun HomeScreen(
     }
 }
 
+@Suppress("LongMethod")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun HomeContent(

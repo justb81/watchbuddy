@@ -60,6 +60,7 @@ data class HomeUiState(
     val canStartCompanion: Boolean get() = canWatch && isOnWifi
 }
 
+@Suppress("LongParameterList")
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     application: Application,

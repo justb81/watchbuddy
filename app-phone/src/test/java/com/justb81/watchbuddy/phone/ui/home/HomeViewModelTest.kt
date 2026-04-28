@@ -6,11 +6,11 @@ import com.justb81.watchbuddy.core.model.TmdbProgressHint
 import com.justb81.watchbuddy.core.model.TmdbSeasonSummary
 import com.justb81.watchbuddy.core.model.TraktWatchedEpisode
 import com.justb81.watchbuddy.core.model.TraktWatchedSeason
+import com.justb81.watchbuddy.core.trakt.TraktApiService
 import com.justb81.watchbuddy.phone.MainDispatcherRule
 import com.justb81.watchbuddy.phone.TestFixtures
 import com.justb81.watchbuddy.phone.auth.TokenRefreshManager
 import com.justb81.watchbuddy.phone.auth.TokenRepository
-import com.justb81.watchbuddy.core.trakt.TraktApiService
 import com.justb81.watchbuddy.phone.network.WifiStateProvider
 import com.justb81.watchbuddy.phone.server.ShowRepository
 import com.justb81.watchbuddy.phone.settings.AppSettings

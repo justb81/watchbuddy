@@ -28,9 +28,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
-import kotlin.math.abs
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.math.abs
 
 /**
  * Listens to active MediaSessions and automatically scrobbles to Trakt.
@@ -43,6 +43,7 @@ import javax.inject.Singleton
  *
  * Confidence thresholds: ≥ 0.95 auto-scrobble; 0.70–0.95 emit for UI confirmation; < 0.70 ignore.
  */
+@Suppress("LargeClass")
 @Singleton
 class MediaSessionScrobbler @Inject constructor(
     @param:ApplicationContext private val context: Context,

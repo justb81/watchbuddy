@@ -9,6 +9,7 @@ import com.justb81.watchbuddy.core.model.TitleExtractionRequest
 import com.justb81.watchbuddy.core.model.TitleExtractionResponse
 import com.justb81.watchbuddy.core.model.TraktEpisode
 import com.justb81.watchbuddy.core.model.TraktShow
+import com.justb81.watchbuddy.core.network.WatchBuddyJson
 import com.justb81.watchbuddy.core.tmdb.TmdbApiService
 import com.justb81.watchbuddy.core.tmdb.TmdbCache
 import com.justb81.watchbuddy.core.trakt.ScrobbleBody
@@ -20,11 +21,8 @@ import com.justb81.watchbuddy.phone.llm.RecapGenerator
 import com.justb81.watchbuddy.phone.settings.AvatarImageStore
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import com.justb81.watchbuddy.service.CompanionStateManager
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.flow.first
 import io.ktor.http.*
+import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
@@ -32,8 +30,10 @@ import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import com.justb81.watchbuddy.core.network.WatchBuddyJson
-import io.ktor.serialization.kotlinx.json.*
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.first
 import kotlinx.serialization.Serializable
 import javax.inject.Inject
 import javax.inject.Singleton
