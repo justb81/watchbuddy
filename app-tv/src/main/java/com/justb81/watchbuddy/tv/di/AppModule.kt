@@ -7,6 +7,7 @@ import com.justb81.watchbuddy.core.scrobbler.WatchedShowSource
 import com.justb81.watchbuddy.tv.discovery.PhoneTitleExtractionClient
 import com.justb81.watchbuddy.tv.scrobbler.TvScrobbleDispatcher
 import com.justb81.watchbuddy.tv.scrobbler.TvWatchedShowSource
+import com.justb81.watchbuddy.tv.scrobbler.WatchNextMetadataSource
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -48,9 +49,10 @@ abstract class AppModule {
         @Named("traktClientId")
         fun provideTraktClientId(): String = ""
 
-        /** No enrichers registered in the TV app yet; populated per-app via Hilt. */
+        /** WatchNextMetadataSource is the first enricher; add future enrichers here. */
         @Provides
         @Singleton
-        fun provideMetadataEnrichers(): List<MetadataEnricher> = emptyList()
+        fun provideMetadataEnrichers(watchNext: WatchNextMetadataSource): List<MetadataEnricher> =
+            listOf(watchNext)
     }
 }

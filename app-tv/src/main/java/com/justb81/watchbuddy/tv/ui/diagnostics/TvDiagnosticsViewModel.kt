@@ -9,7 +9,9 @@ import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.scrobbler.MediaSessionScrobbler
 import com.justb81.watchbuddy.tv.data.JustWatchDeepLinkRepository
 import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
+import com.justb81.watchbuddy.tv.scrobbler.WatchNextMetadataSource
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,6 +20,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 data class TvDiagnosticsUiState(
@@ -36,6 +39,8 @@ data class TvDiagnosticsUiState(
     val cachedDeepLinkCount: Int = 0,
     val negativeDeepLinkCount: Int = 0,
     val lastDeepLinkFetchMs: Long = 0L,
+    /** null = not yet checked, PermissionDenied or Success from the WatchNext provider query. */
+    val watchNextCountResult: WatchNextMetadataSource.CountResult? = null,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -45,6 +50,7 @@ class TvDiagnosticsViewModel @Inject constructor(
     phoneDiscovery: PhoneDiscoveryManager,
     scrobbler: MediaSessionScrobbler,
     private val justWatchRepo: JustWatchDeepLinkRepository,
+    private val watchNextSource: WatchNextMetadataSource,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(TvDiagnosticsUiState())
@@ -53,6 +59,7 @@ class TvDiagnosticsViewModel @Inject constructor(
     init {
         refreshNotificationAccess()
         refreshJustWatchCacheStats()
+        refreshWatchNextStats()
 
         val discoveryState = combine(
             phoneDiscovery.discoveryActive,
@@ -84,6 +91,7 @@ class TvDiagnosticsViewModel @Inject constructor(
                     cachedDeepLinkCount = _uiState.value.cachedDeepLinkCount,
                     negativeDeepLinkCount = _uiState.value.negativeDeepLinkCount,
                     lastDeepLinkFetchMs = _uiState.value.lastDeepLinkFetchMs,
+                    watchNextCountResult = _uiState.value.watchNextCountResult,
                 )
             }.collect { snapshot ->
                 _uiState.update {
@@ -93,6 +101,7 @@ class TvDiagnosticsViewModel @Inject constructor(
                         cachedDeepLinkCount = it.cachedDeepLinkCount,
                         negativeDeepLinkCount = it.negativeDeepLinkCount,
                         lastDeepLinkFetchMs = it.lastDeepLinkFetchMs,
+                        watchNextCountResult = it.watchNextCountResult,
                     )
                 }
             }
@@ -138,6 +147,17 @@ class TvDiagnosticsViewModel @Inject constructor(
         viewModelScope.launch {
             justWatchRepo.clearAll()
             refreshJustWatchCacheStats()
+        }
+    }
+
+    /**
+     * Queries the WatchNext content provider once and updates [TvDiagnosticsUiState.watchNextCountResult].
+     * Call on [Lifecycle.Event.ON_RESUME] so the Diagnostics screen always shows a fresh count.
+     */
+    fun refreshWatchNextStats() {
+        viewModelScope.launch {
+            val result = withContext(Dispatchers.IO) { watchNextSource.countPublishingApps() }
+            _uiState.update { it.copy(watchNextCountResult = result) }
         }
     }
 

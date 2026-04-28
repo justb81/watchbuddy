@@ -153,6 +153,10 @@
     <string name="tv_diagnostics_row_media_session_duration">Dauer</string>
     <string name="tv_diagnostics_row_media_session_observed_age">Beobachtet</string>
     <string name="tv_diagnostics_value_null">(null)</string>
+    <string name="tv_diagnostics_section_watch_next">Watch-Next-Anbieter</string>
+    <string name="tv_diagnostics_row_watch_next_publishing">Veröffentlichende Apps</string>
+    <string name="tv_diagnostics_value_watch_next_count">%d Apps</string>
+    <string name="tv_diagnostics_value_watch_next_permission_denied">Berechtigung verweigert</string>
 
     <!-- Version footer -->
     <string name="settings_version_footer">WatchBuddy v%1$s (Build %2$d)</string>

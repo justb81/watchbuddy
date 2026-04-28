@@ -468,6 +468,10 @@ class MediaSessionScrobbler @Inject constructor(
 
     /**
      * Full match cascade:
+     *   0.5 **Content-ID short-circuit** — if a `watchNext.contentId: tmdb:XXXX` line is
+     *      present, look up the show in the cached library by TMDB ID. When found and
+     *      season/episode numbers are available, returns a confidence-1.0 candidate
+     *      immediately — no LLM, no TMDB search.
      *   1. **Phase 1 (cheap)** — try every MediaMetadata field from [snapshot] as
      *      a candidate show title, parse any `S##E##` marker, score against the
      *      cached library with [fuzzyScore], keep the highest-scoring cache hit.
@@ -492,6 +496,10 @@ class MediaSessionScrobbler @Inject constructor(
         if (candidates.isEmpty()) return null
         val mediaTitle = candidates.first()
 
+        // Phase 0.5: content-ID short-circuit for trusted prefixes (only `tmdb:` on day one)
+        val contentIdHit = resolveByContentId(snapshot, mediaTitle)
+        if (contentIdHit != null) return contentIdHit
+
         val (globalSeason, globalEpisode) = findGlobalEpisodeMarker(candidates)
         val cachedShows = watchedShowSource.getCachedShows()
         val bestCheap = candidates
@@ -509,6 +517,52 @@ class MediaSessionScrobbler @Inject constructor(
 
         return tmdbFallback(snapshot, extraction, bestCheap, mediaTitle)
     }
+
+    /**
+     * Phase 0.5: if the snapshot contains a `watchNext.contentId` line with a trusted
+     * prefix, resolve the show by content ID without running Levenshtein or LLM.
+     *
+     * Only `tmdb:` is trusted on day one — confidence 1.0 when the TMDB ID is found in
+     * the user's library. Other prefixes (opaque Netflix/YouTube IDs) fall through to
+     * Phase 1 so the snapshot's `watchNext.title` line can still contribute evidence.
+     */
+    private suspend fun resolveByContentId(
+        snapshot: MediaMetadataSnapshot,
+        mediaTitle: String,
+    ): ScrobbleCandidate? {
+        val contentId = findSnapshotTag(snapshot, "watchNext.contentId")
+            ?.takeIf { it.startsWith("tmdb:") } ?: return null
+        val tmdbId = contentId.removePrefix("tmdb:").toIntOrNull() ?: return null
+        val cachedShows = watchedShowSource.getCachedShows()
+        val entry = cachedShows.firstOrNull { it.show.ids.tmdb == tmdbId } ?: return null
+        val season = findSnapshotTag(snapshot, "watchNext.season")?.toIntOrNull()
+        val episode = findSnapshotTag(snapshot, "watchNext.episode")?.toIntOrNull()
+        val matchedEpisode = if (season != null && episode != null) {
+            TraktEpisode(season = season, number = episode)
+        } else {
+            null
+        }
+        DiagnosticLog.event(
+            TAG,
+            "WatchNext: content-ID short-circuit tmdbId=$tmdbId " +
+                "show=${entry.show.title} S${season}E${episode} confidence=1.0",
+        )
+        return ScrobbleCandidate(
+            packageName = snapshot.packageName,
+            mediaTitle = mediaTitle,
+            confidence = 1.0f,
+            matchedShow = entry.show,
+            matchedEpisode = matchedEpisode,
+        )
+    }
+
+    /** Extracts the value portion of the first `"<tag>: <value>"` line matching [tag]. */
+    private fun findSnapshotTag(snapshot: MediaMetadataSnapshot, tag: String): String? =
+        snapshot.text.lines()
+            .firstOrNull { it.startsWith("$tag: ") }
+            ?.substringAfter("$tag: ")
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
 
     private fun findGlobalEpisodeMarker(candidates: List<String>): Pair<Int?, Int?> {
         val episodePattern = Regex("""(?i)S(\d{1,2})E(\d{1,2})""")
