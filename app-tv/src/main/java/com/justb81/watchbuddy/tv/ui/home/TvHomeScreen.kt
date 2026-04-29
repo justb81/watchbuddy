@@ -164,16 +164,9 @@ private fun TvHomeShelves(
     val cwRequesters = remember(continueWatching) { mutableMapOf<String, FocusRequester>() }
     val allRequesters = remember(allOthers) { mutableMapOf<String, FocusRequester>() }
 
-    RestoreShelfFocusEffect(
-        focusedShowKey = focusedShowKey,
-        continueWatching = continueWatching,
-        allOthers = allOthers,
-        allShowsExpanded = allShowsExpanded,
-        continueWatchingState = continueWatchingState,
-        allShowsState = allShowsState,
-        cwRequesters = cwRequesters,
-        allRequesters = allRequesters
-    )
+    val cwShelf = ShelfFocusContext(continueWatching, continueWatchingState, cwRequesters)
+    val allShelf = ShelfFocusContext(allOthers, allShowsState, allRequesters)
+    RestoreShelfFocusEffect(focusedShowKey, cwShelf, allShelf, allShowsExpanded)
 
     LazyColumn(
         contentPadding = PaddingValues(horizontal = 48.dp, vertical = 16.dp),
@@ -242,30 +235,32 @@ private fun AllShowsLoadMoreTrigger(state: TvHomeUiState, onLoadMore: () -> Unit
 private fun EnrichedShowEntry.focusKey(): String =
     entry.show.ids.trakt?.toString() ?: entry.show.title
 
+private class ShelfFocusContext(
+    val shows: List<EnrichedShowEntry>,
+    val listState: LazyListState,
+    val requesters: Map<String, FocusRequester>
+)
+
 @Composable
 private fun RestoreShelfFocusEffect(
     focusedShowKey: String?,
-    continueWatching: List<EnrichedShowEntry>,
-    allOthers: List<EnrichedShowEntry>,
-    allShowsExpanded: Boolean,
-    continueWatchingState: LazyListState,
-    allShowsState: LazyListState,
-    cwRequesters: Map<String, FocusRequester>,
-    allRequesters: Map<String, FocusRequester>
+    continueWatching: ShelfFocusContext,
+    allShows: ShelfFocusContext,
+    allShowsExpanded: Boolean
 ) {
-    LaunchedEffect(continueWatching, allOthers, allShowsExpanded) {
+    LaunchedEffect(continueWatching.shows, allShows.shows, allShowsExpanded) {
         val key = focusedShowKey ?: return@LaunchedEffect
-        val cwIndex = continueWatching.indexOfFirst { it.focusKey() == key }
+        val cwIndex = continueWatching.shows.indexOfFirst { it.focusKey() == key }
         if (cwIndex >= 0) {
-            continueWatchingState.scrollToItem(cwIndex)
-            cwRequesters[key]?.requestFocus()
+            continueWatching.listState.scrollToItem(cwIndex)
+            continueWatching.requesters[key]?.requestFocus()
             return@LaunchedEffect
         }
         if (allShowsExpanded) {
-            val allIndex = allOthers.indexOfFirst { it.focusKey() == key }
+            val allIndex = allShows.shows.indexOfFirst { it.focusKey() == key }
             if (allIndex >= 0) {
-                allShowsState.scrollToItem(allIndex)
-                allRequesters[key]?.requestFocus()
+                allShows.listState.scrollToItem(allIndex)
+                allShows.requesters[key]?.requestFocus()
             }
         }
     }
