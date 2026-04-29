@@ -102,17 +102,17 @@ object ShowProgressCalculator {
      * Used to compare user progress against last-aired position without ordinal arithmetic
      * that would break when seasons have different lengths.
      */
-    private fun absoluteOrdinal(season: Int, episode: Int, seasons: List<TmdbSeasonSummary>): Int {
-        var ordinal = 0
-        for (s in seasons.filter { isRegularSeason(it.season_number) }.sortedBy { it.season_number }) {
-            when {
-                s.season_number < season -> ordinal += s.episode_count
-                s.season_number == season -> { ordinal += episode; break }
-                else -> break
+    private fun absoluteOrdinal(season: Int, episode: Int, seasons: List<TmdbSeasonSummary>): Int =
+        seasons
+            .filter { isRegularSeason(it.season_number) }
+            .sortedBy { it.season_number }
+            .sumOf { s ->
+                when {
+                    s.season_number < season -> s.episode_count
+                    s.season_number == season -> episode
+                    else -> 0
+                }
             }
-        }
-        return ordinal
-    }
 
     private fun advanceOneEpisode(season: Int, episode: Int, seasons: List<TmdbSeasonSummary>): Pair<Int, Int> {
         val seasonLength = seasons.firstOrNull { it.season_number == season }?.episode_count
