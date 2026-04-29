@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.32.1](https://github.com/justb81/watchbuddy/compare/v0.32.0...v0.32.1) (2026-04-29)
+
+
+### Bug Fixes
+
+* **tv:** make Streaming Links "Clear cache" D-pad accessible ([#515](https://github.com/justb81/watchbuddy/issues/515)) ([008c930](https://github.com/justb81/watchbuddy/commit/008c930cb697d377614df1286171e6b7286dff12))
+* **tv:** make Watch Next permission-denied row open app settings ([#512](https://github.com/justb81/watchbuddy/issues/512)) ([bb314b0](https://github.com/justb81/watchbuddy/commit/bb314b0ed56f74dd36527accfa8ac8fb368ededf))
+* **tv:** regenerate launcher icon from master logo ([#516](https://github.com/justb81/watchbuddy/issues/516)) ([ec46df8](https://github.com/justb81/watchbuddy/commit/ec46df8e8765c26eb8a0c636084f82e30af7fdad))
+* **tv:** stop diagnostics cards from clipping on D-pad focus ([#517](https://github.com/justb81/watchbuddy/issues/517)) ([d272971](https://github.com/justb81/watchbuddy/commit/d27297129b09f939a76e19fe55042a6874354749))
+* **tv:** surface JustWatch HTTP errors and add browser-like headers ([#522](https://github.com/justb81/watchbuddy/issues/522)) ([c1f9742](https://github.com/justb81/watchbuddy/commit/c1f97420729fb9332249931bcb5560bcf0de820b))
+
+
+### Performance Improvements
+
+* **phone:** cache on-device LLM engines and warm up on service start ([#521](https://github.com/justb81/watchbuddy/issues/521)) ([84992d4](https://github.com/justb81/watchbuddy/commit/84992d447a4db4bddcdf0608725dd155394ed547))
+
 ## [0.32.0](https://github.com/justb81/watchbuddy/compare/v0.31.0...v0.32.0) (2026-04-29)
 
 
