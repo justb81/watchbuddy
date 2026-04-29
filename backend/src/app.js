@@ -448,6 +448,18 @@ export function createApp(config) {
     });
   });
 
+  // Catch-all 404 — keeps unknown paths off Express's default HTML response.
+  app.use((_req, res) => {
+    res.status(404).json({ error: 'not_found' });
+  });
+
+  // Global error handler — final safety net so unhandled exceptions never
+  // leak stack traces via Express's default error response.
+  app.use((err, _req, res, _next) => {
+    console.error('Unhandled error:', err);
+    res.status(500).json({ error: 'internal_error' });
+  });
+
   app.verifyCredentials = verifyCredentials;
   app.clearRetryTimer = () => {
     if (retryTimer) clearTimeout(retryTimer);
