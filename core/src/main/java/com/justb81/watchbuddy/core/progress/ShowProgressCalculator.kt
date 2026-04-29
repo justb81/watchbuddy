@@ -1,6 +1,7 @@
 package com.justb81.watchbuddy.core.progress
 
 import com.justb81.watchbuddy.core.model.TmdbProgressHint
+import com.justb81.watchbuddy.core.model.TmdbSeasonSummary
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
 import java.time.Instant
 import java.time.LocalDate
@@ -63,14 +64,17 @@ object ShowProgressCalculator {
     private const val STATUS_CANCELED = "Canceled"
 
     /**
-     * Returns the (season, episode) pair of the next episode the user should watch.
+     * Returns the (season, episode) pair used by the scrobbler to guess what the user is
+     * currently watching when the streaming app provides no episode marker.
      *
      * Priority:
-     * 1. [TmdbProgressHint.nextAired] — TMDB's globally scheduled next episode (precise).
+     * 1. [TmdbProgressHint.nextAired] — the globally scheduled next episode (most likely
+     *    to be playing on a live-airing show).
      * 2. Highest watched regular episode + 1 (naive; does not cross season boundaries).
      * 3. S01E01 when no episodes are watched yet.
      *
-     * Returns null when [entry] has no TMDB show ID (callers should skip the fetch).
+     * Use [nextUnwatchedEpisodeNumbers] when the goal is to find the user's personal
+     * next unwatched episode (e.g. ShowDetail screen).
      */
     fun nextEpisodeNumbers(entry: TraktWatchedEntry, hint: TmdbProgressHint?): Pair<Int, Int>? {
         hint?.nextAired?.let { next ->
@@ -78,6 +82,72 @@ object ShowProgressCalculator {
         }
         val latest = latestWatched(entry)
         return if (latest == null) 1 to 1 else latest.season to (latest.episode + 1)
+    }
+
+    /**
+     * Returns the (season, episode) pair of the user's personal next unwatched episode.
+     * Used by ShowDetail to determine the episode still image, title, and JustWatch deep links.
+     *
+     * Priority:
+     * 1. Not started → S01E01.
+     * 2. Behind on aired episodes → advance one episode past [latestWatched], season-aware
+     *    (crosses season boundaries when the user is at a season finale).
+     * 3. Caught up and [TmdbProgressHint.nextAired] is a regular season → use nextAired.
+     * 4. Caught up, nothing scheduled (ended show / no TMDB data) → naive +1 (callers handle 404).
+     */
+    fun nextUnwatchedEpisodeNumbers(entry: TraktWatchedEntry, hint: TmdbProgressHint?): Pair<Int, Int>? {
+        val latest = latestWatched(entry)
+
+        // 1) Not started → S01E01
+        if (latest == null) return 1 to 1
+
+        // 2) Behind on aired episodes → walk forward one step, season-aware
+        val lastAired = hint?.lastAired
+        if (lastAired != null && hint.seasons.isNotEmpty()) {
+            val watchedOrdinal = absoluteOrdinal(latest.season, latest.episode, hint.seasons)
+            val airedOrdinal = absoluteOrdinal(lastAired.season_number, lastAired.episode_number, hint.seasons)
+            if (watchedOrdinal < airedOrdinal) {
+                return advanceOneEpisode(latest.season, latest.episode, hint.seasons)
+            }
+        }
+
+        // 3) Caught up & a new episode is scheduled → use TMDB nextAired
+        hint?.nextAired?.let { next ->
+            if (isRegularSeason(next.season_number)) return next.season_number to next.episode_number
+        }
+
+        // 4) Caught up, nothing scheduled (ended show) → naive +1 (callers handle 404)
+        return latest.season to (latest.episode + 1)
+    }
+
+    /**
+     * Cumulative episode position across regular seasons, skipping specials.
+     * Used to compare user progress against last-aired position without ordinal arithmetic
+     * that would break when seasons have different lengths.
+     */
+    private fun absoluteOrdinal(season: Int, episode: Int, seasons: List<TmdbSeasonSummary>): Int =
+        seasons
+            .filter { isRegularSeason(it.season_number) }
+            .sortedBy { it.season_number }
+            .sumOf { s ->
+                when {
+                    s.season_number < season -> s.episode_count
+                    s.season_number == season -> episode
+                    else -> 0
+                }
+            }
+
+    private fun advanceOneEpisode(season: Int, episode: Int, seasons: List<TmdbSeasonSummary>): Pair<Int, Int> {
+        val seasonLength = seasons.firstOrNull { it.season_number == season }?.episode_count
+        return if (seasonLength != null && episode >= seasonLength) {
+            val nextSeason = seasons
+                .filter { isRegularSeason(it.season_number) && it.season_number > season }
+                .minByOrNull { it.season_number }
+                ?.season_number ?: (season + 1)
+            nextSeason to 1
+        } else {
+            season to (episode + 1)
+        }
     }
 
     fun compute(
