@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.justb81.watchbuddy.R
+import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.tv.discovery.PhoneApiClientFactory
 import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -63,9 +64,14 @@ class RecapViewModel @Inject constructor(
             }
 
             // All phones were tried but all failed — distinguish from the "no phones" early return above.
+            DiagnosticLog.event(TAG, "recap_fallback_all_failed phones=${phones.size}")
             _state.value = RecapUiState.Fallback(fallbackSynopsis, allPhonesFailed = true)
         }
     }
 
     fun reset() { _state.value = RecapUiState.Idle }
+
+    private companion object {
+        const val TAG = "RecapViewModel"
+    }
 }

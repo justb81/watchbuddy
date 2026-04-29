@@ -183,5 +183,6 @@ private fun TmdbShow.toProgressHint(): TmdbProgressHint = TmdbProgressHint(
     status = status,
     lastAired = last_episode_to_air,
     nextAired = next_episode_to_air,
-    seasons = seasons
+    seasons = seasons,
+    overview = overview
 )
