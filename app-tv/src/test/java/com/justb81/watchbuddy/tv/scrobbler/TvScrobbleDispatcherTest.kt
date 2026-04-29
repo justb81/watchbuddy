@@ -7,7 +7,6 @@ import com.justb81.watchbuddy.tv.discovery.DiscoveryConstants
 import com.justb81.watchbuddy.tv.discovery.PhoneApiClientFactory
 import com.justb81.watchbuddy.tv.discovery.PhoneApiService
 import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
-import com.justb81.watchbuddy.core.model.PhoneAddToLibraryRequest
 import com.justb81.watchbuddy.tv.discovery.PhoneScrobbleRequest
 import io.mockk.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
