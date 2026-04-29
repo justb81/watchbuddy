@@ -18,6 +18,7 @@ import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.model.AmbiguousScrobbleEvent
 import com.justb81.watchbuddy.phone.llm.LlmOrchestrator
+import com.justb81.watchbuddy.phone.llm.LlmProviderFactory
 import com.justb81.watchbuddy.phone.server.CompanionHttpServer
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import com.justb81.watchbuddy.phone.ui.MainActivity
@@ -76,6 +77,7 @@ class CompanionService : Service() {
 
     @Inject lateinit var companionHttpServer: CompanionHttpServer
     @Inject lateinit var llmOrchestrator: LlmOrchestrator
+    @Inject lateinit var llmProviderFactory: LlmProviderFactory
     @Inject lateinit var stateManager: CompanionStateManager
     @Inject lateinit var settingsRepository: SettingsRepository
     @Inject lateinit var bleAdvertiser: CompanionBleAdvertiser
@@ -123,6 +125,10 @@ class CompanionService : Service() {
         startPresenceMonitor()
         ensureScrobblePromptChannel()
         observeAmbiguousPrompts()
+        // Pre-load the on-device LLM so the user's first recap hits a warm
+        // engine. Fire-and-forget — the warmUp() implementation swallows its
+        // own exceptions and only logs.
+        serviceScope.launch { llmProviderFactory.warmUp() }
         return START_STICKY
     }
 

@@ -46,7 +46,24 @@ class LlmOrchestrator @Inject constructor(
         ),
     }
 
+    // Memoize the first non-NONE result. Repeated `availMem` probes flap as
+    // other apps allocate, which would otherwise let a single recap session
+    // flip between E4B / E2B / NONE and force re-loads of the cached engine
+    // handle in `LlmEngineCache`. NONE is intentionally not memoized so a
+    // companion-service restart after low-RAM startup can recover.
+    @Volatile
+    private var cachedConfig: LlmConfig? = null
+
     fun selectConfig(): LlmConfig {
+        cachedConfig?.let { return it }
+        val config = computeConfig()
+        if (config.backend != LlmBackend.NONE) {
+            cachedConfig = config
+        }
+        return config
+    }
+
+    private fun computeConfig(): LlmConfig {
         // 1. Check AICore availability (Android 14+, Pixel 8+ class devices)
         if (isAiCoreAvailable()) {
             return LlmConfig(LlmBackend.AICORE, null, qualityScore = 150)

@@ -126,4 +126,36 @@ class LlmOrchestratorTest {
             assertEquals(LlmBackend.LITERT, config.backend)
         }
     }
+
+    @Nested
+    @DisplayName("config memoization")
+    inner class MemoizationTest {
+
+        @Test
+        fun `non-NONE config is cached across calls even when freeRam fluctuates`() {
+            mockFreeRam(6000) // First call -> E4B
+            val first = orchestrator.selectConfig()
+            assertEquals(LlmOrchestrator.ModelVariant.GEMMA4_E4B, first.modelVariant)
+
+            // Drop free RAM well below E2B's threshold; without memoization the
+            // next call would flip to NONE and force the LlmEngineCache to drop
+            // the warm engine handle mid-process.
+            mockFreeRam(1000)
+            val second = orchestrator.selectConfig()
+            assertEquals(LlmOrchestrator.ModelVariant.GEMMA4_E4B, second.modelVariant)
+            assertEquals(first, second)
+        }
+
+        @Test
+        fun `NONE config is not cached so a later RAM upgrade is honored`() {
+            mockFreeRam(1000) // Below E2B threshold -> NONE
+            val first = orchestrator.selectConfig()
+            assertEquals(LlmBackend.NONE, first.backend)
+
+            mockFreeRam(6000) // RAM freed up -> E4B should now win
+            val second = orchestrator.selectConfig()
+            assertEquals(LlmBackend.LITERT, second.backend)
+            assertEquals(LlmOrchestrator.ModelVariant.GEMMA4_E4B, second.modelVariant)
+        }
+    }
 }
