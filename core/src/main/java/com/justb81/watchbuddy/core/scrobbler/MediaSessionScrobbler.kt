@@ -69,6 +69,9 @@ class MediaSessionScrobbler @Inject constructor(
 
         /** Bonus applied to a Phase-0 fallthrough intent candidate's text score. */
         private const val INTENT_FALLTHROUGH_BONUS = 0.15f
+
+        /** Maximum score a fallthrough-intent candidate may be given (stays below auto-scrobble). */
+        private const val INTENT_FALLTHROUGH_CAP = 0.94f
         private const val AMBIGUOUS_CANDIDATES_MAX = 3
 
         private const val MS_PER_MINUTE = 60_000.0
@@ -639,7 +642,7 @@ class MediaSessionScrobbler @Inject constructor(
             val traktId = intentEntry?.show?.ids?.trakt
             if (intentEntry != null && traktId != null) {
                 val rawScore = scoreSnapshotAgainstTitle(candidates, fallthroughIntent.showTitle, profile)
-                val bonusScore = (rawScore + INTENT_FALLTHROUGH_BONUS).coerceAtMost(0.94f)
+                val bonusScore = (rawScore + INTENT_FALLTHROUGH_BONUS).coerceAtMost(INTENT_FALLTHROUGH_CAP)
                 if (bonusScore >= AMBIGUOUS_THRESHOLD) {
                     val existing = bestByTraktId[traktId]
                     if (existing == null || bonusScore > existing.score) {

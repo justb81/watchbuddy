@@ -94,17 +94,22 @@ data class PlaybackIntentStats(
 interface PlaybackIntentProvider {
     /** Records a new intent, replacing any existing intent for the same package. */
     fun record(intent: PlaybackIntent)
+
     /**
      * Returns the stored intent for [packageName] if it is still within the TTL window,
      * or null if none exists or the intent has expired (and evicts it).
      */
     fun peek(packageName: String): PlaybackIntent?
+
     /** Removes the intent for [packageName] (called after a Phase-0 auto-scrobble). */
     fun consumeIntent(packageName: String)
+
     /** Increments the Phase-0-confirmed counter. */
     fun recordHit()
+
     /** Increments the Phase-0-fallthrough counter. */
     fun recordFallthrough()
+
     /** Returns a snapshot of all intent-lifecycle counters. */
     fun intentStats(): PlaybackIntentStats
 }
