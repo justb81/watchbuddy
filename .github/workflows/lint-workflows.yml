@@ -1,0 +1,37 @@
+name: Lint workflows
+
+# Enforces supply-chain hygiene on every CI workflow file: any third-party
+# action introduced via a floating tag (`@v3`, `@v4`, …) instead of a full
+# 40-char commit SHA fails this job. See issue #561.
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/**'
+      - '.github/actions/**'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/**'
+      - '.github/actions/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  zizmor:
+    name: zizmor
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+      # `--min-severity=medium` catches `unpinned-uses` (the primary supply-chain
+      # gate this workflow exists to enforce, per issue #561) and `excessive-
+      # permissions`, while skipping low-severity defense-in-depth nits like
+      # `artipacked` that warrant a separate hardening pass.
+      - name: Run zizmor
+        run: pipx run zizmor --min-severity=medium .github/workflows/ .github/actions/

@@ -5,20 +5,22 @@ on:
     branches: [main]
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 jobs:
   release-please:
     name: Release Please
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
       version: ${{ steps.release.outputs.version }}
       body: ${{ steps.release.outputs.body }}
     steps:
-      - uses: googleapis/release-please-action@v4
+      - uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4
         id: release
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -30,11 +32,19 @@ jobs:
     needs: release-please
     if: ${{ needs.release-please.outputs.release_created }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     env:
       VERSION: ${{ needs.release-please.outputs.version }}
       TAG: ${{ needs.release-please.outputs.tag_name }}
     steps:
-      - uses: actions/checkout@v6
+      # build-release uses `gh release upload` which authenticates via the
+      # `GH_TOKEN` env var, not git-stored credentials, so the persisted
+      # credential is unused — turn it off to satisfy zizmor's `artipacked`
+      # audit and avoid the credential leaking into uploaded artifacts.
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup-android-build
 
       # -- Prepare release signing ----------------------------------------
@@ -267,7 +277,7 @@ jobs:
         run: ./gradlew :app-phone:publishReleaseBundle -PplayTrack=internal -PplayStatus=${{ steps.play-status.outputs.status }}
 
       - name: Upload release artifacts
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: watchbuddy-release-${{ needs.release-please.outputs.version }}
           path: |
@@ -281,8 +291,13 @@ jobs:
     needs: [release-please, build-release]
     if: ${{ needs.release-please.outputs.release_created }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v6
+      # Persisted credentials are required so the next step can `git push
+      # origin stable --force`. zizmor's `artipacked` audit warns that the
+      # credential could leak via uploaded artifacts — this job uploads none.
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6 # zizmor: ignore[artipacked]
         with:
           fetch-depth: 0
 
