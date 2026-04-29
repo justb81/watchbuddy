@@ -1,5 +1,8 @@
 package com.justb81.watchbuddy.tv.ui.diagnostics
 
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -9,6 +12,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -579,8 +583,10 @@ private fun MediaNotificationsSection(
     )
 }
 
+@OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun WatchNextSection(countResult: WatchNextMetadataSource.CountResult?) {
+    val context = LocalContext.current
     val (valueStr, status) = when (countResult) {
         null -> "—" to Status.NEUTRAL
         is WatchNextMetadataSource.CountResult.PermissionDenied ->
@@ -589,16 +595,60 @@ private fun WatchNextSection(countResult: WatchNextMetadataSource.CountResult?) 
             pluralStringResource(R.plurals.tv_diagnostics_value_watch_next_count, countResult.count, countResult.count) to
                 if (countResult.count > 0) Status.OK else Status.WARN
     }
-    DiagnosticsSection(
-        title = stringResource(R.string.tv_diagnostics_section_watch_next),
-        rows = listOf(
-            DiagRow(
-                label = stringResource(R.string.tv_diagnostics_row_watch_next_publishing),
-                value = valueStr,
-                status = status,
-            ),
-        ),
+    Text(
+        text = stringResource(R.string.tv_diagnostics_section_watch_next).uppercase(),
+        fontSize = 14.sp,
+        fontWeight = FontWeight.Bold,
+        color = Color.White.copy(alpha = 0.7f),
+        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp, start = 4.dp),
     )
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = CardDefaults.shape(RoundedCornerShape(12.dp)),
+        onClick = {},
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .background(statusColor(status), RoundedCornerShape(2.dp)),
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        stringResource(R.string.tv_diagnostics_row_watch_next_publishing),
+                        fontSize = 14.sp,
+                        color = Color.White,
+                    )
+                }
+                Text(valueStr, fontSize = 13.sp, color = Color.White.copy(alpha = 0.7f))
+            }
+            if (countResult is WatchNextMetadataSource.CountResult.PermissionDenied) {
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = {
+                        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                            data = Uri.fromParts("package", context.packageName, null)
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        runCatching { context.startActivity(intent) }
+                    },
+                ) {
+                    Text(
+                        stringResource(R.string.tv_diagnostics_action_open_permissions),
+                        fontSize = 13.sp,
+                    )
+                }
+            }
+        }
+    }
 }
 
 private fun formatLastCandidate(last: MediaSessionScrobbler.LastCandidate?): String {

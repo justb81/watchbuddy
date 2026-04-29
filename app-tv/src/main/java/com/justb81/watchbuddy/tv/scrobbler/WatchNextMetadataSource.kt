@@ -39,10 +39,19 @@ import javax.inject.Singleton
  * | other   | Netflix, etc.   | No — row still contributes title/season/episode evidence lines |
  *
  * ### Permission
- * `READ_TV_LISTINGS` is granted automatically on Android TV form-factor; no runtime prompt
- * is shown to the user. On non-TV form-factor (e.g. test runners) the query returns an empty
- * cursor, which is handled gracefully. A [SecurityException] is caught and surfaced as a
- * yellow/red dot in TV Diagnostics.
+ * `READ_TV_LISTINGS` has protection level `signature|privileged|appop` on current Android.
+ * Most Android TV firmwares auto-grant it to apps with the leanback launcher feature, but a
+ * growing number of Google TV / Chromecast-with-Google-TV / 3rd-party Android TV builds do
+ * not — they require either an explicit `requestPermissions(...)` flow or a manual toggle in
+ * App Info → Permissions. [TvMainActivity] requests the permission at runtime; the system
+ * suppresses the dialog when it is auto-granted or the user has already answered.
+ *
+ * On non-TV form-factor (e.g. test runners) the query returns an empty cursor, which is
+ * handled gracefully. The first [SecurityException] flips a process-wide [permissionDenied]
+ * flag so subsequent scrobble cycles short-circuit before issuing the content-provider query
+ * — without that, every tick throws and logs once per package. The flag is cleared via
+ * [resetPermissionState] once the user grants the permission and the diagnostics screen
+ * resumes.
  */
 // TvContractCompat.WatchNextPrograms inherits column-name constants from internal
 // ProgramColumns / PreviewProgramColumns interfaces annotated @RestrictTo(LIBRARY_GROUP).
@@ -60,6 +69,27 @@ class WatchNextMetadataSource @Inject constructor(
 
         /** `READ_TV_LISTINGS` was denied — user or device policy blocked the query. */
         object PermissionDenied : CountResult()
+    }
+
+    /**
+     * Set to `true` once [SecurityException] has been thrown by the WatchNext provider so
+     * subsequent calls short-circuit without re-issuing the query. Reset by
+     * [resetPermissionState] when the diagnostics screen returns from the system permission
+     * settings so a freshly granted permission is picked up without an app restart.
+     */
+    @Volatile
+    private var permissionDenied: Boolean = false
+
+    /** Visible for testing — exposes the cached denial flag. */
+    internal fun isPermissionDenied(): Boolean = permissionDenied
+
+    /**
+     * Clears the cached `READ_TV_LISTINGS` denial so the next [enrich]/[countPublishingApps]
+     * call retries the query. Called from the diagnostics screen after the user returns from
+     * the system permission settings.
+     */
+    fun resetPermissionState() {
+        permissionDenied = false
     }
 
     override suspend fun enrich(
@@ -88,6 +118,7 @@ class WatchNextMetadataSource @Inject constructor(
     }
 
     private fun lookup(packageName: String): WatchNextSnippet? {
+        if (permissionDenied) return null
         return try {
             val now = System.currentTimeMillis()
             context.contentResolver.query(
@@ -103,7 +134,8 @@ class WatchNextMetadataSource @Inject constructor(
                 if (age > ROW_FRESHNESS_MS) null else snippet
             }
         } catch (e: SecurityException) {
-            DiagnosticLog.warn(TAG, "WatchNext: READ_TV_LISTINGS denied for $packageName", e)
+            permissionDenied = true
+            DiagnosticLog.warn(TAG, "WatchNext: READ_TV_LISTINGS denied — disabling source", e)
             null
         }
     }
@@ -114,6 +146,7 @@ class WatchNextMetadataSource @Inject constructor(
      * Returns [CountResult.PermissionDenied] when the system denies `READ_TV_LISTINGS`.
      */
     fun countPublishingApps(): CountResult {
+        if (permissionDenied) return CountResult.PermissionDenied
         return try {
             val cutoffMs = System.currentTimeMillis() - ROW_FRESHNESS_MS
             context.contentResolver.query(
@@ -124,7 +157,8 @@ class WatchNextMetadataSource @Inject constructor(
                 null,
             )?.use(::readDistinctPackageCount) ?: CountResult.Success(0)
         } catch (e: SecurityException) {
-            DiagnosticLog.warn(TAG, "WatchNext: READ_TV_LISTINGS denied for diagnostics", e)
+            permissionDenied = true
+            DiagnosticLog.warn(TAG, "WatchNext: READ_TV_LISTINGS denied — disabling source", e)
             CountResult.PermissionDenied
         }
     }

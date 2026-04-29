@@ -164,7 +164,8 @@
         <item quantity="many">%d applis</item>
         <item quantity="other">%d applis</item>
     </plurals>
-    <string name="tv_diagnostics_value_watch_next_permission_denied">Permission refusée</string>
+    <string name="tv_diagnostics_value_watch_next_permission_denied">Permission refusée — appuyez pour ouvrir les paramètres</string>
+    <string name="tv_diagnostics_action_open_permissions">Ouvrir les autorisations de l\'application</string>
 
     <!-- Diagnostics — media notifications (#472) -->
     <string name="tv_diagnostics_section_media_notifications">Notifications multimédias</string>

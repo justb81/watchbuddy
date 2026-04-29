@@ -159,7 +159,8 @@
         <item quantity="one">%d App</item>
         <item quantity="other">%d Apps</item>
     </plurals>
-    <string name="tv_diagnostics_value_watch_next_permission_denied">Berechtigung verweigert</string>
+    <string name="tv_diagnostics_value_watch_next_permission_denied">Berechtigung verweigert — zum Öffnen tippen</string>
+    <string name="tv_diagnostics_action_open_permissions">App-Berechtigungen öffnen</string>
 
     <!-- Diagnostics — media notifications (#472) -->
     <string name="tv_diagnostics_section_media_notifications">Medienbenachrichtigungen</string>

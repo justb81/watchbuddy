@@ -373,4 +373,71 @@ class WatchNextMetadataSourceTest {
             assertTrue(result is WatchNextMetadataSource.CountResult.PermissionDenied)
         }
     }
+
+    // ── permission denial caching ───────────────────────────────────────────
+
+    @Nested
+    @DisplayName("permission denial caching")
+    inner class PermissionDenialCaching {
+
+        private val tick = PlaybackTick(
+            state = PlaybackTick.STATE_PLAYING,
+            positionMs = 0L,
+            durationMs = 3_600_000L,
+            capturedAtMs = System.currentTimeMillis(),
+        )
+
+        @Test
+        fun `enrich short-circuits subsequent calls after first SecurityException`() = runTest {
+            every {
+                contentResolver.query(any(), any(), any(), any(), any())
+            } throws SecurityException("READ_TV_LISTINGS denied")
+            val builder1 = MediaSnapshotBuilder("com.netflix.ninja")
+            val builder2 = MediaSnapshotBuilder("com.disney.disneyplus")
+
+            source.enrich("com.netflix.ninja", tick, builder1)
+            source.enrich("com.disney.disneyplus", tick, builder2)
+
+            assertTrue(source.isPermissionDenied())
+            // The first call hit the resolver (and threw), the second short-circuited.
+            verify(exactly = 1) { contentResolver.query(any(), any(), any(), any(), any()) }
+            assertFalse(builder1.build().text.contains("watchNext."))
+            assertFalse(builder2.build().text.contains("watchNext."))
+        }
+
+        @Test
+        fun `countPublishingApps short-circuits after a prior denial`() = runTest {
+            every {
+                contentResolver.query(any(), any(), any(), any(), any())
+            } throws SecurityException("READ_TV_LISTINGS denied")
+
+            // First call records the denial.
+            val first = source.countPublishingApps()
+            // Second call must NOT hit the resolver again.
+            val second = source.countPublishingApps()
+
+            assertTrue(first is WatchNextMetadataSource.CountResult.PermissionDenied)
+            assertTrue(second is WatchNextMetadataSource.CountResult.PermissionDenied)
+            verify(exactly = 1) { contentResolver.query(any(), any(), any(), any(), any()) }
+        }
+
+        @Test
+        fun `resetPermissionState re-enables queries after a prior denial`() = runTest {
+            every {
+                contentResolver.query(any(), any(), any(), any(), any())
+            } throws SecurityException("READ_TV_LISTINGS denied")
+            source.countPublishingApps() // caches denial
+            assertTrue(source.isPermissionDenied())
+
+            // Permission has been granted — diagnostics screen calls reset, then the next
+            // query should hit the resolver again instead of short-circuiting.
+            source.resetPermissionState()
+            assertFalse(source.isPermissionDenied())
+            givenCountQuery(buildPackageCursor("com.netflix.ninja"))
+
+            val result = source.countPublishingApps()
+
+            assertEquals(WatchNextMetadataSource.CountResult.Success(1), result)
+        }
+    }
 }
