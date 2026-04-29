@@ -191,7 +191,6 @@ class JustWatchDeepLinkRepository @Inject constructor(
     ) {
         try {
             val language = "en"
-
             when (val result = searchShowByTmdbId(tmdbShowId, showTitle, countryCode, language)) {
                 is SearchResult.GraphQlError -> {
                     val msg = "GraphQL error searching '$showTitle' (tmdb=$tmdbShowId): ${result.summary}"
@@ -204,69 +203,8 @@ class JustWatchDeepLinkRepository @Inject constructor(
                     recordMiss()
                     return
                 }
-                is SearchResult.Found -> {
-                    val jwNode = result.title
-
-                    // Cache show-level offers while we have the show node
-                    cacheOffers(jwNode.offers, tmdbShowId, 0, 0, countryCode)
-
-                    // Fetch seasons
-                    val seasonsResp = api.query(
-                        JustWatchGraphQlRequest(
-                            query = JustWatchApiService.SEASONS_QUERY,
-                            variables = buildJsonObject {
-                                put("nodeId", jwNode.id)
-                                put("country", countryCode)
-                                put("language", language)
-                            },
-                        )
-                    )
-                    if (!seasonsResp.errors.isNullOrEmpty()) {
-                        val msg = "GraphQL errors in seasons query for tmdbId=$tmdbShowId"
-                        DiagnosticLog.error(TAG, msg)
-                        recordError(msg)
-                        return
-                    }
-                    val jwSeasons = seasonsResp.data?.node?.seasons
-                    if (jwSeasons.isNullOrEmpty()) {
-                        DiagnosticLog.warn(TAG, "Empty seasons list for tmdbId=$tmdbShowId")
-                        return
-                    }
-
-                    // Match season by index (season 1 → index 0); JustWatch orders from S1
-                    val seasonIndex = (season - 1).coerceIn(0, jwSeasons.size - 1)
-                    val seasonId = jwSeasons[seasonIndex].id
-
-                    // Fetch episodes for this season
-                    val episodesResp = api.query(
-                        JustWatchGraphQlRequest(
-                            query = JustWatchApiService.EPISODES_QUERY,
-                            variables = buildJsonObject {
-                                put("nodeId", seasonId)
-                                put("country", countryCode)
-                                put("language", language)
-                            },
-                        )
-                    )
-                    if (!episodesResp.errors.isNullOrEmpty()) {
-                        val msg = "GraphQL errors in episodes query for tmdbId=$tmdbShowId S$season"
-                        DiagnosticLog.error(TAG, msg)
-                        recordError(msg)
-                        return
-                    }
-                    val jwEpisodes = episodesResp.data?.node?.episodes
-                    if (jwEpisodes.isNullOrEmpty()) {
-                        DiagnosticLog.warn(TAG, "Empty episodes list for tmdbId=$tmdbShowId S$season")
-                        return
-                    }
-
-                    val jwEp = jwEpisodes.find { it.seasonNumber == season && it.episodeNumber == episode }
-                    if (jwEp != null) {
-                        cacheOffers(jwEp.offers, tmdbShowId, season, episode, countryCode)
-                    } else {
-                        DiagnosticLog.warn(TAG, "Episode S${season}E$episode not found in JustWatch for tmdbId=$tmdbShowId")
-                    }
-                }
+                is SearchResult.Found ->
+                    fetchEpisodeOffersForNode(result.title, tmdbShowId, season, episode, countryCode, language)
             }
         } catch (e: CancellationException) {
             throw e
@@ -275,6 +213,75 @@ class JustWatchDeepLinkRepository @Inject constructor(
             DiagnosticLog.error(TAG, "Episode fetch failed for tmdbId=$tmdbShowId S${season}E$episode: $msg", e)
             recordError(msg)
             // Network/parse failure: do not cache negatives so the next attempt retries
+        }
+    }
+
+    private suspend fun fetchEpisodeOffersForNode(
+        jwNode: JustWatchTitle,
+        tmdbShowId: Int,
+        season: Int,
+        episode: Int,
+        countryCode: String,
+        language: String,
+    ) {
+        // Cache show-level offers while we have the show node
+        cacheOffers(jwNode.offers, tmdbShowId, 0, 0, countryCode)
+
+        // Fetch seasons
+        val seasonsResp = api.query(
+            JustWatchGraphQlRequest(
+                query = JustWatchApiService.SEASONS_QUERY,
+                variables = buildJsonObject {
+                    put("nodeId", jwNode.id)
+                    put("country", countryCode)
+                    put("language", language)
+                },
+            )
+        )
+        if (!seasonsResp.errors.isNullOrEmpty()) {
+            val msg = "GraphQL errors in seasons query for tmdbId=$tmdbShowId"
+            DiagnosticLog.error(TAG, msg)
+            recordError(msg)
+            return
+        }
+        val jwSeasons = seasonsResp.data?.node?.seasons
+        if (jwSeasons.isNullOrEmpty()) {
+            DiagnosticLog.warn(TAG, "Empty seasons list for tmdbId=$tmdbShowId")
+            return
+        }
+
+        // Match season by index (season 1 → index 0); JustWatch orders from S1
+        val seasonIndex = (season - 1).coerceIn(0, jwSeasons.size - 1)
+        val seasonId = jwSeasons[seasonIndex].id
+
+        // Fetch episodes for this season
+        val episodesResp = api.query(
+            JustWatchGraphQlRequest(
+                query = JustWatchApiService.EPISODES_QUERY,
+                variables = buildJsonObject {
+                    put("nodeId", seasonId)
+                    put("country", countryCode)
+                    put("language", language)
+                },
+            )
+        )
+        if (!episodesResp.errors.isNullOrEmpty()) {
+            val msg = "GraphQL errors in episodes query for tmdbId=$tmdbShowId S$season"
+            DiagnosticLog.error(TAG, msg)
+            recordError(msg)
+            return
+        }
+        val jwEpisodes = episodesResp.data?.node?.episodes
+        if (jwEpisodes.isNullOrEmpty()) {
+            DiagnosticLog.warn(TAG, "Empty episodes list for tmdbId=$tmdbShowId S$season")
+            return
+        }
+
+        val jwEp = jwEpisodes.find { it.seasonNumber == season && it.episodeNumber == episode }
+        if (jwEp != null) {
+            cacheOffers(jwEp.offers, tmdbShowId, season, episode, countryCode)
+        } else {
+            DiagnosticLog.warn(TAG, "Episode S${season}E$episode not found in JustWatch for tmdbId=$tmdbShowId")
         }
     }
 
