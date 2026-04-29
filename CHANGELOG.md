@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.32.2](https://github.com/justb81/watchbuddy/compare/v0.32.1...v0.32.2) (2026-04-29)
+
+
+### Bug Fixes
+
+* **backend:** add 404 + global error handlers so unhandled errors don't leak internals ([#583](https://github.com/justb81/watchbuddy/issues/583)) ([d12e07c](https://github.com/justb81/watchbuddy/commit/d12e07c466b1372aedfa293a6e773fb6688713d8)), closes [#553](https://github.com/justb81/watchbuddy/issues/553)
+* **backend:** sanitize Trakt error bodies and cap JSON request size ([#580](https://github.com/justb81/watchbuddy/issues/580)) ([dee441b](https://github.com/justb81/watchbuddy/commit/dee441b36813a9bb8036a547512403ecc3763d88)), closes [#551](https://github.com/justb81/watchbuddy/issues/551) [#552](https://github.com/justb81/watchbuddy/issues/552)
+* **tv:** restore D-pad scroll on Diagnostics screen ([#584](https://github.com/justb81/watchbuddy/issues/584)) ([96ae9f5](https://github.com/justb81/watchbuddy/commit/96ae9f5760ed90264bab5a7d3f8426755defa348))
+
 ## [0.32.1](https://github.com/justb81/watchbuddy/compare/v0.32.0...v0.32.1) (2026-04-29)
 
 
