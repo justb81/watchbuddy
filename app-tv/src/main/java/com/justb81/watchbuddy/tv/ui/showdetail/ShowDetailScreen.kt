@@ -55,6 +55,7 @@ fun ShowDetailScreen(
     val nextEpisodeUi by viewModel.nextEpisode.collectAsState()
     val providerState by viewModel.providers.collectAsState()
     val deepLinks by viewModel.deepLinks.collectAsState()
+    val watchNowState by viewModel.watchNowState.collectAsState()
     val watchNowFocus = remember { FocusRequester() }
 
     LaunchedEffect(entry.show.ids.trakt) {
@@ -72,11 +73,6 @@ fun ShowDetailScreen(
 
     val imageUrl = nextEpisodeUi.stillUrl ?: TmdbImageHelper.poster(enriched.posterPath, TMDB_POSTER_WIDTH)
 
-    val topProviderDeepLink = viewModel.resolveTopProviderDeepLink()
-    val topProviderState = (providerState as? ProviderListUiState.Success)
-        ?.providers?.firstOrNull()
-        ?.let { deepLinks[it.providerId] }
-
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         ShowDetailImagePanel(imageUrl, modifier = Modifier.align(Alignment.CenterStart))
         ShowDetailGradient()
@@ -85,13 +81,16 @@ fun ShowDetailScreen(
             nextEpisode = nextEpisodeUi,
             providerState = providerState,
             deepLinks = deepLinks,
-            topProviderDeepLinkState = topProviderState,
+            watchNowState = watchNowState,
             watchNowFocus = watchNowFocus,
             actions = ShowDetailActions(
                 onWatchNow = {
-                    val firstProvider = (providerState as? ProviderListUiState.Success)
-                        ?.providers?.firstOrNull()
-                    launchProvider(context, firstProvider, topProviderDeepLink)
+                    val state = watchNowState
+                    if (state is WatchNowState.Available) {
+                        val firstProvider = (providerState as? ProviderListUiState.Success)
+                            ?.providers?.firstOrNull()
+                        launchProvider(context, firstProvider, state.url)
+                    }
                 },
                 onProviderClick = { provider ->
                     val link = viewModel.onProviderSelected(provider, enriched)
@@ -195,7 +194,7 @@ private fun ShowDetailContent(
     nextEpisode: NextEpisodeUiState,
     providerState: ProviderListUiState,
     deepLinks: Map<Int, DeepLinkState>,
-    topProviderDeepLinkState: DeepLinkState?,
+    watchNowState: WatchNowState,
     watchNowFocus: FocusRequester,
     actions: ShowDetailActions,
     modifier: Modifier = Modifier,
@@ -240,7 +239,7 @@ private fun ShowDetailContent(
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             WatchNowButton(
-                deepLinkState = topProviderDeepLinkState,
+                state = watchNowState,
                 onClick = actions.onWatchNow,
                 focusRequester = watchNowFocus,
             )
@@ -259,12 +258,12 @@ private fun ShowDetailContent(
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun WatchNowButton(
-    deepLinkState: DeepLinkState?,
+    state: WatchNowState,
     onClick: () -> Unit,
     focusRequester: FocusRequester,
 ) {
-    when (deepLinkState) {
-        is DeepLinkState.Loading -> {
+    when (state) {
+        is WatchNowState.Loading -> {
             Button(
                 onClick = {},
                 enabled = false,
@@ -280,7 +279,7 @@ private fun WatchNowButton(
                 Text(text = stringResource(R.string.tv_watch_now), fontWeight = FontWeight.Bold)
             }
         }
-        is DeepLinkState.Available -> {
+        is WatchNowState.Available -> {
             Button(
                 onClick = onClick,
                 modifier = Modifier.focusRequester(focusRequester),
@@ -289,7 +288,7 @@ private fun WatchNowButton(
                 Text(text = stringResource(R.string.tv_watch_now), fontWeight = FontWeight.Bold)
             }
         }
-        is DeepLinkState.Unavailable -> {
+        is WatchNowState.Unavailable -> {
             Button(
                 onClick = {},
                 enabled = false,
@@ -299,13 +298,14 @@ private fun WatchNowButton(
                 Text(text = stringResource(R.string.tv_watch_now_unavailable), fontWeight = FontWeight.Bold)
             }
         }
-        null -> {
+        is WatchNowState.NoProvider -> {
             Button(
-                onClick = onClick,
+                onClick = {},
+                enabled = false,
                 modifier = Modifier.focusRequester(focusRequester),
                 colors = ButtonDefaults.colors(containerColor = MaterialTheme.colorScheme.primary),
             ) {
-                Text(text = stringResource(R.string.tv_watch_now), fontWeight = FontWeight.Bold)
+                Text(text = stringResource(R.string.tv_watch_now_no_provider), fontWeight = FontWeight.Bold)
             }
         }
     }

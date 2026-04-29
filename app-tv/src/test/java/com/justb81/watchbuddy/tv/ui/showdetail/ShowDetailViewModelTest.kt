@@ -383,14 +383,75 @@ class ShowDetailViewModelTest {
     }
 
     @Nested
-    @DisplayName("resolveTopProviderDeepLink")
-    inner class ResolveTopProviderDeepLinkTest {
+    @DisplayName("watchNowState")
+    inner class WatchNowStateTest {
 
         @Test
-        fun `returns JustWatch URL for first provider in Success state`() = runTest {
+        fun `is Loading initially`() {
+            assertEquals(WatchNowState.Loading, viewModel.watchNowState.value)
+        }
+
+        @Test
+        fun `is Loading while providers are loading`() = runTest {
+            // providers StateFlow starts as Loading — no additional calls needed
+            assertEquals(WatchNowState.Loading, viewModel.watchNowState.value)
+        }
+
+        @Test
+        fun `is NoProvider when providers are Empty`() = runTest {
+            every { phoneDiscovery.getBestPhone() } returns makePhone("api-key")
+            coEvery {
+                watchProviders.getResolvedProviders(any(), any(), any(), any())
+            } returns (emptyList<ResolvedProvider>() to null)
+
+            viewModel.loadProviders(makeEntry())
+
+            assertEquals(WatchNowState.NoProvider, viewModel.watchNowState.value)
+        }
+
+        @Test
+        fun `is NoProvider when providers are Error`() = runTest {
+            every { phoneDiscovery.getBestPhone() } returns null
+
+            viewModel.loadProviders(makeEntry())
+
+            assertEquals(WatchNowState.NoProvider, viewModel.watchNowState.value)
+        }
+
+        @Test
+        fun `is NoProvider when provider list is empty after Success`() = runTest {
+            every { phoneDiscovery.getBestPhone() } returns makePhone("api-key")
+            coEvery {
+                watchProviders.getResolvedProviders(any(), any(), any(), any())
+            } returns (emptyList<ResolvedProvider>() to null)
+
+            viewModel.loadProviders(makeEntry())
+
+            assertEquals(WatchNowState.NoProvider, viewModel.watchNowState.value)
+        }
+
+        @Test
+        fun `is Loading when top provider deep link is still loading`() = runTest {
             val provider = makeProvider(providerId = 8)
             every { phoneDiscovery.getBestPhone() } returns makePhone("api-key")
-            coEvery { watchProviders.getResolvedProviders(100, any(), "api-key", false) } returns (listOf(provider) to null)
+            coEvery {
+                watchProviders.getResolvedProviders(100, any(), "api-key", false)
+            } returns (listOf(provider) to null)
+            // resolveDeepLink hangs so deep link stays Loading — don't call loadDeepLinks here
+
+            viewModel.loadProviders(makeEntry())
+
+            // providers = Success but deepLinks is empty → top provider has no entry → Loading
+            assertEquals(WatchNowState.Loading, viewModel.watchNowState.value)
+        }
+
+        @Test
+        fun `is Available when top provider deep link resolves`() = runTest {
+            val provider = makeProvider(providerId = 8)
+            every { phoneDiscovery.getBestPhone() } returns makePhone("api-key")
+            coEvery {
+                watchProviders.getResolvedProviders(100, any(), "api-key", false)
+            } returns (listOf(provider) to null)
             coEvery {
                 justWatchRepo.resolveDeepLink(100, 1, 2, 8, any(), "Test Show")
             } returns "https://www.netflix.com/watch/99"
@@ -398,25 +459,49 @@ class ShowDetailViewModelTest {
             viewModel.loadProviders(makeEntry())
             viewModel.loadDeepLinks(makeEntry())
 
-            assertEquals("https://www.netflix.com/watch/99", viewModel.resolveTopProviderDeepLink())
+            val state = viewModel.watchNowState.value
+            assertInstanceOf(WatchNowState.Available::class.java, state)
+            assertEquals("https://www.netflix.com/watch/99", (state as WatchNowState.Available).url)
         }
 
         @Test
-        fun `returns null when providers not in Success state`() {
-            assertNull(viewModel.resolveTopProviderDeepLink())
-        }
-
-        @Test
-        fun `returns null when deep link is Unavailable`() = runTest {
+        fun `is Unavailable when top provider deep link is Unavailable`() = runTest {
             val provider = makeProvider(providerId = 8)
             every { phoneDiscovery.getBestPhone() } returns makePhone("api-key")
-            coEvery { watchProviders.getResolvedProviders(100, any(), "api-key", false) } returns (listOf(provider) to null)
-            coEvery { justWatchRepo.resolveDeepLink(any(), any(), any(), any(), any(), any()) } returns null
+            coEvery {
+                watchProviders.getResolvedProviders(100, any(), "api-key", false)
+            } returns (listOf(provider) to null)
+            coEvery {
+                justWatchRepo.resolveDeepLink(any(), any(), any(), any(), any(), any())
+            } returns null
 
             viewModel.loadProviders(makeEntry())
             viewModel.loadDeepLinks(makeEntry())
 
-            assertNull(viewModel.resolveTopProviderDeepLink())
+            assertEquals(WatchNowState.Unavailable, viewModel.watchNowState.value)
+        }
+
+        @Test
+        fun `uses first provider when multiple providers exist`() = runTest {
+            val first = makeProvider(providerId = 8, name = "Netflix")
+            val second = makeProvider(providerId = 9, name = "Disney+")
+            every { phoneDiscovery.getBestPhone() } returns makePhone("api-key")
+            coEvery {
+                watchProviders.getResolvedProviders(100, any(), "api-key", false)
+            } returns (listOf(first, second) to null)
+            coEvery {
+                justWatchRepo.resolveDeepLink(100, 1, 2, 8, any(), "Test Show")
+            } returns "https://netflix.com/watch/1"
+            coEvery {
+                justWatchRepo.resolveDeepLink(100, 1, 2, 9, any(), "Test Show")
+            } returns "https://disneyplus.com/watch/1"
+
+            viewModel.loadProviders(makeEntry())
+            viewModel.loadDeepLinks(makeEntry())
+
+            val state = viewModel.watchNowState.value
+            assertInstanceOf(WatchNowState.Available::class.java, state)
+            assertEquals("https://netflix.com/watch/1", (state as WatchNowState.Available).url)
         }
     }
 }

@@ -64,6 +64,7 @@
     <!-- JustWatch deep links (#476) -->
     <string name="tv_provider_no_deep_link">Kein Deep Link</string>
     <string name="tv_watch_now_unavailable">Deep Link nicht verfügbar</string>
+    <string name="tv_watch_now_no_provider">Kein Anbieter verfügbar</string>
     <string name="tv_justwatch_attribution">Streaming-Daten von JustWatch</string>
     <!-- Diagnostics — streaming deep links (#476) -->
     <string name="tv_diagnostics_section_streaming_links">Streaming-Deep-Links</string>
