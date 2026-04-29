@@ -87,7 +87,7 @@ class LlmProviderFactory @Inject constructor(
                 )
                 return result
             } catch (e: TimeoutCancellationException) {
-                Log.w(TAG, "Provider ${provider.displayName} timed out after ${LLM_TIMEOUT_MS}ms")
+                Log.w(TAG, "Provider ${provider.displayName} timed out after ${LLM_TIMEOUT_MS}ms", e)
                 errors += "${provider.displayName}: timeout(${LLM_TIMEOUT_MS}ms)"
             } catch (e: Exception) {
                 Log.w(TAG, "Provider ${provider.displayName} failed: ${e.message}")
@@ -154,7 +154,7 @@ class LlmProviderFactory @Inject constructor(
                 )
                 return result
             } catch (e: TimeoutCancellationException) {
-                Log.w(TAG, "Provider ${provider.displayName} timed out after ${LLM_TIMEOUT_MS}ms")
+                Log.w(TAG, "Provider ${provider.displayName} timed out after ${LLM_TIMEOUT_MS}ms", e)
                 errors += "${provider.displayName}: timeout(${LLM_TIMEOUT_MS}ms)"
             } catch (e: Exception) {
                 Log.w(TAG, "Provider ${provider.displayName} failed: ${e.message}")
