@@ -27,6 +27,8 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
       # `--min-severity=medium` catches `unpinned-uses` (the primary supply-chain
       # gate this workflow exists to enforce, per issue #561) and `excessive-
       # permissions`, while skipping low-severity defense-in-depth nits like
