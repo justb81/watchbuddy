@@ -288,7 +288,7 @@ class JustWatchDeepLinkRepositoryTest {
         }
 
         @Test
-        fun `does not cache negatives on GraphQL errors in seasons response`() = runTest {
+        fun `does not cache episode-level negatives on GraphQL errors in seasons response`() = runTest {
             coEvery { dao.get(any(), any(), any(), any(), any()) } returns null
             coEvery { api.query(match { it.query == JustWatchApiService.SEARCH_QUERY }) } returns
                 makeSearchResponse()
@@ -297,7 +297,10 @@ class JustWatchDeepLinkRepositoryTest {
 
             repository.resolveDeepLink(100, 1, 2, 8, "US", "Breaking Bad")
 
-            coVerify(exactly = 0) { dao.upsert(match { it.standardWebUrl == null }) }
+            // Episode-level negatives must not be written — the error came from the API, not a confirmed miss
+            coVerify(exactly = 0) {
+                dao.upsert(match { it.season == 1 && it.episode == 2 && it.standardWebUrl == null })
+            }
         }
 
         @Test

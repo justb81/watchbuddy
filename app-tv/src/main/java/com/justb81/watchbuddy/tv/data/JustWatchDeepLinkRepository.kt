@@ -86,7 +86,7 @@ class JustWatchDeepLinkRepository @Inject constructor(
      */
     fun searchMissCount(windowMs: Long = 24 * 60 * 60 * 1000L): Int = synchronized(missLock) {
         val cutoff = System.currentTimeMillis() - windowMs
-        while (missTimestamps.isNotEmpty() && missTimestamps.peekFirst() < cutoff) {
+        while (missTimestamps.isNotEmpty() && missTimestamps.peekFirst()!! < cutoff) {
             missTimestamps.pollFirst()
         }
         missTimestamps.size
@@ -287,8 +287,8 @@ class JustWatchDeepLinkRepository @Inject constructor(
                     recordError(msg)
                 }
                 is SearchResult.SearchMiss -> {
-                    DiagnosticLog.warn(TAG, "No JustWatch node matched tmdbId=$tmdbShowId title='$showTitle'")
-                    recordMiss()
+                    DiagnosticLog.warn(TAG, "No JustWatch node matched tmdbId=$tmdbShowId title='$showTitle' (show-level)")
+                    // No miss recorded here — the episode-level fetch already counted it
                 }
                 is SearchResult.Found -> {
                     cacheOffers(result.title.offers, tmdbShowId, 0, 0, countryCode)
