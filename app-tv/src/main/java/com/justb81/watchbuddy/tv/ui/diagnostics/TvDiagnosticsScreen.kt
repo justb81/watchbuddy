@@ -220,6 +220,8 @@ fun TvDiagnosticsScreen(
                     cachedCount = uiState.cachedDeepLinkCount,
                     negativeCount = uiState.negativeDeepLinkCount,
                     lastFetchMs = uiState.lastDeepLinkFetchMs,
+                    lastError = uiState.lastJustWatchError,
+                    searchMisses24h = uiState.justWatchSearchMisses24h,
                     onClearCache = { viewModel.clearJustWatchCache() },
                 )
             }
@@ -515,6 +517,8 @@ private fun StreamingDeepLinksSection(
     cachedCount: Int,
     negativeCount: Int,
     lastFetchMs: Long,
+    lastError: String?,
+    searchMisses24h: Int,
     onClearCache: () -> Unit,
 ) {
     Text(
@@ -534,18 +538,38 @@ private fun StreamingDeepLinksSection(
                 DiagRow(stringResource(R.string.tv_diagnostics_row_cached_urls), cachedCount.toString(), Status.NEUTRAL),
                 DiagRow(stringResource(R.string.tv_diagnostics_row_negative_entries), negativeCount.toString(), Status.NEUTRAL),
                 DiagRow(stringResource(R.string.tv_diagnostics_row_last_fetch), formatAge(lastFetchMs), Status.NEUTRAL),
+                DiagRow(
+                    label = stringResource(R.string.tv_diagnostics_row_jw_search_misses),
+                    value = searchMisses24h.toString(),
+                    status = if (searchMisses24h > 0) Status.WARN else Status.NEUTRAL,
+                ),
+                DiagRow(
+                    label = stringResource(R.string.tv_diagnostics_row_jw_last_error),
+                    value = lastError ?: "—",
+                    status = if (lastError != null) Status.FAIL else Status.NEUTRAL,
+                ),
             ).forEach { row ->
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f),
+                    ) {
                         Box(Modifier.size(10.dp).background(statusColor(row.status), RoundedCornerShape(2.dp)))
                         Spacer(Modifier.width(12.dp))
                         Text(row.label, fontSize = 14.sp, color = Color.White)
                     }
-                    Text(row.value, fontSize = 13.sp, color = Color.White.copy(alpha = 0.7f))
+                    Text(
+                        row.value,
+                        fontSize = 13.sp,
+                        color = Color.White.copy(alpha = 0.7f),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
                 }
             }
             Spacer(Modifier.height(8.dp))

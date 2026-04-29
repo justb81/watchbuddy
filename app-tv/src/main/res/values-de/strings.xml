@@ -71,6 +71,8 @@
     <string name="tv_diagnostics_row_negative_entries">Negative Einträge</string>
     <string name="tv_diagnostics_row_last_fetch">Letzter Abruf</string>
     <string name="tv_diagnostics_action_clear_streaming_cache">Streaming-Link-Cache löschen</string>
+    <string name="tv_diagnostics_row_jw_search_misses">Suchtreffer fehler (24 Std.)</string>
+    <string name="tv_diagnostics_row_jw_last_error">Letzter JustWatch-Fehler</string>
 
     <!-- TV Settings hub (#344 / #367) -->
     <string name="tv_settings_title">Einstellungen</string>
