@@ -4,6 +4,10 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -163,7 +167,9 @@ fun TvDiagnosticsScreen(
             if (uiState.phones.isEmpty()) {
                 item {
                     Surface(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .diagnosticsFocusable(),
                         shape = RoundedCornerShape(12.dp),
                         colors = SurfaceDefaults.colors(
                             containerColor = MaterialTheme.colorScheme.surfaceVariant,
@@ -247,7 +253,9 @@ fun TvDiagnosticsScreen(
             if (uiState.recentEvents.isEmpty()) {
                 item {
                     Surface(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .diagnosticsFocusable(),
                         shape = RoundedCornerShape(12.dp),
                         colors = SurfaceDefaults.colors(
                             containerColor = MaterialTheme.colorScheme.surfaceVariant,
@@ -280,7 +288,9 @@ fun TvDiagnosticsScreen(
 @Composable
 private fun PhoneDiagnosticsCard(phone: PhoneDiscoveryManager.DiscoveredPhone) {
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .diagnosticsFocusable(),
         shape = RoundedCornerShape(12.dp),
         colors = SurfaceDefaults.colors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant,
@@ -353,7 +363,9 @@ private fun RecentEventRow(entry: DiagnosticLog.Entry) {
     }
     val message = entry.throwableSummary?.let { "${entry.message} → $it" } ?: entry.message
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .diagnosticsFocusable(),
         shape = RoundedCornerShape(12.dp),
         colors = SurfaceDefaults.colors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant,
@@ -404,7 +416,9 @@ private fun DiagnosticsSection(title: String, rows: List<DiagRow>) {
         modifier = Modifier.padding(top = 8.dp, bottom = 4.dp, start = 4.dp),
     )
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .diagnosticsFocusable(),
         shape = RoundedCornerShape(12.dp),
         colors = SurfaceDefaults.colors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant,
@@ -445,6 +459,16 @@ private fun statusColor(status: Status): Color = when (status) {
     Status.WARN -> Color(0xFFF9A825)
     Status.FAIL -> Color(0xFFC62828)
     Status.NEUTRAL -> Color.White.copy(alpha = 0.3f)
+}
+
+@Composable
+private fun Modifier.diagnosticsFocusable(): Modifier {
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
+    val borderColor = if (focused) MaterialTheme.colorScheme.primary else Color.Transparent
+    return this
+        .border(2.dp, borderColor, RoundedCornerShape(12.dp))
+        .focusable(interactionSource = interaction)
 }
 
 private val ActionHintColor = Color(0xFF90CAF9)
@@ -730,7 +754,7 @@ private fun WatchNextSection(countResult: WatchNextMetadataSource.CountResult?) 
         ) { cardContent() }
     } else {
         Surface(
-            modifier = cardModifier,
+            modifier = cardModifier.diagnosticsFocusable(),
             shape = cardShape,
             colors = SurfaceDefaults.colors(
                 containerColor = MaterialTheme.colorScheme.surfaceVariant,
