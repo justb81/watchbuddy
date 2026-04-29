@@ -94,7 +94,7 @@ class ShowDetailViewModel @Inject constructor(
     fun loadNextEpisode(enriched: EnrichedShowEntry) {
         val tmdbId = enriched.entry.show.ids.tmdb ?: return
         val (nextSeason, nextEp) =
-            ShowProgressCalculator.nextEpisodeNumbers(enriched.entry, enriched.tmdb) ?: return
+            ShowProgressCalculator.nextUnwatchedEpisodeNumbers(enriched.entry, enriched.tmdb) ?: return
 
         viewModelScope.launch {
             _nextEpisode.value = NextEpisodeUiState(isLoading = true)
@@ -163,7 +163,7 @@ class ShowDetailViewModel @Inject constructor(
     fun loadDeepLinks(enriched: EnrichedShowEntry) {
         val tmdbId = enriched.entry.show.ids.tmdb ?: return
         val (nextSeason, nextEp) =
-            ShowProgressCalculator.nextEpisodeNumbers(enriched.entry, enriched.tmdb) ?: return
+            ShowProgressCalculator.nextUnwatchedEpisodeNumbers(enriched.entry, enriched.tmdb) ?: return
         val providerState = _providers.value
         val providerList = (providerState as? ProviderListUiState.Success)?.providers ?: return
         val countryCode = Locale.getDefault().country.takeIf { it.length == 2 } ?: "US"
@@ -214,7 +214,7 @@ class ShowDetailViewModel @Inject constructor(
         // Capture Watch-Now intent before launching the streaming app so Phase 0 can short-circuit
         // the scrobble cascade when the media session appears on the matching package.
         val pkgName = provider.packageName
-        val nextEp = ShowProgressCalculator.nextEpisodeNumbers(enriched.entry, enriched.tmdb)
+        val nextEp = ShowProgressCalculator.nextUnwatchedEpisodeNumbers(enriched.entry, enriched.tmdb)
         if (pkgName != null && nextEp != null) {
             intentProvider.record(
                 PlaybackIntent(

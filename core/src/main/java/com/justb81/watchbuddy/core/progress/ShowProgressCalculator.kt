@@ -64,7 +64,29 @@ object ShowProgressCalculator {
     private const val STATUS_CANCELED = "Canceled"
 
     /**
-     * Returns the (season, episode) pair of the next episode the user should watch.
+     * Returns the (season, episode) pair used by the scrobbler to guess what the user is
+     * currently watching when the streaming app provides no episode marker.
+     *
+     * Priority:
+     * 1. [TmdbProgressHint.nextAired] — the globally scheduled next episode (most likely
+     *    to be playing on a live-airing show).
+     * 2. Highest watched regular episode + 1 (naive; does not cross season boundaries).
+     * 3. S01E01 when no episodes are watched yet.
+     *
+     * Use [nextUnwatchedEpisodeNumbers] when the goal is to find the user's personal
+     * next unwatched episode (e.g. ShowDetail screen).
+     */
+    fun nextEpisodeNumbers(entry: TraktWatchedEntry, hint: TmdbProgressHint?): Pair<Int, Int>? {
+        hint?.nextAired?.let { next ->
+            if (isRegularSeason(next.season_number)) return next.season_number to next.episode_number
+        }
+        val latest = latestWatched(entry)
+        return if (latest == null) 1 to 1 else latest.season to (latest.episode + 1)
+    }
+
+    /**
+     * Returns the (season, episode) pair of the user's personal next unwatched episode.
+     * Used by ShowDetail to determine the episode still image, title, and JustWatch deep links.
      *
      * Priority:
      * 1. Not started → S01E01.
@@ -73,7 +95,7 @@ object ShowProgressCalculator {
      * 3. Caught up and [TmdbProgressHint.nextAired] is a regular season → use nextAired.
      * 4. Caught up, nothing scheduled (ended show / no TMDB data) → naive +1 (callers handle 404).
      */
-    fun nextEpisodeNumbers(entry: TraktWatchedEntry, hint: TmdbProgressHint?): Pair<Int, Int>? {
+    fun nextUnwatchedEpisodeNumbers(entry: TraktWatchedEntry, hint: TmdbProgressHint?): Pair<Int, Int>? {
         val latest = latestWatched(entry)
 
         // 1) Not started → S01E01
