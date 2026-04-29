@@ -6,7 +6,6 @@
     <ID>CommentWrapping:BleDiscoveryContractTest.kt$BleDiscoveryContractTest$/* AD type 0x21 */</ID>
     <ID>CommentWrapping:BleDiscoveryContractTest.kt$BleDiscoveryContractTest$/* UUID */</ID>
     <ID>CommentWrapping:BleDiscoveryContractTest.kt$BleDiscoveryContractTest$/* length */</ID>
-    <ID>ComplexCondition:ShowProgressCalculator.kt$ShowProgressCalculator$best == null || season.number &gt; best.season || (season.number == best.season &amp;&amp; ep.number &gt; best.episode)</ID>
     <ID>ConstructorParameterNaming:Models.kt$TmdbEpisode$val air_date: String? = null</ID>
     <ID>ConstructorParameterNaming:Models.kt$TmdbEpisode$val episode_number: Int</ID>
     <ID>ConstructorParameterNaming:Models.kt$TmdbEpisode$val season_number: Int</ID>

@@ -78,7 +78,7 @@ class LiteRtLlmProvider internal constructor(
             getOrCreateHandle().sendMessage(prompt)
         }
         if (text.isBlank()) {
-            throw IllegalStateException("LiteRT-LM returned empty response")
+            error("LiteRT-LM returned empty response")
         }
         text
     }
@@ -107,9 +107,7 @@ class LiteRtLlmProvider internal constructor(
         val modelDir = File(context.filesDir, "llm_models")
         val modelPath = File(modelDir, modelVariant.fileName).absolutePath
         if (!File(modelPath).exists()) {
-            throw IllegalStateException(
-                "Model file not found: ${modelVariant.fileName}. Download it first via Settings."
-            )
+            error("Model file not found: ${modelVariant.fileName}. Download it first via Settings.")
         }
         return modelPath
     }

@@ -354,7 +354,7 @@ class CompanionHttpServerTest {
             coEvery { showRepository.getShows() } returns listOf(enrichedEntry)
             coEvery { tmdbApiService.getShow(100, "api-key", any()) } returns tmdbShow
             stubSuccessfulEpisodes()
-            coEvery { recapGenerator.generateRecap(any(), any(), any(), any()) } returns "<div>Recap HTML</div>"
+            coEvery { recapGenerator.generateRecap(any(), any(), any()) } returns "<div>Recap HTML</div>"
 
             val response = client.post("/recap/1") {
                 contentType(ContentType.Application.Json)
@@ -371,7 +371,7 @@ class CompanionHttpServerTest {
             coEvery { showRepository.getShows() } returns listOf(enrichedEntry)
             tmdbCache.putShow(100, tmdbShow)
             stubSuccessfulEpisodes()
-            coEvery { recapGenerator.generateRecap(any(), any(), any(), any()) } returns "<div>ok</div>"
+            coEvery { recapGenerator.generateRecap(any(), any(), any()) } returns "<div>ok</div>"
 
             val response = client.post("/recap/1") {
                 contentType(ContentType.Application.Json)
@@ -388,7 +388,7 @@ class CompanionHttpServerTest {
             coEvery { showRepository.getShows() } returns listOf(enrichedEntry)
             coEvery { tmdbApiService.getShow(100, "api-key", any()) } returns tmdbShow
             stubSuccessfulEpisodes()
-            coEvery { recapGenerator.generateRecap(any(), any(), any(), any()) } returns "<div>ok</div>"
+            coEvery { recapGenerator.generateRecap(any(), any(), any()) } returns "<div>ok</div>"
 
             client.post("/recap/1") {
                 contentType(ContentType.Application.Json)
@@ -409,7 +409,7 @@ class CompanionHttpServerTest {
             tmdbCache.putEpisode(100, 1, 1, ep1)
             tmdbCache.putEpisode(100, 1, 2, ep2)
             tmdbCache.putEpisode(100, 2, 1, ep3)
-            coEvery { recapGenerator.generateRecap(any(), any(), any(), any()) } returns "<div>ok</div>"
+            coEvery { recapGenerator.generateRecap(any(), any(), any()) } returns "<div>ok</div>"
 
             val response = client.post("/recap/1") {
                 contentType(ContentType.Application.Json)
@@ -426,7 +426,7 @@ class CompanionHttpServerTest {
             coEvery { showRepository.getShows() } returns listOf(enrichedEntry)
             coEvery { tmdbApiService.getShow(100, "api-key", any()) } returns tmdbShow
             stubSuccessfulEpisodes()
-            coEvery { recapGenerator.generateRecap(any(), any(), any(), any()) } returns "<div>ok</div>"
+            coEvery { recapGenerator.generateRecap(any(), any(), any()) } returns "<div>ok</div>"
 
             client.post("/recap/1") {
                 contentType(ContentType.Application.Json)
@@ -451,7 +451,7 @@ class CompanionHttpServerTest {
             coEvery { tmdbApiService.getEpisode(100, 1, 1, "api-key", any()) } returns ep1
             coEvery { tmdbApiService.getEpisode(100, 1, 2, "api-key", any()) } throws RuntimeException("Network error")
             coEvery { tmdbApiService.getEpisode(100, 2, 1, "api-key", any()) } returns ep3
-            coEvery { recapGenerator.generateRecap(any(), any(), any(), any()) } returns "<div>ok</div>"
+            coEvery { recapGenerator.generateRecap(any(), any(), any()) } returns "<div>ok</div>"
 
             val response = client.post("/recap/1") {
                 contentType(ContentType.Application.Json)
@@ -482,7 +482,7 @@ class CompanionHttpServerTest {
             coEvery { showRepository.getShows() } returns listOf(enrichedEntry)
             coEvery { tmdbApiService.getShow(100, "api-key", any()) } returns tmdbShow
             stubSuccessfulEpisodes()
-            coEvery { recapGenerator.generateRecap(any(), any(), any(), any()) } throws RuntimeException("LLM crashed")
+            coEvery { recapGenerator.generateRecap(any(), any(), any()) } throws RuntimeException("LLM crashed")
 
             val response = client.post("/recap/1") {
                 contentType(ContentType.Application.Json)
@@ -503,7 +503,7 @@ class CompanionHttpServerTest {
             coEvery { tmdbApiService.getEpisode(100, 1, 1, "settings-key", any()) } returns ep1
             coEvery { tmdbApiService.getEpisode(100, 1, 2, "settings-key", any()) } returns ep2
             coEvery { tmdbApiService.getEpisode(100, 2, 1, "settings-key", any()) } returns ep3
-            coEvery { recapGenerator.generateRecap(any(), any(), any(), any()) } returns "<div>ok</div>"
+            coEvery { recapGenerator.generateRecap(any(), any(), any()) } returns "<div>ok</div>"
 
             // Send no body → key must come from settings
             val response = client.post("/recap/1")
@@ -534,7 +534,7 @@ class CompanionHttpServerTest {
             coEvery { tmdbApiService.getEpisode(100, 2, 3, "api-key", any()) } returns TmdbEpisode(8, "S2E3", null, null, 2, 3)
             coEvery { tmdbApiService.getEpisode(100, 2, 4, "api-key", any()) } returns TmdbEpisode(9, "S2E4", null, null, 2, 4)
             coEvery { tmdbApiService.getEpisode(100, 2, 5, "api-key", any()) } returns TmdbEpisode(10, "S2E5", null, null, 2, 5)
-            coEvery { recapGenerator.generateRecap(any(), any(), any(), any()) } returns "<div>ok</div>"
+            coEvery { recapGenerator.generateRecap(any(), any(), any()) } returns "<div>ok</div>"
 
             val response = client.post("/recap/1") {
                 contentType(ContentType.Application.Json)

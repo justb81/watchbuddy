@@ -93,7 +93,7 @@ class ShowDetailViewModel @Inject constructor(
                 }
 
                 watchedEntry.show.ids.tmdb?.let { tmdbId -> loadTmdbDetails(tmdbId) }
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 _uiState.update {
                     it.copy(
                         isLoading = false,
@@ -113,7 +113,7 @@ class ShowDetailViewModel @Inject constructor(
         showRepository.getShows()
         return showRepository.shows.value
             .firstOrNull { it.entry.show.ids.trakt == traktShowId }?.entry
-            ?: throw IllegalStateException("Show not found in library")
+            ?: error("Show not found in library")
     }
 
     private fun buildSeasonUis(

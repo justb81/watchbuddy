@@ -20,6 +20,7 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import java.io.IOException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
@@ -423,7 +424,7 @@ class HomeViewModelTest {
         @Test
         fun `sets error when settings flow emits error during collection`() = runTest {
             every { settingsRepository.settings } returns flow {
-                throw RuntimeException("DataStore corrupted")
+                throw IOException("DataStore corrupted")
             }
 
             val vm = createViewModel()

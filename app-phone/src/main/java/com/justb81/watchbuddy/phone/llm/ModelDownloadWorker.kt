@@ -22,6 +22,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
 import java.io.FileOutputStream
+import java.io.IOException
 import javax.inject.Named
 
 @HiltWorker
@@ -46,7 +47,7 @@ class ModelDownloadWorker @AssistedInject constructor(
         try {
             downloadFile(modelUrl, tempFile)
             if (!tempFile.renameTo(outputFile)) {
-                throw RuntimeException("Failed to rename downloaded model to final path")
+                throw IOException("Failed to rename downloaded model to final path")
             }
             // Sanity-check: a real .litertlm model is hundreds of MB; anything smaller
             // is almost certainly an HTML error page or a corrupt response.
@@ -88,7 +89,7 @@ class ModelDownloadWorker @AssistedInject constructor(
         val request = Request.Builder().url(url).build()
         downloadClient.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
-                throw RuntimeException("HTTP ${response.code}: ${response.message}")
+                throw IOException("HTTP ${response.code}: ${response.message}")
             }
 
             val body = response.body
@@ -118,7 +119,7 @@ class ModelDownloadWorker @AssistedInject constructor(
                     }
 
                     if (contentLength > 0 && bytesRead != contentLength) {
-                        throw RuntimeException(
+                        throw IOException(
                             "Incomplete download: expected $contentLength bytes, got $bytesRead"
                         )
                     }

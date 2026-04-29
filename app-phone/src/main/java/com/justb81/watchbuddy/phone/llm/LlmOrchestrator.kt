@@ -71,7 +71,7 @@ class LlmOrchestrator @Inject constructor(
         return try {
             context.packageManager.getPackageInfo("com.google.android.aicore", 0)
             true
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             false
         }
     }

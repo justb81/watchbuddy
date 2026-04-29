@@ -14,6 +14,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import java.io.IOException
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
@@ -107,7 +108,7 @@ class TvSettingsViewModelTest {
 
     @Test
     fun `observation failure is logged via DiagnosticLog`() = runTest {
-        every { repository.isPhoneDiscoveryEnabled } returns flow { throw RuntimeException("boom") }
+        every { repository.isPhoneDiscoveryEnabled } returns flow { throw IOException("boom") }
 
         TvSettingsViewModel(application, repository)
         advanceUntilIdle()

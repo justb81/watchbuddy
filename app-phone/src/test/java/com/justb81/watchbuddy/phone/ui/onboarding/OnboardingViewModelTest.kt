@@ -17,6 +17,7 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import java.io.IOException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -463,10 +464,10 @@ class OnboardingViewModelTest {
             coEvery { tokenProxy.exchangeDeviceCode(any()) } answers {
                 callCount++
                 when (callCount) {
-                    1 -> throw RuntimeException("network blip")  // counts as 1
+                    1 -> throw IOException("network blip")  // counts as 1
                     2 -> throw HttpException(Response.error<Any>(400, "".toResponseBody())) // resets to 0
-                    3 -> throw RuntimeException("network blip")  // counts as 1 again
-                    4 -> throw RuntimeException("network blip")  // counts as 2
+                    3 -> throw IOException("network blip")  // counts as 1 again
+                    4 -> throw IOException("network blip")  // counts as 2
                     5 -> proxyTokenResponse                       // succeeds before reaching 3
                     else -> proxyTokenResponse
                 }

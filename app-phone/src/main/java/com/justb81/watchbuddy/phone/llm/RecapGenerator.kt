@@ -57,13 +57,12 @@ class RecapGenerator @Inject constructor(
     suspend fun generateRecap(
         show: TmdbShow,
         watchedEpisodes: List<TmdbEpisode>,
-        targetEpisode: TmdbEpisode,
-        apiKey: String
+        targetEpisode: TmdbEpisode
     ): String {
         val prompt = buildPrompt(show, watchedEpisodes, targetEpisode)
         val rawHtml = inferWithLlm(prompt, watchedEpisodes)
         val sanitized = sanitizeHtml(rawHtml)
-        return replaceTmdbPlaceholders(sanitized, watchedEpisodes, apiKey)
+        return replaceTmdbPlaceholders(sanitized, watchedEpisodes)
     }
 
     private fun buildPrompt(
@@ -124,8 +123,7 @@ Respond in $language.
 
     private fun replaceTmdbPlaceholders(
         html: String,
-        episodes: List<TmdbEpisode>,
-        apiKey: String
+        episodes: List<TmdbEpisode>
     ): String {
         return STILL_PLACEHOLDER_REGEX.replace(html) { match ->
             val season = match.groupValues[1].toIntOrNull() ?: return@replace match.value
