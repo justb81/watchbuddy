@@ -633,29 +633,7 @@ class MediaSessionScrobbler @Inject constructor(
 
         // Inject the Phase-0 fallthrough intent as an extra candidate with a score bonus.
         if (fallthroughIntent != null) {
-            val intentEntry = cachedShows.firstOrNull { entry ->
-                (fallthroughIntent.showIds.trakt != null &&
-                    entry.show.ids.trakt == fallthroughIntent.showIds.trakt) ||
-                (fallthroughIntent.showIds.tmdb != null &&
-                    entry.show.ids.tmdb == fallthroughIntent.showIds.tmdb)
-            }
-            val traktId = intentEntry?.show?.ids?.trakt
-            if (intentEntry != null && traktId != null) {
-                val rawScore = scoreSnapshotAgainstTitle(candidates, fallthroughIntent.showTitle, profile)
-                val bonusScore = (rawScore + INTENT_FALLTHROUGH_BONUS).coerceAtMost(INTENT_FALLTHROUGH_CAP)
-                if (bonusScore >= AMBIGUOUS_THRESHOLD) {
-                    val existing = bestByTraktId[traktId]
-                    if (existing == null || bonusScore > existing.score) {
-                        bestByTraktId[traktId] = ScoredEntry(
-                            entry = intentEntry,
-                            score = bonusScore,
-                            season = fallthroughIntent.season,
-                            episode = fallthroughIntent.episode,
-                            sourceLabel = "watch-now-intent",
-                        )
-                    }
-                }
-            }
+            injectFallthroughIntent(bestByTraktId, candidates, cachedShows, profile, fallthroughIntent)
         }
 
         return bestByTraktId.values
@@ -671,6 +649,32 @@ class MediaSessionScrobbler @Inject constructor(
                     sourceLabel = se.sourceLabel,
                 )
             }
+    }
+
+    private fun injectFallthroughIntent(
+        bestByTraktId: MutableMap<Int, ScoredEntry>,
+        candidates: List<String>,
+        cachedShows: List<TraktWatchedEntry>,
+        profile: AppProfile?,
+        intent: PlaybackIntent,
+    ) {
+        val intentEntry = cachedShows.firstOrNull { entry ->
+            (intent.showIds.trakt != null && entry.show.ids.trakt == intent.showIds.trakt) ||
+            (intent.showIds.tmdb != null && entry.show.ids.tmdb == intent.showIds.tmdb)
+        }
+        val traktId = intentEntry?.show?.ids?.trakt ?: return
+        val rawScore = scoreSnapshotAgainstTitle(candidates, intent.showTitle, profile)
+        val bonusScore = (rawScore + INTENT_FALLTHROUGH_BONUS).coerceAtMost(INTENT_FALLTHROUGH_CAP)
+        if (bonusScore < AMBIGUOUS_THRESHOLD) return
+        val existing = bestByTraktId[traktId]
+        if (existing != null && bonusScore <= existing.score) return
+        bestByTraktId[traktId] = ScoredEntry(
+            entry = intentEntry,
+            score = bonusScore,
+            season = intent.season,
+            episode = intent.episode,
+            sourceLabel = "watch-now-intent",
+        )
     }
 
     private data class ScoredEntry(
