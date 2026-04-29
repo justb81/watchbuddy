@@ -40,6 +40,8 @@ data class TvDiagnosticsUiState(
     val cachedDeepLinkCount: Int = 0,
     val negativeDeepLinkCount: Int = 0,
     val lastDeepLinkFetchMs: Long = 0L,
+    val lastJustWatchError: String? = null,
+    val justWatchSearchMisses24h: Int = 0,
     /** null = not yet checked, PermissionDenied or Success from the WatchNext provider query. */
     val watchNextCountResult: WatchNextMetadataSource.CountResult? = null,
     /**
@@ -120,6 +122,8 @@ class TvDiagnosticsViewModel @Inject constructor(
                         cachedDeepLinkCount = it.cachedDeepLinkCount,
                         negativeDeepLinkCount = it.negativeDeepLinkCount,
                         lastDeepLinkFetchMs = it.lastDeepLinkFetchMs,
+                        lastJustWatchError = it.lastJustWatchError,
+                        justWatchSearchMisses24h = it.justWatchSearchMisses24h,
                         watchNextCountResult = it.watchNextCountResult,
                         notificationTrackedCount = it.notificationTrackedCount,
                         appProfileStats = it.appProfileStats,
@@ -155,11 +159,15 @@ class TvDiagnosticsViewModel @Inject constructor(
             val count = justWatchRepo.count()
             val negCount = justWatchRepo.negativeCount()
             val lastFetch = justWatchRepo.lastFetchedAt() ?: 0L
+            val lastError = justWatchRepo.lastFetchError()
+            val misses24h = justWatchRepo.searchMissCount()
             _uiState.update {
                 it.copy(
                     cachedDeepLinkCount = count,
                     negativeDeepLinkCount = negCount,
                     lastDeepLinkFetchMs = lastFetch,
+                    lastJustWatchError = lastError,
+                    justWatchSearchMisses24h = misses24h,
                 )
             }
         }

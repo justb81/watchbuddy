@@ -1,6 +1,7 @@
 package com.justb81.watchbuddy.core.justwatch
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import retrofit2.http.Body
 import retrofit2.http.POST
@@ -91,6 +92,7 @@ data class JustWatchGraphQlRequest(
 @Serializable
 data class JustWatchGraphQlResponse(
     val data: JustWatchData? = null,
+    val errors: JsonArray? = null,
 )
 
 @Serializable

@@ -20,7 +20,11 @@ import io.mockk.mockk
 import io.mockk.runs
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -66,6 +70,14 @@ class JustWatchDeepLinkRepositoryTest {
             )
         )
     )
+
+    private fun makeGraphQlErrorResponse(message: String = "Field not found") =
+        JustWatchGraphQlResponse(
+            data = null,
+            errors = buildJsonArray {
+                add(buildJsonObject { put("message", message) })
+            },
+        )
 
     private fun makeSeasonsResponse(seasonIds: List<String> = listOf("season-1-id")) =
         JustWatchGraphQlResponse(
@@ -204,7 +216,7 @@ class JustWatchDeepLinkRepositoryTest {
         }
 
         @Test
-        fun `caches negative when search returns no matching TMDB id`() = runTest {
+        fun `does not cache negatives when search returns no matching TMDB id`() = runTest {
             coEvery { dao.get(100, 1, 2, 8, "US") } returns null andThen null
             coEvery { dao.get(100, 0, 0, 8, "US") } returns null andThen null
 
@@ -214,8 +226,19 @@ class JustWatchDeepLinkRepositoryTest {
 
             repository.resolveDeepLink(100, 1, 2, 8, "US", "Unknown Show")
 
-            // Should have cached negatives for all known providers
-            coVerify(atLeast = 1) { dao.upsert(match { it.standardWebUrl == null }) }
+            // No negatives should be cached — the search miss may be a title mismatch, allow retry
+            coVerify(exactly = 0) { dao.upsert(any()) }
+        }
+
+        @Test
+        fun `increments miss counter when search returns no matching TMDB id`() = runTest {
+            coEvery { dao.get(any(), any(), any(), any(), any()) } returns null
+            coEvery { api.query(match { it.query == JustWatchApiService.SEARCH_QUERY }) } returns
+                makeSearchResponse(tmdbId = "999")
+
+            repository.resolveDeepLink(100, 1, 2, 8, "US", "Unknown Show")
+
+            assertEquals(1, repository.searchMissCount())
         }
 
         @Test
@@ -230,6 +253,54 @@ class JustWatchDeepLinkRepositoryTest {
             assertNull(result)
             // No negatives should be cached — allow retry on next call
             coVerify(exactly = 0) { dao.upsert(any()) }
+        }
+
+        @Test
+        fun `records error message on API exception`() = runTest {
+            coEvery { dao.get(any(), any(), any(), any(), any()) } returns null
+            coEvery { api.query(any()) } throws RuntimeException("connection refused")
+
+            repository.resolveDeepLink(100, 1, 2, 8, "US", "Breaking Bad")
+
+            assertNotNull(repository.lastFetchError())
+        }
+
+        @Test
+        fun `does not cache negatives on GraphQL errors in search response`() = runTest {
+            coEvery { dao.get(any(), any(), any(), any(), any()) } returns null
+            coEvery { api.query(match { it.query == JustWatchApiService.SEARCH_QUERY }) } returns
+                makeGraphQlErrorResponse("Unknown field 'tmdbId'")
+
+            repository.resolveDeepLink(100, 1, 2, 8, "US", "Breaking Bad")
+
+            coVerify(exactly = 0) { dao.upsert(any()) }
+        }
+
+        @Test
+        fun `records last error on GraphQL errors in search response`() = runTest {
+            coEvery { dao.get(any(), any(), any(), any(), any()) } returns null
+            coEvery { api.query(match { it.query == JustWatchApiService.SEARCH_QUERY }) } returns
+                makeGraphQlErrorResponse("Unknown field 'tmdbId'")
+
+            repository.resolveDeepLink(100, 1, 2, 8, "US", "Breaking Bad")
+
+            assertNotNull(repository.lastFetchError())
+        }
+
+        @Test
+        fun `does not cache episode-level negatives on GraphQL errors in seasons response`() = runTest {
+            coEvery { dao.get(any(), any(), any(), any(), any()) } returns null
+            coEvery { api.query(match { it.query == JustWatchApiService.SEARCH_QUERY }) } returns
+                makeSearchResponse()
+            coEvery { api.query(match { it.query == JustWatchApiService.SEASONS_QUERY }) } returns
+                makeGraphQlErrorResponse("Season field unavailable")
+
+            repository.resolveDeepLink(100, 1, 2, 8, "US", "Breaking Bad")
+
+            // Episode-level negatives must not be written — the error came from the API, not a confirmed miss
+            coVerify(exactly = 0) {
+                dao.upsert(match { it.season == 1 && it.episode == 2 && it.standardWebUrl == null })
+            }
         }
 
         @Test
@@ -255,6 +326,64 @@ class JustWatchDeepLinkRepositoryTest {
             coVerify(exactly = 0) {
                 dao.upsert(match { it.providerId == 350 && it.standardWebUrl != null })
             }
+        }
+    }
+
+    @Nested
+    @DisplayName("country code sanitization")
+    inner class CountryCodeTests {
+
+        @Test
+        fun `accepts valid 2-letter country code`() = runTest {
+            coEvery { dao.get(100, 1, 2, 8, "DE") } returns
+                makeLink(countryCode = "DE", url = "https://www.netflix.com/watch/99")
+
+            val result = repository.resolveDeepLink(100, 1, 2, 8, "DE", "Breaking Bad")
+
+            assertEquals("https://www.netflix.com/watch/99", result)
+        }
+
+        @Test
+        fun `falls back to US for invalid country code`() = runTest {
+            coEvery { dao.get(100, 1, 2, 8, "US") } returns
+                makeLink(countryCode = "US", url = "https://www.netflix.com/watch/99")
+
+            // Pass an invalid code — the repository should sanitize to US before the DAO call
+            val result = repository.resolveDeepLink(100, 1, 2, 8, "XYZ", "Breaking Bad")
+
+            assertEquals("https://www.netflix.com/watch/99", result)
+        }
+
+        @Test
+        fun `falls back to US for empty country code`() = runTest {
+            coEvery { dao.get(100, 1, 2, 8, "US") } returns
+                makeLink(countryCode = "US", url = "https://www.netflix.com/watch/99")
+
+            val result = repository.resolveDeepLink(100, 1, 2, 8, "", "Breaking Bad")
+
+            assertEquals("https://www.netflix.com/watch/99", result)
+        }
+
+        @Test
+        fun `records error on invalid country code`() = runTest {
+            coEvery { dao.get(100, 1, 2, 8, "US") } returns null
+            coEvery { dao.get(100, 0, 0, 8, "US") } returns null
+
+            coEvery { api.query(any()) } returns JustWatchGraphQlResponse(data = null)
+
+            repository.resolveDeepLink(100, 1, 2, 8, "INVALID", "Breaking Bad")
+
+            assertNotNull(repository.lastFetchError())
+        }
+
+        @Test
+        fun `uppercases lowercase country code`() = runTest {
+            coEvery { dao.get(100, 1, 2, 8, "DE") } returns
+                makeLink(countryCode = "DE", url = "https://www.netflix.com/watch/99")
+
+            val result = repository.resolveDeepLink(100, 1, 2, 8, "de", "Breaking Bad")
+
+            assertEquals("https://www.netflix.com/watch/99", result)
         }
     }
 
@@ -309,6 +438,16 @@ class JustWatchDeepLinkRepositoryTest {
             coEvery { dao.deleteAll() } just runs
             repository.clearAll()
             coVerify { dao.deleteAll() }
+        }
+
+        @Test
+        fun `searchMissCount returns 0 when no misses recorded`() = runTest {
+            assertEquals(0, repository.searchMissCount())
+        }
+
+        @Test
+        fun `lastFetchError returns null initially`() {
+            assertNull(repository.lastFetchError())
         }
     }
 }
