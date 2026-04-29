@@ -2,6 +2,7 @@ package com.justb81.watchbuddy.tv.data
 
 import com.justb81.watchbuddy.core.justwatch.JustWatchApiService
 import com.justb81.watchbuddy.core.justwatch.JustWatchGraphQlRequest
+import com.justb81.watchbuddy.core.justwatch.JustWatchGraphQlResponse
 import com.justb81.watchbuddy.core.justwatch.JustWatchOffer
 import com.justb81.watchbuddy.core.justwatch.JustWatchPackageMap
 import com.justb81.watchbuddy.core.justwatch.JustWatchTitle
@@ -11,6 +12,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import retrofit2.Response
 import java.util.ArrayDeque
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -21,6 +23,7 @@ private const val TAG = "JustWatchRepo"
 private val COUNTRY_CODE_REGEX = Regex("[A-Z]{2}")
 private const val DEFAULT_MISS_WINDOW_MS = 24L * 60 * 60 * 1_000
 private const val MAX_ERROR_SUMMARY_LENGTH = 200
+private const val MAX_HTTP_ERROR_BODY_LENGTH = 500
 
 /**
  * Resolves JustWatch per-episode deep links with a persistent Room cache.
@@ -54,6 +57,9 @@ class JustWatchDeepLinkRepository @Inject constructor(
 
         /** The API returned a top-level GraphQL errors array. */
         data class GraphQlError(val summary: String) : SearchResult()
+
+        /** The API returned a non-2xx HTTP status (typically 422 from JustWatch). */
+        data class HttpError(val code: Int, val bodySummary: String) : SearchResult()
     }
 
     private data class FetchKey(
@@ -192,6 +198,12 @@ class JustWatchDeepLinkRepository @Inject constructor(
         try {
             val language = "en"
             when (val result = searchShowByTmdbId(tmdbShowId, showTitle, countryCode, language)) {
+                is SearchResult.HttpError -> {
+                    val msg = "HTTP ${result.code} searching '$showTitle' (tmdb=$tmdbShowId): ${result.bodySummary}"
+                    DiagnosticLog.error(TAG, msg)
+                    recordError(msg)
+                    return
+                }
                 is SearchResult.GraphQlError -> {
                     val msg = "GraphQL error searching '$showTitle' (tmdb=$tmdbShowId): ${result.summary}"
                     DiagnosticLog.error(TAG, msg)
@@ -238,13 +250,12 @@ class JustWatchDeepLinkRepository @Inject constructor(
                 },
             )
         )
-        if (!seasonsResp.errors.isNullOrEmpty()) {
-            val msg = "GraphQL errors in seasons query for tmdbId=$tmdbShowId"
-            DiagnosticLog.error(TAG, msg)
-            recordError(msg)
-            return
-        }
-        val jwSeasons = seasonsResp.data?.node?.seasons
+        val seasonsBody = unwrapBodyOrLog(
+            seasonsResp,
+            queryName = "seasons",
+            context = "tmdbId=$tmdbShowId",
+        ) ?: return
+        val jwSeasons = seasonsBody.data?.node?.seasons
         if (jwSeasons.isNullOrEmpty()) {
             DiagnosticLog.warn(TAG, "Empty seasons list for tmdbId=$tmdbShowId")
             return
@@ -265,13 +276,12 @@ class JustWatchDeepLinkRepository @Inject constructor(
                 },
             )
         )
-        if (!episodesResp.errors.isNullOrEmpty()) {
-            val msg = "GraphQL errors in episodes query for tmdbId=$tmdbShowId S$season"
-            DiagnosticLog.error(TAG, msg)
-            recordError(msg)
-            return
-        }
-        val jwEpisodes = episodesResp.data?.node?.episodes
+        val episodesBody = unwrapBodyOrLog(
+            episodesResp,
+            queryName = "episodes",
+            context = "tmdbId=$tmdbShowId S$season",
+        ) ?: return
+        val jwEpisodes = episodesBody.data?.node?.episodes
         if (jwEpisodes.isNullOrEmpty()) {
             DiagnosticLog.warn(TAG, "Empty episodes list for tmdbId=$tmdbShowId S$season")
             return
@@ -285,6 +295,43 @@ class JustWatchDeepLinkRepository @Inject constructor(
         }
     }
 
+    /**
+     * Inspects a [Response] for a follow-up GraphQL query (seasons / episodes).
+     *
+     * Logs and records the error for non-2xx HTTP responses (e.g. 422), null bodies,
+     * and top-level GraphQL `errors[]` arrays. Returns the response body on success,
+     * or null when the caller should bail out (the negative-cache policy is unchanged
+     * — these errors do not produce negative entries, so the next visit retries).
+     */
+    private fun unwrapBodyOrLog(
+        response: Response<JustWatchGraphQlResponse>,
+        queryName: String,
+        context: String,
+    ): JustWatchGraphQlResponse? {
+        if (!response.isSuccessful) {
+            val body = readErrorBody(response)
+            val msg = "HTTP ${response.code()} from JustWatch $queryName query ($context): $body"
+            DiagnosticLog.error(TAG, msg)
+            recordError(msg)
+            return null
+        }
+        val body = response.body()
+        if (body == null) {
+            val msg = "Empty $queryName response body from JustWatch ($context)"
+            DiagnosticLog.error(TAG, msg)
+            recordError(msg)
+            return null
+        }
+        if (!body.errors.isNullOrEmpty()) {
+            val summary = body.errors.toString().take(MAX_ERROR_SUMMARY_LENGTH)
+            val msg = "GraphQL errors in $queryName query ($context): $summary"
+            DiagnosticLog.error(TAG, msg)
+            recordError(msg)
+            return null
+        }
+        return body
+    }
+
     private suspend fun fetchAndCacheShowOffers(
         tmdbShowId: Int,
         countryCode: String,
@@ -292,6 +339,11 @@ class JustWatchDeepLinkRepository @Inject constructor(
     ) {
         try {
             when (val result = searchShowByTmdbId(tmdbShowId, showTitle, countryCode, "en")) {
+                is SearchResult.HttpError -> {
+                    val msg = "HTTP ${result.code} searching '$showTitle' (tmdb=$tmdbShowId, show-level): ${result.bodySummary}"
+                    DiagnosticLog.error(TAG, msg)
+                    recordError(msg)
+                }
                 is SearchResult.GraphQlError -> {
                     val msg = "GraphQL error searching '$showTitle' (tmdb=$tmdbShowId): ${result.summary}"
                     DiagnosticLog.error(TAG, msg)
@@ -333,15 +385,27 @@ class JustWatchDeepLinkRepository @Inject constructor(
                 },
             )
         )
-        if (!response.errors.isNullOrEmpty()) {
-            val summary = response.errors.toString().take(MAX_ERROR_SUMMARY_LENGTH)
+        if (!response.isSuccessful) {
+            return SearchResult.HttpError(response.code(), readErrorBody(response))
+        }
+        val body = response.body() ?: return SearchResult.HttpError(response.code(), "Empty response body")
+        if (!body.errors.isNullOrEmpty()) {
+            val summary = body.errors.toString().take(MAX_ERROR_SUMMARY_LENGTH)
             return SearchResult.GraphQlError(summary)
         }
-        val match = response.data?.popularTitles?.edges
+        val match = body.data?.popularTitles?.edges
             ?.map { it.node }
             ?.firstOrNull { node -> node.content?.externalIds?.tmdbId == tmdbShowId.toString() }
         return if (match != null) SearchResult.Found(match) else SearchResult.SearchMiss
     }
+
+    /** Reads up to [MAX_HTTP_ERROR_BODY_LENGTH] chars from a Retrofit error body. */
+    private fun readErrorBody(response: Response<*>): String =
+        try {
+            response.errorBody()?.string()?.take(MAX_HTTP_ERROR_BODY_LENGTH).orEmpty()
+        } catch (e: Exception) {
+            "<failed to read error body: ${e.javaClass.simpleName}>"
+        }
 
     /** Converts JustWatch offer list to Room entries and upserts them. */
     private suspend fun cacheOffers(

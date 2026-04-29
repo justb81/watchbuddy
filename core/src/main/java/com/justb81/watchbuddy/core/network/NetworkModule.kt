@@ -19,6 +19,7 @@ import javax.inject.Named
 import javax.inject.Singleton
 
 private const val JUSTWATCH_TIMEOUT_SECONDS = 5L
+private const val JUSTWATCH_USER_AGENT = "Mozilla/5.0 (Linux; Android 14) WatchBuddy"
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -94,6 +95,10 @@ object NetworkModule {
      * TV-direct — the phone is never involved. Short timeout keeps the detail
      * screen from hanging on slow connections; cache absorbs most latency after
      * the first visit.
+     *
+     * Injects browser-like headers because JustWatch's unofficial GraphQL endpoint
+     * returns HTTP 422 for requests that look unidentified (no User-Agent / Origin /
+     * Referer). See issue #511.
      */
     @Provides
     @Singleton
@@ -101,6 +106,16 @@ object NetworkModule {
     fun provideJustWatchOkHttpClient(): OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(JUSTWATCH_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         .readTimeout(JUSTWATCH_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        .addInterceptor { chain ->
+            val request = chain.request().newBuilder()
+                .header("User-Agent", JUSTWATCH_USER_AGENT)
+                .header("Accept", "application/json")
+                .header("Accept-Language", "en-US,en;q=0.9")
+                .header("Origin", "https://www.justwatch.com")
+                .header("Referer", "https://www.justwatch.com/")
+                .build()
+            chain.proceed(request)
+        }
         .build()
 
     @Provides

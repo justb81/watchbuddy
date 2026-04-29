@@ -3,6 +3,7 @@ package com.justb81.watchbuddy.core.justwatch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.POST
 
@@ -12,11 +13,15 @@ import retrofit2.http.POST
  * Base URL: https://apis.justwatch.com/
  * All requests POST to the single /graphql endpoint.
  * TV-direct — the phone is never involved.
+ *
+ * Returns the raw [Response] so callers can read the error body on non-2xx
+ * responses (JustWatch's GraphQL endpoint frequently returns HTTP 422 with a
+ * descriptive payload when a request looks unidentified or malformed).
  */
 interface JustWatchApiService {
 
     @POST("graphql")
-    suspend fun query(@Body request: JustWatchGraphQlRequest): JustWatchGraphQlResponse
+    suspend fun query(@Body request: JustWatchGraphQlRequest): Response<JustWatchGraphQlResponse>
 
     companion object {
 

@@ -23,13 +23,17 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import retrofit2.Response
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @DisplayName("JustWatchDeepLinkRepository")
@@ -53,17 +57,19 @@ class JustWatchDeepLinkRepositoryTest {
         tmdbId: String = "100",
         nodeId: String = "show-123",
         offers: List<JustWatchOffer> = emptyList(),
-    ) = JustWatchGraphQlResponse(
-        data = JustWatchData(
-            popularTitles = JustWatchTitleConnection(
-                edges = listOf(
-                    JustWatchTitleEdge(
-                        node = JustWatchTitle(
-                            id = nodeId,
-                            offers = offers,
-                            content = JustWatchContent(
-                                externalIds = JustWatchExternalIds(tmdbId = tmdbId)
-                            ),
+    ): Response<JustWatchGraphQlResponse> = Response.success(
+        JustWatchGraphQlResponse(
+            data = JustWatchData(
+                popularTitles = JustWatchTitleConnection(
+                    edges = listOf(
+                        JustWatchTitleEdge(
+                            node = JustWatchTitle(
+                                id = nodeId,
+                                offers = offers,
+                                content = JustWatchContent(
+                                    externalIds = JustWatchExternalIds(tmdbId = tmdbId)
+                                ),
+                            )
                         )
                     )
                 )
@@ -71,28 +77,41 @@ class JustWatchDeepLinkRepositoryTest {
         )
     )
 
-    private fun makeGraphQlErrorResponse(message: String = "Field not found") =
-        JustWatchGraphQlResponse(
-            data = null,
-            errors = buildJsonArray {
-                add(buildJsonObject { put("message", message) })
-            },
+    private fun makeGraphQlErrorResponse(message: String = "Field not found"): Response<JustWatchGraphQlResponse> =
+        Response.success(
+            JustWatchGraphQlResponse(
+                data = null,
+                errors = buildJsonArray {
+                    add(buildJsonObject { put("message", message) })
+                },
+            )
         )
 
-    private fun makeSeasonsResponse(seasonIds: List<String> = listOf("season-1-id")) =
+    private fun makeSeasonsResponse(
+        seasonIds: List<String> = listOf("season-1-id"),
+    ): Response<JustWatchGraphQlResponse> = Response.success(
         JustWatchGraphQlResponse(
             data = JustWatchData(
                 node = JustWatchNode(seasons = seasonIds.map { JustWatchSeasonRef(id = it) })
             )
         )
+    )
 
     private fun makeEpisodesResponse(
         episodes: List<JustWatchEpisode>,
-    ) = JustWatchGraphQlResponse(
-        data = JustWatchData(
-            node = JustWatchNode(episodes = episodes)
+    ): Response<JustWatchGraphQlResponse> = Response.success(
+        JustWatchGraphQlResponse(
+            data = JustWatchData(
+                node = JustWatchNode(episodes = episodes)
+            )
         )
     )
+
+    private fun makeHttpErrorResponse(
+        code: Int,
+        bodyJson: String = """{"message":"unauthenticated"}""",
+    ): Response<JustWatchGraphQlResponse> =
+        Response.error(code, bodyJson.toResponseBody("application/json".toMediaType()))
 
     private fun makeOffer(
         url: String = "https://www.netflix.com/watch/99",
@@ -148,7 +167,7 @@ class JustWatchDeepLinkRepositoryTest {
             coEvery { dao.get(100, 0, 0, 8, "US") } returns null
 
             // API returns no results
-            coEvery { api.query(any()) } returns JustWatchGraphQlResponse(data = null)
+            coEvery { api.query(any()) } returns Response.success(JustWatchGraphQlResponse(data = null))
 
             val result = repository.resolveDeepLink(100, 1, 2, 8, "US", "Breaking Bad")
 
@@ -288,6 +307,54 @@ class JustWatchDeepLinkRepositoryTest {
         }
 
         @Test
+        fun `does not cache negatives on HTTP 422 from search`() = runTest {
+            coEvery { dao.get(any(), any(), any(), any(), any()) } returns null
+            coEvery { api.query(match { it.query == JustWatchApiService.SEARCH_QUERY }) } returns
+                makeHttpErrorResponse(422, """{"message":"unauthenticated request"}""")
+
+            repository.resolveDeepLink(100, 1, 2, 8, "US", "Breaking Bad")
+
+            coVerify(exactly = 0) { dao.upsert(any()) }
+        }
+
+        @Test
+        fun `records HTTP status and error body on HTTP 422 from search`() = runTest {
+            coEvery { dao.get(any(), any(), any(), any(), any()) } returns null
+            // `answers { ... }` returns a fresh Response on each invocation: the
+            // episode-level cascade also calls the show-level fallback, and a
+            // single ResponseBody.string() can only be consumed once.
+            coEvery { api.query(match { it.query == JustWatchApiService.SEARCH_QUERY }) } answers {
+                makeHttpErrorResponse(422, """{"message":"unauthenticated request"}""")
+            }
+
+            repository.resolveDeepLink(100, 1, 2, 8, "US", "Breaking Bad")
+
+            val lastError = repository.lastFetchError()
+            assertNotNull(lastError)
+            assertTrue(lastError!!.contains("422"), "expected '422' in error: $lastError")
+            assertTrue(
+                lastError.contains("unauthenticated"),
+                "expected error body summary in error: $lastError",
+            )
+        }
+
+        @Test
+        fun `does not cache episode-level negatives on HTTP 422 from seasons query`() = runTest {
+            coEvery { dao.get(any(), any(), any(), any(), any()) } returns null
+            coEvery { api.query(match { it.query == JustWatchApiService.SEARCH_QUERY }) } returns
+                makeSearchResponse()
+            coEvery { api.query(match { it.query == JustWatchApiService.SEASONS_QUERY }) } returns
+                makeHttpErrorResponse(422)
+
+            repository.resolveDeepLink(100, 1, 2, 8, "US", "Breaking Bad")
+
+            // No episode-level negatives — HTTP error is not a confirmed miss
+            coVerify(exactly = 0) {
+                dao.upsert(match { it.season == 1 && it.episode == 2 && it.standardWebUrl == null })
+            }
+        }
+
+        @Test
         fun `does not cache episode-level negatives on GraphQL errors in seasons response`() = runTest {
             coEvery { dao.get(any(), any(), any(), any(), any()) } returns null
             coEvery { api.query(match { it.query == JustWatchApiService.SEARCH_QUERY }) } returns
@@ -369,7 +436,7 @@ class JustWatchDeepLinkRepositoryTest {
             coEvery { dao.get(100, 1, 2, 8, "US") } returns null
             coEvery { dao.get(100, 0, 0, 8, "US") } returns null
 
-            coEvery { api.query(any()) } returns JustWatchGraphQlResponse(data = null)
+            coEvery { api.query(any()) } returns Response.success(JustWatchGraphQlResponse(data = null))
 
             repository.resolveDeepLink(100, 1, 2, 8, "INVALID", "Breaking Bad")
 
