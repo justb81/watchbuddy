@@ -39,8 +39,13 @@ class LlmEngineCache @Inject constructor() {
      * Returns a cached LiteRT-LM handle for [variant]+[useGpu] or creates one
      * via [factory]. If a handle is cached for a different variant or backend
      * (GPU vs. CPU) it is closed before the new one is built.
+     *
+     * `internal` because [LiteRtLlmProvider.EngineFactory] / [LiteRtLlmProvider.EngineHandle]
+     * are themselves `internal` (the JNI-backed engine types must not leak to
+     * other modules). Same-module callers — `LiteRtLlmProvider` and the unit
+     * tests — can still reach this from the LLM package.
      */
-    suspend fun getOrCreateLiteRtHandle(
+    internal suspend fun getOrCreateLiteRtHandle(
         variant: LlmOrchestrator.ModelVariant,
         useGpu: Boolean,
         modelPath: String,
