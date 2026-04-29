@@ -43,7 +43,7 @@ class EpisodeRepository @Inject constructor(
             }
         }
         val token = tokenRefreshManager.getValidAccessToken()
-            ?: throw IllegalStateException("No access token available")
+            ?: error("No access token available")
         val fresh = traktApi.getShowSeasons("Bearer $token", showId)
         mutex.withLock {
             cache[showId] = Cached(fetchedAt = now, seasons = fresh)
@@ -58,7 +58,7 @@ class EpisodeRepository @Inject constructor(
     ): Result<Unit> = runCatching {
         val body = buildBody(ids, season, episode)
         val token = tokenRefreshManager.getValidAccessToken()
-            ?: throw IllegalStateException("No access token available")
+            ?: error("No access token available")
         traktApi.addToHistory("Bearer $token", body)
         Unit
     }.onFailure { Log.w(TAG, "markEpisodeWatched S${season}E${episode} failed", it) }
@@ -70,7 +70,7 @@ class EpisodeRepository @Inject constructor(
     ): Result<Unit> = runCatching {
         val body = buildBody(ids, season, episode)
         val token = tokenRefreshManager.getValidAccessToken()
-            ?: throw IllegalStateException("No access token available")
+            ?: error("No access token available")
         traktApi.removeFromHistory("Bearer $token", body)
         Unit
     }.onFailure { Log.w(TAG, "markEpisodeUnwatched S${season}E${episode} failed", it) }

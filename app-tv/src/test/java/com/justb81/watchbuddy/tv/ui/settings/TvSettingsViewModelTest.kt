@@ -23,6 +23,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
+import java.io.IOException
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @DisplayName("TvSettingsViewModel")
@@ -107,7 +108,7 @@ class TvSettingsViewModelTest {
 
     @Test
     fun `observation failure is logged via DiagnosticLog`() = runTest {
-        every { repository.isPhoneDiscoveryEnabled } returns flow { throw RuntimeException("boom") }
+        every { repository.isPhoneDiscoveryEnabled } returns flow { throw IOException("boom") }
 
         TvSettingsViewModel(application, repository)
         advanceUntilIdle()

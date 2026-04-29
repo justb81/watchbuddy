@@ -56,7 +56,7 @@ class RecapViewModel @Inject constructor(
                     val recap = phoneApiClientFactory.createClient(phone.baseUrl).getRecap(traktShowId)
                     _state.value = RecapUiState.Ready(recap.html)
                     return@launch
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     // Failover to next phone
                     continue
                 }

@@ -40,7 +40,7 @@ class RecapGeneratorTest {
             val dangerousHtml = """<div>Safe</div><script>alert('xss')</script><div>Also safe</div>"""
             coEvery { llmProviderFactory.generateWithCascade(any(), any(), any()) } returns dangerousHtml
 
-            val result = generator.generateRecap(testShow, episodes(3), targetEpisode, "api-key")
+            val result = generator.generateRecap(testShow, episodes(3), targetEpisode)
             assertFalse(result.contains("<script>"))
             assertFalse(result.contains("alert"))
             assertTrue(result.contains("Safe"))
@@ -51,7 +51,7 @@ class RecapGeneratorTest {
             val htmlWithPlaceholders = """<img data-tmdb-still="S01E01" alt="scene">"""
             coEvery { llmProviderFactory.generateWithCascade(any(), any(), any()) } returns htmlWithPlaceholders
 
-            val result = generator.generateRecap(testShow, episodes(3), targetEpisode, "api-key")
+            val result = generator.generateRecap(testShow, episodes(3), targetEpisode)
             assertTrue(result.contains("src=\"https://image.tmdb.org/t/p/w300/still1.jpg\""))
             assertFalse(result.contains("data-tmdb-still"))
         }
@@ -61,7 +61,7 @@ class RecapGeneratorTest {
             val promptSlot = slot<String>()
             coEvery { llmProviderFactory.generateWithCascade(any(), capture(promptSlot), any()) } returns "<div>Recap</div>"
 
-            generator.generateRecap(testShow, episodes(3), targetEpisode, "api-key")
+            generator.generateRecap(testShow, episodes(3), targetEpisode)
             val prompt = promptSlot.captured
             assertTrue(prompt.contains("Breaking Bad"))
             assertTrue(prompt.contains("S05E14"))
@@ -75,7 +75,7 @@ class RecapGeneratorTest {
 
         private suspend fun sanitize(html: String): String {
             coEvery { llmProviderFactory.generateWithCascade(any(), any(), any()) } returns html
-            return generator.generateRecap(testShow, episodes(1), targetEpisode, "key")
+            return generator.generateRecap(testShow, episodes(1), targetEpisode)
         }
 
         @Test
@@ -145,7 +145,7 @@ class RecapGeneratorTest {
             val promptSlot = slot<String>()
             coEvery { llmProviderFactory.generateWithCascade(any(), capture(promptSlot), any()) } returns "<div></div>"
 
-            generator.generateRecap(testShow, episodes(12), targetEpisode, "key")
+            generator.generateRecap(testShow, episodes(12), targetEpisode)
             val prompt = promptSlot.captured
             // Episodes 5-12 should be in prompt (last 8), episodes 1-4 should not
             assertFalse(prompt.contains("Episode 4"))
@@ -158,7 +158,7 @@ class RecapGeneratorTest {
             val promptSlot = slot<String>()
             coEvery { llmProviderFactory.generateWithCascade(any(), capture(promptSlot), any()) } returns "<div></div>"
 
-            generator.generateRecap(testShow, episodes(1), targetEpisode, "key")
+            generator.generateRecap(testShow, episodes(1), targetEpisode)
             assertTrue(promptSlot.captured.contains("Breaking Bad"))
         }
 
@@ -167,7 +167,7 @@ class RecapGeneratorTest {
             val promptSlot = slot<String>()
             coEvery { llmProviderFactory.generateWithCascade(any(), capture(promptSlot), any()) } returns "<div></div>"
 
-            generator.generateRecap(testShow, episodes(3), targetEpisode, "key")
+            generator.generateRecap(testShow, episodes(3), targetEpisode)
             assertTrue(promptSlot.captured.contains("S01E01"))
             assertTrue(promptSlot.captured.contains("S01E02"))
         }
@@ -183,7 +183,7 @@ class RecapGeneratorTest {
             coEvery { llmProviderFactory.generateWithCascade(any(), any(), any()) } returns html
 
             val eps = episodes(2)
-            val result = generator.generateRecap(testShow, eps, targetEpisode, "key")
+            val result = generator.generateRecap(testShow, eps, targetEpisode)
             assertTrue(result.contains("/still1.jpg"))
             assertTrue(result.contains("/still2.jpg"))
         }
@@ -193,7 +193,7 @@ class RecapGeneratorTest {
             val html = """<img data-tmdb-still="S99E99">"""
             coEvery { llmProviderFactory.generateWithCascade(any(), any(), any()) } returns html
 
-            val result = generator.generateRecap(testShow, episodes(1), targetEpisode, "key")
+            val result = generator.generateRecap(testShow, episodes(1), targetEpisode)
             assertTrue(result.contains("src=\"\""))
         }
 
@@ -203,7 +203,7 @@ class RecapGeneratorTest {
             coEvery { llmProviderFactory.generateWithCascade(any(), any(), any()) } returns html
 
             val eps = listOf(TmdbEpisode(1, "Ep1", "Ov", null, 1, 1))
-            val result = generator.generateRecap(testShow, eps, targetEpisode, "key")
+            val result = generator.generateRecap(testShow, eps, targetEpisode)
             assertTrue(result.contains("src=\"\""))
         }
     }

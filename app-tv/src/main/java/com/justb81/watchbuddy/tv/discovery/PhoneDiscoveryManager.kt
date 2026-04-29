@@ -202,7 +202,7 @@ class PhoneDiscoveryManager @Inject constructor(
                     failCount = 0,
                     lastSuccessfulCheck = System.currentTimeMillis()
                 )
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 val newFailCount = phone.failCount + 1
                 if (newFailCount >= DiscoveryConstants.MAX_CONSECUTIVE_FAILURES) {
                     Log.i(TAG, "Removing phone ${phone.baseUrl} after ${DiscoveryConstants.MAX_CONSECUTIVE_FAILURES} failed heartbeats")

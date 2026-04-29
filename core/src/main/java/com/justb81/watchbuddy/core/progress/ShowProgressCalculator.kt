@@ -181,10 +181,10 @@ object ShowProgressCalculator {
             if (!isRegularSeason(season.number)) continue
             for (ep in season.episodes) {
                 val ts = parseInstant(ep.last_watched_at) ?: continue
-                if (best == null ||
+                val isHigherRanked = best == null ||
                     season.number > best.season ||
                     (season.number == best.season && ep.number > best.episode)
-                ) {
+                if (isHigherRanked) {
                     best = WatchedRef(season.number, ep.number, ts)
                 }
             }

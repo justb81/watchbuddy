@@ -2,8 +2,6 @@
 <SmellBaseline>
   <ManuallySuppressedIssues/>
   <CurrentIssues>
-    <ID>FunctionOnlyReturningConstant:AppModule.kt$AppModule.Companion$@Provides @Singleton @Named("traktClientId") fun provideTraktClientId(): String</ID>
-    <ID>FunctionOnlyReturningConstant:AppModule.kt$AppModule.Companion$@Provides @Singleton fun provideTokenBackendUrl(): String</ID>
     <ID>ImportOrdering:RecapScreen.kt$import android.webkit.WebView import android.webkit.WebViewClient import androidx.compose.foundation.background import androidx.compose.foundation.layout.* import androidx.compose.foundation.shape.RoundedCornerShape import androidx.compose.runtime.* import androidx.compose.ui.Alignment import androidx.compose.ui.Modifier import androidx.compose.ui.res.stringResource import androidx.compose.ui.semantics.contentDescription import androidx.compose.ui.semantics.semantics import androidx.compose.ui.text.font.FontWeight import androidx.compose.ui.text.style.TextAlign import androidx.compose.ui.unit.dp import androidx.compose.ui.unit.sp import androidx.compose.ui.viewinterop.AndroidView import androidx.compose.material3.CircularProgressIndicator import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel import androidx.compose.ui.graphics.Color import androidx.tv.material3.* import com.justb81.watchbuddy.R import com.justb81.watchbuddy.tv.ui.theme.extendedColors import com.justb81.watchbuddy.tv.ui.theme.toCssHex</ID>
     <ID>ImportOrdering:ScrobbleViewModelTest.kt$import com.justb81.watchbuddy.core.model.ScrobbleCandidate import com.justb81.watchbuddy.core.model.TraktEpisode import com.justb81.watchbuddy.core.model.TraktIds import com.justb81.watchbuddy.core.model.TraktShow import com.justb81.watchbuddy.tv.MainDispatcherRule import com.justb81.watchbuddy.core.scrobbler.MediaSessionScrobbler import io.mockk.* import kotlinx.coroutines.ExperimentalCoroutinesApi import kotlinx.coroutines.flow.MutableSharedFlow import kotlinx.coroutines.flow.SharedFlow import kotlinx.coroutines.test.runTest import org.junit.jupiter.api.Assertions.* import org.junit.jupiter.api.BeforeEach import org.junit.jupiter.api.DisplayName import org.junit.jupiter.api.Nested import org.junit.jupiter.api.Test import org.junit.jupiter.api.extension.RegisterExtension</ID>
     <ID>ImportOrdering:ShowDetailScreen.kt$import android.content.Intent import android.net.Uri import androidx.compose.foundation.background import androidx.compose.foundation.layout.* import androidx.compose.foundation.shape.RoundedCornerShape import androidx.compose.ui.draw.clip import androidx.compose.runtime.* import androidx.compose.ui.Alignment import androidx.compose.ui.Modifier import androidx.compose.ui.focus.FocusRequester import androidx.compose.ui.focus.focusRequester import androidx.compose.ui.platform.LocalContext import androidx.compose.ui.res.stringResource import androidx.compose.ui.text.font.FontWeight import androidx.compose.ui.text.style.TextOverflow import androidx.compose.ui.unit.dp import androidx.compose.ui.unit.sp import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel import androidx.compose.ui.graphics.Color import androidx.tv.material3.* import com.justb81.watchbuddy.R import com.justb81.watchbuddy.core.model.TraktWatchedEntry</ID>
@@ -66,7 +64,6 @@
     <ID>MagicNumber:TvTheme.kt$TvExtendedColors$0xFF4CAF50</ID>
     <ID>MagicNumber:TvTheme.kt$TvExtendedColors$0xFF757575</ID>
     <ID>MagicNumber:TvTheme.kt$TvExtendedColors$0xFFE53935</ID>
-    <ID>MatchingDeclarationName:TvNavGraph.kt$TvRoute</ID>
     <ID>MultiLineIfElse:RecapScreen.kt$R.string.tv_recap_fallback</ID>
     <ID>MultiLineIfElse:RecapScreen.kt$R.string.tv_recap_fallback_phones_failed</ID>
     <ID>MultiLineIfElse:TvDiagnosticsScreen.kt$Status.OK</ID>
@@ -147,9 +144,6 @@
     <ID>SpacingBetweenDeclarationsWithComments:PhoneDiscoveryManager.kt$PhoneDiscoveryManager$/** Whether this manager currently holds a Wi-Fi multicast lock. */</ID>
     <ID>SpacingBetweenDeclarationsWithComments:PhoneDiscoveryManager.kt$PhoneDiscoveryManager.Companion$/** Back-off before retrying a stop+start cycle after FAILURE_ALREADY_ACTIVE. */</ID>
     <ID>StringTemplate:TvDiagnosticsScreen.kt$${pct}</ID>
-    <ID>SwallowedException:PhoneDiscoveryManager.kt$PhoneDiscoveryManager$e: Exception</ID>
-    <ID>SwallowedException:RecapViewModel.kt$RecapViewModel$e: Exception</ID>
-    <ID>TooGenericExceptionThrown:TvSettingsViewModelTest.kt$TvSettingsViewModelTest$throw RuntimeException("boom")</ID>
     <ID>WildcardImport:MediaSessionScrobblerTest.kt$import io.mockk.*</ID>
     <ID>WildcardImport:MediaSessionScrobblerTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
     <ID>WildcardImport:PhoneApiClientFactoryTest.kt$import org.junit.jupiter.api.Assertions.*</ID>

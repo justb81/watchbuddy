@@ -37,7 +37,7 @@ class AiCoreLlmProvider(
         val response = model.generateContent(prompt)
         val text = response.text
         if (text.isNullOrBlank()) {
-            throw IllegalStateException("AICore returned empty response")
+            error("AICore returned empty response")
         }
         text
     }

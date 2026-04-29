@@ -21,15 +21,16 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
+import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
-import okhttp3.ResponseBody.Companion.toResponseBody
 import retrofit2.HttpException
 import retrofit2.Response
+import java.io.IOException
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @DisplayName("OnboardingViewModel")
@@ -463,10 +464,10 @@ class OnboardingViewModelTest {
             coEvery { tokenProxy.exchangeDeviceCode(any()) } answers {
                 callCount++
                 when (callCount) {
-                    1 -> throw RuntimeException("network blip")  // counts as 1
+                    1 -> throw IOException("network blip")  // counts as 1
                     2 -> throw HttpException(Response.error<Any>(400, "".toResponseBody())) // resets to 0
-                    3 -> throw RuntimeException("network blip")  // counts as 1 again
-                    4 -> throw RuntimeException("network blip")  // counts as 2
+                    3 -> throw IOException("network blip")  // counts as 1 again
+                    4 -> throw IOException("network blip")  // counts as 2
                     5 -> proxyTokenResponse                       // succeeds before reaching 3
                     else -> proxyTokenResponse
                 }

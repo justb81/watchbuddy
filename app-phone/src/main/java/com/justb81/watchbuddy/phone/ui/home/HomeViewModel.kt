@@ -286,8 +286,7 @@ class HomeViewModel @Inject constructor(
     private suspend fun fetchShows() {
         _uiState.update { it.copy(isLoading = true, error = null) }
         try {
-            val token = tokenRepository.getAccessToken()
-                ?: throw IllegalStateException("No access token available")
+            tokenRepository.getAccessToken() ?: error("No access token available")
             showRepository.getShows() // Result flows into observeShows() via StateFlow.
             _uiState.update {
                 it.copy(

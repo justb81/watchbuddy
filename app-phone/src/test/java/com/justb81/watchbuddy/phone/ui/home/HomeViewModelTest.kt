@@ -34,6 +34,7 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
 import retrofit2.HttpException
+import java.io.IOException
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 
@@ -423,7 +424,7 @@ class HomeViewModelTest {
         @Test
         fun `sets error when settings flow emits error during collection`() = runTest {
             every { settingsRepository.settings } returns flow {
-                throw RuntimeException("DataStore corrupted")
+                throw IOException("DataStore corrupted")
             }
 
             val vm = createViewModel()

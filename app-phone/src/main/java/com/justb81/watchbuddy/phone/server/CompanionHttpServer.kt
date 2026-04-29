@@ -255,8 +255,7 @@ internal fun Application.configureCompanionRoutes(
                 val html = recapGenerator.generateRecap(
                     show = tmdbShow,
                     watchedEpisodes = watchedEpisodes,
-                    targetEpisode = targetEpisode,
-                    apiKey = apiKey
+                    targetEpisode = targetEpisode
                 )
                 call.respond(mapOf("html" to html))
             } catch (e: SecurityException) {

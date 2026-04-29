@@ -41,6 +41,7 @@ abstract class AppModule {
          * Token proxy backend URL — the TV app uses no token proxy, so this is blank.
          * Satisfies NetworkModule's constructor requirement; no token requests are made from TV.
          */
+        @Suppress("FunctionOnlyReturningConstant")
         @Provides
         @Singleton
         fun provideTokenBackendUrl(): String = ""
@@ -50,6 +51,7 @@ abstract class AppModule {
          * (all Trakt operations go through the phone proxy), so this is blank.
          * Satisfies NetworkModule's constructor requirement; no `trakt-api-key` header is attached.
          */
+        @Suppress("FunctionOnlyReturningConstant")
         @Provides
         @Singleton
         @Named("traktClientId")

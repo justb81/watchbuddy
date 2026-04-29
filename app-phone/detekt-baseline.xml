@@ -70,9 +70,6 @@
     <ID>MagicNumber:RecapGenerator.kt$RecapGenerator$8</ID>
     <ID>MagicNumber:ShowDetailViewModel.kt$ShowDetailViewModel$300</ID>
     <ID>MagicNumber:TokenRepository.kt$TokenRepository$1_000L</ID>
-    <ID>MatchingDeclarationName:BluetoothAdvertisePermissionHandler.kt$BluetoothAdvertisePermission</ID>
-    <ID>MatchingDeclarationName:NotificationPermissionHandler.kt$NotificationPermission</ID>
-    <ID>MatchingDeclarationName:PhoneNavGraph.kt$PhoneRoute</ID>
     <ID>MaxLineLength:CompanionHttpServerTest.kt$CompanionHttpServerTest.ScrobbleEndpoints$private val scrobbleBody = """{"show":{"title":"Breaking Bad","year":2008,"ids":{"trakt":1}},"episode":{"season":1,"number":1,"ids":{}},"progress":0.0}"""</ID>
     <ID>MaxLineLength:CompanionHttpServerTest.kt$CompanionHttpServerTest.ScrobbleEndpoints$val pauseBody = """{"show":{"title":"Breaking Bad","year":2008,"ids":{"trakt":1}},"episode":{"season":1,"number":1,"ids":{}},"progress":50.0}"""</ID>
     <ID>MaxLineLength:CompanionHttpServerTest.kt$CompanionHttpServerTest.ScrobbleEndpoints$val stopBody = """{"show":{"title":"Breaking Bad","year":2008,"ids":{"trakt":1}},"episode":{"season":1,"number":1,"ids":{}},"progress":100.0}"""</ID>
@@ -214,23 +211,6 @@
     <ID>StringTemplate:CompanionHttpServer.kt$${episode}</ID>
     <ID>StringTemplate:EpisodeRepository.kt$EpisodeRepository$${episode}</ID>
     <ID>StringTemplate:ShowDetailViewModelTest.kt$ShowDetailViewModelTest$${e}</ID>
-    <ID>SwallowedException:LlmOrchestrator.kt$LlmOrchestrator$e: Exception</ID>
-    <ID>SwallowedException:ShowDetailViewModel.kt$ShowDetailViewModel$e: Exception</ID>
-    <ID>TooGenericExceptionThrown:HomeViewModelTest.kt$HomeViewModelTest.CompanionStateErrorTest$throw RuntimeException("DataStore corrupted")</ID>
-    <ID>TooGenericExceptionThrown:ModelDownloadWorker.kt$ModelDownloadWorker$throw RuntimeException( "Incomplete download: expected $contentLength bytes, got $bytesRead" )</ID>
-    <ID>TooGenericExceptionThrown:ModelDownloadWorker.kt$ModelDownloadWorker$throw RuntimeException("Empty response body")</ID>
-    <ID>TooGenericExceptionThrown:ModelDownloadWorker.kt$ModelDownloadWorker$throw RuntimeException("Failed to rename downloaded model to final path")</ID>
-    <ID>TooGenericExceptionThrown:ModelDownloadWorker.kt$ModelDownloadWorker$throw RuntimeException("HTTP ${response.code}: ${response.message}")</ID>
-    <ID>TooGenericExceptionThrown:OnboardingViewModelTest.kt$OnboardingViewModelTest.PollingErrorHandling$throw RuntimeException("network blip")</ID>
-    <ID>UnusedParameter:OnboardingScreen.kt$verificationUrl: String</ID>
-    <ID>UnusedParameter:RecapGenerator.kt$RecapGenerator$apiKey: String</ID>
-    <ID>UnusedPrivateProperty:HomeViewModel.kt$HomeViewModel$val token = tokenRepository.getAccessToken() ?: throw IllegalStateException("No access token available")</ID>
-    <ID>UseCheckOrError:AiCoreLlmProvider.kt$AiCoreLlmProvider$throw IllegalStateException("AICore returned empty response")</ID>
-    <ID>UseCheckOrError:EpisodeRepository.kt$EpisodeRepository$throw IllegalStateException("No access token available")</ID>
-    <ID>UseCheckOrError:HomeViewModel.kt$HomeViewModel$throw IllegalStateException("No access token available")</ID>
-    <ID>UseCheckOrError:LiteRtLlmProvider.kt$LiteRtLlmProvider$throw IllegalStateException( "Model file not found: ${modelVariant.fileName}. Download it first via Settings." )</ID>
-    <ID>UseCheckOrError:LiteRtLlmProvider.kt$LiteRtLlmProvider$throw IllegalStateException("LiteRT-LM returned empty response")</ID>
-    <ID>UseCheckOrError:ShowDetailViewModel.kt$ShowDetailViewModel$throw IllegalStateException("Show not found in library")</ID>
     <ID>WildcardImport:AiCoreLlmProviderTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
     <ID>WildcardImport:AppSettingsTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
     <ID>WildcardImport:CompanionHttpServer.kt$import io.ktor.http.*</ID>

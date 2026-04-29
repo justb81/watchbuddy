@@ -217,7 +217,7 @@ private fun PinCard(userCode: String, verificationUrl: String, expiresIn: Int) {
             color          = MaterialTheme.colorScheme.primary,
             fontWeight     = FontWeight.Bold,
             textDecoration = TextDecoration.Underline,
-            modifier       = Modifier.clickable { uriHandler.openUri("https://trakt.tv/activate") }
+            modifier       = Modifier.clickable { uriHandler.openUri(verificationUrl) }
         )
 
         // Step 2
