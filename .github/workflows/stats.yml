@@ -5,7 +5,11 @@ name: Update README stats
 # and the job only fires on the authoritative branch. The resulting commit is
 # tagged with `[skip ci]` to break the workflow_run -> push -> workflow_run loop.
 
-on:
+# `workflow_run` is safe here: triggered only by our own `Build Android APKs`
+# workflow on `main`, gated on success, and the job checks out `ref: main`
+# (never the triggering PR's head). The follow-up commit uses `[skip ci]` to
+# break the loop. No PR-controlled inputs are read.
+on: # zizmor: ignore[dangerous-triggers]
   workflow_run:
     workflows: ["Build Android APKs"]
     types: [completed]
@@ -22,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout main
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           ref: main
           # Use the built-in token so the follow-up push is authenticated.
