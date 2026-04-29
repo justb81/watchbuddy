@@ -117,7 +117,8 @@ class ShowDetailViewModelTest {
         coEvery { lastUsedRepo.recordUsed(any(), any()) } just runs
         coEvery { justWatchRepo.resolveDeepLink(any(), any(), any(), any(), any(), any()) } returns null
         viewModel = ShowDetailViewModel(
-            watchProviders, lastUsedRepo, streamingPrefs, phoneDiscovery, tmdbApi, justWatchRepo
+            watchProviders, lastUsedRepo, streamingPrefs, phoneDiscovery, tmdbApi, justWatchRepo,
+            com.justb81.watchbuddy.core.scrobbler.NoOpPlaybackIntentProvider(),
         )
     }
 

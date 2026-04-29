@@ -28,6 +28,7 @@ import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.model.PlaybackTick
 import com.justb81.watchbuddy.core.scrobbler.MediaSessionScrobbler
+import com.justb81.watchbuddy.core.scrobbler.PlaybackIntentStats
 import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
 import com.justb81.watchbuddy.tv.scrobbler.WatchNextMetadataSource
 
@@ -48,6 +49,7 @@ fun TvDiagnosticsScreen(
                 viewModel.refreshNotificationStats()
                 viewModel.refreshAppProfileStats()
                 viewModel.refreshAmbiguousPromptStats()
+                viewModel.refreshIntentStats()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -213,6 +215,10 @@ fun TvDiagnosticsScreen(
 
             item {
                 AmbiguousPromptStatsSection(stats = uiState.ambiguousPromptStats)
+            }
+
+            item {
+                IntentStatsSection(stats = uiState.intentStats)
             }
 
             item {
@@ -477,6 +483,35 @@ private fun AppProfilesSection(stats: MediaSessionScrobbler.ObservedPackageStats
                 status = status,
             ),
         ),
+    )
+}
+
+@Composable
+private fun IntentStatsSection(stats: PlaybackIntentStats?) {
+    val rows = if (stats == null) {
+        listOf(DiagRow(label = "—", value = "—", status = Status.NEUTRAL))
+    } else {
+        listOf(
+            DiagRow(
+                label = stringResource(R.string.tv_diagnostics_row_intent_hits),
+                value = stats.hits.toString(),
+                status = if (stats.hits > 0) Status.OK else Status.NEUTRAL,
+            ),
+            DiagRow(
+                label = stringResource(R.string.tv_diagnostics_row_intent_fallthroughs),
+                value = stats.fallthroughs.toString(),
+                status = Status.NEUTRAL,
+            ),
+            DiagRow(
+                label = stringResource(R.string.tv_diagnostics_row_intent_overridden),
+                value = stats.overriddenByManualMark.toString(),
+                status = Status.NEUTRAL,
+            ),
+        )
+    }
+    DiagnosticsSection(
+        title = stringResource(R.string.tv_diagnostics_section_watch_now_intent),
+        rows = rows,
     )
 }
 

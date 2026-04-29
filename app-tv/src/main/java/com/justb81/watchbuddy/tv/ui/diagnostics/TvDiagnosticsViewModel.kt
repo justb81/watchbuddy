@@ -7,6 +7,8 @@ import androidx.lifecycle.viewModelScope
 import com.justb81.watchbuddy.BuildConfig
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.scrobbler.MediaSessionScrobbler
+import com.justb81.watchbuddy.core.scrobbler.PlaybackIntentProvider
+import com.justb81.watchbuddy.core.scrobbler.PlaybackIntentStats
 import com.justb81.watchbuddy.tv.data.JustWatchDeepLinkRepository
 import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
 import com.justb81.watchbuddy.tv.scrobbler.NotificationMetadataSource
@@ -55,6 +57,8 @@ data class TvDiagnosticsUiState(
     val appProfileStats: MediaSessionScrobbler.ObservedPackageStats? = null,
     /** Counters for ambiguous-prompt lifecycle (emitted / resolved / dismissed). Null before first refresh. */
     val ambiguousPromptStats: MediaSessionScrobbler.AmbiguousPromptStats? = null,
+    /** Counters for Watch-Now intent lifecycle (hits / fallthroughs / manual-mark overrides). Null before first refresh. */
+    val intentStats: PlaybackIntentStats? = null,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -66,6 +70,7 @@ class TvDiagnosticsViewModel @Inject constructor(
     private val justWatchRepo: JustWatchDeepLinkRepository,
     private val watchNextSource: WatchNextMetadataSource,
     private val notificationSource: NotificationMetadataSource,
+    private val intentProvider: PlaybackIntentProvider,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(TvDiagnosticsUiState())
@@ -78,6 +83,7 @@ class TvDiagnosticsViewModel @Inject constructor(
         refreshNotificationStats()
         refreshAppProfileStats()
         refreshAmbiguousPromptStats()
+        refreshIntentStats()
 
         val discoveryState = combine(
             phoneDiscovery.discoveryActive,
@@ -124,6 +130,7 @@ class TvDiagnosticsViewModel @Inject constructor(
                         notificationTrackedCount = it.notificationTrackedCount,
                         appProfileStats = it.appProfileStats,
                         ambiguousPromptStats = it.ambiguousPromptStats,
+                        intentStats = it.intentStats,
                     )
                 }
             }
@@ -212,6 +219,15 @@ class TvDiagnosticsViewModel @Inject constructor(
      */
     fun refreshAmbiguousPromptStats() {
         _uiState.update { it.copy(ambiguousPromptStats = scrobbler.ambiguousPromptStats()) }
+    }
+
+    /**
+     * Reads the in-memory Watch-Now intent counters and updates
+     * [TvDiagnosticsUiState.intentStats]. Fast in-memory read.
+     * Call on [Lifecycle.Event.ON_RESUME].
+     */
+    fun refreshIntentStats() {
+        _uiState.update { it.copy(intentStats = intentProvider.intentStats()) }
     }
 
     companion object {

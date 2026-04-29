@@ -187,6 +187,10 @@
     <string name="tv_diagnostics_row_ambiguous_emitted">Solicitudes ambiguas enviadas</string>
     <string name="tv_diagnostics_row_ambiguous_resolved">Solicitudes resueltas</string>
     <string name="tv_diagnostics_row_ambiguous_dismissed">Solicitudes descartadas</string>
+    <string name="tv_diagnostics_section_watch_now_intent">Intención Ver ahora</string>
+    <string name="tv_diagnostics_row_intent_hits">Scrobbles automáticos Fase 0</string>
+    <string name="tv_diagnostics_row_intent_fallthroughs">Fallbacks Fase 0</string>
+    <string name="tv_diagnostics_row_intent_overridden">Reemplazado por marca manual</string>
 
     <!-- Version footer -->
     <string name="settings_version_footer">WatchBuddy v%1$s (build %2$d)</string>

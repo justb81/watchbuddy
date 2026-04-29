@@ -53,6 +53,8 @@ class MediaSessionScrobbler @Inject constructor(
     private val titleExtractor: TitleExtractor,
     /** Enrichers append additional evidence lines; populated per-app via Hilt. */
     private val metadataEnrichers: List<@JvmSuppressWildcards MetadataEnricher> = emptyList(),
+    /** TV-side Watch-Now intent store. Phone app binds NoOpPlaybackIntentProvider. */
+    private val playbackIntentProvider: PlaybackIntentProvider = NoOpPlaybackIntentProvider(),
 ) {
     companion object {
         private const val TAG = "MediaSessionScrobbler"
@@ -61,6 +63,12 @@ class MediaSessionScrobbler @Inject constructor(
 
         /** Minimum confidence to show the user an ambiguous-prompt with top-3 candidates. */
         internal const val AMBIGUOUS_THRESHOLD = 0.40f
+
+        /** Minimum text score for a Watch-Now intent to be confirmed in Phase 0. */
+        internal const val INTENT_CONFIRM_THRESHOLD = 0.40f
+
+        /** Bonus applied to a Phase-0 fallthrough intent candidate's text score. */
+        private const val INTENT_FALLTHROUGH_BONUS = 0.15f
         private const val AMBIGUOUS_CANDIDATES_MAX = 3
 
         private const val MS_PER_MINUTE = 60_000.0
@@ -499,15 +507,21 @@ class MediaSessionScrobbler @Inject constructor(
         tick: PlaybackTick = PlaybackTick.UNKNOWN,
     ) {
         if (sessionKey == currentlySessionKey) return
-        val candidate = matchSnapshot(snapshot, tick)
+        val intent = playbackIntentProvider.peek(snapshot.packageName)
+        val candidate = matchSnapshot(snapshot, tick, intent)
         if (candidate == null) {
-            maybeEmitAmbiguousPrompt(snapshot, sessionKey, tick)
+            if (intent != null) playbackIntentProvider.recordFallthrough()
+            maybeEmitAmbiguousPrompt(snapshot, sessionKey, tick, intent)
             if (debugLogMediaSession) {
                 DiagnosticLog.debug(TAG, "no match for '$sessionKey' — best confidence null")
             }
             return
         }
         if (candidate.confidence >= AUTO_SCROBBLE_THRESHOLD) {
+            if (intent != null) {
+                playbackIntentProvider.recordHit()
+                playbackIntentProvider.consumeIntent(snapshot.packageName)
+            }
             autoScrobble(candidate, progress, sessionKey)
             _lastCandidate.value = LastCandidate(candidate, System.currentTimeMillis(), autoScrobbled = true)
         } else if (candidate.confidence >= OVERLAY_THRESHOLD) {
@@ -525,11 +539,16 @@ class MediaSessionScrobbler @Inject constructor(
      * Collects up to [AMBIGUOUS_CANDIDATES_MAX] library entries scoring in
      * [AMBIGUOUS_THRESHOLD, OVERLAY_THRESHOLD) and emits them as an [AmbiguousScrobbleEvent].
      * Idempotent per session key — each key is only emitted once until [stopListening].
+     *
+     * [fallthroughIntent] is the Watch-Now intent that fired in Phase 0 but whose text score
+     * was below [INTENT_CONFIRM_THRESHOLD]; it is injected as an extra Top-3 candidate with a
+     * +0.15 score bonus so the user sees a "From Watch Now" hint in the ambiguous prompt.
      */
     private suspend fun maybeEmitAmbiguousPrompt(
         snapshot: MediaMetadataSnapshot,
         sessionKey: String,
         tick: PlaybackTick,
+        fallthroughIntent: PlaybackIntent? = null,
     ) {
         if (!emittedAmbiguousKeys.add(sessionKey)) return
         val profile = AppProfiles.forPackage(snapshot.packageName)
@@ -539,7 +558,7 @@ class MediaSessionScrobbler @Inject constructor(
         if (cachedShows.isEmpty()) return
         val (globalSeason, globalEpisode) = findGlobalEpisodeMarker(candidates, profile)
         val ambiguous = collectAmbiguousCandidates(
-            candidates, cachedShows, globalSeason, globalEpisode, profile, tick,
+            candidates, cachedShows, globalSeason, globalEpisode, profile, tick, fallthroughIntent,
         )
         if (ambiguous.isEmpty()) {
             emittedAmbiguousKeys.remove(sessionKey)
@@ -565,6 +584,10 @@ class MediaSessionScrobbler @Inject constructor(
      * Returns up to [AMBIGUOUS_CANDIDATES_MAX] library entries whose runtimeAffinity-weighted
      * fuzzy score falls in [AMBIGUOUS_THRESHOLD, OVERLAY_THRESHOLD), sorted DESC by score.
      * Deduplicates by Trakt ID so the same show doesn't appear more than once.
+     *
+     * When [fallthroughIntent] is non-null (Phase 0 fired but text score < [INTENT_CONFIRM_THRESHOLD]),
+     * the intent's show is injected as an extra candidate with a +[INTENT_FALLTHROUGH_BONUS] score
+     * boost and [AmbiguousCandidate.sourceLabel] = `"watch-now-intent"`.
      */
     internal fun collectAmbiguousCandidates(
         candidates: List<String>,
@@ -573,6 +596,7 @@ class MediaSessionScrobbler @Inject constructor(
         globalEpisode: Int?,
         profile: AppProfile?,
         tick: PlaybackTick,
+        fallthroughIntent: PlaybackIntent? = null,
     ): List<AmbiguousCandidate> {
         val patterns = buildList {
             profile?.markerRegexes?.let { addAll(it) }
@@ -603,6 +627,34 @@ class MediaSessionScrobbler @Inject constructor(
                 }
             }
         }
+
+        // Inject the Phase-0 fallthrough intent as an extra candidate with a score bonus.
+        if (fallthroughIntent != null) {
+            val intentEntry = cachedShows.firstOrNull { entry ->
+                (fallthroughIntent.showIds.trakt != null &&
+                    entry.show.ids.trakt == fallthroughIntent.showIds.trakt) ||
+                (fallthroughIntent.showIds.tmdb != null &&
+                    entry.show.ids.tmdb == fallthroughIntent.showIds.tmdb)
+            }
+            val traktId = intentEntry?.show?.ids?.trakt
+            if (intentEntry != null && traktId != null) {
+                val rawScore = scoreSnapshotAgainstTitle(candidates, fallthroughIntent.showTitle, profile)
+                val bonusScore = (rawScore + INTENT_FALLTHROUGH_BONUS).coerceAtMost(0.94f)
+                if (bonusScore >= AMBIGUOUS_THRESHOLD) {
+                    val existing = bestByTraktId[traktId]
+                    if (existing == null || bonusScore > existing.score) {
+                        bestByTraktId[traktId] = ScoredEntry(
+                            entry = intentEntry,
+                            score = bonusScore,
+                            season = fallthroughIntent.season,
+                            episode = fallthroughIntent.episode,
+                            sourceLabel = "watch-now-intent",
+                        )
+                    }
+                }
+            }
+        }
+
         return bestByTraktId.values
             .sortedByDescending { it.score }
             .take(AMBIGUOUS_CANDIDATES_MAX)
@@ -613,7 +665,7 @@ class MediaSessionScrobbler @Inject constructor(
                         TraktEpisode(season = se.season, number = se.episode)
                     } else null,
                     score = se.score,
-                    sourceLabel = "library",
+                    sourceLabel = se.sourceLabel,
                 )
             }
     }
@@ -623,6 +675,7 @@ class MediaSessionScrobbler @Inject constructor(
         val score: Float,
         val season: Int?,
         val episode: Int?,
+        val sourceLabel: String = "library",
     )
 
     /**
@@ -674,7 +727,35 @@ class MediaSessionScrobbler @Inject constructor(
     }
 
     /**
-     * Full match cascade:
+     * Scores each candidate string from [candidates] against [title] (after stripping any
+     * S##E## marker from the candidate) and returns the highest fuzzy score.
+     * Used by Phase 0 and the fallthrough-intent path in [collectAmbiguousCandidates].
+     */
+    private fun scoreSnapshotAgainstTitle(
+        candidates: List<String>,
+        title: String,
+        profile: AppProfile? = null,
+    ): Float {
+        val patterns = buildList {
+            profile?.markerRegexes?.let { addAll(it) }
+            add(Regex("""(?i)S(\d{1,2})E(\d{1,2})"""))
+        }
+        return candidates.maxOfOrNull { field ->
+            val m = patterns.firstNotNullOfOrNull { it.find(field) }
+            val showTitle = if (m != null) field.substringBefore(m.value).trim() else field.trim()
+            if (showTitle.isBlank()) 0f else fuzzyScore(showTitle, title)
+        } ?: 0f
+    }
+
+    /**
+     * Full match cascade (Phases 0 → 0.5 → 1 → 2 → 3).
+     *
+     *   0  **Watch-Now intent gate** — when [intent] is non-null and its package matches
+     *      [snapshot.packageName], score the snapshot against the intent's show title. If the
+     *      score ≥ [INTENT_CONFIRM_THRESHOLD] (0.40), return a high-confidence candidate
+     *      immediately (confidence = max(textScore, [AUTO_SCROBBLE_THRESHOLD])). On a
+     *      miss the cascade continues normally; the caller is responsible for passing the
+     *      intent to [maybeEmitAmbiguousPrompt] as a fallthrough candidate.
      *   0.5 **Content-ID short-circuit** — if a `watchNext.contentId: tmdb:XXXX` line is
      *      present, look up the show in the cached library by TMDB ID. When found and
      *      season/episode numbers are available, returns a confidence-1.0 candidate
@@ -688,14 +769,13 @@ class MediaSessionScrobbler @Inject constructor(
      *   3. **TMDB fallback** — if the library still has no match, search TMDB
      *      with the best-scoring candidate (cheap-path best or extractor
      *      output).
-     */
-    /**
-     * Full match cascade (Phases 0.5 → 1 → 2 → 3). [tick] is used by
-     * Phase 1 for runtime-affinity scoring; enrichers may also gate on tick.isPlaying.
+     *
+     * [tick] is used by Phase 1 for runtime-affinity scoring; enrichers may also gate on tick.isPlaying.
      */
     internal suspend fun matchSnapshot(
         snapshot: MediaMetadataSnapshot,
         tick: PlaybackTick = PlaybackTick.UNKNOWN,
+        intent: PlaybackIntent? = null,
     ): ScrobbleCandidate? {
         val profile = AppProfiles.forPackage(snapshot.packageName)
 
@@ -704,8 +784,37 @@ class MediaSessionScrobbler @Inject constructor(
         if (candidates.isEmpty()) return null
         val mediaTitle = candidates.first()
 
-        // Fetch once — shared by Phase 0.5 and Phase 1 to avoid a double round-trip.
+        // Fetch once — shared by Phase 0, Phase 0.5, and Phase 1 to avoid double round-trips.
         val cachedShows = watchedShowSource.getCachedShows()
+
+        // Phase 0: Watch-Now intent gate.
+        if (intent != null) {
+            val textScore = scoreSnapshotAgainstTitle(candidates, intent.showTitle, profile)
+            if (textScore >= INTENT_CONFIRM_THRESHOLD) {
+                val cachedEntry = cachedShows.firstOrNull { entry ->
+                    (intent.showIds.trakt != null && entry.show.ids.trakt == intent.showIds.trakt) ||
+                    (intent.showIds.tmdb != null && entry.show.ids.tmdb == intent.showIds.tmdb)
+                }
+                val show = cachedEntry?.show
+                    ?: TraktShow(title = intent.showTitle, ids = intent.showIds)
+                DiagnosticLog.event(
+                    TAG,
+                    "Phase 0 confirmed intent: ${intent.showTitle} " +
+                        "S${intent.season}E${intent.episode} textScore=$textScore",
+                )
+                return ScrobbleCandidate(
+                    packageName = snapshot.packageName,
+                    mediaTitle = mediaTitle,
+                    confidence = maxOf(textScore, AUTO_SCROBBLE_THRESHOLD),
+                    matchedShow = show,
+                    matchedEpisode = TraktEpisode(season = intent.season, number = intent.episode),
+                )
+            }
+            DiagnosticLog.event(
+                TAG,
+                "Phase 0 fallthrough: ${intent.showTitle} textScore=$textScore",
+            )
+        }
 
         // Phase 0.5: content-ID short-circuit for trusted prefixes (only `tmdb:` on day one)
         val contentIdHit = resolveByContentId(snapshot, mediaTitle, cachedShows)
