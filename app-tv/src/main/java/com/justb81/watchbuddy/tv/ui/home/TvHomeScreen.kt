@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
@@ -20,6 +21,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -153,6 +157,29 @@ private fun TvHomeShelves(
     val allOthers = state.allShows
     var allShowsExpanded by rememberSaveable { mutableStateOf(false) }
 
+    var focusedShowKey by rememberSaveable { mutableStateOf<String?>(null) }
+    val continueWatchingState = rememberLazyListState()
+    val allShowsState = rememberLazyListState()
+    val cwRequesters = remember(continueWatching) { mutableMapOf<String, FocusRequester>() }
+    val allRequesters = remember(allOthers) { mutableMapOf<String, FocusRequester>() }
+
+    LaunchedEffect(continueWatching, allOthers, allShowsExpanded) {
+        val key = focusedShowKey ?: return@LaunchedEffect
+        val cwIndex = continueWatching.indexOfFirst { it.focusKey() == key }
+        if (cwIndex >= 0) {
+            continueWatchingState.scrollToItem(cwIndex)
+            cwRequesters[key]?.requestFocus()
+            return@LaunchedEffect
+        }
+        if (allShowsExpanded) {
+            val allIndex = allOthers.indexOfFirst { it.focusKey() == key }
+            if (allIndex >= 0) {
+                allShowsState.scrollToItem(allIndex)
+                allRequesters[key]?.requestFocus()
+            }
+        }
+    }
+
     LazyColumn(
         contentPadding = PaddingValues(horizontal = 48.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
@@ -168,15 +195,21 @@ private fun TvHomeShelves(
             }
             item {
                 LazyRow(
+                    state = continueWatchingState,
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                     contentPadding = PaddingValues(horizontal = 4.dp)
                 ) {
-                    items(continueWatching, key = { it.entry.show.ids.trakt ?: it.entry.show.title }) { enriched ->
+                    items(continueWatching, key = { it.focusKey() }) { enriched ->
+                        val key = enriched.focusKey()
+                        val requester = cwRequesters.getOrPut(key) { FocusRequester() }
                         TvShowCard(
                             enriched = enriched,
                             progress = enriched.entry.show.ids.trakt?.let { state.progress[it] },
                             hasNewSeason = enriched.entry.show.ids.trakt?.let { state.hasNewSeason[it] } == true,
-                            onClick = { onShowClick(enriched) }
+                            onClick = { onShowClick(enriched) },
+                            modifier = Modifier
+                                .focusRequester(requester)
+                                .onFocusChanged { if (it.isFocused) focusedShowKey = key }
                         )
                     }
                 }
@@ -194,15 +227,21 @@ private fun TvHomeShelves(
         if (allShowsExpanded) {
             item {
                 LazyRow(
+                    state = allShowsState,
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                     contentPadding = PaddingValues(horizontal = 4.dp)
                 ) {
-                    items(allOthers, key = { it.entry.show.ids.trakt ?: it.entry.show.title }) { enriched ->
+                    items(allOthers, key = { it.focusKey() }) { enriched ->
+                        val key = enriched.focusKey()
+                        val requester = allRequesters.getOrPut(key) { FocusRequester() }
                         TvShowCard(
                             enriched = enriched,
                             progress = enriched.entry.show.ids.trakt?.let { state.progress[it] },
                             hasNewSeason = enriched.entry.show.ids.trakt?.let { state.hasNewSeason[it] } == true,
-                            onClick = { onShowClick(enriched) }
+                            onClick = { onShowClick(enriched) },
+                            modifier = Modifier
+                                .focusRequester(requester)
+                                .onFocusChanged { if (it.isFocused) focusedShowKey = key }
                         )
                     }
                 }
@@ -224,6 +263,9 @@ private fun TvHomeShelves(
         }
     }
 }
+
+private fun EnrichedShowEntry.focusKey(): String =
+    entry.show.ids.trakt?.toString() ?: entry.show.title
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
@@ -342,7 +384,8 @@ private fun TvShowCard(
     enriched: EnrichedShowEntry,
     progress: ShowProgress?,
     hasNewSeason: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val entry = enriched.entry
     val posterUrl = TmdbImageHelper.poster(enriched.posterPath, 500)
@@ -353,7 +396,7 @@ private fun TvShowCard(
 
     Card(
         onClick = onClick,
-        modifier = Modifier
+        modifier = modifier
             .width(180.dp)
             .aspectRatio(2f / 3f)
             .semantics { contentDescription = cardDescription },
