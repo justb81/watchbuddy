@@ -3,6 +3,7 @@ package com.justb81.watchbuddy.tv.scrobbler
 import android.util.Log
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.model.AmbiguousScrobbleEvent
+import com.justb81.watchbuddy.core.model.PhoneAddToLibraryRequest
 import com.justb81.watchbuddy.core.model.TraktEpisode
 import com.justb81.watchbuddy.core.model.TraktShow
 import com.justb81.watchbuddy.core.scrobbler.ScrobbleDispatcher
@@ -78,6 +79,14 @@ class TvScrobbleDispatcher(
 
     /** Session keys for which an ambiguous prompt has already been dispatched. Cleared on resolution. */
     private val dispatchedAmbiguousKeys: MutableSet<String> =
+        Collections.newSetFromMap(ConcurrentHashMap())
+
+    /**
+     * TMDB IDs for which the user has already confirmed an add-to-library this session.
+     * Prevents duplicate Trakt history writes when the overlay is confirmed more than once
+     * for the same unknown show. Cleared on service restart.
+     */
+    private val confirmedUnknownTmdbIds: MutableSet<Int> =
         Collections.newSetFromMap(ConcurrentHashMap())
 
     init {
@@ -183,6 +192,54 @@ class TvScrobbleDispatcher(
 
     override suspend fun dispatchStop(show: TraktShow, episode: TraktEpisode, progress: Float) =
         dispatch(ScrobbleAction.STOP, show, episode, progress)
+
+    /**
+     * Fans an add-to-library request to every reachable phone in parallel so the episode
+     * is written to each user's Trakt history immediately after overlay confirmation.
+     *
+     * Idempotent per TMDB id — a second confirmation for the same unknown show within the
+     * same session is silently dropped to prevent duplicate Trakt history entries.
+     * Per-phone failures are logged and do not block other phones.
+     */
+    override suspend fun dispatchAddToLibrary(show: TraktShow, episode: TraktEpisode) {
+        val tmdbId = show.ids.tmdb ?: run {
+            DiagnosticLog.warn(TAG, "add-to-library: skipped — show has no TMDB id '${show.title}'")
+            return
+        }
+        if (!confirmedUnknownTmdbIds.add(tmdbId)) {
+            DiagnosticLog.event(TAG, "add-to-library: dedup skip tmdbId=$tmdbId '${show.title}'")
+            return
+        }
+        DiagnosticLog.event(
+            TAG,
+            "add-to-library-confirmed: '${show.title}' S${episode.season}E${episode.number} tmdbId=$tmdbId",
+        )
+        val phones = availablePhones()
+        if (phones.isEmpty()) {
+            DiagnosticLog.warn(TAG, "add-to-library: no phones reachable for tmdbId=$tmdbId '${show.title}'")
+            return
+        }
+        coroutineScope {
+            phones.forEach { phone ->
+                launch {
+                    try {
+                        val client = phoneApiClientFactory.createClient(phone.baseUrl)
+                        client.addShowToLibrary(PhoneAddToLibraryRequest(show = show, episode = episode))
+                        Log.i(TAG, "add-to-library-ok ${phone.baseUrl}: ${show.title} S${episode.season}E${episode.number}")
+                        DiagnosticLog.event(TAG, "add-to-library-ok phone=${phone.baseUrl} '${show.title}'")
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: IOException) {
+                        Log.e(TAG, "add-to-library failed for ${phone.baseUrl}", e)
+                        DiagnosticLog.warn(TAG, "add-to-library-err phone=${phone.baseUrl}: ${e.message}")
+                    } catch (e: HttpException) {
+                        Log.e(TAG, "add-to-library HTTP error for ${phone.baseUrl}: ${e.code()}", e)
+                        DiagnosticLog.warn(TAG, "add-to-library-err phone=${phone.baseUrl} http=${e.code()}")
+                    }
+                }
+            }
+        }
+    }
 
     /**
      * Fans [event] to every reachable phone in parallel. Idempotent on [AmbiguousScrobbleEvent.sessionKey]:

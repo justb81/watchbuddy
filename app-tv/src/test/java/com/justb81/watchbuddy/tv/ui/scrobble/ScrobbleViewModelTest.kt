@@ -6,10 +6,10 @@ import com.justb81.watchbuddy.core.model.TraktIds
 import com.justb81.watchbuddy.core.model.TraktShow
 import com.justb81.watchbuddy.tv.MainDispatcherRule
 import com.justb81.watchbuddy.core.scrobbler.MediaSessionScrobbler
+import com.justb81.watchbuddy.core.scrobbler.ScrobbleDispatcher
 import io.mockk.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
@@ -29,6 +29,7 @@ class ScrobbleViewModelTest {
     }
 
     private val scrobbler: MediaSessionScrobbler = mockk()
+    private val scrobbleDispatcher: ScrobbleDispatcher = mockk()
     private val pendingFlow = MutableSharedFlow<ScrobbleCandidate>()
     private lateinit var viewModel: ScrobbleViewModel
 
@@ -38,10 +39,16 @@ class ScrobbleViewModelTest {
         "com.netflix", "Breaking Bad S01E01", 0.85f, testShow, testEpisode
     )
 
+    private val unknownShow = TraktShow("Stranger Things", 2016, TraktIds(tmdb = 66732))
+    private val unknownCandidate = ScrobbleCandidate(
+        "com.plex.android", "Stranger Things S01E01", 0.95f, unknownShow, testEpisode
+    )
+
     @BeforeEach
     fun setUp() {
         every { scrobbler.pendingConfirmation } returns pendingFlow
-        viewModel = ScrobbleViewModel(scrobbler)
+        coEvery { scrobbleDispatcher.dispatchAddToLibrary(any(), any()) } just runs
+        viewModel = ScrobbleViewModel(scrobbler, scrobbleDispatcher)
     }
 
     @Test
@@ -104,6 +111,41 @@ class ScrobbleViewModelTest {
         // Different episode should appear
         pendingFlow.emit(candidate2)
         assertNotNull(viewModel.pendingCandidate.value)
+    }
+
+    @Nested
+    @DisplayName("Unknown-show confirm (#468)")
+    inner class UnknownShowConfirmTest {
+
+        @Test
+        fun `confirmScrobble on unknown show calls dispatchAddToLibrary`() = runTest {
+            coEvery { scrobbler.autoScrobble(any()) } just runs
+
+            pendingFlow.emit(unknownCandidate)
+            viewModel.confirmScrobble()
+
+            coVerify(exactly = 1) { scrobbleDispatcher.dispatchAddToLibrary(unknownShow, testEpisode) }
+        }
+
+        @Test
+        fun `confirmScrobble on known show does not call dispatchAddToLibrary`() = runTest {
+            coEvery { scrobbler.autoScrobble(any()) } just runs
+
+            pendingFlow.emit(testCandidate)
+            viewModel.confirmScrobble()
+
+            coVerify(exactly = 0) { scrobbleDispatcher.dispatchAddToLibrary(any(), any()) }
+        }
+
+        @Test
+        fun `confirmScrobble on unknown show still calls autoScrobble`() = runTest {
+            coEvery { scrobbler.autoScrobble(any()) } just runs
+
+            pendingFlow.emit(unknownCandidate)
+            viewModel.confirmScrobble()
+
+            coVerify(exactly = 1) { scrobbler.autoScrobble(unknownCandidate) }
+        }
     }
 
     @Nested

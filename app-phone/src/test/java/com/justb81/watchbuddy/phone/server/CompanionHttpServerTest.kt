@@ -5,6 +5,7 @@ import com.justb81.watchbuddy.core.model.LlmBackend
 import com.justb81.watchbuddy.core.model.MediaMetadataSnapshot
 import com.justb81.watchbuddy.core.model.ScrobbleAction
 import com.justb81.watchbuddy.core.model.DeviceCapability
+import com.justb81.watchbuddy.core.trakt.SyncHistoryResult
 import com.justb81.watchbuddy.core.model.TitleExtractionResponse
 import com.justb81.watchbuddy.core.model.TmdbEpisode
 import com.justb81.watchbuddy.core.model.TmdbShow
@@ -901,6 +902,112 @@ class CompanionHttpServerTest {
             assertEquals(HttpStatusCode.OK, response.status)
             val body = response.bodyAsText()
             assertEquals("{}", body)
+        }
+    }
+
+    // ── POST /shows/add-to-library ────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("POST /shows/add-to-library (#468)")
+    inner class AddToLibraryEndpoint {
+
+        private val addToLibraryBody = """
+            {
+              "show": {"title":"Stranger Things","year":2016,"ids":{"tmdb":66732}},
+              "episode": {"season":1,"number":1,"ids":{}}
+            }
+        """.trimIndent()
+
+        @Test
+        fun `returns 401 when access token is missing`() = testApp {
+            coEvery { tokenRefreshManager.getValidAccessToken() } returns null
+
+            val response = client.post("/shows/add-to-library") {
+                contentType(ContentType.Application.Json)
+                setBody(addToLibraryBody)
+            }
+
+            assertEquals(HttpStatusCode.Unauthorized, response.status)
+        }
+
+        @Test
+        fun `returns 400 when request body is invalid`() = testApp {
+            coEvery { tokenRefreshManager.getValidAccessToken() } returns "token"
+
+            val response = client.post("/shows/add-to-library") {
+                contentType(ContentType.Application.Json)
+                setBody("not-valid-json")
+            }
+
+            assertEquals(HttpStatusCode.BadRequest, response.status)
+        }
+
+        @Test
+        fun `returns 200 and calls addToHistory on Trakt`() = testApp {
+            coEvery { tokenRefreshManager.getValidAccessToken() } returns "test-token"
+            coEvery { traktApiService.addToHistory("Bearer test-token", any()) } returns
+                SyncHistoryResult(added = com.justb81.watchbuddy.core.trakt.SyncHistoryCount(episodes = 1))
+            every { showRepository.invalidateCache() } just runs
+
+            val response = client.post("/shows/add-to-library") {
+                contentType(ContentType.Application.Json)
+                setBody(addToLibraryBody)
+            }
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertTrue(response.bodyAsText().contains("true"))
+            coVerify { traktApiService.addToHistory("Bearer test-token", any()) }
+        }
+
+        @Test
+        fun `invalidates ShowRepository cache after successful add`() = testApp {
+            coEvery { tokenRefreshManager.getValidAccessToken() } returns "test-token"
+            coEvery { traktApiService.addToHistory(any(), any()) } returns SyncHistoryResult()
+            every { showRepository.invalidateCache() } just runs
+
+            client.post("/shows/add-to-library") {
+                contentType(ContentType.Application.Json)
+                setBody(addToLibraryBody)
+            }
+
+            verify { showRepository.invalidateCache() }
+        }
+
+        @Test
+        fun `returns 503 when Trakt addToHistory throws`() = testApp {
+            coEvery { tokenRefreshManager.getValidAccessToken() } returns "token"
+            coEvery { traktApiService.addToHistory(any(), any()) } throws RuntimeException("Trakt error")
+
+            val response = client.post("/shows/add-to-library") {
+                contentType(ContentType.Application.Json)
+                setBody(addToLibraryBody)
+            }
+
+            assertEquals(HttpStatusCode.ServiceUnavailable, response.status)
+            assertFalse(response.bodyAsText().contains("Trakt error"))
+        }
+
+        @Test
+        fun `builds correct SyncHistoryBody from request show and episode`() = testApp {
+            coEvery { tokenRefreshManager.getValidAccessToken() } returns "test-token"
+            val capturedBodies = mutableListOf<com.justb81.watchbuddy.core.trakt.SyncHistoryBody>()
+            coEvery { traktApiService.addToHistory(any(), capture(capturedBodies)) } returns SyncHistoryResult()
+            every { showRepository.invalidateCache() } just runs
+
+            client.post("/shows/add-to-library") {
+                contentType(ContentType.Application.Json)
+                setBody(addToLibraryBody)
+            }
+
+            assertEquals(1, capturedBodies.size)
+            val body = capturedBodies.first()
+            assertEquals(1, body.shows.size)
+            val showItem = body.shows.first()
+            assertEquals(66732, showItem.ids.tmdb)
+            assertEquals(1, showItem.seasons.size)
+            assertEquals(1, showItem.seasons.first().number)
+            assertEquals(1, showItem.seasons.first().episodes.size)
+            assertEquals(1, showItem.seasons.first().episodes.first().number)
         }
     }
 }

@@ -206,7 +206,10 @@ data class ScrobbleCandidate(
     val confidence: Float,              // 0.0–1.0
     val matchedShow: TraktShow? = null,
     val matchedEpisode: TraktEpisode? = null
-)
+) {
+    /** True when the cascade matched via TMDB but the show has no Trakt ID — not yet in the user's library. */
+    fun isUnknownShow(): Boolean = matchedShow?.ids?.trakt == null && matchedShow?.ids?.tmdb != null
+}
 
 /**
  * One stable string of evidence per session tick, plus the package name.
@@ -270,6 +273,13 @@ data class TitleExtractionResponse(
     val libraryTraktId: Int? = null,
     /** Self-reported, clamped to `[0.0, 1.0]` server-side. */
     val confidence: Float = 0f,
+)
+
+/** Request body for `POST /shows/add-to-library`. Shared between TV (client) and phone (server). */
+@Serializable
+data class PhoneAddToLibraryRequest(
+    val show: TraktShow,
+    val episode: TraktEpisode,
 )
 
 // ── Scrobble Display ─────────────────────────────────────────────────────────
