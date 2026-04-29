@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.32.0](https://github.com/justb81/watchbuddy/compare/v0.31.0...v0.32.0) (2026-04-29)
+
+
+### Features
+
+* **tv:** auto-add unknown shows to Trakt library on overlay confirm ([#468](https://github.com/justb81/watchbuddy/issues/468)) ([#509](https://github.com/justb81/watchbuddy/issues/509)) ([f10362a](https://github.com/justb81/watchbuddy/commit/f10362a212ca28e43f33a029147c284771befb85))
+* **tv:** Watch-Now intent as Phase 0 scrobble hint ([#475](https://github.com/justb81/watchbuddy/issues/475)) ([#504](https://github.com/justb81/watchbuddy/issues/504)) ([da536a2](https://github.com/justb81/watchbuddy/commit/da536a257def4f94b9cf0cbdacecc234a6e78e29))
+
+
+### Bug Fixes
+
+* **core:** introduce nextUnwatchedEpisodeNumbers for ShowDetail ([#498](https://github.com/justb81/watchbuddy/issues/498)) ([#507](https://github.com/justb81/watchbuddy/issues/507)) ([da9daff](https://github.com/justb81/watchbuddy/commit/da9daff8392fa8a7f01fa2abaaa5baf1b213ccec))
+* **core:** use count-based episodesBehind in ShowProgressCalculator ([#503](https://github.com/justb81/watchbuddy/issues/503)) ([03b2010](https://github.com/justb81/watchbuddy/commit/03b20107d1645c69483813522de145d9a13df03c))
+* **tv:** disable Watch Now button when no streaming provider is available ([#510](https://github.com/justb81/watchbuddy/issues/510)) ([b981e00](https://github.com/justb81/watchbuddy/commit/b981e00d448df29ae37aaa6e978722843bf2919f)), closes [#496](https://github.com/justb81/watchbuddy/issues/496)
+* **tv:** request READ_TV_LISTINGS at runtime + cache denial in WatchNextMetadataSource ([#500](https://github.com/justb81/watchbuddy/issues/500)) ([cb35eed](https://github.com/justb81/watchbuddy/commit/cb35eed88181d63447d7754f3ceb70def145e043))
+* **tv:** show TMDB synopsis as recap fallback when companion is unreachable ([#508](https://github.com/justb81/watchbuddy/issues/508)) ([a8b31d1](https://github.com/justb81/watchbuddy/commit/a8b31d17da6641d121826bf40ccc8744c6c61718)), closes [#497](https://github.com/justb81/watchbuddy/issues/497)
+* **tv:** surface JustWatch errors, stop caching negatives on hard failures ([#502](https://github.com/justb81/watchbuddy/issues/502)) ([55da643](https://github.com/justb81/watchbuddy/commit/55da643f3345d9970324a026c405f83404cfbeac))
+
 ## [0.31.0](https://github.com/justb81/watchbuddy/compare/v0.30.0...v0.31.0) (2026-04-28)
 
 
