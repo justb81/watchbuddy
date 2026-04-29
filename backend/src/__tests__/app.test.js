@@ -1315,3 +1315,161 @@ describe('Trust proxy', () => {
     expect(res.body.access_token).toBe('acc');
   });
 });
+
+// ── filterErrorResponse — sanitize Trakt error bodies (#551) ───────────────
+
+describe('filterErrorResponse — Trakt error bodies are sanitized before forwarding', () => {
+  let errorSpy;
+  let warnSpy;
+
+  beforeEach(() => {
+    errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    errorSpy.mockRestore();
+    warnSpy.mockRestore();
+  });
+
+  it('strips non-standard fields from a Trakt 4xx body on token exchange', async () => {
+    const app = buildApp(
+      mockFetch(403, {
+        error: 'invalid_api_key',
+        error_description: 'API key revoked',
+        rate_limit_remaining: 5,
+        account_id: 12345,
+        access_token: 'leaked-token',
+        debug_hint: 'internal-trakt-state',
+      })
+    );
+
+    const res = await request(app).post('/trakt/token').send({ code: 'device-code-abc' });
+
+    expect(res.status).toBe(403);
+    expect(res.body).toEqual({
+      error: 'invalid_api_key',
+      error_description: 'API key revoked',
+    });
+    expect(res.body).not.toHaveProperty('rate_limit_remaining');
+    expect(res.body).not.toHaveProperty('account_id');
+    expect(res.body).not.toHaveProperty('access_token');
+    expect(res.body).not.toHaveProperty('debug_hint');
+  });
+
+  it('strips non-standard fields from a Trakt 4xx body on token refresh', async () => {
+    const app = buildApp(
+      mockFetch(401, {
+        error: 'invalid_token',
+        error_description: 'expired',
+        user_id: 99,
+        partial_access_token: 'leak',
+      })
+    );
+
+    const res = await request(app)
+      .post('/trakt/token/refresh')
+      .send({ refresh_token: 'expired-token' });
+
+    expect(res.status).toBe(401);
+    expect(res.body).toEqual({
+      error: 'invalid_token',
+      error_description: 'expired',
+    });
+    expect(res.body).not.toHaveProperty('user_id');
+    expect(res.body).not.toHaveProperty('partial_access_token');
+  });
+
+  it('returns an empty body when the Trakt error has no error / error_description', async () => {
+    const app = buildApp(mockFetch(500, { rate_limit_remaining: 0, internal_id: 'x' }));
+    const res = await request(app).post('/trakt/token').send({ code: 'device-code-abc' });
+    expect(res.status).toBe(500);
+    expect(res.body).toEqual({});
+  });
+
+  it('drops non-string error / error_description fields', async () => {
+    const app = buildApp(mockFetch(400, { error: 42, error_description: { nested: 'object' } }));
+    const res = await request(app).post('/trakt/token').send({ code: 'device-code-abc' });
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({});
+  });
+
+  it('still logs the full Trakt error body server-side at error level', async () => {
+    const app = buildApp(
+      mockFetch(403, {
+        error: 'invalid_api_key',
+        rate_limit_remaining: 5,
+      })
+    );
+    await request(app).post('/trakt/token').send({ code: 'device-code-abc' });
+    // The original body snippet (incl. the field that was stripped from the
+    // client response) is still logged server-side for debugging.
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('rate_limit_remaining'));
+  });
+});
+
+// ── Body parser hardening (#552) ───────────────────────────────────────────
+
+describe('Body parser hardening — content type and size limits', () => {
+  it('rejects POST with non-JSON content-type with 415', async () => {
+    const app = buildApp(mockFetch(200, {}));
+    const res = await request(app)
+      .post('/trakt/token')
+      .set('Content-Type', 'text/plain')
+      .send('code=abc');
+    expect(res.status).toBe(415);
+    expect(res.body).toEqual({ error: 'invalid_content_type' });
+  });
+
+  it('rejects POST with form-urlencoded content-type with 415', async () => {
+    const app = buildApp(mockFetch(200, {}));
+    const res = await request(app)
+      .post('/trakt/token')
+      .set('Content-Type', 'application/x-www-form-urlencoded')
+      .send('code=abc');
+    expect(res.status).toBe(415);
+    expect(res.body).toEqual({ error: 'invalid_content_type' });
+  });
+
+  it('rejects oversized JSON body with 413 payload_too_large', async () => {
+    const app = buildApp(mockFetch(200, {}));
+    const oversize = JSON.stringify({ code: 'a'.repeat(8000) });
+    const res = await request(app)
+      .post('/trakt/token')
+      .set('Content-Type', 'application/json')
+      .send(oversize);
+    expect(res.status).toBe(413);
+    expect(res.body).toEqual({ error: 'payload_too_large' });
+  });
+
+  it('rejects malformed JSON with 400 invalid_json', async () => {
+    const app = buildApp(mockFetch(200, {}));
+    const res = await request(app)
+      .post('/trakt/token')
+      .set('Content-Type', 'application/json')
+      .send('{not valid json');
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ error: 'invalid_json' });
+  });
+
+  it('still accepts well-formed JSON under the 4kb limit', async () => {
+    const app = buildApp(
+      mockFetch(200, {
+        access_token: 'acc',
+        refresh_token: 'ref',
+        expires_in: 7776000,
+        token_type: 'Bearer',
+        scope: 'public',
+      })
+    );
+    const res = await request(app).post('/trakt/token').send({ code: 'device-code-abc' });
+    expect(res.status).toBe(200);
+    expect(res.body.access_token).toBe('acc');
+  });
+
+  it('does not 415 GET /health (only POST is gated)', async () => {
+    const app = buildApp(mockFetch(200, {}));
+    const res = await request(app).get('/health');
+    expect(res.status).not.toBe(415);
+  });
+});

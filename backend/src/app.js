@@ -123,6 +123,17 @@ export function createApp(config) {
     };
   }
 
+  // Trakt error bodies can include rate-limit hints, account state, or partial
+  // token fields — strip everything except the standard OAuth `error` /
+  // `error_description` so the client never sees information it doesn't need.
+  function filterErrorResponse(data) {
+    if (!data || typeof data !== 'object') return {};
+    const out = {};
+    if (typeof data.error === 'string') out.error = data.error;
+    if (typeof data.error_description === 'string') out.error_description = data.error_description;
+    return out;
+  }
+
   /**
    * Handles a caught fetch error (AbortError / network error) and writes the
    * appropriate HTTP error response.  fetchTimeoutMs is read from the outer closure.
@@ -267,7 +278,23 @@ export function createApp(config) {
   // from X-Forwarded-For instead of treating all traffic as one bucket.
   app.set('trust proxy', 1);
   app.use(helmet());
-  app.use(express.json());
+
+  app.use((req, res, next) => {
+    if (req.method === 'POST' && !req.is('application/json')) {
+      return res.status(415).json({ error: 'invalid_content_type' });
+    }
+    next();
+  });
+  app.use(express.json({ limit: '4kb', strict: true }));
+  app.use((err, _req, res, next) => {
+    if (err?.type === 'entity.too.large') {
+      return res.status(413).json({ error: 'payload_too_large' });
+    }
+    if (err?.type === 'entity.parse.failed') {
+      return res.status(400).json({ error: 'invalid_json' });
+    }
+    return next(err);
+  });
 
   if (debug) {
     app.use((req, res, next) => {
@@ -343,7 +370,7 @@ export function createApp(config) {
             );
           }
         }
-        return res.status(traktRes.status).json(data);
+        return res.status(traktRes.status).json(filterErrorResponse(data));
       }
 
       return res.json(filterTokenResponse(data));
@@ -390,7 +417,7 @@ export function createApp(config) {
             'Hint: HTTP 403 from Trakt usually means TRAKT_CLIENT_ID is invalid or revoked.'
           );
         }
-        return res.status(traktRes.status).json(data);
+        return res.status(traktRes.status).json(filterErrorResponse(data));
       }
 
       return res.json(filterTokenResponse(data));
