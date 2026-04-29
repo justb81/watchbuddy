@@ -275,5 +275,4 @@ class ShowDetailViewModel @Inject constructor(
             else -> provider.tmdbPageUrl
         }
     }
-
 }
