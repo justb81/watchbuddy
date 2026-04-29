@@ -1,11 +1,10 @@
 package com.justb81.watchbuddy.phone.server
 
+import com.justb81.watchbuddy.core.model.DeviceCapability
 import com.justb81.watchbuddy.core.model.EnrichedShowEntry
 import com.justb81.watchbuddy.core.model.LlmBackend
 import com.justb81.watchbuddy.core.model.MediaMetadataSnapshot
 import com.justb81.watchbuddy.core.model.ScrobbleAction
-import com.justb81.watchbuddy.core.model.DeviceCapability
-import com.justb81.watchbuddy.core.trakt.SyncHistoryResult
 import com.justb81.watchbuddy.core.model.TitleExtractionResponse
 import com.justb81.watchbuddy.core.model.TmdbEpisode
 import com.justb81.watchbuddy.core.model.TmdbShow
@@ -18,6 +17,7 @@ import com.justb81.watchbuddy.core.model.TraktWatchedSeason
 import com.justb81.watchbuddy.core.tmdb.TmdbApiService
 import com.justb81.watchbuddy.core.tmdb.TmdbCache
 import com.justb81.watchbuddy.core.trakt.ScrobbleResponse
+import com.justb81.watchbuddy.core.trakt.SyncHistoryResult
 import com.justb81.watchbuddy.core.trakt.TraktApiService
 import com.justb81.watchbuddy.phone.auth.TokenRefreshManager
 import com.justb81.watchbuddy.phone.auth.TokenRepository
