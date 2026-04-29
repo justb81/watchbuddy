@@ -57,6 +57,9 @@ class TvDiagnosticsViewModelTest {
         coEvery { justWatchRepo.count() } returns 0
         coEvery { justWatchRepo.negativeCount() } returns 0
         coEvery { justWatchRepo.lastFetchedAt() } returns null
+        coEvery { justWatchRepo.clearAll() } returns Unit
+        every { justWatchRepo.lastFetchError() } returns null
+        every { justWatchRepo.searchMissCount() } returns 0
         every { watchNextSource.countPublishingApps() } returns WatchNextMetadataSource.CountResult.Success(0)
     }
 
@@ -172,5 +175,21 @@ class TvDiagnosticsViewModelTest {
         advanceUntilIdle()
 
         assertEquals(1, vm.uiState.value.notificationTrackedCount)
+    }
+
+    @Test
+    fun `clearJustWatchCache clears repo and resets cache stats to zero`() = runTest {
+        coEvery { justWatchRepo.count() } returnsMany listOf(5, 0)
+        coEvery { justWatchRepo.negativeCount() } returnsMany listOf(3, 0)
+        val vm = TvDiagnosticsViewModel(
+            application, phoneDiscovery, scrobbler, justWatchRepo, watchNextSource, notificationSource, NoOpPlaybackIntentProvider(),
+        )
+        advanceUntilIdle()
+
+        vm.clearJustWatchCache()
+        advanceUntilIdle()
+
+        assertEquals(0, vm.uiState.value.cachedDeepLinkCount)
+        assertEquals(0, vm.uiState.value.negativeDeepLinkCount)
     }
 }

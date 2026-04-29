@@ -568,7 +568,7 @@ private fun StreamingDeepLinksSection(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = CardDefaults.shape(RoundedCornerShape(12.dp)),
-        onClick = {},
+        onClick = onClearCache,
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             listOf(
@@ -610,9 +610,12 @@ private fun StreamingDeepLinksSection(
                 }
             }
             Spacer(Modifier.height(8.dp))
-            OutlinedButton(onClick = onClearCache) {
-                Text(stringResource(R.string.tv_diagnostics_action_clear_streaming_cache), fontSize = 13.sp)
-            }
+            Text(
+                text = stringResource(R.string.tv_diagnostics_action_clear_streaming_cache),
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = ActionHintColor,
+            )
         }
     }
 }
