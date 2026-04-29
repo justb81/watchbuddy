@@ -162,10 +162,12 @@ fun TvDiagnosticsScreen(
 
             if (uiState.phones.isEmpty()) {
                 item {
-                    Card(
+                    Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = CardDefaults.shape(RoundedCornerShape(12.dp)),
-                        onClick = {},
+                        shape = RoundedCornerShape(12.dp),
+                        colors = SurfaceDefaults.colors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        ),
                     ) {
                         Text(
                             text = stringResource(R.string.tv_diagnostics_value_no_phones),
@@ -244,10 +246,12 @@ fun TvDiagnosticsScreen(
 
             if (uiState.recentEvents.isEmpty()) {
                 item {
-                    Card(
+                    Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = CardDefaults.shape(RoundedCornerShape(12.dp)),
-                        onClick = {},
+                        shape = RoundedCornerShape(12.dp),
+                        colors = SurfaceDefaults.colors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        ),
                     ) {
                         Text(
                             text = stringResource(R.string.tv_diagnostics_value_no_events),
@@ -275,10 +279,12 @@ fun TvDiagnosticsScreen(
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun PhoneDiagnosticsCard(phone: PhoneDiscoveryManager.DiscoveredPhone) {
-    Card(
+    Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = CardDefaults.shape(RoundedCornerShape(12.dp)),
-        onClick = {},
+        shape = RoundedCornerShape(12.dp),
+        colors = SurfaceDefaults.colors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+        ),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
@@ -346,10 +352,12 @@ private fun RecentEventRow(entry: DiagnosticLog.Entry) {
         DiagnosticLog.Level.ERROR -> Status.FAIL
     }
     val message = entry.throwableSummary?.let { "${entry.message} → $it" } ?: entry.message
-    Card(
+    Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = CardDefaults.shape(RoundedCornerShape(12.dp)),
-        onClick = {},
+        shape = RoundedCornerShape(12.dp),
+        colors = SurfaceDefaults.colors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+        ),
     ) {
         Row(
             modifier = Modifier
@@ -395,10 +403,12 @@ private fun DiagnosticsSection(title: String, rows: List<DiagRow>) {
         color = Color.White.copy(alpha = 0.7f),
         modifier = Modifier.padding(top = 8.dp, bottom = 4.dp, start = 4.dp),
     )
-    Card(
+    Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = CardDefaults.shape(RoundedCornerShape(12.dp)),
-        onClick = {},
+        shape = RoundedCornerShape(12.dp),
+        colors = SurfaceDefaults.colors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+        ),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             rows.forEach { row ->
@@ -568,6 +578,7 @@ private fun StreamingDeepLinksSection(
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = CardDefaults.shape(RoundedCornerShape(12.dp)),
+        scale = CardDefaults.scale(focusedScale = 1.02f),
         onClick = onClearCache,
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -667,19 +678,9 @@ private fun WatchNextSection(countResult: WatchNextMetadataSource.CountResult?) 
         color = Color.White.copy(alpha = 0.7f),
         modifier = Modifier.padding(top = 8.dp, bottom = 4.dp, start = 4.dp),
     )
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = CardDefaults.shape(RoundedCornerShape(12.dp)),
-        onClick = {
-            if (isPermissionDenied) {
-                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                    data = Uri.fromParts("package", context.packageName, null)
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                runCatching { context.startActivity(intent) }
-            }
-        },
-    ) {
+    val cardModifier = Modifier.fillMaxWidth()
+    val cardShape = RoundedCornerShape(12.dp)
+    val cardContent: @Composable () -> Unit = {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
                 modifier = Modifier
@@ -713,6 +714,28 @@ private fun WatchNextSection(countResult: WatchNextMetadataSource.CountResult?) 
                 )
             }
         }
+    }
+    if (isPermissionDenied) {
+        Card(
+            modifier = cardModifier,
+            shape = CardDefaults.shape(cardShape),
+            scale = CardDefaults.scale(focusedScale = 1.02f),
+            onClick = {
+                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.fromParts("package", context.packageName, null)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                runCatching { context.startActivity(intent) }
+            },
+        ) { cardContent() }
+    } else {
+        Surface(
+            modifier = cardModifier,
+            shape = cardShape,
+            colors = SurfaceDefaults.colors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+            ),
+        ) { cardContent() }
     }
 }
 
