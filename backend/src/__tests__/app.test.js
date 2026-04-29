@@ -515,10 +515,77 @@ describe('POST /trakt/token — server_misconfigured', () => {
 // ── Unknown routes ──────────────────────────────────────────────────────────
 
 describe('Unknown routes', () => {
-  it('returns 404 for unregistered paths', async () => {
+  it('returns 404 with JSON body for unregistered paths', async () => {
     const app = buildApp(mockFetch(200, {}));
     const res = await request(app).get('/does-not-exist');
     expect(res.status).toBe(404);
+    expect(res.headers['content-type']).toMatch(/application\/json/);
+    expect(res.body).toEqual({ error: 'not_found' });
+  });
+
+  it('returns 404 JSON for unknown POST paths regardless of method', async () => {
+    const app = buildApp(mockFetch(200, {}));
+    const res = await request(app)
+      .post('/no-such-endpoint')
+      .set('Content-Type', 'application/json')
+      .send({ foo: 'bar' });
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({ error: 'not_found' });
+  });
+});
+
+describe('Global error handler', () => {
+  let errorSpy;
+
+  beforeEach(() => {
+    errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    errorSpy.mockRestore();
+  });
+
+  // body-parser throws { type: 'encoding.unsupported' } for unrecognised
+  // Content-Encoding values. The dedicated body-parser error handler in
+  // app.js only catches entity.too.large / entity.parse.failed and forwards
+  // every other type, which lands on the global error handler — exactly
+  // the path we want to exercise.
+  it('returns 500 JSON when an unhandled body-parser error reaches it', async () => {
+    const app = buildApp(mockFetch(200, {}));
+    const res = await request(app)
+      .post('/trakt/token')
+      .set('Content-Type', 'application/json')
+      .set('Content-Encoding', 'utterly-invalid-encoding')
+      .send('{"code":"abc"}');
+    expect(res.status).toBe(500);
+    expect(res.headers['content-type']).toMatch(/application\/json/);
+    expect(res.body).toEqual({ error: 'internal_error' });
+  });
+
+  it('does not leak the underlying error message in the response body', async () => {
+    const app = buildApp(mockFetch(200, {}));
+    const res = await request(app)
+      .post('/trakt/token')
+      .set('Content-Type', 'application/json')
+      .set('Content-Encoding', 'utterly-invalid-encoding')
+      .send('{"code":"abc"}');
+    const serialized = JSON.stringify(res.body);
+    expect(serialized).not.toMatch(/encoding/i);
+    expect(serialized).not.toMatch(/stack/i);
+    expect(serialized).not.toMatch(/utterly-invalid-encoding/);
+  });
+
+  it('logs the original error so operators can diagnose failures', async () => {
+    const app = buildApp(mockFetch(200, {}));
+    await request(app)
+      .post('/trakt/token')
+      .set('Content-Type', 'application/json')
+      .set('Content-Encoding', 'utterly-invalid-encoding')
+      .send('{"code":"abc"}');
+    const logged = errorSpy.mock.calls.some(([first]) =>
+      typeof first === 'string' ? first.includes('Unhandled error') : false
+    );
+    expect(logged).toBe(true);
   });
 });
 
