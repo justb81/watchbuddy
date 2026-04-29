@@ -283,7 +283,11 @@ private fun TvShowShelfRow(
     ) {
         items(shows, key = { it.focusKey() }) { enriched ->
             val key = enriched.focusKey()
-            val requester = requesters.getOrPut(key) { FocusRequester() }
+            val requester = remember(key) { FocusRequester() }
+            DisposableEffect(key, requester) {
+                requesters[key] = requester
+                onDispose { requesters.remove(key, requester) }
+            }
             TvShowCard(
                 enriched = enriched,
                 progress = enriched.entry.show.ids.trakt?.let { state.progress[it] },
