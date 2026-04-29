@@ -175,9 +175,13 @@ class TvDiagnosticsViewModel @Inject constructor(
     /**
      * Queries the WatchNext content provider once and updates [TvDiagnosticsUiState.watchNextCountResult].
      * Call on [Lifecycle.Event.ON_RESUME] so the Diagnostics screen always shows a fresh count.
+     *
+     * Clears the cached permission-denied flag first so that a permission grant the user just
+     * made in the system settings is picked up immediately when they return to this screen.
      */
     fun refreshWatchNextStats() {
         viewModelScope.launch {
+            watchNextSource.resetPermissionState()
             val result = withContext(Dispatchers.IO) { watchNextSource.countPublishingApps() }
             _uiState.update { it.copy(watchNextCountResult = result) }
         }

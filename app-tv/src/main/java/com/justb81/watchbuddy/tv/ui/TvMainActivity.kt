@@ -11,12 +11,17 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.justb81.watchbuddy.tv.discovery.TvDiscoveryService
+import com.justb81.watchbuddy.tv.scrobbler.WatchNextMetadataSource
 import com.justb81.watchbuddy.tv.ui.navigation.TvNavGraph
 import com.justb81.watchbuddy.tv.ui.theme.WatchBuddyTvTheme
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class TvMainActivity : ComponentActivity() {
+
+    @Inject
+    lateinit var watchNextSource: WatchNextMetadataSource
 
     private val requestBluetoothScanPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -26,9 +31,21 @@ class TvMainActivity : ComponentActivity() {
         Log.i(TAG, "BLUETOOTH_SCAN granted=$granted")
     }
 
+    private val requestReadTvListingsPermission = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        Log.i(TAG, "READ_TV_LISTINGS granted=$granted")
+        if (granted) {
+            // Clear the cached denial so WatchNextMetadataSource retries the
+            // provider query on the next scrobble tick instead of short-circuiting.
+            watchNextSource.resetPermissionState()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         maybeRequestBluetoothScanPermission()
+        maybeRequestReadTvListingsPermission()
         setContent {
             WatchBuddyTvTheme {
                 TvNavGraph()
@@ -69,6 +86,24 @@ class TvMainActivity : ComponentActivity() {
             ) != PackageManager.PERMISSION_GRANTED
         ) {
             requestBluetoothScanPermission.launch(Manifest.permission.BLUETOOTH_SCAN)
+        }
+    }
+
+    /**
+     * Request READ_TV_LISTINGS so [WatchNextMetadataSource] can read the system
+     * WatchNext content provider — the primary evidence channel for Netflix /
+     * Disney+ / Prime / Apple TV+ / YouTube TV scrobbling. The permission is
+     * auto-granted on most Android TV firmwares but not on all Google TV /
+     * 3rd-party builds, where the system shows a runtime dialog. The system
+     * suppresses the dialog when already granted or after the user has answered.
+     */
+    private fun maybeRequestReadTvListingsPermission() {
+        if (ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.READ_TV_LISTINGS
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            requestReadTvListingsPermission.launch(Manifest.permission.READ_TV_LISTINGS)
         }
     }
 

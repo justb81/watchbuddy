@@ -32,9 +32,13 @@
          currently-playing program metadata (title, season, episode, contentId)
          from the system TV provider that streaming apps populate for the
          Android TV launcher's "Continue Watching" row.
-         Granted automatically on Android TV form-factor; no runtime prompt
-         needed. On non-TV form-factor the query returns an empty cursor, which
-         WatchNextMetadataSource handles gracefully. -->
+         Auto-granted on most Android TV firmwares but a growing number of
+         Google TV / 3rd-party builds require an explicit runtime grant. The
+         permission has protection level signature|privileged|appop, so
+         TvMainActivity.maybeRequestReadTvListingsPermission() requests it at
+         runtime; the system suppresses the dialog when already granted.
+         WatchNextMetadataSource caches a SecurityException once and surfaces a
+         "tap to open settings" CTA in TV Diagnostics for manual recovery. -->
     <uses-permission android:name="android.permission.READ_TV_LISTINGS" />
 
     <!-- Scrobble detection — WatchBuddyNotificationListener is declared as a
