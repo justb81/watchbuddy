@@ -94,7 +94,8 @@ class ShowProgressCalculatorTest {
     @DisplayName("InProgress")
     inner class InProgressTest {
         @Test
-        fun `watched S01E03 with S01E05 aired yields behind=2`() {
+        fun `watched S01E01-03 with 5 aired in season yields behind=2`() {
+            // episode_count=5 represents the 5 aired episodes; watched 3 of them → behind=2
             val e = entry(
                 Triple(1, 1, "2024-01-01T10:00:00Z"),
                 Triple(1, 2, "2024-01-02T10:00:00Z"),
@@ -104,7 +105,7 @@ class ShowProgressCalculatorTest {
                 status = "Returning Series",
                 lastAired = TmdbEpisodeSummary(1, 5, air_date = "2024-02-01"),
                 nextAired = TmdbEpisodeSummary(1, 6, air_date = "2024-02-08"),
-                seasons = listOf(TmdbSeasonSummary(1, 10))
+                seasons = listOf(TmdbSeasonSummary(1, 5))
             )
             val result = ShowProgressCalculator.compute(e, h, utc)
             assertTrue(result is ShowProgress.InProgress)
@@ -117,19 +118,32 @@ class ShowProgressCalculatorTest {
 
         @Test
         fun `multi-season gap math sums prior seasons`() {
-            val e = entry(Triple(1, 10, "2024-01-01T10:00:00Z"))
+            // User watched all 10 of S1. S2 (8 eps) fully aired, S3 has 2 aired.
+            // episode_count per season = aired count: S1=10, S2=8, S3=2.
+            // airedRegular=20, watchedRegular=10 → behind=10.
+            val e = entry(
+                Triple(1, 1, "2024-01-01T10:00:00Z"),
+                Triple(1, 2, "2024-01-02T10:00:00Z"),
+                Triple(1, 3, "2024-01-03T10:00:00Z"),
+                Triple(1, 4, "2024-01-04T10:00:00Z"),
+                Triple(1, 5, "2024-01-05T10:00:00Z"),
+                Triple(1, 6, "2024-01-06T10:00:00Z"),
+                Triple(1, 7, "2024-01-07T10:00:00Z"),
+                Triple(1, 8, "2024-01-08T10:00:00Z"),
+                Triple(1, 9, "2024-01-09T10:00:00Z"),
+                Triple(1, 10, "2024-01-10T10:00:00Z")
+            )
             val h = hint(
                 status = "Returning Series",
                 lastAired = TmdbEpisodeSummary(3, 2, air_date = "2024-06-01"),
                 seasons = listOf(
                     TmdbSeasonSummary(1, 10),
                     TmdbSeasonSummary(2, 8),
-                    TmdbSeasonSummary(3, 10)
+                    TmdbSeasonSummary(3, 2)
                 )
             )
             val result = ShowProgressCalculator.compute(e, h, utc)
             assertTrue(result is ShowProgress.InProgress)
-            // watched=10 (S1E10), aired=S3E2 => 10+8+2=20 → behind=10
             assertEquals(10, (result as ShowProgress.InProgress).episodesBehind)
         }
 
@@ -201,34 +215,49 @@ class ShowProgressCalculatorTest {
         }
 
         @Test
-        fun `season 0 episode_count does not inflate airedOrdinal across seasons`() {
+        fun `season 0 episode_count does not inflate airedRegular count`() {
             // TMDB returns S0 with 100 specials alongside real seasons. The
-            // S0 episode_count must not be summed into prior-season totals
-            // when computing the gap between watched and aired.
-            val e = entry(Triple(1, 5, "2024-01-05T10:00:00Z"))
+            // S0 episode_count must not be included in the aired-regular sum.
+            // User watched S1E01-E05 (5 eps); S1 has 10, S2 has 3 aired.
+            // airedRegular = 10+3 = 13 (S0=100 excluded), watchedRegular = 5 → behind=8.
+            val e = entry(
+                Triple(1, 1, "2024-01-01T10:00:00Z"),
+                Triple(1, 2, "2024-01-02T10:00:00Z"),
+                Triple(1, 3, "2024-01-03T10:00:00Z"),
+                Triple(1, 4, "2024-01-04T10:00:00Z"),
+                Triple(1, 5, "2024-01-05T10:00:00Z")
+            )
             val h = hint(
                 status = "Returning Series",
                 lastAired = TmdbEpisodeSummary(2, 3, air_date = "2024-02-01"),
                 seasons = listOf(
-                    TmdbSeasonSummary(0, 100), // specials
+                    TmdbSeasonSummary(0, 100), // specials — must not inflate count
                     TmdbSeasonSummary(1, 10),
-                    TmdbSeasonSummary(2, 10)
+                    TmdbSeasonSummary(2, 3)
                 )
             )
             val result = ShowProgressCalculator.compute(e, h, utc)
             assertTrue(result is ShowProgress.InProgress)
-            // watched = S1E5 → 5
-            // aired   = S2E3 → priorSum(S1=10) + 3 = 13  (S0=100 must NOT count)
-            // behind  = 13 - 5 = 8
             assertEquals(8, (result as ShowProgress.InProgress).episodesBehind)
         }
 
         @Test
         fun `only-specials aired reports zero behind`() {
-            // TMDB says the most recently aired episode is a special. The
-            // calculator must not treat that as a regular episode the user
-            // is behind on.
-            val e = entry(Triple(1, 10, "2024-01-05T10:00:00Z"))
+            // User has watched all 10 regular episodes of S1. The most recently
+            // aired episode is a special (season 0). S0 must not be counted in
+            // airedRegular. airedRegular=10, watchedRegular=10 → behind=0 → CaughtUpAiring.
+            val e = entry(
+                Triple(1, 1, "2024-01-01T10:00:00Z"),
+                Triple(1, 2, "2024-01-02T10:00:00Z"),
+                Triple(1, 3, "2024-01-03T10:00:00Z"),
+                Triple(1, 4, "2024-01-04T10:00:00Z"),
+                Triple(1, 5, "2024-01-05T10:00:00Z"),
+                Triple(1, 6, "2024-01-06T10:00:00Z"),
+                Triple(1, 7, "2024-01-07T10:00:00Z"),
+                Triple(1, 8, "2024-01-08T10:00:00Z"),
+                Triple(1, 9, "2024-01-09T10:00:00Z"),
+                Triple(1, 10, "2024-01-10T10:00:00Z")
+            )
             val h = hint(
                 status = "Returning Series",
                 lastAired = TmdbEpisodeSummary(0, 47, air_date = "2024-02-01"),
@@ -239,16 +268,75 @@ class ShowProgressCalculatorTest {
                 )
             )
             val result = ShowProgressCalculator.compute(e, h, utc)
-            // lastAired is a special → airedOrdinal=0 → behind clamps to 0,
-            // and because there is a next regular aired we expect CaughtUpAiring.
             assertTrue(result is ShowProgress.CaughtUpAiring)
         }
 
         @Test
-        fun `specials watched alongside regulars do not affect behind delta`() {
+        fun `only finale watched on ended show yields InProgress not CaughtUpEnded`() {
+            // Bug regression: user watched only S03E08 (finale) of an 8-ep ended show.
+            // The ordinal approach gave behind=0 (watched ordinal == aired ordinal) and
+            // wrongly returned CaughtUpEnded. The count approach gives behind=7.
+            val e = entry(Triple(3, 8, "2024-10-08T10:00:00Z"))
+            val h = hint(
+                status = "Ended",
+                lastAired = TmdbEpisodeSummary(3, 8, air_date = "2024-10-01"),
+                seasons = listOf(TmdbSeasonSummary(3, 8))
+            )
+            val result = ShowProgressCalculator.compute(e, h, utc)
+            assertTrue(result is ShowProgress.InProgress)
+            assertEquals(7, (result as ShowProgress.InProgress).episodesBehind)
+        }
+
+        @Test
+        fun `5 of 8 episodes watched contiguously yields behind=3`() {
             val e = entry(
-                Triple(0, 3, "2024-03-01T10:00:00Z"),   // special
-                Triple(1, 2, "2024-01-01T10:00:00Z"),
+                Triple(3, 1, "2024-03-01T10:00:00Z"),
+                Triple(3, 2, "2024-03-08T10:00:00Z"),
+                Triple(3, 3, "2024-03-15T10:00:00Z"),
+                Triple(3, 4, "2024-03-22T10:00:00Z"),
+                Triple(3, 5, "2024-03-29T10:00:00Z")
+            )
+            val h = hint(
+                status = "Ended",
+                lastAired = TmdbEpisodeSummary(3, 8, air_date = "2024-05-01"),
+                seasons = listOf(TmdbSeasonSummary(3, 8))
+            )
+            val result = ShowProgressCalculator.compute(e, h, utc)
+            assertTrue(result is ShowProgress.InProgress)
+            assertEquals(3, (result as ShowProgress.InProgress).episodesBehind)
+        }
+
+        @Test
+        fun `5 of 8 episodes watched with gap at S03E03 yields behind=3`() {
+            // Gap-watching: S03E03 skipped. Count-based behind correctly counts
+            // unwatched episodes (8 total - 5 watched = 3), not ordinal gap.
+            val e = entry(
+                Triple(3, 1, "2024-03-01T10:00:00Z"),
+                Triple(3, 2, "2024-03-08T10:00:00Z"),
+                // S03E03 intentionally skipped
+                Triple(3, 4, "2024-03-22T10:00:00Z"),
+                Triple(3, 5, "2024-03-29T10:00:00Z"),
+                Triple(3, 6, "2024-04-05T10:00:00Z")
+            )
+            val h = hint(
+                status = "Ended",
+                lastAired = TmdbEpisodeSummary(3, 8, air_date = "2024-05-01"),
+                seasons = listOf(TmdbSeasonSummary(3, 8))
+            )
+            val result = ShowProgressCalculator.compute(e, h, utc)
+            assertTrue(result is ShowProgress.InProgress)
+            assertEquals(3, (result as ShowProgress.InProgress).episodesBehind)
+        }
+
+        @Test
+        fun `specials watched alongside regulars do not affect behind delta`() {
+            // User watched S1E01-E03 (3 regular eps) plus a special (S0E03).
+            // episode_count=5 for S1 (5 aired regular eps), S0 excluded from count.
+            // airedRegular=5, watchedRegular=3 → behind=2.
+            val e = entry(
+                Triple(0, 3, "2024-03-01T10:00:00Z"),   // special — must not count
+                Triple(1, 1, "2024-01-01T10:00:00Z"),
+                Triple(1, 2, "2024-01-05T10:00:00Z"),
                 Triple(1, 3, "2024-01-10T10:00:00Z")
             )
             val h = hint(
@@ -256,12 +344,11 @@ class ShowProgressCalculatorTest {
                 lastAired = TmdbEpisodeSummary(1, 5, air_date = "2024-02-01"),
                 seasons = listOf(
                     TmdbSeasonSummary(0, 20),
-                    TmdbSeasonSummary(1, 10)
+                    TmdbSeasonSummary(1, 5)
                 )
             )
             val result = ShowProgressCalculator.compute(e, h, utc)
             assertTrue(result is ShowProgress.InProgress)
-            // watched regular = S1E3 → 3, aired regular = S1E5 → 5
             assertEquals(2, (result as ShowProgress.InProgress).episodesBehind)
             assertEquals("S01E03", result.latestWatchedLabel)
         }
@@ -359,6 +446,28 @@ class ShowProgressCalculatorTest {
     @DisplayName("CaughtUp")
     inner class CaughtUpTest {
         @Test
+        fun `all 8 of 8 episodes watched on ended show returns CaughtUpEnded`() {
+            // Regression guard: user watched every episode → CaughtUpEnded, not InProgress.
+            val e = entry(
+                Triple(3, 1, "2024-03-01T10:00:00Z"),
+                Triple(3, 2, "2024-03-08T10:00:00Z"),
+                Triple(3, 3, "2024-03-15T10:00:00Z"),
+                Triple(3, 4, "2024-03-22T10:00:00Z"),
+                Triple(3, 5, "2024-03-29T10:00:00Z"),
+                Triple(3, 6, "2024-04-05T10:00:00Z"),
+                Triple(3, 7, "2024-04-12T10:00:00Z"),
+                Triple(3, 8, "2024-10-08T10:00:00Z")
+            )
+            val h = hint(
+                status = "Ended",
+                lastAired = TmdbEpisodeSummary(3, 8, air_date = "2024-10-01"),
+                seasons = listOf(TmdbSeasonSummary(3, 8))
+            )
+            val result = ShowProgressCalculator.compute(e, h, utc)
+            assertTrue(result is ShowProgress.CaughtUpEnded)
+        }
+
+        @Test
         fun `ended show all watched returns CaughtUpEnded`() {
             val e = entry(
                 Triple(1, 1, "2024-01-01T10:00:00Z"),
@@ -376,12 +485,20 @@ class ShowProgressCalculatorTest {
 
         @Test
         fun `airing show all watched with next scheduled returns CaughtUpAiring`() {
-            val e = entry(Triple(1, 5, "2024-02-01T10:00:00Z"))
+            // User watched all 5 aired episodes; episode_count=5 to match.
+            // airedRegular=5, watchedRegular=5 → behind=0 → CaughtUpAiring.
+            val e = entry(
+                Triple(1, 1, "2024-01-01T10:00:00Z"),
+                Triple(1, 2, "2024-01-08T10:00:00Z"),
+                Triple(1, 3, "2024-01-15T10:00:00Z"),
+                Triple(1, 4, "2024-01-22T10:00:00Z"),
+                Triple(1, 5, "2024-02-01T10:00:00Z")
+            )
             val h = hint(
                 status = "Returning Series",
                 lastAired = TmdbEpisodeSummary(1, 5, air_date = "2024-02-01"),
                 nextAired = TmdbEpisodeSummary(1, 6, air_date = "2024-02-08"),
-                seasons = listOf(TmdbSeasonSummary(1, 10))
+                seasons = listOf(TmdbSeasonSummary(1, 5))
             )
             val result = ShowProgressCalculator.compute(e, h, utc)
             assertTrue(result is ShowProgress.CaughtUpAiring)
@@ -390,21 +507,36 @@ class ShowProgressCalculatorTest {
 
         @Test
         fun `stale TMDB (watched ahead of lastAired) clamps to zero and stays CaughtUp`() {
-            val e = entry(Triple(1, 8, "2024-02-10T10:00:00Z"))
+            // Trakt is fresher than TMDB: user watched 8 episodes but TMDB only lists 5.
+            // watchedRegular=8, airedRegular=5 → behind=max(5-8,0)=0 → CaughtUpAiring.
+            val e = entry(
+                Triple(1, 1, "2024-01-01T10:00:00Z"),
+                Triple(1, 2, "2024-01-08T10:00:00Z"),
+                Triple(1, 3, "2024-01-15T10:00:00Z"),
+                Triple(1, 4, "2024-01-22T10:00:00Z"),
+                Triple(1, 5, "2024-01-29T10:00:00Z"),
+                Triple(1, 6, "2024-02-05T10:00:00Z"),
+                Triple(1, 7, "2024-02-07T10:00:00Z"),
+                Triple(1, 8, "2024-02-10T10:00:00Z")
+            )
             val h = hint(
                 status = "Returning Series",
                 lastAired = TmdbEpisodeSummary(1, 5, air_date = "2024-02-01"),
                 nextAired = TmdbEpisodeSummary(1, 6, air_date = "2024-02-08"),
-                seasons = listOf(TmdbSeasonSummary(1, 10))
+                seasons = listOf(TmdbSeasonSummary(1, 5))
             )
             val result = ShowProgressCalculator.compute(e, h, utc)
-            // watchedOrdinal=8, airedOrdinal=5 → behind=0 (clamped), next scheduled → CaughtUpAiring
             assertTrue(result is ShowProgress.CaughtUpAiring)
         }
 
         @Test
         fun `canceled status treated as ended`() {
-            val e = entry(Triple(1, 3, "2024-02-10T10:00:00Z"))
+            // All 3 episodes watched on a canceled show → CaughtUpEnded.
+            val e = entry(
+                Triple(1, 1, "2024-01-01T10:00:00Z"),
+                Triple(1, 2, "2024-01-08T10:00:00Z"),
+                Triple(1, 3, "2024-02-10T10:00:00Z")
+            )
             val h = hint(
                 status = "Canceled",
                 lastAired = TmdbEpisodeSummary(1, 3, air_date = "2024-02-01"),
