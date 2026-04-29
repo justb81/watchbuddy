@@ -423,4 +423,110 @@ class TvScrobbleDispatcherTest {
             coVerify(exactly = 1) { phoneApiService.scrobbleStart(any()) }
         }
     }
+
+    // ── dispatchAddToLibrary ───────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("dispatchAddToLibrary (#468)")
+    inner class AddToLibraryTest {
+
+        @Test
+        fun `fans out to all available phones in parallel`() = runTest(UnconfinedTestDispatcher()) {
+            dispatcher = TvScrobbleDispatcher(phoneDiscovery, phoneApiClientFactory, backgroundScope) { fakeNow }
+            val apiService1: PhoneApiService = mockk()
+            val apiService2: PhoneApiService = mockk()
+            val phone1 = makePhone(baseUrl = "http://phone1:8765/", name = "phone1")
+            val phone2 = makePhone(baseUrl = "http://phone2:8765/", name = "phone2")
+            phonesFlow.value = listOf(phone1, phone2)
+            coEvery { phoneApiClientFactory.createClient("http://phone1:8765/") } returns apiService1
+            coEvery { phoneApiClientFactory.createClient("http://phone2:8765/") } returns apiService2
+            coEvery { apiService1.addShowToLibrary(any()) } returns mockk()
+            coEvery { apiService2.addShowToLibrary(any()) } returns mockk()
+
+            val show = TestFixtures.traktShow(ids = TestFixtures.traktIds(trakt = null, tmdb = 66732))
+            dispatcher.dispatchAddToLibrary(show, TestFixtures.traktEpisode())
+
+            coVerify { apiService1.addShowToLibrary(any()) }
+            coVerify { apiService2.addShowToLibrary(any()) }
+        }
+
+        @Test
+        fun `IOException on one phone does not block dispatch to other phones`() = runTest(UnconfinedTestDispatcher()) {
+            dispatcher = TvScrobbleDispatcher(phoneDiscovery, phoneApiClientFactory, backgroundScope) { fakeNow }
+            val apiService1: PhoneApiService = mockk()
+            val apiService2: PhoneApiService = mockk()
+            val phone1 = makePhone(baseUrl = "http://phone1:8765/", name = "phone1")
+            val phone2 = makePhone(baseUrl = "http://phone2:8765/", name = "phone2")
+            phonesFlow.value = listOf(phone1, phone2)
+            coEvery { phoneApiClientFactory.createClient("http://phone1:8765/") } returns apiService1
+            coEvery { phoneApiClientFactory.createClient("http://phone2:8765/") } returns apiService2
+            coEvery { apiService1.addShowToLibrary(any()) } throws java.io.IOException("connection refused")
+            coEvery { apiService2.addShowToLibrary(any()) } returns mockk()
+
+            val show = TestFixtures.traktShow(ids = TestFixtures.traktIds(trakt = null, tmdb = 66732))
+            // Should not throw even when one phone fails.
+            dispatcher.dispatchAddToLibrary(show, TestFixtures.traktEpisode())
+
+            coVerify { apiService2.addShowToLibrary(any()) }
+        }
+
+        @Test
+        fun `session dedup prevents a second dispatch for the same TMDB id`() = runTest(UnconfinedTestDispatcher()) {
+            dispatcher = TvScrobbleDispatcher(phoneDiscovery, phoneApiClientFactory, backgroundScope) { fakeNow }
+            val phone = makePhone()
+            phonesFlow.value = listOf(phone)
+            coEvery { phoneApiClientFactory.createClient(any()) } returns phoneApiService
+            coEvery { phoneApiService.addShowToLibrary(any()) } returns mockk()
+
+            val show = TestFixtures.traktShow(ids = TestFixtures.traktIds(trakt = null, tmdb = 66732))
+            dispatcher.dispatchAddToLibrary(show, TestFixtures.traktEpisode())
+            dispatcher.dispatchAddToLibrary(show, TestFixtures.traktEpisode())
+
+            // Only the first call should reach the phone API.
+            coVerify(exactly = 1) { phoneApiService.addShowToLibrary(any()) }
+        }
+
+        @Test
+        fun `different TMDB ids are each dispatched`() = runTest(UnconfinedTestDispatcher()) {
+            dispatcher = TvScrobbleDispatcher(phoneDiscovery, phoneApiClientFactory, backgroundScope) { fakeNow }
+            val phone = makePhone()
+            phonesFlow.value = listOf(phone)
+            coEvery { phoneApiClientFactory.createClient(any()) } returns phoneApiService
+            coEvery { phoneApiService.addShowToLibrary(any()) } returns mockk()
+
+            val show1 = TestFixtures.traktShow(ids = TestFixtures.traktIds(trakt = null, tmdb = 111))
+            val show2 = TestFixtures.traktShow(ids = TestFixtures.traktIds(trakt = null, tmdb = 222))
+            dispatcher.dispatchAddToLibrary(show1, TestFixtures.traktEpisode())
+            dispatcher.dispatchAddToLibrary(show2, TestFixtures.traktEpisode())
+
+            coVerify(exactly = 2) { phoneApiService.addShowToLibrary(any()) }
+        }
+
+        @Test
+        fun `no-op when show has no TMDB id`() = runTest(UnconfinedTestDispatcher()) {
+            dispatcher = TvScrobbleDispatcher(phoneDiscovery, phoneApiClientFactory, backgroundScope) { fakeNow }
+            val phone = makePhone()
+            phonesFlow.value = listOf(phone)
+            coEvery { phoneApiClientFactory.createClient(any()) } returns phoneApiService
+
+            val showWithoutTmdbId = TestFixtures.traktShow(
+                ids = TestFixtures.traktIds(trakt = null, tmdb = null)
+            )
+            dispatcher.dispatchAddToLibrary(showWithoutTmdbId, TestFixtures.traktEpisode())
+
+            coVerify(exactly = 0) { phoneApiClientFactory.createClient(any()) }
+        }
+
+        @Test
+        fun `skips dispatch when no phones are available`() = runTest(UnconfinedTestDispatcher()) {
+            dispatcher = TvScrobbleDispatcher(phoneDiscovery, phoneApiClientFactory, backgroundScope) { fakeNow }
+            phonesFlow.value = emptyList()
+
+            val show = TestFixtures.traktShow(ids = TestFixtures.traktIds(trakt = null, tmdb = 66732))
+            // Should not throw.
+            dispatcher.dispatchAddToLibrary(show, TestFixtures.traktEpisode())
+
+            coVerify(exactly = 0) { phoneApiClientFactory.createClient(any()) }
+        }
+    }
 }

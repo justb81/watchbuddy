@@ -2,6 +2,7 @@ package com.justb81.watchbuddy.tv.discovery
 
 import com.justb81.watchbuddy.core.model.AmbiguousScrobbleEvent
 import com.justb81.watchbuddy.core.model.EnrichedShowEntry
+import com.justb81.watchbuddy.core.model.PhoneAddToLibraryRequest
 import com.justb81.watchbuddy.core.model.TitleExtractionRequest
 import com.justb81.watchbuddy.core.model.TitleExtractionResponse
 import com.justb81.watchbuddy.core.model.TraktEpisode
@@ -46,6 +47,13 @@ interface PhoneApiService {
      */
     @POST("/scrobble/prompt")
     suspend fun scrobblePrompt(@Body body: AmbiguousScrobbleEvent): PhoneScrobbleActionResponse
+
+    /**
+     * Adds ([show], [episode]) to the phone user's Trakt history.
+     * Called on overlay confirm for unknown shows (TMDB-only candidates).
+     */
+    @POST("/shows/add-to-library")
+    suspend fun addShowToLibrary(@Body body: PhoneAddToLibraryRequest): PhoneScrobbleActionResponse
 }
 
 @Serializable

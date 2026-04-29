@@ -3,6 +3,7 @@ package com.justb81.watchbuddy.phone.server
 import com.justb81.watchbuddy.core.locale.LocaleHelper
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.model.AmbiguousScrobbleEvent
+import com.justb81.watchbuddy.core.model.PhoneAddToLibraryRequest
 import com.justb81.watchbuddy.core.model.ScrobbleAction
 import com.justb81.watchbuddy.core.model.ScrobbleDisplayEvent
 import com.justb81.watchbuddy.core.model.TitleExtractionRequest
@@ -13,6 +14,10 @@ import com.justb81.watchbuddy.core.network.WatchBuddyJson
 import com.justb81.watchbuddy.core.tmdb.TmdbApiService
 import com.justb81.watchbuddy.core.tmdb.TmdbCache
 import com.justb81.watchbuddy.core.trakt.ScrobbleBody
+import com.justb81.watchbuddy.core.trakt.SyncHistoryBody
+import com.justb81.watchbuddy.core.trakt.SyncHistoryEpisodeItem
+import com.justb81.watchbuddy.core.trakt.SyncHistorySeasonItem
+import com.justb81.watchbuddy.core.trakt.SyncHistoryShowItem
 import com.justb81.watchbuddy.core.trakt.TraktApiService
 import com.justb81.watchbuddy.phone.auth.TokenRefreshManager
 import com.justb81.watchbuddy.phone.auth.TokenRepository
@@ -57,6 +62,7 @@ private const val MAX_PAGE_SIZE = 200
  *   POST /scrobble/extract     → LLM fallback — normalize raw MediaSession
  *                                metadata into (showTitle, season?, episode?)
  *   POST /scrobble/prompt      → Deliver ambiguous-scrobble prompt; consumed via state stream
+ *   POST /shows/add-to-library → Add an episode to Trakt history (unknown-show overlay confirm)
  */
 @Singleton
 class CompanionHttpServer @Inject constructor(
@@ -316,6 +322,41 @@ internal fun Application.configureCompanionRoutes(
             )
             call.respond(HttpStatusCode.NoContent)
         }
+
+        post("/shows/add-to-library") {
+            val token = tokenRefreshManager.getValidAccessToken()
+                ?: return@post call.respond(HttpStatusCode.Unauthorized, ErrorResponse("No access token"))
+            val body = try {
+                call.receive<PhoneAddToLibraryRequest>()
+            } catch (_: Exception) {
+                return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid request body"))
+            }
+            try {
+                val syncBody = SyncHistoryBody(
+                    shows = listOf(
+                        SyncHistoryShowItem(
+                            ids = body.show.ids,
+                            seasons = listOf(
+                                SyncHistorySeasonItem(
+                                    number = body.episode.season,
+                                    episodes = listOf(SyncHistoryEpisodeItem(number = body.episode.number))
+                                )
+                            )
+                        )
+                    )
+                )
+                traktApiService.addToHistory("Bearer $token", syncBody)
+                showRepository.invalidateCache()
+                DiagnosticLog.event(
+                    TAG,
+                    "add-to-library ok show='${body.show.title}' S${body.episode.season}E${body.episode.number}",
+                )
+                call.respond(AddToLibraryResponse(success = true))
+            } catch (e: Exception) {
+                DiagnosticLog.error(TAG, "add-to-library failed for '${body.show.title}'", e)
+                call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("Add to library failed"))
+            }
+        }
     }
 }
 
@@ -376,5 +417,10 @@ private data class ScrobbleRequestBody(
 
 @Serializable
 private data class ScrobbleActionResponse(
+    val success: Boolean
+)
+
+@Serializable
+private data class AddToLibraryResponse(
     val success: Boolean
 )

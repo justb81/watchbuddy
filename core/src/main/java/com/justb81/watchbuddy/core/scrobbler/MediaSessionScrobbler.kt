@@ -503,7 +503,7 @@ class MediaSessionScrobbler @Inject constructor(
         _lastObservedSession.value = null
     }
 
-    private suspend fun processPlayingMedia(
+    internal suspend fun processPlayingMedia(
         snapshot: MediaMetadataSnapshot,
         sessionKey: String,
         progress: Float?,
@@ -520,7 +520,15 @@ class MediaSessionScrobbler @Inject constructor(
             }
             return
         }
-        if (candidate.confidence >= AUTO_SCROBBLE_THRESHOLD) {
+        val isUnknown = candidate.isUnknownShow()
+        if (isUnknown) {
+            DiagnosticLog.event(
+                TAG,
+                "unknown-show-detected: '${candidate.matchedShow?.title}' " +
+                    "tmdb=${candidate.matchedShow?.ids?.tmdb} confidence=${candidate.confidence}",
+            )
+        }
+        if (candidate.confidence >= AUTO_SCROBBLE_THRESHOLD && !isUnknown) {
             if (intent != null) {
                 playbackIntentProvider.recordHit()
                 playbackIntentProvider.consumeIntent(snapshot.packageName)

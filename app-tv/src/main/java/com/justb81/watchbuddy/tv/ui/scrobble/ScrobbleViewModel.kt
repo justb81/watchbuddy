@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.justb81.watchbuddy.core.model.ScrobbleCandidate
 import com.justb81.watchbuddy.core.scrobbler.MediaSessionScrobbler
+import com.justb81.watchbuddy.core.scrobbler.ScrobbleDispatcher
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,12 +17,15 @@ import javax.inject.Inject
  * Bridges [MediaSessionScrobbler] with the [ScrobbleOverlay] UI.
  *
  * Candidates with confidence 0.70–0.95 land here for user confirmation.
+ * For unknown shows (TMDB-only candidates), even high-confidence matches
+ * are routed here instead of auto-scrobbling.
  * Dismissed episodes are remembered so the overlay is not shown again
  * for the same episode during this session.
  */
 @HiltViewModel
 class ScrobbleViewModel @Inject constructor(
-    private val scrobbler: MediaSessionScrobbler
+    private val scrobbler: MediaSessionScrobbler,
+    private val scrobbleDispatcher: ScrobbleDispatcher,
 ) : ViewModel() {
 
     private val _pendingCandidate = MutableStateFlow<ScrobbleCandidate?>(null)
@@ -45,6 +49,15 @@ class ScrobbleViewModel @Inject constructor(
         val candidate = _pendingCandidate.value ?: return
         _pendingCandidate.value = null
         viewModelScope.launch {
+            if (candidate.isUnknownShow()) {
+                val show = candidate.matchedShow
+                val episode = candidate.matchedEpisode
+                if (show != null && episode != null) {
+                    launch {
+                        runCatching { scrobbleDispatcher.dispatchAddToLibrary(show, episode) }
+                    }
+                }
+            }
             scrobbler.autoScrobble(candidate)
         }
     }

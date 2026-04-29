@@ -34,6 +34,13 @@ interface ScrobbleDispatcher {
     suspend fun dispatchStart(show: TraktShow, episode: TraktEpisode, progress: Float)
     suspend fun dispatchPause(show: TraktShow, episode: TraktEpisode, progress: Float)
     suspend fun dispatchStop(show: TraktShow, episode: TraktEpisode, progress: Float)
+
+    /**
+     * Best-effort add of ([show], [episode]) to every connected user's Trakt history.
+     * Only called from the overlay-confirm path for unknown shows (TMDB-only match).
+     * Per-phone failures are logged and do not block other phones.
+     */
+    suspend fun dispatchAddToLibrary(show: TraktShow, episode: TraktEpisode)
 }
 
 /**
