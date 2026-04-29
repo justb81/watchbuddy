@@ -19,6 +19,8 @@ private val ALLOWED_MONETIZATION = setOf("FLATRATE", "ADS", "FREE")
 private const val SEARCH_RESULT_LIMIT = 5
 private const val TAG = "JustWatchRepo"
 private val COUNTRY_CODE_REGEX = Regex("[A-Z]{2}")
+private const val DEFAULT_MISS_WINDOW_MS = 24L * 60 * 60 * 1_000
+private const val MAX_ERROR_SUMMARY_LENGTH = 200
 
 /**
  * Resolves JustWatch per-episode deep links with a persistent Room cache.
@@ -46,8 +48,10 @@ class JustWatchDeepLinkRepository @Inject constructor(
 
     private sealed class SearchResult {
         data class Found(val title: JustWatchTitle) : SearchResult()
+
         /** The API returned a valid response but no node matched the TMDB ID. */
         data object SearchMiss : SearchResult()
+
         /** The API returned a top-level GraphQL errors array. */
         data class GraphQlError(val summary: String) : SearchResult()
     }
@@ -84,7 +88,7 @@ class JustWatchDeepLinkRepository @Inject constructor(
      * A miss is counted when the API returned successfully but no JustWatch node
      * matched the requested TMDB show ID.
      */
-    fun searchMissCount(windowMs: Long = 24 * 60 * 60 * 1000L): Int = synchronized(missLock) {
+    fun searchMissCount(windowMs: Long = DEFAULT_MISS_WINDOW_MS): Int = synchronized(missLock) {
         val cutoff = System.currentTimeMillis() - windowMs
         while (missTimestamps.isNotEmpty() && missTimestamps.peekFirst()!! < cutoff) {
             missTimestamps.pollFirst()
@@ -245,14 +249,14 @@ class JustWatchDeepLinkRepository @Inject constructor(
                         )
                     )
                     if (!episodesResp.errors.isNullOrEmpty()) {
-                        val msg = "GraphQL errors in episodes query for tmdbId=$tmdbShowId S${season}"
+                        val msg = "GraphQL errors in episodes query for tmdbId=$tmdbShowId S$season"
                         DiagnosticLog.error(TAG, msg)
                         recordError(msg)
                         return
                     }
                     val jwEpisodes = episodesResp.data?.node?.episodes
                     if (jwEpisodes.isNullOrEmpty()) {
-                        DiagnosticLog.warn(TAG, "Empty episodes list for tmdbId=$tmdbShowId S${season}")
+                        DiagnosticLog.warn(TAG, "Empty episodes list for tmdbId=$tmdbShowId S$season")
                         return
                     }
 
@@ -260,7 +264,7 @@ class JustWatchDeepLinkRepository @Inject constructor(
                     if (jwEp != null) {
                         cacheOffers(jwEp.offers, tmdbShowId, season, episode, countryCode)
                     } else {
-                        DiagnosticLog.warn(TAG, "Episode S${season}E${episode} not found in JustWatch for tmdbId=$tmdbShowId")
+                        DiagnosticLog.warn(TAG, "Episode S${season}E$episode not found in JustWatch for tmdbId=$tmdbShowId")
                     }
                 }
             }
@@ -268,7 +272,7 @@ class JustWatchDeepLinkRepository @Inject constructor(
             throw e
         } catch (e: Exception) {
             val msg = "${e.javaClass.simpleName}: ${e.message}"
-            DiagnosticLog.error(TAG, "Episode fetch failed for tmdbId=$tmdbShowId S${season}E${episode}: $msg", e)
+            DiagnosticLog.error(TAG, "Episode fetch failed for tmdbId=$tmdbShowId S${season}E$episode: $msg", e)
             recordError(msg)
             // Network/parse failure: do not cache negatives so the next attempt retries
         }
@@ -323,7 +327,7 @@ class JustWatchDeepLinkRepository @Inject constructor(
             )
         )
         if (!response.errors.isNullOrEmpty()) {
-            val summary = response.errors.toString().take(200)
+            val summary = response.errors.toString().take(MAX_ERROR_SUMMARY_LENGTH)
             return SearchResult.GraphQlError(summary)
         }
         val match = response.data?.popularTitles?.edges
