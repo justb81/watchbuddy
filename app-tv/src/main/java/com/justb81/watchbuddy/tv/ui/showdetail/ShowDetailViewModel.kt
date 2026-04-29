@@ -19,8 +19,11 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.Locale
 import javax.inject.Inject
@@ -43,6 +46,24 @@ sealed interface ProviderListUiState {
 
     /** Network or API error — the user can retry. */
     object Error : ProviderListUiState
+}
+
+/**
+ * Aggregated state for the "Watch Now" button derived from [ProviderListUiState] and
+ * the per-provider [DeepLinkState] map.
+ */
+sealed class WatchNowState {
+    /** Providers are still loading or the top provider's deep link is still resolving. */
+    object Loading : WatchNowState()
+
+    /** A usable JustWatch deep-link URL is available for the top provider. */
+    data class Available(val url: String) : WatchNowState()
+
+    /** The top provider resolved but JustWatch has no offer for this show/region. */
+    object Unavailable : WatchNowState()
+
+    /** No streaming providers are available (Empty or Error state). */
+    object NoProvider : WatchNowState()
 }
 
 /** Per-provider JustWatch deep link resolution state. */
@@ -84,6 +105,27 @@ class ShowDetailViewModel @Inject constructor(
 
     private val _deepLinks = MutableStateFlow<Map<Int, DeepLinkState>>(emptyMap())
     val deepLinks: StateFlow<Map<Int, DeepLinkState>> = _deepLinks.asStateFlow()
+
+    /**
+     * Aggregated "Watch Now" button state derived from [providers] and [deepLinks].
+     * Computed reactively — the UI observes this instead of deriving state from nullable fields.
+     */
+    val watchNowState: StateFlow<WatchNowState> = combine(_providers, _deepLinks) { providerState, deepLinks ->
+        when (providerState) {
+            is ProviderListUiState.Loading -> WatchNowState.Loading
+            is ProviderListUiState.Empty -> WatchNowState.NoProvider
+            is ProviderListUiState.Error -> WatchNowState.NoProvider
+            is ProviderListUiState.Success -> {
+                val topProvider = providerState.providers.firstOrNull()
+                    ?: return@combine WatchNowState.NoProvider
+                when (val linkState = deepLinks[topProvider.providerId]) {
+                    is DeepLinkState.Loading, null -> WatchNowState.Loading
+                    is DeepLinkState.Available -> WatchNowState.Available(linkState.url)
+                    is DeepLinkState.Unavailable -> WatchNowState.Unavailable
+                }
+            }
+        }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, WatchNowState.Loading)
 
     private val inFlight = mutableMapOf<DeepLinkKey, Deferred<String?>>()
 
@@ -234,14 +276,4 @@ class ShowDetailViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Returns the JustWatch URL for the top-ranked provider (used by the "Watch now" button),
-     * or null when no deep link is resolved yet.
-     */
-    fun resolveTopProviderDeepLink(): String? {
-        val providerState = _providers.value as? ProviderListUiState.Success ?: return null
-        val topProvider = providerState.providers.firstOrNull() ?: return null
-        val linkState = _deepLinks.value[topProvider.providerId]
-        return (linkState as? DeepLinkState.Available)?.url
-    }
 }
