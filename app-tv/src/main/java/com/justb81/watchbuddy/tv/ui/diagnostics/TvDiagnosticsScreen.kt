@@ -654,6 +654,7 @@ private fun WatchNextSection(countResult: WatchNextMetadataSource.CountResult?) 
             pluralStringResource(R.plurals.tv_diagnostics_value_watch_next_count, countResult.count, countResult.count) to
                 if (countResult.count > 0) Status.OK else Status.WARN
     }
+    val isPermissionDenied = countResult is WatchNextMetadataSource.CountResult.PermissionDenied
     Text(
         text = stringResource(R.string.tv_diagnostics_section_watch_next).uppercase(),
         fontSize = 14.sp,
@@ -664,7 +665,15 @@ private fun WatchNextSection(countResult: WatchNextMetadataSource.CountResult?) 
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = CardDefaults.shape(RoundedCornerShape(12.dp)),
-        onClick = {},
+        onClick = {
+            if (isPermissionDenied) {
+                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.fromParts("package", context.packageName, null)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                runCatching { context.startActivity(intent) }
+            }
+        },
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -689,22 +698,14 @@ private fun WatchNextSection(countResult: WatchNextMetadataSource.CountResult?) 
                 }
                 Text(valueStr, fontSize = 13.sp, color = Color.White.copy(alpha = 0.7f))
             }
-            if (countResult is WatchNextMetadataSource.CountResult.PermissionDenied) {
+            if (isPermissionDenied) {
                 Spacer(Modifier.height(8.dp))
-                OutlinedButton(
-                    onClick = {
-                        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                            data = Uri.fromParts("package", context.packageName, null)
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        }
-                        runCatching { context.startActivity(intent) }
-                    },
-                ) {
-                    Text(
-                        stringResource(R.string.tv_diagnostics_action_open_permissions),
-                        fontSize = 13.sp,
-                    )
-                }
+                Text(
+                    text = stringResource(R.string.tv_diagnostics_action_open_permissions),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF90CAF9),
+                )
             }
         }
     }
