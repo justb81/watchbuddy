@@ -20,6 +20,11 @@ import java.util.concurrent.atomic.AtomicBoolean
  * internal files directory before calling [generate]. Model download is handled
  * separately by WorkManager (see SettingsViewModel.downloadModel).
  *
+ * Engine handles are owned by [LlmEngineCache] (process-wide singleton) so that
+ * the cascade-built fresh provider instances on every recap call still hit a
+ * warm engine. Without this the first call after each recap would re-load the
+ * full ~2.4–3.4 GB model from disk.
+ *
  * LiteRT-LM's GPU backend needs an OpenCL runtime that not every Android device
  * ships. Rather than probing upfront, we try GPU first and fall back to CPU on
  * any failure — including failures that only surface inside the JNI call for
@@ -31,6 +36,7 @@ class LiteRtLlmProvider internal constructor(
     private val context: Context,
     private val modelVariant: LlmOrchestrator.ModelVariant,
     private val engineFactory: EngineFactory,
+    private val engineCache: LlmEngineCache,
 ) : LlmProvider {
 
     // Public production constructor — wires the real Engine factory. The
@@ -39,7 +45,8 @@ class LiteRtLlmProvider internal constructor(
     constructor(
         context: Context,
         modelVariant: LlmOrchestrator.ModelVariant,
-    ) : this(context, modelVariant, DefaultEngineFactory)
+        engineCache: LlmEngineCache,
+    ) : this(context, modelVariant, DefaultEngineFactory, engineCache)
 
     /**
      * Test seam: production wires [DefaultEngineFactory] which creates a real
@@ -63,18 +70,15 @@ class LiteRtLlmProvider internal constructor(
 
     override val displayName: String = "LiteRT-LM (${modelVariant.fileName})"
 
-    private var handle: EngineHandle? = null
-    private var currentBackendIsGpu: Boolean = false
-
     override suspend fun generate(prompt: String): String = withContext(Dispatchers.IO) {
+        val handle = getOrCreateHandle()
+        val triedGpu = engineCache.isLiteRtGpu()
         val text = try {
-            getOrCreateHandle().sendMessage(prompt)
+            handle.sendMessage(prompt)
         } catch (e: Exception) {
-            if (!currentBackendIsGpu) throw e
+            if (!triedGpu) throw e
             markGpuBadAndLog("inference", e)
-            runCatching { handle?.close() }
-            handle = null
-            currentBackendIsGpu = false
+            engineCache.invalidateLiteRtHandle()
             getOrCreateHandle().sendMessage(prompt)
         }
         if (text.isBlank()) {
@@ -83,25 +87,39 @@ class LiteRtLlmProvider internal constructor(
         text
     }
 
-    private fun getOrCreateHandle(): EngineHandle {
-        handle?.let { return it }
-        val modelPath = resolveModelPath()
-        val newHandle = if (gpuKnownBad.get()) {
-            createHandle(modelPath, useGpu = false).also { currentBackendIsGpu = false }
-        } else {
-            try {
-                createHandle(modelPath, useGpu = true).also { currentBackendIsGpu = true }
-            } catch (e: Exception) {
-                markGpuBadAndLog("init", e)
-                createHandle(modelPath, useGpu = false).also { currentBackendIsGpu = false }
-            }
+    /**
+     * Pre-loads the engine handle off the request path. Called once at
+     * companion-service startup so the first user-facing recap hits a warm
+     * engine. Returns gracefully if the model file isn't present yet — the
+     * inference path will surface that error via the cascade.
+     */
+    suspend fun warmUp() {
+        try {
+            getOrCreateHandle()
+            DiagnosticLog.event(TAG, "warmUp ok variant=${modelVariant.fileName} gpu=${engineCache.isLiteRtGpu()}")
+        } catch (e: Exception) {
+            DiagnosticLog.warn(
+                TAG,
+                "warmUp skipped variant=${modelVariant.fileName}: ${e.javaClass.simpleName}",
+                e,
+            )
         }
-        handle = newHandle
-        return newHandle
     }
 
-    private fun createHandle(modelPath: String, useGpu: Boolean): EngineHandle =
-        engineFactory.create(modelPath, useGpu)
+    private suspend fun getOrCreateHandle(): EngineHandle {
+        val modelPath = resolveModelPath()
+        return if (gpuKnownBad.get()) {
+            engineCache.getOrCreateLiteRtHandle(modelVariant, useGpu = false, modelPath, engineFactory)
+        } else {
+            try {
+                engineCache.getOrCreateLiteRtHandle(modelVariant, useGpu = true, modelPath, engineFactory)
+            } catch (e: Exception) {
+                markGpuBadAndLog("init", e)
+                engineCache.invalidateLiteRtHandle()
+                engineCache.getOrCreateLiteRtHandle(modelVariant, useGpu = false, modelPath, engineFactory)
+            }
+        }
+    }
 
     private fun resolveModelPath(): String {
         val modelDir = File(context.filesDir, "llm_models")

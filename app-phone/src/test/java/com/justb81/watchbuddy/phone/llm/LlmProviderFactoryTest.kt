@@ -7,6 +7,8 @@ import com.justb81.watchbuddy.phone.settings.AppSettings
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import dagger.Lazy
 import io.mockk.*
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.*
@@ -14,6 +16,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 
 @DisplayName("LlmProviderFactory")
 class LlmProviderFactoryTest {
@@ -21,6 +24,7 @@ class LlmProviderFactoryTest {
     private val context: Context = mockk(relaxed = true)
     private val orchestrator: LlmOrchestrator = mockk()
     private val eventLog = LlmEventLog()
+    private val engineCache = LlmEngineCache()
     private val settingsRepository: SettingsRepository = mockk {
         every { settings } returns flowOf(AppSettings(llmActivityLoggingEnabled = false))
     }
@@ -35,7 +39,7 @@ class LlmProviderFactoryTest {
 
     @BeforeEach
     fun setUp() {
-        factory = LlmProviderFactory(context, orchestrator, eventLog, settingsLazy)
+        factory = LlmProviderFactory(context, orchestrator, eventLog, settingsLazy, engineCache)
     }
 
     @Nested
@@ -96,6 +100,39 @@ class LlmProviderFactoryTest {
             )
             val result = factory.generateWithCascade("recap", "prompt", episodes)
             assertNotNull(result)
+        }
+    }
+
+    @Nested
+    @DisplayName("per-provider timeout")
+    inner class TimeoutTest {
+
+        @Test
+        fun `provider that exceeds timeout throws TimeoutCancellationException`() = runTest {
+            val slowProvider = object : LlmProvider {
+                override val displayName: String = "slow-provider"
+                override suspend fun generate(prompt: String): String {
+                    // Virtual time inside runTest — withTimeout(75_000) fires
+                    // before this delay completes.
+                    delay(LlmProviderFactory.LLM_TIMEOUT_MS + 5_000)
+                    return "should-not-reach-here"
+                }
+            }
+            assertThrows<TimeoutCancellationException> {
+                factory.invokeWithTimeoutForTesting(slowProvider, "prompt")
+            }
+        }
+
+        @Test
+        fun `provider that finishes before timeout returns its result`() = runTest {
+            val fastProvider = object : LlmProvider {
+                override val displayName: String = "fast-provider"
+                override suspend fun generate(prompt: String): String {
+                    delay(50)
+                    return "ok"
+                }
+            }
+            assertEquals("ok", factory.invokeWithTimeoutForTesting(fastProvider, "prompt"))
         }
     }
 }

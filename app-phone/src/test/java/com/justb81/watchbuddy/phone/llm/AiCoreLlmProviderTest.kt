@@ -21,7 +21,8 @@ import org.junit.jupiter.api.assertThrows
 class AiCoreLlmProviderTest {
 
     private val context: Context = mockk(relaxed = true)
-    private val provider = AiCoreLlmProvider(context)
+    private val engineCache = LlmEngineCache()
+    private val provider = AiCoreLlmProvider(context, engineCache)
 
     @AfterEach
     fun tearDown() {

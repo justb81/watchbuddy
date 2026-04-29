@@ -8,7 +8,9 @@ import com.justb81.watchbuddy.core.model.TmdbEpisode
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import dagger.Lazy
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -31,7 +33,8 @@ class LlmProviderFactory @Inject constructor(
     @param:ApplicationContext private val context: Context,
     private val llmOrchestrator: LlmOrchestrator,
     private val llmEventLog: LlmEventLog,
-    private val settingsRepository: Lazy<SettingsRepository>
+    private val settingsRepository: Lazy<SettingsRepository>,
+    private val engineCache: LlmEngineCache,
 ) {
     companion object {
         private const val TAG = "LlmProviderFactory"
@@ -40,6 +43,13 @@ class LlmProviderFactory @Inject constructor(
         private const val BACKEND_FALLBACK = "fallback"
         private const val BACKEND_NONE = "none"
         private const val MAX_ERROR_MESSAGE = 200
+
+        // Per-provider inference timeout. The TV-side OkHttp client allows 90 s
+        // for the recap response (`PhoneApiClientFactory.kt`); 75 s gives the
+        // cascade enough headroom to also try the next provider before the TV
+        // tears down the request, and it bounds the wait so a hung JNI call
+        // can't block the Ktor request thread indefinitely.
+        const val LLM_TIMEOUT_MS = 75_000L
     }
 
     /**
@@ -64,7 +74,7 @@ class LlmProviderFactory @Inject constructor(
         for (provider in providers) {
             try {
                 Log.d(TAG, "Trying provider: ${provider.displayName}")
-                val result = provider.generate(prompt)
+                val result = invokeWithTimeout(provider, prompt)
                 Log.d(TAG, "Success with provider: ${provider.displayName}")
                 recordEvent(
                     enabled = loggingEnabled,
@@ -76,6 +86,9 @@ class LlmProviderFactory @Inject constructor(
                     status = LlmEventLog.Status.SUCCESS,
                 )
                 return result
+            } catch (e: TimeoutCancellationException) {
+                Log.w(TAG, "Provider ${provider.displayName} timed out after ${LLM_TIMEOUT_MS}ms", e)
+                errors += "${provider.displayName}: timeout(${LLM_TIMEOUT_MS}ms)"
             } catch (e: Exception) {
                 Log.w(TAG, "Provider ${provider.displayName} failed: ${e.message}")
                 errors += "${provider.displayName}: ${summarize(e)}"
@@ -128,7 +141,7 @@ class LlmProviderFactory @Inject constructor(
         for (provider in providers) {
             try {
                 Log.d(TAG, "Trying provider: ${provider.displayName}")
-                val result = provider.generate(prompt)
+                val result = invokeWithTimeout(provider, prompt)
                 Log.d(TAG, "Success with provider: ${provider.displayName}")
                 recordEvent(
                     enabled = loggingEnabled,
@@ -140,6 +153,9 @@ class LlmProviderFactory @Inject constructor(
                     status = LlmEventLog.Status.SUCCESS,
                 )
                 return result
+            } catch (e: TimeoutCancellationException) {
+                Log.w(TAG, "Provider ${provider.displayName} timed out after ${LLM_TIMEOUT_MS}ms", e)
+                errors += "${provider.displayName}: timeout(${LLM_TIMEOUT_MS}ms)"
             } catch (e: Exception) {
                 Log.w(TAG, "Provider ${provider.displayName} failed: ${e.message}")
                 errors += "${provider.displayName}: ${summarize(e)}"
@@ -157,6 +173,45 @@ class LlmProviderFactory @Inject constructor(
         )
         return null
     }
+
+    /**
+     * Pre-loads on-device LLM engines off the request path. Called once after
+     * `CompanionService` enters the foreground so the user's first recap (and
+     * the first scrobble title-extract) hits a warm engine.
+     *
+     * Failures are intentionally swallowed and logged — the inference path will
+     * surface the underlying error via the cascade if/when it is invoked.
+     */
+    suspend fun warmUp() {
+        val config = try {
+            llmOrchestrator.selectConfig()
+        } catch (e: Exception) {
+            DiagnosticLog.warn(TAG, "warmUp selectConfig failed: ${e.javaClass.simpleName}", e)
+            return
+        }
+        when (config.backend) {
+            LlmBackend.AICORE -> {
+                AiCoreLlmProvider(context, engineCache).warmUp()
+                config.modelVariant?.let { variant ->
+                    LiteRtLlmProvider(context, variant, engineCache).warmUp()
+                }
+            }
+            LlmBackend.LITERT -> {
+                val variant = config.modelVariant ?: return
+                LiteRtLlmProvider(context, variant, engineCache).warmUp()
+            }
+            LlmBackend.NONE -> {
+                DiagnosticLog.event(TAG, "warmUp skipped backend=none")
+            }
+        }
+    }
+
+    private suspend fun invokeWithTimeout(provider: LlmProvider, prompt: String): String =
+        withTimeout(LLM_TIMEOUT_MS) { provider.generate(prompt) }
+
+    @androidx.annotation.VisibleForTesting
+    internal suspend fun invokeWithTimeoutForTesting(provider: LlmProvider, prompt: String): String =
+        invokeWithTimeout(provider, prompt)
 
     private suspend fun isLoggingEnabled(): Boolean = try {
         settingsRepository.get().settings.first().llmActivityLoggingEnabled
@@ -211,11 +266,11 @@ class LlmProviderFactory @Inject constructor(
         val providers = mutableListOf<LlmProvider>()
         when (config.backend) {
             LlmBackend.AICORE -> {
-                providers += AiCoreLlmProvider(context)
-                config.modelVariant?.let { providers += LiteRtLlmProvider(context, it) }
+                providers += AiCoreLlmProvider(context, engineCache)
+                config.modelVariant?.let { providers += LiteRtLlmProvider(context, it, engineCache) }
             }
             LlmBackend.LITERT -> {
-                config.modelVariant?.let { providers += LiteRtLlmProvider(context, it) }
+                config.modelVariant?.let { providers += LiteRtLlmProvider(context, it, engineCache) }
             }
             LlmBackend.NONE -> { /* no on-device backend */ }
         }
@@ -230,15 +285,15 @@ class LlmProviderFactory @Inject constructor(
 
         when (config.backend) {
             LlmBackend.AICORE -> {
-                providers += AiCoreLlmProvider(context)
+                providers += AiCoreLlmProvider(context, engineCache)
                 // Fall through to LiteRT-LM if AICore fails
                 config.modelVariant?.let {
-                    providers += LiteRtLlmProvider(context, it)
+                    providers += LiteRtLlmProvider(context, it, engineCache)
                 }
             }
             LlmBackend.LITERT -> {
                 config.modelVariant?.let {
-                    providers += LiteRtLlmProvider(context, it)
+                    providers += LiteRtLlmProvider(context, it, engineCache)
                 }
             }
             LlmBackend.NONE -> { /* skip on-device, go straight to fallback */ }

@@ -23,11 +23,13 @@ class LiteRtLlmProviderTest {
     lateinit var tempDir: File
 
     private val context: Context = mockk(relaxed = true)
+    private lateinit var engineCache: LlmEngineCache
 
     @BeforeEach
     fun setUp() {
         LiteRtLlmProvider.resetGpuKnownBadForTesting()
         every { context.filesDir } returns File(tempDir, "files")
+        engineCache = LlmEngineCache()
     }
 
     @AfterEach
@@ -52,7 +54,7 @@ class LiteRtLlmProviderTest {
         }
 
     private fun provider(factory: LiteRtLlmProvider.EngineFactory): LiteRtLlmProvider =
-        LiteRtLlmProvider(context, LlmOrchestrator.ModelVariant.GEMMA4_E2B, factory)
+        LiteRtLlmProvider(context, LlmOrchestrator.ModelVariant.GEMMA4_E2B, factory, engineCache)
 
     @Nested
     @DisplayName("GPU to CPU fallback — sendMessage failure")
@@ -101,13 +103,18 @@ class LiteRtLlmProviderTest {
     inner class GpuKnownBadLatch {
 
         @Test
-        fun `second provider instance skips GPU when latch is set`() = runTest {
+        fun `latch survives cache invalidation and steers fresh build to CPU`() = runTest {
             createModelFile()
             val factory1 = LiteRtLlmProvider.EngineFactory { _, useGpu ->
                 if (useGpu) throwingHandle("OpenCL unavailable") else fakeHandle("CPU response")
             }
             provider(factory1).generate("first prompt")
             assertTrue(LiteRtLlmProvider.isGpuKnownBadForTesting())
+
+            // Drop the cached handle (simulates process pressure / explicit
+            // invalidation). The gpuKnownBad latch is process-wide so the next
+            // build must still skip the GPU path.
+            engineCache.clearForTesting()
 
             var gpuRequested = false
             val factory2 = LiteRtLlmProvider.EngineFactory { _, useGpu ->
@@ -117,6 +124,21 @@ class LiteRtLlmProviderTest {
             val result = provider(factory2).generate("second prompt")
             assertEquals("CPU direct", result)
             assertFalse(gpuRequested)
+        }
+
+        @Test
+        fun `cached handle is reused across provider instances`() = runTest {
+            createModelFile()
+            var callCount = 0
+            val factory = LiteRtLlmProvider.EngineFactory { _, _ ->
+                callCount++
+                fakeHandle("response")
+            }
+            provider(factory).generate("first prompt")
+            provider(factory).generate("second prompt")
+            // Engine handle is created once and reused — two recap calls must
+            // not double-load the model.
+            assertEquals(1, callCount)
         }
     }
 

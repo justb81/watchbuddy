@@ -186,6 +186,7 @@
     <ID>SpacingBetweenDeclarationsWithAnnotations:CompanionService.kt$CompanionService$/** * Last IPv4 address published in the NSD TXT record / pinned as * [NsdServiceInfo.host]. Used by [registerNetworkCallback] to skip the * full `unregister → 300 ms → register` dance when Wi-Fi re-announces a * network whose IPv4 didn't actually change (#345 Opt D): on many OEM * stacks `NetworkCallback.onAvailable` fires repeatedly during captive * portal / DNS retries without any real handoff, and each churn briefly * removes our advertisement from the network. */ @Volatile private var lastRegisteredIpv4: String? = null</ID>
     <ID>SpacingBetweenDeclarationsWithAnnotations:CompanionService.kt$CompanionService$@Inject lateinit var bleAdvertiser: CompanionBleAdvertiser</ID>
     <ID>SpacingBetweenDeclarationsWithAnnotations:CompanionService.kt$CompanionService$@Inject lateinit var llmOrchestrator: LlmOrchestrator</ID>
+    <ID>SpacingBetweenDeclarationsWithAnnotations:CompanionService.kt$CompanionService$@Inject lateinit var llmProviderFactory: LlmProviderFactory</ID>
     <ID>SpacingBetweenDeclarationsWithAnnotations:CompanionService.kt$CompanionService$@Inject lateinit var settingsRepository: SettingsRepository</ID>
     <ID>SpacingBetweenDeclarationsWithAnnotations:CompanionService.kt$CompanionService$@Inject lateinit var stateManager: CompanionStateManager</ID>
     <ID>SpacingBetweenDeclarationsWithAnnotations:CompanionService.kt$CompanionService$@Volatile private var nsdState: NsdState = NsdState.IDLE</ID>
