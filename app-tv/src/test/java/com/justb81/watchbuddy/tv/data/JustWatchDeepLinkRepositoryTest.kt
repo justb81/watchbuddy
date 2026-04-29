@@ -320,8 +320,12 @@ class JustWatchDeepLinkRepositoryTest {
         @Test
         fun `records HTTP status and error body on HTTP 422 from search`() = runTest {
             coEvery { dao.get(any(), any(), any(), any(), any()) } returns null
-            coEvery { api.query(match { it.query == JustWatchApiService.SEARCH_QUERY }) } returns
+            // `answers { ... }` returns a fresh Response on each invocation: the
+            // episode-level cascade also calls the show-level fallback, and a
+            // single ResponseBody.string() can only be consumed once.
+            coEvery { api.query(match { it.query == JustWatchApiService.SEARCH_QUERY }) } answers {
                 makeHttpErrorResponse(422, """{"message":"unauthenticated request"}""")
+            }
 
             repository.resolveDeepLink(100, 1, 2, 8, "US", "Breaking Bad")
 
