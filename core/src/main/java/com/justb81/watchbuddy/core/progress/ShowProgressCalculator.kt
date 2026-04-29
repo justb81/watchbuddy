@@ -1,6 +1,7 @@
 package com.justb81.watchbuddy.core.progress
 
 import com.justb81.watchbuddy.core.model.TmdbProgressHint
+import com.justb81.watchbuddy.core.model.TmdbSeasonSummary
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
 import java.time.Instant
 import java.time.LocalDate
