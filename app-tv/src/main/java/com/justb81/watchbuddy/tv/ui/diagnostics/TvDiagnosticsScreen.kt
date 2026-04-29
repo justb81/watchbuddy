@@ -437,6 +437,8 @@ private fun statusColor(status: Status): Color = when (status) {
     Status.NEUTRAL -> Color.White.copy(alpha = 0.3f)
 }
 
+private val ActionHintColor = Color(0xFF90CAF9)
+
 @Composable
 private fun yesNoStr(value: Boolean): String =
     if (value) stringResource(R.string.tv_diagnostics_value_yes)
@@ -704,7 +706,7 @@ private fun WatchNextSection(countResult: WatchNextMetadataSource.CountResult?) 
                     text = stringResource(R.string.tv_diagnostics_action_open_permissions),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF90CAF9),
+                    color = ActionHintColor,
                 )
             }
         }
