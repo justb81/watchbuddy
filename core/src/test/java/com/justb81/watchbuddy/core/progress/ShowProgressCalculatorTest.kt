@@ -708,10 +708,10 @@ class ShowProgressCalculatorTest {
         }
 
         @Test
-        fun `no watched episodes with hint nextAired returns hint values`() {
+        fun `no watched episodes with hint nextAired still returns S01E01 (user must start from beginning)`() {
             val e = entry()
             val h = hint(nextAired = TmdbEpisodeSummary(1, 3, air_date = "2024-06-01"))
-            assertEquals(1 to 3, ShowProgressCalculator.nextEpisodeNumbers(e, h))
+            assertEquals(1 to 1, ShowProgressCalculator.nextEpisodeNumbers(e, h))
         }
 
         @Test
@@ -737,6 +737,75 @@ class ShowProgressCalculatorTest {
                 Triple(1, 4, "2024-01-01T10:00:00Z")
             )
             assertEquals(1 to 5, ShowProgressCalculator.nextEpisodeNumbers(e, null))
+        }
+
+        // ── Issue #498 regression tests ───────────────────────────────────────
+
+        @Test
+        fun `user behind (S03E05, last aired S05E10, next S05E11) returns S03E06 not S05E11`() {
+            val e = entry(Triple(3, 5, "2024-01-01T10:00:00Z"))
+            val h = hint(
+                lastAired = TmdbEpisodeSummary(5, 10, air_date = "2024-03-01"),
+                nextAired = TmdbEpisodeSummary(5, 11, air_date = "2024-04-01"),
+                seasons = listOf(
+                    TmdbSeasonSummary(1, 10),
+                    TmdbSeasonSummary(2, 10),
+                    TmdbSeasonSummary(3, 10),
+                    TmdbSeasonSummary(4, 10),
+                    TmdbSeasonSummary(5, 11)
+                )
+            )
+            assertEquals(3 to 6, ShowProgressCalculator.nextEpisodeNumbers(e, h))
+        }
+
+        @Test
+        fun `user at season finale (S03E08) with S04E02 aired crosses season boundary to S04E01`() {
+            val e = entry(Triple(3, 8, "2024-01-01T10:00:00Z"))
+            val h = hint(
+                lastAired = TmdbEpisodeSummary(4, 2, air_date = "2024-03-01"),
+                seasons = listOf(
+                    TmdbSeasonSummary(1, 10),
+                    TmdbSeasonSummary(2, 10),
+                    TmdbSeasonSummary(3, 8),
+                    TmdbSeasonSummary(4, 10)
+                )
+            )
+            assertEquals(4 to 1, ShowProgressCalculator.nextEpisodeNumbers(e, h))
+        }
+
+        @Test
+        fun `user caught up to last aired (S05E10) with next aired (S05E11) returns S05E11`() {
+            val e = entry(Triple(5, 10, "2024-01-01T10:00:00Z"))
+            val h = hint(
+                lastAired = TmdbEpisodeSummary(5, 10, air_date = "2024-03-01"),
+                nextAired = TmdbEpisodeSummary(5, 11, air_date = "2024-04-01"),
+                seasons = listOf(
+                    TmdbSeasonSummary(1, 10),
+                    TmdbSeasonSummary(2, 10),
+                    TmdbSeasonSummary(3, 10),
+                    TmdbSeasonSummary(4, 10),
+                    TmdbSeasonSummary(5, 10)
+                )
+            )
+            assertEquals(5 to 11, ShowProgressCalculator.nextEpisodeNumbers(e, h))
+        }
+
+        @Test
+        fun `user caught up on ended show with no nextAired returns naive plus one`() {
+            val e = entry(Triple(5, 10, "2024-01-01T10:00:00Z"))
+            val h = hint(
+                status = "Ended",
+                lastAired = TmdbEpisodeSummary(5, 10, air_date = "2024-03-01"),
+                nextAired = null,
+                seasons = listOf(
+                    TmdbSeasonSummary(1, 10),
+                    TmdbSeasonSummary(2, 10),
+                    TmdbSeasonSummary(3, 10),
+                    TmdbSeasonSummary(4, 10),
+                    TmdbSeasonSummary(5, 10)
+                )
+            )
+            assertEquals(5 to 11, ShowProgressCalculator.nextEpisodeNumbers(e, h))
         }
     }
 }
