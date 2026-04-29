@@ -113,7 +113,8 @@ data class TmdbProgressHint(
     val status: String? = null,
     val lastAired: TmdbEpisodeSummary? = null,
     val nextAired: TmdbEpisodeSummary? = null,
-    val seasons: List<TmdbSeasonSummary> = emptyList()
+    val seasons: List<TmdbSeasonSummary> = emptyList(),
+    val overview: String? = null
 )
 
 @Serializable

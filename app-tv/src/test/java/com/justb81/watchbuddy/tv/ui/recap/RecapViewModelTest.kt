@@ -69,6 +69,18 @@ class RecapViewModelTest {
             assertEquals("Fallback synopsis text", state.synopsis)
             assertFalse(state.allPhonesFailed)
         }
+
+        @Test
+        fun `returns Fallback carrying TMDB synopsis when provided`() = runTest {
+            val tmdbSynopsis = "A drama set in the world of competitive baking."
+
+            viewModel.requestRecap(456, tmdbSynopsis)
+            advanceUntilIdle()
+
+            val state = viewModel.state.value as RecapUiState.Fallback
+            assertEquals(tmdbSynopsis, state.synopsis)
+            assertFalse(state.allPhonesFailed)
+        }
     }
 
     @Nested

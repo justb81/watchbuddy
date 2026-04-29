@@ -62,10 +62,11 @@ fun TvNavGraph() {
         composable(TvRoute.Recap.route) {
             val enriched = selectedEntry
             if (enriched != null) {
+                val tmdbOverview = enriched.tmdb?.overview?.takeIf { it.isNotBlank() }
                 RecapScreen(
                     traktShowId      = enriched.entry.show.ids.trakt ?: 0,
                     showTitle        = enriched.entry.show.title,
-                    fallbackSynopsis = stringResource(R.string.tv_no_description),
+                    fallbackSynopsis = tmdbOverview ?: stringResource(R.string.tv_no_description),
                     onClose          = { navController.popBackStack() },
                     onWatchNow       = {
                         // Pop back to detail, then trigger deep link

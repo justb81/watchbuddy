@@ -148,6 +148,22 @@ class ShowRepositoryTest {
     }
 
     @Test
+    fun `getShows forwards TMDB overview into TmdbProgressHint`() = runTest {
+        every { settingsRepository.getTmdbApiKey() } returns flowOf("api-key")
+        coEvery { tokenRefreshManager.getValidAccessToken() } returns "test-token"
+        coEvery { traktApi.getWatchedShows(any()) } returns testShows
+        coEvery { tmdbApiService.getShow(100, "api-key", any()) } returns
+            TmdbShow(100, "Show 1", overview = "A great show about things.", poster_path = "/one.jpg")
+        coEvery { tmdbApiService.getShow(200, "api-key", any()) } returns
+            TmdbShow(200, "Show 2", overview = null, poster_path = "/two.jpg")
+
+        val result = repository.getShows()
+
+        assertEquals("A great show about things.", result[0].tmdb?.overview)
+        assertNull(result[1].tmdb?.overview)
+    }
+
+    @Test
     fun `getShows emits shows sorted by last-watched DESC with unwatched at bottom`() = runTest {
         val entries = listOf(
             watchedEntry(trakt = 1, title = "Old", lastWatchedAt = "2026-04-10T10:00:00Z"),
