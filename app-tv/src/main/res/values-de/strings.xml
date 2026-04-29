@@ -183,6 +183,10 @@
     <string name="tv_diagnostics_row_ambiguous_emitted">Mehrdeutige Abfragen gesendet</string>
     <string name="tv_diagnostics_row_ambiguous_resolved">Abfragen bestätigt</string>
     <string name="tv_diagnostics_row_ambiguous_dismissed">Abfragen abgewiesen</string>
+    <string name="tv_diagnostics_section_watch_now_intent">Watch-Now-Absicht</string>
+    <string name="tv_diagnostics_row_intent_hits">Phase-0-Auto-Scrobbles</string>
+    <string name="tv_diagnostics_row_intent_fallthroughs">Phase-0-Durchfälle</string>
+    <string name="tv_diagnostics_row_intent_overridden">Durch manuelle Markierung überschrieben</string>
 
     <!-- Version footer -->
     <string name="settings_version_footer">WatchBuddy v%1$s (Build %2$d)</string>

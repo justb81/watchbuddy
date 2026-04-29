@@ -183,6 +183,10 @@
     <string name="tv_diagnostics_row_ambiguous_emitted">Ambiguous prompts sent</string>
     <string name="tv_diagnostics_row_ambiguous_resolved">Prompts resolved</string>
     <string name="tv_diagnostics_row_ambiguous_dismissed">Prompts dismissed</string>
+    <string name="tv_diagnostics_section_watch_now_intent">Watch Now intent</string>
+    <string name="tv_diagnostics_row_intent_hits">Phase 0 auto-scrobbles</string>
+    <string name="tv_diagnostics_row_intent_fallthroughs">Phase 0 fallthroughs</string>
+    <string name="tv_diagnostics_row_intent_overridden">Overridden by manual mark</string>
 
     <!-- Version footer -->
     <string name="settings_version_footer">WatchBuddy v%1$s (build %2$d)</string>

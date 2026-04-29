@@ -1,11 +1,13 @@
 package com.justb81.watchbuddy.tv.di
 
 import com.justb81.watchbuddy.core.scrobbler.MetadataEnricher
+import com.justb81.watchbuddy.core.scrobbler.PlaybackIntentProvider
 import com.justb81.watchbuddy.core.scrobbler.ScrobbleDispatcher
 import com.justb81.watchbuddy.core.scrobbler.TitleExtractor
 import com.justb81.watchbuddy.core.scrobbler.WatchedShowSource
 import com.justb81.watchbuddy.tv.discovery.PhoneTitleExtractionClient
 import com.justb81.watchbuddy.tv.scrobbler.NotificationMetadataSource
+import com.justb81.watchbuddy.tv.scrobbler.PlaybackIntentRegistry
 import com.justb81.watchbuddy.tv.scrobbler.TvScrobbleDispatcher
 import com.justb81.watchbuddy.tv.scrobbler.TvWatchedShowSource
 import com.justb81.watchbuddy.tv.scrobbler.WatchNextMetadataSource
@@ -29,6 +31,9 @@ abstract class AppModule {
 
     @Binds
     abstract fun bindTitleExtractor(impl: PhoneTitleExtractionClient): TitleExtractor
+
+    @Binds
+    abstract fun bindPlaybackIntentProvider(impl: PlaybackIntentRegistry): PlaybackIntentProvider
 
     companion object {
 

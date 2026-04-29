@@ -3,6 +3,7 @@ package com.justb81.watchbuddy.tv.ui.diagnostics
 import android.app.Application
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.scrobbler.MediaSessionScrobbler
+import com.justb81.watchbuddy.core.scrobbler.NoOpPlaybackIntentProvider
 import com.justb81.watchbuddy.tv.MainDispatcherRule
 import com.justb81.watchbuddy.tv.data.JustWatchDeepLinkRepository
 import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
@@ -67,7 +68,7 @@ class TvDiagnosticsViewModelTest {
     @Test
     fun `recentEvents is empty on fresh VM`() = runTest {
         val vm = TvDiagnosticsViewModel(
-            application, phoneDiscovery, scrobbler, justWatchRepo, watchNextSource, notificationSource,
+            application, phoneDiscovery, scrobbler, justWatchRepo, watchNextSource, notificationSource, NoOpPlaybackIntentProvider(),
         )
         advanceUntilIdle()
 
@@ -77,7 +78,7 @@ class TvDiagnosticsViewModelTest {
     @Test
     fun `single event is projected with correct level and newest-first order`() = runTest {
         val vm = TvDiagnosticsViewModel(
-            application, phoneDiscovery, scrobbler, justWatchRepo, watchNextSource, notificationSource,
+            application, phoneDiscovery, scrobbler, justWatchRepo, watchNextSource, notificationSource, NoOpPlaybackIntentProvider(),
         )
         advanceUntilIdle()
 
@@ -94,7 +95,7 @@ class TvDiagnosticsViewModelTest {
     @Test
     fun `recentEvents is truncated to 100 entries newest first`() = runTest {
         val vm = TvDiagnosticsViewModel(
-            application, phoneDiscovery, scrobbler, justWatchRepo, watchNextSource, notificationSource,
+            application, phoneDiscovery, scrobbler, justWatchRepo, watchNextSource, notificationSource, NoOpPlaybackIntentProvider(),
         )
         advanceUntilIdle()
 
@@ -112,7 +113,7 @@ class TvDiagnosticsViewModelTest {
         val isListeningFlow = MutableStateFlow(false)
         every { scrobbler.isListening } returns isListeningFlow
         val vm = TvDiagnosticsViewModel(
-            application, phoneDiscovery, scrobbler, justWatchRepo, watchNextSource, notificationSource,
+            application, phoneDiscovery, scrobbler, justWatchRepo, watchNextSource, notificationSource, NoOpPlaybackIntentProvider(),
         )
         advanceUntilIdle()
 
@@ -127,7 +128,7 @@ class TvDiagnosticsViewModelTest {
         val isListeningFlow = MutableStateFlow(true)
         every { scrobbler.isListening } returns isListeningFlow
         val vm = TvDiagnosticsViewModel(
-            application, phoneDiscovery, scrobbler, justWatchRepo, watchNextSource, notificationSource,
+            application, phoneDiscovery, scrobbler, justWatchRepo, watchNextSource, notificationSource, NoOpPlaybackIntentProvider(),
         )
         advanceUntilIdle()
 
@@ -141,7 +142,7 @@ class TvDiagnosticsViewModelTest {
     fun `scrobblerListening starts as false when scrobbler is not listening`() = runTest {
         every { scrobbler.isListening } returns MutableStateFlow(false)
         val vm = TvDiagnosticsViewModel(
-            application, phoneDiscovery, scrobbler, justWatchRepo, watchNextSource, notificationSource,
+            application, phoneDiscovery, scrobbler, justWatchRepo, watchNextSource, notificationSource, NoOpPlaybackIntentProvider(),
         )
         advanceUntilIdle()
 
@@ -151,7 +152,7 @@ class TvDiagnosticsViewModelTest {
     @Test
     fun `notificationTrackedCount reflects snippets in NotificationMetadataSource`() = runTest {
         val vm = TvDiagnosticsViewModel(
-            application, phoneDiscovery, scrobbler, justWatchRepo, watchNextSource, notificationSource,
+            application, phoneDiscovery, scrobbler, justWatchRepo, watchNextSource, notificationSource, NoOpPlaybackIntentProvider(),
         )
         advanceUntilIdle()
         assertEquals(0, vm.uiState.value.notificationTrackedCount)

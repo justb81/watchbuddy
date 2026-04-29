@@ -7,6 +7,7 @@ import com.justb81.watchbuddy.core.model.TraktEpisode
 import com.justb81.watchbuddy.core.model.TraktIds
 import com.justb81.watchbuddy.core.model.TraktShow
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
+import kotlinx.serialization.Serializable
 
 /**
  * Provides the user's watched show list for fuzzy title matching and the TMDB API key
@@ -54,4 +55,71 @@ interface TitleExtractor {
 /** No-op implementation wired on the phone app and in tests that don't exercise the LLM path. */
 object NoOpTitleExtractor : TitleExtractor {
     override suspend fun extract(snapshot: MediaMetadataSnapshot): TitleExtractionResponse? = null
+}
+
+/**
+ * Captures the user's Watch-Now intent when they tap a streaming-provider chip on the TV
+ * ShowDetailScreen. Stored TV-local by [PlaybackIntentProvider]; consulted by
+ * [MediaSessionScrobbler.matchSnapshot] as the Phase 0 gate.
+ */
+@Serializable
+data class PlaybackIntent(
+    val showIds: TraktIds,
+    /** Display title used for snapshot text-scoring in Phase 0. */
+    val showTitle: String,
+    val season: Int,
+    val episode: Int,
+    /** Package name of the streaming app that was launched. */
+    val providerPackageName: String,
+    /** Wall-clock milliseconds at capture time, for TTL eviction. */
+    val capturedAtMs: Long,
+)
+
+/** Counters for Watch-Now intent outcomes, surfaced in TV Diagnostics. */
+data class PlaybackIntentStats(
+    /** Phase 0 confirmed the intent and auto-scrobbled. */
+    val hits: Int,
+    /** Phase 0 had an intent but text score < 0.40; intent surfaced as a Top-3 candidate. */
+    val fallthroughs: Int,
+    /** User manually marked a different episode while an intent was active (channel-surfing signal). */
+    val overriddenByManualMark: Int,
+)
+
+/**
+ * Abstracts the Watch-Now intent store so [MediaSessionScrobbler] (core) stays decoupled
+ * from the TV-specific [PlaybackIntentRegistry].
+ *
+ * The phone app binds [NoOpPlaybackIntentProvider]; the TV app binds [PlaybackIntentRegistry].
+ */
+interface PlaybackIntentProvider {
+    /** Records a new intent, replacing any existing intent for the same package. */
+    fun record(intent: PlaybackIntent)
+
+    /**
+     * Returns the stored intent for [packageName] if it is still within the TTL window,
+     * or null if none exists or the intent has expired (and evicts it).
+     */
+    fun peek(packageName: String): PlaybackIntent?
+
+    /** Removes the intent for [packageName] (called after a Phase-0 auto-scrobble). */
+    fun consumeIntent(packageName: String)
+
+    /** Increments the Phase-0-confirmed counter. */
+    fun recordHit()
+
+    /** Increments the Phase-0-fallthrough counter. */
+    fun recordFallthrough()
+
+    /** Returns a snapshot of all intent-lifecycle counters. */
+    fun intentStats(): PlaybackIntentStats
+}
+
+/** No-op implementation used by the phone app and in tests that don't exercise the intent path. */
+class NoOpPlaybackIntentProvider : PlaybackIntentProvider {
+    override fun record(intent: PlaybackIntent) {}
+    override fun peek(packageName: String): PlaybackIntent? = null
+    override fun consumeIntent(packageName: String) {}
+    override fun recordHit() {}
+    override fun recordFallthrough() {}
+    override fun intentStats(): PlaybackIntentStats = PlaybackIntentStats(0, 0, 0)
 }

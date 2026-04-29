@@ -4,7 +4,9 @@ import android.content.Context
 import androidx.work.WorkManager
 import com.justb81.watchbuddy.BuildConfig
 import com.justb81.watchbuddy.core.scrobbler.MetadataEnricher
+import com.justb81.watchbuddy.core.scrobbler.NoOpPlaybackIntentProvider
 import com.justb81.watchbuddy.core.scrobbler.NoOpTitleExtractor
+import com.justb81.watchbuddy.core.scrobbler.PlaybackIntentProvider
 import com.justb81.watchbuddy.core.scrobbler.TitleExtractor
 import dagger.Module
 import dagger.Provides
@@ -84,4 +86,12 @@ object AppModule {
     @Provides
     @Singleton
     fun provideMetadataEnrichers(): List<MetadataEnricher> = emptyList()
+
+    /**
+     * The phone has no Watch-Now UI surface today, so there is nothing to capture
+     * for Phase 0. Bind the no-op to keep the Hilt graph consistent with the TV app.
+     */
+    @Provides
+    @Singleton
+    fun providePlaybackIntentProvider(): PlaybackIntentProvider = NoOpPlaybackIntentProvider()
 }
