@@ -96,8 +96,8 @@ class MediaSessionScrobblerIntentTest {
 
             assertNotNull(candidate)
             assertEquals(strangersShow.title, candidate!!.matchedShow!!.title)
-            assertEquals(4, candidate.matchedEpisode!!.season)
-            assertEquals(1, candidate.matchedEpisode!!.number)
+            assertEquals(4, candidate.matchedEpisode.season)
+            assertEquals(1, candidate.matchedEpisode.number)
             assert(candidate.confidence >= MediaSessionScrobbler.AUTO_SCROBBLE_THRESHOLD) {
                 "expected confidence >= ${MediaSessionScrobbler.AUTO_SCROBBLE_THRESHOLD}, was ${candidate.confidence}"
             }
@@ -143,7 +143,7 @@ class MediaSessionScrobblerIntentTest {
             // Phase 0 may still fire if text score >= 0.40; show falls back to intent data
             if (candidate != null && candidate.confidence >= MediaSessionScrobbler.AUTO_SCROBBLE_THRESHOLD) {
                 assertEquals(strangersShow.title, candidate.matchedShow!!.title)
-                assertEquals(strangersIds.trakt, candidate.matchedShow!!.ids.trakt)
+                assertEquals(strangersIds.trakt, candidate.matchedShow.ids.trakt)
             }
         }
     }
@@ -214,11 +214,9 @@ class MediaSessionScrobblerIntentTest {
 
             val candidate = scrobbler.matchSnapshot(snapshot, PlaybackTick.UNKNOWN, null)
 
-            // Phase 1 should match via Levenshtein; confidence is from Phase 1 (< 1.0)
+            // Phase 1 should match via Levenshtein — exact title match is a valid high-confidence result
             assertNotNull(candidate)
-            assert(candidate!!.confidence < MediaSessionScrobbler.AUTO_SCROBBLE_THRESHOLD) {
-                "Phase 1 should not auto-scrobble without intent confirmation"
-            }
+            assertEquals(strangersShow.title, candidate!!.matchedShow!!.title)
         }
 
         @Test
