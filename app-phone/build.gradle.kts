@@ -25,7 +25,7 @@ android {
 
         // versionName: release-please sets VERSION_NAME, fallback to hardcoded value
         versionName = providers.environmentVariable("VERSION_NAME")
-            .orElse("0.32.0").get() // x-release-please-version
+            .orElse("0.32.1").get() // x-release-please-version
 
         // ── Trakt configuration ───────────────────────────────────────────────
         buildConfigField(
