@@ -100,14 +100,23 @@ class TvMainActivity : ComponentActivity() {
     private fun maybeRequestReadTvListingsPermission() {
         if (ContextCompat.checkSelfPermission(
                 this,
-                Manifest.permission.READ_TV_LISTINGS
+                READ_TV_LISTINGS
             ) != PackageManager.PERMISSION_GRANTED
         ) {
-            requestReadTvListingsPermission.launch(Manifest.permission.READ_TV_LISTINGS)
+            requestReadTvListingsPermission.launch(READ_TV_LISTINGS)
         }
     }
 
     companion object {
         private const val TAG = "TvMainActivity"
+
+        /**
+         * `android.permission.READ_TV_LISTINGS` is referenced as a string literal because
+         * `android.Manifest.permission.READ_TV_LISTINGS` is annotated `@hide` /
+         * `@SystemApi` in the public Android SDK stubs and therefore not resolvable at
+         * compile time. The string value is stable platform contract and matches the
+         * `<uses-permission>` entry declared in the manifest.
+         */
+        private const val READ_TV_LISTINGS = "android.permission.READ_TV_LISTINGS"
     }
 }
