@@ -738,7 +738,6 @@ class ShowProgressCalculatorTest {
             )
             assertEquals(1 to 5, ShowProgressCalculator.nextEpisodeNumbers(e, null))
         }
-
     }
 
     @Nested
