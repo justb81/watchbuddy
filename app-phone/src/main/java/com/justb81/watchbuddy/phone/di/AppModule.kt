@@ -1,6 +1,9 @@
 package com.justb81.watchbuddy.phone.di
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
+import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.work.WorkManager
 import com.justb81.watchbuddy.BuildConfig
 import com.justb81.watchbuddy.core.scrobbler.MetadataEnricher
@@ -8,6 +11,7 @@ import com.justb81.watchbuddy.core.scrobbler.NoOpPlaybackIntentProvider
 import com.justb81.watchbuddy.core.scrobbler.NoOpTitleExtractor
 import com.justb81.watchbuddy.core.scrobbler.PlaybackIntentProvider
 import com.justb81.watchbuddy.core.scrobbler.TitleExtractor
+import com.justb81.watchbuddy.phone.network.WifiStateProvider
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -94,4 +98,21 @@ object AppModule {
     @Provides
     @Singleton
     fun providePlaybackIntentProvider(): PlaybackIntentProvider = NoOpPlaybackIntentProvider()
+
+    /**
+     * Singleton [WifiStateProvider] wired to the process lifecycle so its
+     * [ConnectivityManager.NetworkCallback] is automatically unregistered when
+     * the process ends (#529). The observer is added on the main thread because
+     * [androidx.lifecycle.Lifecycle.addObserver] requires it; the @Provides method
+     * itself is invoked from Application.onCreate(), which runs on the main thread.
+     */
+    @Provides
+    @Singleton
+    fun provideWifiStateProvider(@ApplicationContext context: Context): WifiStateProvider {
+        val provider = WifiStateProvider(context)
+        Handler(Looper.getMainLooper()).post {
+            ProcessLifecycleOwner.get().lifecycle.addObserver(provider)
+        }
+        return provider
+    }
 }
