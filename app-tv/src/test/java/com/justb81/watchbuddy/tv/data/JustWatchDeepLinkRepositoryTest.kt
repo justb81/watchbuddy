@@ -18,8 +18,14 @@ import io.mockk.coVerify
 import io.mockk.just
 import io.mockk.mockk
 import io.mockk.runs
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.yield
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -516,5 +522,64 @@ class JustWatchDeepLinkRepositoryTest {
         fun `lastFetchError returns null initially`() {
             assertNull(repository.lastFetchError())
         }
+    }
+
+    @Nested
+    @DisplayName("fetch deduplication")
+    inner class FetchDeduplicationTests {
+
+        private class FakeDao : JustWatchDeepLinkDao {
+            private val store = ConcurrentHashMap<String, JustWatchDeepLink>()
+
+            private fun key(showId: Int, season: Int, episode: Int, providerId: Int, countryCode: String) =
+                "$showId:$season:$episode:$providerId:$countryCode"
+
+            override suspend fun get(showId: Int, season: Int, episode: Int, providerId: Int, countryCode: String): JustWatchDeepLink? =
+                store[key(showId, season, episode, providerId, countryCode)]
+
+            override suspend fun upsert(entry: JustWatchDeepLink) {
+                store[key(entry.tmdbShowId, entry.season, entry.episode, entry.providerId, entry.countryCode)] = entry
+            }
+
+            override suspend fun deleteAll() = store.clear()
+            override suspend fun countPositive(): Int = store.values.count { it.standardWebUrl != null }
+            override suspend fun countNegative(): Int = store.values.count { it.standardWebUrl == null }
+            override suspend fun lastFetchedAt(): Long? = store.values.maxOfOrNull { it.fetchedAt }
+        }
+
+        @Test
+        fun `100 concurrent requests for same episode deduplicate to a single API roundtrip`() =
+            runTest(UnconfinedTestDispatcher()) {
+                val searchCallCount = AtomicInteger(0)
+                val fakeDao = FakeDao()
+                val episodeOffer = makeOffer(url = "https://www.netflix.com/watch/42")
+
+                coEvery { api.query(match { it.query == JustWatchApiService.SEARCH_QUERY }) } coAnswers {
+                    // yield so all waiting coroutines can race to the mutex before the
+                    // fetch result is written to the cache
+                    yield()
+                    searchCallCount.incrementAndGet()
+                    makeSearchResponse(offers = listOf(episodeOffer))
+                }
+                coEvery { api.query(match { it.query == JustWatchApiService.SEASONS_QUERY }) } returns
+                    makeSeasonsResponse(listOf("season-1-id"))
+                coEvery { api.query(match { it.query == JustWatchApiService.EPISODES_QUERY }) } returns
+                    makeEpisodesResponse(
+                        listOf(JustWatchEpisode(episodeNumber = 2, seasonNumber = 1, offers = listOf(episodeOffer)))
+                    )
+
+                val repo = JustWatchDeepLinkRepository(fakeDao, api)
+
+                val results = (1..100).map {
+                    async { repo.resolveDeepLink(100, 1, 2, 8, "US", "Breaking Bad") }
+                }.awaitAll()
+
+                assertTrue(results.all { it == "https://www.netflix.com/watch/42" })
+                assertEquals(
+                    1,
+                    searchCallCount.get(),
+                    "Expected exactly 1 SEARCH_QUERY call for 100 concurrent requests, got ${searchCallCount.get()}",
+                )
+            }
     }
 }
