@@ -2,14 +2,20 @@ package com.justb81.watchbuddy.phone.network
 
 import android.content.Context
 import android.net.ConnectivityManager
+import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import androidx.lifecycle.LifecycleOwner
+import io.mockk.any
+import io.mockk.anyConstructed
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
+import io.mockk.mockkConstructor
 import io.mockk.runs
+import io.mockk.unmockkConstructor
 import io.mockk.verify
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
@@ -26,10 +32,23 @@ class WifiStateProviderTest {
     @BeforeEach
     fun setUp() {
         every { context.getSystemService(ConnectivityManager::class.java) } returns connectivityManager
-        // registerNetworkCallback is void — tell MockK to accept any call
+
+        // NetworkRequest.Builder is an Android stub whose addTransportType() returns null
+        // in unit-test stubs, making the chained .build() call NPE. Mock the constructor
+        // so the chain returns a proper NetworkRequest mock.
+        mockkConstructor(NetworkRequest.Builder::class)
+        val mockRequest = mockk<NetworkRequest>()
+        every { anyConstructed<NetworkRequest.Builder>().addTransportType(any()) } answers { self as NetworkRequest.Builder }
+        every { anyConstructed<NetworkRequest.Builder>().build() } returns mockRequest
+
         every {
             connectivityManager.registerNetworkCallback(any<NetworkRequest>(), any<ConnectivityManager.NetworkCallback>())
         } just runs
+    }
+
+    @AfterEach
+    fun tearDown() {
+        unmockkConstructor(NetworkRequest.Builder::class)
     }
 
     private fun buildProvider(): WifiStateProvider = WifiStateProvider(context)
@@ -46,7 +65,7 @@ class WifiStateProviderTest {
 
         @Test
         fun `starts true when active network has TRANSPORT_WIFI`() {
-            val network = mockk<android.net.Network>()
+            val network = mockk<Network>()
             val caps = mockk<NetworkCapabilities>()
             every { connectivityManager.activeNetwork } returns network
             every { connectivityManager.getNetworkCapabilities(network) } returns caps
@@ -110,7 +129,7 @@ class WifiStateProviderTest {
             } throws IllegalArgumentException("already unregistered")
             val provider = buildProvider()
 
-            provider.shutdown() // must swallow the exception via runCatching
+            provider.shutdown() // runCatching must swallow the exception
         }
     }
 
