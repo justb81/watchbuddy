@@ -115,20 +115,30 @@ class CompanionService : Service() {
             DiagnosticLog.debug(TAG, "onStartCommand skipped; service already running")
             return START_STICKY
         }
-        companionHttpServer.start()
-        stateManager.setHttpServerBinding("0.0.0.0:${CompanionHttpServer.PORT}")
-        stateManager.setWifiIpv4(ipv4.hostAddress)
-        DiagnosticLog.event(TAG, "HTTP server bound 0.0.0.0:${CompanionHttpServer.PORT}")
-        startBleAdvertising()
-        stateManager.setServiceRunning(true)
-        registerNetworkCallback()
-        startPresenceMonitor()
-        ensureScrobblePromptChannel()
-        observeAmbiguousPrompts()
-        // Pre-load the on-device LLM so the user's first recap hits a warm
-        // engine. Fire-and-forget — the warmUp() implementation swallows its
-        // own exceptions and only logs.
-        serviceScope.launch { llmProviderFactory.warmUp() }
+        try {
+            companionHttpServer.start()
+            stateManager.setHttpServerBinding("0.0.0.0:${CompanionHttpServer.PORT}")
+            stateManager.setWifiIpv4(ipv4.hostAddress)
+            DiagnosticLog.event(TAG, "HTTP server bound 0.0.0.0:${CompanionHttpServer.PORT}")
+            startBleAdvertising()
+            stateManager.setServiceRunning(true)
+            registerNetworkCallback()
+            startPresenceMonitor()
+            ensureScrobblePromptChannel()
+            observeAmbiguousPrompts()
+            // Pre-load the on-device LLM so the user's first recap hits a warm
+            // engine. Fire-and-forget — the warmUp() implementation swallows its
+            // own exceptions and only logs.
+            serviceScope.launch { llmProviderFactory.warmUp() }
+        } catch (e: Exception) {
+            // If anything throws after registerNetworkCallback() the system may
+            // not call onDestroy(), so we unregister the callback here to avoid
+            // leaking the Service reference (#529).
+            DiagnosticLog.warn(TAG, "onStartCommand init failed — cleaning up callback", e)
+            unregisterNetworkCallback()
+            stopSelf(startId)
+            return START_NOT_STICKY
+        }
         return START_STICKY
     }
 
