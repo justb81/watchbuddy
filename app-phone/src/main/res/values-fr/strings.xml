@@ -29,8 +29,8 @@
     <string name="onboarding_error_server_misconfigured">Le serveur d\'authentification est mal configuré. Veuillez réessayer plus tard ou contacter le mainteneur.</string>
     <string name="onboarding_skip">Ignorer pour le moment</string>
     <string name="onboarding_reconnect_title">Se connecter à Trakt</string>
-    <string name="onboarding_decrypt_failed_banner">Votre connexion précédente n'a pas pu être lue. Veuillez vous reconnecter.</string>
-    <string name="auth_keystore_unavailable">Le stockage sécurisé de votre appareil est indisponible. La protection des jetons est désactivée — veuillez redémarrer l'application ou vérifier les paramètres de sécurité de votre appareil.</string>
+    <string name="onboarding_decrypt_failed_banner">Votre connexion précédente n\'a pas pu être lue. Veuillez vous reconnecter.</string>
+    <string name="auth_keystore_unavailable">Le stockage sécurisé de votre appareil est indisponible. La protection des jetons est désactivée — veuillez redémarrer l\'application ou vérifier les paramètres de sécurité de votre appareil.</string>
 
     <!-- Home -->
     <string name="home_title">Mes séries</string>
