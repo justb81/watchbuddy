@@ -37,7 +37,7 @@ const app = createApp({
   debug,
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`WatchBuddy token proxy running on port ${PORT}`);
   if (debug) {
     console.log('Debug mode enabled — request logging is active');
@@ -46,3 +46,11 @@ app.listen(PORT, () => {
   // will report "starting" until this completes.
   app.verifyCredentials();
 });
+
+const shutdown = () => {
+  app.clearRetryTimer();
+  server.close(() => process.exit(0));
+  // Force exit if the server hasn't closed within 10 s (e.g. keep-alive connections).
+  setTimeout(() => process.exit(1), 10_000).unref();
+};
+['SIGTERM', 'SIGINT'].forEach((s) => process.on(s, shutdown));
