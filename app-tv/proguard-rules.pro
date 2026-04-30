@@ -29,22 +29,13 @@
 -dontwarn retrofit2.KotlinExtensions
 -dontwarn retrofit2.KotlinExtensions$*
 -if interface * { @retrofit2.http.* <methods>; }
--keep,allowobfuscation interface <1>
+-keep interface <1> { *; }
 -keep,allowobfuscation,allowshrinking class kotlin.coroutines.Continuation
 
-# Explicit non-obfuscated keep rules for every Retrofit service interface in
-# the project.  Under AGP 9 / R8 full mode, the generic
-# `-keep,allowobfuscation interface <1>` rule above permits renaming and
-# horizontal class merging, which breaks the `Proxy.newProxyInstance` →
-# Kotlin-inserted checkcast invariant that `retrofit.create(Foo::class.java)`
-# relies on.  Symptom: ClassCastException thrown from the @Provides method
-# the moment the Hilt graph constructs the Retrofit service (issue #247 on
-# 0.14.3, first triggered on TV because app-tv has fewer live call sites
-# into these interfaces than app-phone, so R8 is more aggressive).
-# NOTE: Every new Retrofit interface MUST be added here as well.
--keep interface com.justb81.watchbuddy.core.tmdb.TmdbApiService { *; }
--keep interface com.justb81.watchbuddy.core.trakt.TraktApiService { *; }
--keep interface com.justb81.watchbuddy.core.trakt.TokenProxyService { *; }
+# Retrofit interfaces defined in :core are kept by core/consumer-rules.pro,
+# which is automatically merged into this module by AGP. The rule above also
+# covers app-tv-local interfaces (e.g. PhoneApiService) without requiring
+# explicit entries — see issue #574.
 
 # ── OkHttp ───────────────────────────────────────────────────────────────────
 -dontwarn okhttp3.internal.platform.**

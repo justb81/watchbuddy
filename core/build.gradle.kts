@@ -10,6 +10,11 @@ android {
         minSdk = 31
     }
 
+    // Propagate the Retrofit interface keep rule to all consuming app modules
+    // (app-phone, app-tv) so new interfaces added here are automatically
+    // protected without manual entries in their proguard-rules.pro files.
+    consumerProguardFiles("consumer-rules.pro")
+
     buildFeatures {
         buildConfig = true
     }
