@@ -437,11 +437,11 @@ class PhoneDiscoveryManager(
      * [CapabilityResult.Invalid] before this function ever runs.
      */
     private fun validateCapability(cap: DeviceCapability): String? = when {
-        cap.deviceId.isBlank()   -> "blank deviceId"
-        cap.userName.isBlank()   -> "blank userName"
+        cap.deviceId.isBlank() -> "blank deviceId"
+        cap.userName.isBlank() -> "blank userName"
         cap.deviceName.isBlank() -> "blank deviceName"
-        cap.modelQuality < 0     -> "negative modelQuality (${cap.modelQuality})"
-        cap.freeRamMb < 0        -> "negative freeRamMb (${cap.freeRamMb})"
+        cap.modelQuality < 0 -> "negative modelQuality (${cap.modelQuality})"
+        cap.freeRamMb < 0 -> "negative freeRamMb (${cap.freeRamMb})"
         else -> null
     }
 
