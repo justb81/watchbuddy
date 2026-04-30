@@ -345,10 +345,9 @@ class PhoneDiscoveryManagerTest {
             return phone
         }
 
-        private fun stubCapabilityResponse(code: Int, body: String?) {
-            val responseBody = body?.let {
-                mockk<ResponseBody>(relaxed = true).apply { every { string() } returns it }
-            }
+        private fun stubCapabilityResponse(code: Int, body: String) {
+            val responseBody = mockk<ResponseBody>(relaxed = true)
+            every { responseBody.string() } returns body
             val response = mockk<Response>(relaxed = true)
             every { response.code } returns code
             every { response.isSuccessful } returns (code in 200..299)
@@ -572,19 +571,6 @@ class PhoneDiscoveryManagerTest {
             runTest(UnconfinedTestDispatcher()) {
                 seedPhone()
                 stubCapabilityResponse(code = 200, body = "")
-
-                manager.runTickForTest()
-
-                val phones = manager.discoveredPhones.value
-                assertEquals(1, phones.size)
-                assertEquals(1, phones.single().failCount)
-            }
-
-        @Test
-        fun `HTTP 200 with null body is a transport failure - bumps failCount`() =
-            runTest(UnconfinedTestDispatcher()) {
-                seedPhone()
-                stubCapabilityResponse(code = 200, body = null)
 
                 manager.runTickForTest()
 

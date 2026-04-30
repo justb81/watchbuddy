@@ -412,8 +412,8 @@ class PhoneDiscoveryManager(
             if (!resp.isSuccessful) {
                 return@use CapabilityResult.TransportFailure("HTTP ${resp.code}")
             }
-            val body = resp.body?.string()
-            if (body.isNullOrBlank()) {
+            val body = resp.body.string()
+            if (body.isBlank()) {
                 return@use CapabilityResult.TransportFailure("empty body")
             }
             val capability = try {
