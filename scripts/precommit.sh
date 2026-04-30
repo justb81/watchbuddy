@@ -49,7 +49,7 @@ ran_any=0
 skipped_android=0
 
 # --- Android / Kotlin scope (mirrors build-android.yml `android:` filter) ---
-if match '^(app-phone|app-tv|core)/' \
+if match '^(app-phone|app-tv|core|build-logic)/' \
    || match '\.gradle\.kts$' \
    || match '^gradle/' \
    || match '^gradle\.properties$' \
@@ -96,6 +96,12 @@ if match '^\.github/workflows/.*\.ya?ml$'; then
     actionlint
   else
     echo "precommit: actionlint not installed — skipping (install via 'go install github.com/rhysd/actionlint/cmd/actionlint@latest' or 'brew install actionlint')"
+  fi
+
+  # Security check: verify release.yml does not expose signing secrets as plain env vars.
+  if printf '%s\n' "$STAGED" | grep -q '^\.github/workflows/release\.yml$'; then
+    section "Release workflow security check"
+    python3 scripts/validate-release-security.py
   fi
 fi
 

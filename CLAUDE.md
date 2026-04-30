@@ -85,8 +85,9 @@ watchbuddy/
 │       ├── stats.yml           CI: refreshes the README "Code Statistics" table after a green main build
 │       └── test-backend.yml    CI: tests for the Node.js backend
 ├── scripts/
-│   ├── precommit.sh            Scoped local mirror of CI checks (see "Local pre-commit checks")
-│   └── update-readme-stats.sh  Regenerates the README "Code Statistics" block (cloc + JUnit + Jest)
+│   ├── precommit.sh                  Scoped local mirror of CI checks (see "Local pre-commit checks")
+│   ├── validate-release-security.py  Validates release.yml signing-secret hygiene (run by precommit.sh when release.yml is staged)
+│   └── update-readme-stats.sh        Regenerates the README "Code Statistics" block (cloc + JUnit + Jest)
 └── gradle/
     └── libs.versions.toml  Version catalog (single source of truth for dependencies)
 ```
@@ -155,6 +156,14 @@ The only exceptions are **localization string resources** (`values-de/`, `values
 - Secrets via `local.properties` (not checked in) or environment variables for CI
 - Convention plugins live in `build-logic/convention/`. `watchbuddy.android.library` is applied by `core`; `watchbuddy.android.application` is applied by `app-phone` and `app-tv`. Both plugins centralise `compileSdk`, Java/Kotlin 17 options, Hilt/KSP wiring, and test dependencies so module `build.gradle.kts` files declare only what is unique to that module.
 
+**Release signing credentials** are passed via Gradle project properties, not environment variables, so they never appear in env-var dumps or third-party plugin logs. CI writes them to `~/.gradle/gradle.properties` (chmod 600) in the `release.yml` workflow. For local release builds, add them to your personal `~/.gradle/gradle.properties`:
+```
+watchbuddy.signing.storePassword=<your keystore password>
+watchbuddy.signing.keyAlias=<your key alias>
+watchbuddy.signing.keyPassword=<your key password>
+```
+The keystore file path is still supplied via the `KEYSTORE_FILE` environment variable (it is not a secret). The convention plugin (`watchbuddy.android.application.gradle.kts`) reads the Gradle properties via `providers.gradleProperty("watchbuddy.signing.*")`.
+
 ### Static analysis
 - `./gradlew detektAll` — runs detekt (Kotlin static analysis) on every module. Config: `config/detekt/detekt.yml`. Baselines: `<module>/detekt-baseline.xml`.
 - `./gradlew detektBaselineAll` — regenerates detekt baselines (only when you intentionally want to accept new findings; the goal is normally to **fix** them).
@@ -177,7 +186,7 @@ Once enabled, `.githooks/pre-commit` delegates to `scripts/precommit.sh` on ever
 
 **Scoping rules** (must match the CI `paths-filter` sets exactly):
 
-- `app-phone/**`, `app-tv/**`, `core/**`, `*.gradle.kts`, `gradle/**`, `gradle.properties`, `config/detekt/**`, `.github/actions/**` → `./gradlew test detektAll :app-phone:lintDebug :app-tv:lintDebug`
+- `app-phone/**`, `app-tv/**`, `core/**`, `build-logic/**`, `*.gradle.kts`, `gradle/**`, `gradle.properties`, `config/detekt/**`, `.github/actions/**` → `./gradlew test detektAll :app-phone:lintDebug :app-tv:lintDebug`
 - `backend/**` → `npm --prefix backend run lint && npm --prefix backend run format:check && npm --prefix backend test`
 - `.github/workflows/*.y?ml` → `python3 yaml.safe_load` on each changed file + `actionlint` when installed
 
