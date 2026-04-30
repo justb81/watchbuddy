@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.33.1](https://github.com/justb81/watchbuddy/compare/v0.33.0...v0.33.1) (2026-04-30)
+
+
+### Bug Fixes
+
+* fix JustWatch 422 GRAPHQL_VALIDATION_FAILED on seasons/episodes queries ([#617](https://github.com/justb81/watchbuddy/issues/617)) ([0acad5c](https://github.com/justb81/watchbuddy/commit/0acad5cdfb9fe76e538b0183bb9166bbf6029e7c))
+* **tv:** query WatchNext provider without selection clause to avoid AOSP SecurityException ([#619](https://github.com/justb81/watchbuddy/issues/619)) ([740c1e1](https://github.com/justb81/watchbuddy/commit/740c1e12e1cf9835e19a8aeee70ca7226b24c53c))
+
 ## [0.33.0](https://github.com/justb81/watchbuddy/compare/v0.32.4...v0.33.0) (2026-04-30)
 
 
