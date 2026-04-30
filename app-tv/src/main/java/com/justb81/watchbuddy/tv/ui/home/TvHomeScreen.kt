@@ -6,8 +6,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
@@ -20,6 +22,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -153,6 +158,16 @@ private fun TvHomeShelves(
     val allOthers = state.allShows
     var allShowsExpanded by rememberSaveable { mutableStateOf(false) }
 
+    var focusedShowKey by rememberSaveable { mutableStateOf<String?>(null) }
+    val continueWatchingState = rememberLazyListState()
+    val allShowsState = rememberLazyListState()
+    val cwRequesters = remember(continueWatching) { mutableMapOf<String, FocusRequester>() }
+    val allRequesters = remember(allOthers) { mutableMapOf<String, FocusRequester>() }
+
+    val cwShelf = ShelfFocusContext(continueWatching, continueWatchingState, cwRequesters)
+    val allShelf = ShelfFocusContext(allOthers, allShowsState, allRequesters)
+    RestoreShelfFocusEffect(focusedShowKey, cwShelf, allShelf, allShowsExpanded)
+
     LazyColumn(
         contentPadding = PaddingValues(horizontal = 48.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
@@ -167,19 +182,14 @@ private fun TvHomeShelves(
                 )
             }
             item {
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    contentPadding = PaddingValues(horizontal = 4.dp)
-                ) {
-                    items(continueWatching, key = { it.entry.show.ids.trakt ?: it.entry.show.title }) { enriched ->
-                        TvShowCard(
-                            enriched = enriched,
-                            progress = enriched.entry.show.ids.trakt?.let { state.progress[it] },
-                            hasNewSeason = enriched.entry.show.ids.trakt?.let { state.hasNewSeason[it] } == true,
-                            onClick = { onShowClick(enriched) }
-                        )
-                    }
-                }
+                TvShowShelfRow(
+                    shows = continueWatching,
+                    state = state,
+                    listState = continueWatchingState,
+                    requesters = cwRequesters,
+                    onShowClick = onShowClick,
+                    onFocused = { focusedShowKey = it }
+                )
             }
         }
 
@@ -193,34 +203,100 @@ private fun TvHomeShelves(
 
         if (allShowsExpanded) {
             item {
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    contentPadding = PaddingValues(horizontal = 4.dp)
-                ) {
-                    items(allOthers, key = { it.entry.show.ids.trakt ?: it.entry.show.title }) { enriched ->
-                        TvShowCard(
-                            enriched = enriched,
-                            progress = enriched.entry.show.ids.trakt?.let { state.progress[it] },
-                            hasNewSeason = enriched.entry.show.ids.trakt?.let { state.hasNewSeason[it] } == true,
-                            onClick = { onShowClick(enriched) }
-                        )
-                    }
-                }
+                TvShowShelfRow(
+                    shows = allOthers,
+                    state = state,
+                    listState = allShowsState,
+                    requesters = allRequesters,
+                    onShowClick = onShowClick,
+                    onFocused = { focusedShowKey = it }
+                )
             }
-            // Trigger load-more when the All shows section is expanded.
             if (state.canLoadMore) {
-                item {
-                    LaunchedEffect(allShowsExpanded) { if (allShowsExpanded) onLoadMore() }
-                    if (state.isLoadingMore) {
-                        Box(Modifier.fillMaxWidth().padding(8.dp), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator(
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(32.dp)
-                            )
-                        }
-                    }
-                }
+                item { AllShowsLoadMoreTrigger(state, onLoadMore) }
             }
+        }
+    }
+}
+
+@Composable
+private fun AllShowsLoadMoreTrigger(state: TvHomeUiState, onLoadMore: () -> Unit) {
+    LaunchedEffect(Unit) { onLoadMore() }
+    if (state.isLoadingMore) {
+        Box(Modifier.fillMaxWidth().padding(8.dp), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(32.dp)
+            )
+        }
+    }
+}
+
+private fun EnrichedShowEntry.focusKey(): String =
+    entry.show.ids.trakt?.toString() ?: entry.show.title
+
+private class ShelfFocusContext(
+    val shows: List<EnrichedShowEntry>,
+    val listState: LazyListState,
+    val requesters: Map<String, FocusRequester>
+)
+
+@Composable
+private fun RestoreShelfFocusEffect(
+    focusedShowKey: String?,
+    continueWatching: ShelfFocusContext,
+    allShows: ShelfFocusContext,
+    allShowsExpanded: Boolean
+) {
+    LaunchedEffect(continueWatching.shows, allShows.shows, allShowsExpanded) {
+        val key = focusedShowKey ?: return@LaunchedEffect
+        val cwIndex = continueWatching.shows.indexOfFirst { it.focusKey() == key }
+        if (cwIndex >= 0) {
+            continueWatching.listState.scrollToItem(cwIndex)
+            continueWatching.requesters[key]?.requestFocus()
+            return@LaunchedEffect
+        }
+        if (allShowsExpanded) {
+            val allIndex = allShows.shows.indexOfFirst { it.focusKey() == key }
+            if (allIndex >= 0) {
+                allShows.listState.scrollToItem(allIndex)
+                allShows.requesters[key]?.requestFocus()
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+private fun TvShowShelfRow(
+    shows: List<EnrichedShowEntry>,
+    state: TvHomeUiState,
+    listState: LazyListState,
+    requesters: MutableMap<String, FocusRequester>,
+    onShowClick: (EnrichedShowEntry) -> Unit,
+    onFocused: (String) -> Unit
+) {
+    LazyRow(
+        state = listState,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        contentPadding = PaddingValues(horizontal = 4.dp)
+    ) {
+        items(shows, key = { it.focusKey() }) { enriched ->
+            val key = enriched.focusKey()
+            val requester = remember(key) { FocusRequester() }
+            DisposableEffect(key, requester) {
+                requesters[key] = requester
+                onDispose { requesters.remove(key, requester) }
+            }
+            TvShowCard(
+                enriched = enriched,
+                progress = enriched.entry.show.ids.trakt?.let { state.progress[it] },
+                hasNewSeason = enriched.entry.show.ids.trakt?.let { state.hasNewSeason[it] } == true,
+                onClick = { onShowClick(enriched) },
+                modifier = Modifier
+                    .focusRequester(requester)
+                    .onFocusChanged { if (it.isFocused) onFocused(key) }
+            )
         }
     }
 }
@@ -342,7 +418,8 @@ private fun TvShowCard(
     enriched: EnrichedShowEntry,
     progress: ShowProgress?,
     hasNewSeason: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val entry = enriched.entry
     val posterUrl = TmdbImageHelper.poster(enriched.posterPath, 500)
@@ -353,7 +430,7 @@ private fun TvShowCard(
 
     Card(
         onClick = onClick,
-        modifier = Modifier
+        modifier = modifier
             .width(180.dp)
             .aspectRatio(2f / 3f)
             .semantics { contentDescription = cardDescription },
