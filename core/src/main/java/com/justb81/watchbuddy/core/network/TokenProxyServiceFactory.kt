@@ -15,13 +15,15 @@ import javax.inject.Singleton
  * instead of relying on the build-time TOKEN_BACKEND_URL.
  */
 @Singleton
-class TokenProxyServiceFactory @Inject constructor() {
+class TokenProxyServiceFactory @Inject constructor(
+    private val sharedClient: OkHttpClient,
+) {
 
     fun create(baseUrl: String): TokenProxyService {
         val url = if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"
         return Retrofit.Builder()
             .baseUrl(url)
-            .client(OkHttpClient())
+            .client(sharedClient)
             .addConverterFactory(WatchBuddyJson.asConverterFactory("application/json".toMediaType()))
             .build()
             .create(TokenProxyService::class.java)

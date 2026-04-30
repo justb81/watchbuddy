@@ -73,6 +73,20 @@ class NetworkModuleTest {
         }
 
         @Test
+        fun `has explicit connect read and call timeouts`() {
+            val client = NetworkModule.provideOkHttpClient(traktClientId = "test-id")
+            assertEquals(10_000, client.connectTimeoutMillis)
+            assertEquals(30_000, client.readTimeoutMillis)
+            assertEquals(45_000, client.callTimeoutMillis)
+        }
+
+        @Test
+        fun `disables retry on connection failure to prevent double-charging Trakt scrobble endpoints`() {
+            val client = NetworkModule.provideOkHttpClient(traktClientId = "test-id")
+            assertFalse(client.retryOnConnectionFailure)
+        }
+
+        @Test
         fun `does not apply certificate pinning`() {
             val client = NetworkModule.provideOkHttpClient(traktClientId = "test-id")
             assertTrue(client.certificatePinner.pins.isEmpty())

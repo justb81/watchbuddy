@@ -18,6 +18,9 @@ import java.util.concurrent.TimeUnit
 import javax.inject.Named
 import javax.inject.Singleton
 
+private const val CONNECT_TIMEOUT_SECONDS = 10L
+private const val READ_TIMEOUT_SECONDS = 30L
+private const val CALL_TIMEOUT_SECONDS = 45L
 private const val JUSTWATCH_TIMEOUT_SECONDS = 5L
 private const val JUSTWATCH_USER_AGENT = "Mozilla/5.0 (Linux; Android 14) WatchBuddy"
 
@@ -30,6 +33,12 @@ object NetworkModule {
     fun provideOkHttpClient(
         @Named("traktClientId") traktClientId: String,
     ): OkHttpClient = OkHttpClient.Builder()
+        .connectTimeout(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        .readTimeout(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        .callTimeout(CALL_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        // Trakt scrobble endpoints (/scrobble/start|pause|stop) are not idempotent;
+        // a silent retry would double-charge a watch event on Trakt's side.
+        .retryOnConnectionFailure(false)
         .addInterceptor { chain ->
             val builder = chain.request().newBuilder()
                 .addHeader("Content-Type", "application/json")
