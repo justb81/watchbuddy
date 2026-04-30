@@ -1,6 +1,5 @@
 package com.justb81.watchbuddy.tv.discovery
 
-import android.net.nsd.NsdServiceInfo
 import com.justb81.watchbuddy.core.model.DeviceCapability
 import com.justb81.watchbuddy.core.model.LlmBackend
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
@@ -196,10 +195,8 @@ class PhoneTitleExtractionClientTest {
         modelQuality: Int,
         score: Int = modelQuality,
     ): PhoneDiscoveryManager.DiscoveredPhone {
-        val serviceInfo = mockk<NsdServiceInfo>(relaxed = true)
-        every { serviceInfo.serviceName } returns "test-$baseUrl"
         return PhoneDiscoveryManager.DiscoveredPhone(
-            serviceInfo = serviceInfo,
+            serviceName = "test-$baseUrl",
             txtRecord = PhoneDiscoveryManager.PhoneTxtRecord(
                 version = "1",
                 modelQuality = modelQuality,
