@@ -44,6 +44,7 @@ class IdleTimeoutMonitorTest {
             val result = async { monitor().awaitTimeout(hasPhones) }
             advanceTimeBy(NO_DISCOVERY_MS - 1)
             assertFalse(result.isCompleted)
+            result.cancel()
         }
 
         @Test
@@ -55,6 +56,7 @@ class IdleTimeoutMonitorTest {
             hasPhones.value = true             // phone appears — phase 1 cancels
             advanceTimeBy(ALL_UNREACHABLE_MS + 1) // phones stay present; phase 2 timer not running
             assertFalse(result.isCompleted)
+            result.cancel()
         }
     }
 
@@ -84,6 +86,7 @@ class IdleTimeoutMonitorTest {
             hasPhones.value = true                 // phones come back in time
             advanceTimeBy(ALL_UNREACHABLE_MS + 1) // phones still present; timer reset
             assertFalse(result.isCompleted)
+            result.cancel()
         }
 
         @Test
@@ -112,6 +115,7 @@ class IdleTimeoutMonitorTest {
             // Advance well past both timeouts with phones continuously present
             advanceTimeBy(NO_DISCOVERY_MS + ALL_UNREACHABLE_MS + 10_000L)
             assertFalse(result.isCompleted)
+            result.cancel()
         }
     }
 
