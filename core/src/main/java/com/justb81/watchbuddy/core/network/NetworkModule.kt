@@ -40,8 +40,14 @@ object NetworkModule {
             chain.proceed(builder.build())
         }
         .addInterceptor(HttpLoggingInterceptor().apply {
-            level = if (com.justb81.watchbuddy.core.BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BODY
-                    else HttpLoggingInterceptor.Level.NONE
+            if (com.justb81.watchbuddy.core.BuildConfig.DEBUG) {
+                level = HttpLoggingInterceptor.Level.HEADERS
+                redactHeader("Authorization")
+                redactHeader("trakt-api-key")
+                redactHeader("X-API-Key")
+            } else {
+                level = HttpLoggingInterceptor.Level.NONE
+            }
         })
         .build()
 
