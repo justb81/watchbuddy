@@ -141,9 +141,8 @@ class PhoneDiscoveryManager(
     private val pollSchedules = ConcurrentHashMap<String, PollSchedule>()
 
     /**
-     * Lightweight device info reconstructed from the BLE payload (or the
-     * TXT record of a legacy NSD resolve). Available immediately, before
-     * any `/capability` round-trip.
+     * Lightweight device info reconstructed from the BLE payload.
+     * Available immediately, before any `/capability` round-trip.
      */
     data class PhoneTxtRecord(
         val version: String,

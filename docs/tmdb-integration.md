@@ -166,28 +166,29 @@ When no LLM backend is available (AICore unavailable, insufficient RAM for LiteR
 
 ### 2. Deep Link Resolution (TV App)
 
-When the user views a show's detail screen on the TV, the app constructs deep links to streaming services using the TMDB ID.
+When the user opens a show's detail screen on the TV, `ShowDetailViewModel.loadDeepLinks()` resolves
+per-episode streaming URLs via JustWatch's unofficial GraphQL API. Static deep-link templates were
+removed; every link is resolved at runtime and cached in a Room database on the TV.
 
 ```mermaid
 flowchart TD
-    A["User opens show detail"] --> B["ShowDetailViewModel.resolveDeepLink()"]
-    B --> C["Extract tmdbId from\nentry.show.ids.tmdb"]
-    C --> D{"tmdb == null?"}
-    D -->|Yes| E["No deep link (return null)"]
-    D -->|No| F["Substitute placeholders in template:\n{tmdb_id} → tmdbId\n{slug} → Trakt slug\n{id} → tmdbId (fallback)"]
-    F --> G["Return resolved URL\ne.g. netflix.com/title/1234"]
+    A["User opens show detail\nproviders loaded"] --> B["ShowDetailViewModel.loadDeepLinks()"]
+    B --> C["For each ResolvedProvider:\nviewModelScope.async"]
+    C --> D["JustWatchDeepLinkRepository\n.resolveDeepLink(tmdbShowId, season,\nepisode, providerId, countryCode)"]
+    D --> E{"Episode-level\nRoom cache hit?"}
+    E -->|Yes| F["DeepLinkState.Available(url)"]
+    E -->|No| G["Live JustWatch GraphQL call\n(SEARCH → SEASONS → EPISODES)"]
+    G --> H{"Offer found?"}
+    H -->|Yes| I["Cache permanently → Available(url)"]
+    H -->|No| J["Cache 30-day negative → Unavailable"]
 ```
 
-**Deep link templates using `{tmdb_id}`:**
+`ProviderCatalog` maps TMDB `provider_id` integers to Android package names so deep links can be
+attributed to the correct app. JustWatch `technicalName` strings (e.g. `nfx`, `prv`, `dnp`) are
+translated to TMDB `provider_id` integers by `JustWatchPackageMap`.
 
-| Service | Template |
-|---------|----------|
-| Netflix | `https://www.netflix.com/title/{tmdb_id}` |
-| Disney+ | `https://www.disneyplus.com/series/{slug}/{tmdb_id}` |
-| Prime Video | `https://www.primevideo.com/search?phrase={slug}` (title-based search) |
-| ARD Mediathek | `https://www.ardmediathek.de/video/{id}` (TMDB ID as fallback) |
-
-Note: This journey does **not** call the TMDB API directly. It only uses the TMDB ID already present in the Trakt data model.
+Note: This journey calls the JustWatch GraphQL API, not the TMDB API. TMDB data (the TMDB show ID
+and the episode numbers from `ShowProgressCalculator`) is used as input to the JustWatch query.
 
 ### 3. Device Capability Reporting
 
@@ -243,7 +244,7 @@ sequenceDiagram
 - `app-tv/…/data/WatchProvidersRepository.kt` — fetch, 24 h in-memory cache, ordering
 - `app-tv/…/data/LastUsedProviderRepository.kt` — TV-local DataStore, `Map<tmdbId, providerId>`
 - `app-tv/…/discovery/InstalledAppsProbe.kt` — `PackageManager` cache, invalidated on install/remove
-- `core/…/deeplink/ProviderCatalog.kt` — TMDB `provider_id` → package + deep-link template
+- `core/…/deeplink/ProviderCatalog.kt` — TMDB `provider_id` → package name (for `InstalledAppsProbe` + `<queries>` manifest)
 - `app-tv/AndroidManifest.xml` — `<queries>` block for Android 11+ package visibility
 
 ### 5. TV ShowDetail — Next-Episode Still Image and Title (#366)
@@ -373,7 +374,7 @@ Separately, `LocaleHelper.getLlmResponseLanguage()` reads the device's system lo
 | Module | File | TMDB Role |
 |--------|------|-----------|
 | **core** | `tmdb/TmdbApiService.kt` | Retrofit interface (`getShow`, `getEpisode`, `searchTv`), response DTOs, `TmdbImageHelper` |
-| **core** | `model/Models.kt` | `TmdbShow`, `TmdbEpisode`, `TmdbTvSearchResponse` data classes; `TraktIds.tmdb` mapping; `KNOWN_STREAMING_SERVICES` with `{tmdb_id}` templates |
+| **core** | `model/Models.kt` | `TmdbShow`, `TmdbEpisode`, `TmdbTvSearchResponse` data classes; `TraktIds.tmdb` mapping; `WatchProviderEntry`/`WatchProviderResponse` for TMDB watch-provider results |
 | **core** | `network/NetworkModule.kt` | OkHttpClient with cert pinning, TMDB Retrofit instance, Hilt DI |
 | **app-phone** | `server/CompanionHttpServer.kt` | Recap endpoint: calls `getShow()` + `getEpisode()`, passes data to `RecapGenerator` |
 | **app-phone** | `llm/RecapGenerator.kt` | Builds LLM prompt from TMDB data, replaces still image placeholders |
@@ -383,11 +384,11 @@ Separately, `LocaleHelper.getLlmResponseLanguage()` reads the device's system lo
 | **app-phone** | `settings/SettingsRepository.kt` | Stores and retrieves user's TMDB API key |
 | **app-phone** | `ui/home/HomeViewModel.kt` | Loads TMDB posters for each show in the library (parallel `getShow()` calls after sync) |
 | **app-phone** | `ui/showdetail/ShowDetailViewModel.kt` | Loads TMDB poster + overview for a single show's detail screen |
-| **app-tv** | `ui/showdetail/ShowDetailViewModel.kt` | Loads providers via `WatchProvidersRepository`, records last-used on tap, resolves deep links via `ProviderCatalog` |
+| **app-tv** | `ui/showdetail/ShowDetailViewModel.kt` | Loads providers via `WatchProvidersRepository`, records last-used on tap, resolves per-episode deep links via `JustWatchDeepLinkRepository` |
 | **app-tv** | `data/WatchProvidersRepository.kt` | Calls `getWatchProviders()`, caches 24 h, composes installed/last-used ordered list |
 | **app-tv** | `data/LastUsedProviderRepository.kt` | TV-local DataStore — tracks most-recently used `provider_id` per show |
 | **app-tv** | `discovery/InstalledAppsProbe.kt` | `PackageManager` cache — reports which streaming apps are installed |
-| **core** | `deeplink/ProviderCatalog.kt` | Maps TMDB `provider_id` → package name + deep-link template |
+| **core** | `deeplink/ProviderCatalog.kt` | Maps TMDB `provider_id` → Android package name (static registry; no deep-link templates) |
 | **app-tv** | `scrobbler/MediaSessionScrobbler.kt` | Uses `searchTv()` as fallback when fuzzy-matching media titles against the local show cache |
 
 ---

@@ -6,6 +6,7 @@ import com.justb81.watchbuddy.core.model.WatchProviderEntry
 import com.justb81.watchbuddy.core.tmdb.TmdbApiService
 import com.justb81.watchbuddy.core.tmdb.TmdbImageHelper
 import com.justb81.watchbuddy.tv.discovery.InstalledAppsProbe
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -33,7 +34,7 @@ class WatchProvidersRepository @Inject constructor(
         val fetchedAtMs: Long,
     )
 
-    private val cache = mutableMapOf<String, CacheEntry>()
+    private val cache = ConcurrentHashMap<String, CacheEntry>()
 
     /**
      * Returns ordered, filtered [ResolvedProvider] list for [tmdbId] in [countryCode].

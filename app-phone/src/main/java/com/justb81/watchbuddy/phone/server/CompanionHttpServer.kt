@@ -49,7 +49,7 @@ private const val MAX_PAGE_SIZE = 200
 
 /**
  * Local HTTP server running on the phone (port 8765).
- * The TV app discovers this via NSD (mDNS) and calls its endpoints.
+ * The TV discovers this via BLE advertisement and calls its endpoints over plain HTTP.
  *
  * Endpoints:
  *   GET  /capability           → DeviceCapability (device score, RAM, LLM backend)

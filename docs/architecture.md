@@ -44,15 +44,17 @@ The 9-byte payload is the authoritative wire contract — see
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/capability` | Device info + LLM score + TMDB API key + `avatarSource` (#342) |
+| GET | `/capability` | Device info + LLM score + TMDB API key + `avatarSource` + `lastResolvedSessionKey` + `lastResolvedTraktId` (#342, #474) |
 | GET | `/avatar` | Custom avatar JPEG (200 bytes, ETag-revalidated; 404 when `avatarSource != CUSTOM`) |
-| GET | `/shows` | User's Trakt watched shows (cached) |
+| GET | `/shows` | User's Trakt watched shows (cached), paginated via `offset` + `limit` query params |
 | POST | `/recap/{traktShowId}` | Generate HTML recap for a show |
-| GET | `/auth/token` | Current access token (server-side, not used by TV) |
+| GET | `/auth/token` | Current Trakt access token (used by TV to obtain a token for authenticated calls) |
 | POST | `/scrobble/start` | Forward scrobble start to this user's Trakt account |
 | POST | `/scrobble/pause` | Forward scrobble pause to this user's Trakt account |
 | POST | `/scrobble/stop` | Forward scrobble stop to this user's Trakt account |
 | POST | `/scrobble/extract` | LLM fallback — accepts a `MediaMetadataSnapshot` + library hints, returns normalized `(showTitle, season?, episode?, confidence)`. TV calls this only when the deterministic multi-field + fuzzy-match cascade misses (< 0.70 cache confidence). 90 s client / 75 s server budget absorbs cold LiteRT-LM inference; per-raw-title in-flight dedup on the TV side prevents the 30 s `MediaSession` poll cycle from stacking duplicate inferences. |
+| POST | `/scrobble/prompt` | Delivers an `AmbiguousScrobbleEvent` (top-3 candidates) to the phone; the phone presents a notification and/or in-app card so the user can pick the correct show. Returns HTTP 204 No Content. (#474) |
+| POST | `/shows/add-to-library` | Adds a `PhoneAddToLibraryRequest` episode to the user's Trakt history. Called after the TV overlay confirmation for an unknown show. Invalidates the local show cache on success. |
 
 **TV app API boundaries:**
 - **TMDB API** — show/movie details, images, search (direct call from TV using key from `/capability`)
@@ -192,8 +194,8 @@ the advert. The TV's `PhoneBleScanner` listens for the same UUID in
 `SCAN_MODE_BALANCED` whenever discovery is enabled; each match feeds the existing
 `/capability` fetch + heartbeat pipeline, deduped by `baseUrl`. BLE range can exceed the
 LAN's reach — a phone that's out of Wi-Fi range but still within BLE range will fail
-`/capability` and be evicted after `MAX_CONSECUTIVE_FAILURES = 3` heartbeat misses
-(~3 min). Graceful degradation is the default: on Bluetooth-off, permission-denied, or
+`/capability` and be evicted after `MAX_CONSECUTIVE_FAILURES = 5` heartbeat misses
+with exponential backoff (~5 min total). Graceful degradation is the default: on Bluetooth-off, permission-denied, or
 BLE-unsupported hardware the advertiser/scanner no-ops and the pair simply cannot
 connect until BLE is available again. Permissions: `BLUETOOTH_ADVERTISE` (phone, runtime
 prompt from HomeScreen when the "I am watching TV" toggle flips on) and `BLUETOOTH_SCAN`
@@ -224,7 +226,7 @@ manifest declaration on Android 14+. The `connectedDevice` type is authorised by
 The TV's `PhoneDiscoveryManager` runs a heartbeat coroutine every 60 seconds that re-fetches
 `GET /capability` for each discovered phone. This serves two purposes:
 
-1. **Presence verification** — if a phone fails 3 consecutive heartbeats, it is removed from
+1. **Presence verification** — if a phone fails 5 consecutive heartbeats (with exponential backoff), it is removed from
    the discovered list and excluded from scrobbling.
 2. **Capability refresh** — updated capability data (RAM, LLM backend) is reflected immediately.
 
@@ -314,17 +316,17 @@ The available-provider list for each show is fetched from TMDB `/tv/{id}/watch/p
 | TMDB provider_id | Service | Package |
 |-----------------|---------|---------|
 | 8 | Netflix | `com.netflix.ninja` |
-| 119 | Prime Video | `com.amazon.amazonvideo.livingroom` |
+| 9, 119 | Prime Video | `com.amazon.amazonvideo.livingroom` |
 | 337 | Disney+ | `com.disney.disneyplus` |
 | 350 | Apple TV+ | `com.apple.atve.androidtv.appletv` |
 | 531 | Paramount+ | `com.cbs.app` |
 | 1899 | Max / HBO | `com.hbo.hbonow` |
-| 2187 | WaipuTV | `tv.waipu.app` |
-| 2184 | Joyn | `de.prosiebensat1digital.android.joyn` |
+| 2187 | WaipuTV | `de.exaring.waipu` |
+| 2184 | Joyn / 7TV | `de.prosiebensat1digital.seventv` |
 | 192 | YouTube | `com.google.android.youtube.tv` |
-| 35 | Rakuten TV | `com.rakuten.tv` |
-| 195 | ARD Mediathek | `de.swr.avp.ard.phone` |
-| 231 | ZDF Mediathek | `de.zdf.android.app` |
+| 35 | Rakuten TV | `tv.wuaki.apptv` |
+| 195 | ARD Mediathek | `de.swr.avp.ard.tv` |
+| 231 | ZDF Mediathek | `com.zdf.android.mediathek` |
 
 ### JustWatch-powered per-episode deep links
 
