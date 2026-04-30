@@ -186,7 +186,7 @@ Once enabled, `.githooks/pre-commit` delegates to `scripts/precommit.sh` on ever
 
 **Scoping rules** (must match the CI `paths-filter` sets exactly):
 
-- `app-phone/**`, `app-tv/**`, `core/**`, `*.gradle.kts`, `gradle/**`, `gradle.properties`, `config/detekt/**`, `.github/actions/**` → `./gradlew test detektAll :app-phone:lintDebug :app-tv:lintDebug`
+- `app-phone/**`, `app-tv/**`, `core/**`, `build-logic/**`, `*.gradle.kts`, `gradle/**`, `gradle.properties`, `config/detekt/**`, `.github/actions/**` → `./gradlew test detektAll :app-phone:lintDebug :app-tv:lintDebug`
 - `backend/**` → `npm --prefix backend run lint && npm --prefix backend run format:check && npm --prefix backend test`
 - `.github/workflows/*.y?ml` → `python3 yaml.safe_load` on each changed file + `actionlint` when installed
 

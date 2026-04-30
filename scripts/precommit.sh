@@ -49,7 +49,7 @@ ran_any=0
 skipped_android=0
 
 # --- Android / Kotlin scope (mirrors build-android.yml `android:` filter) ---
-if match '^(app-phone|app-tv|core)/' \
+if match '^(app-phone|app-tv|core|build-logic)/' \
    || match '\.gradle\.kts$' \
    || match '^gradle/' \
    || match '^gradle\.properties$' \
