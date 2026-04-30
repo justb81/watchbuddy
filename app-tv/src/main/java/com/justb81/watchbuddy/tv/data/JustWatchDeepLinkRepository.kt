@@ -7,16 +7,16 @@ import com.justb81.watchbuddy.core.justwatch.JustWatchOffer
 import com.justb81.watchbuddy.core.justwatch.JustWatchPackageMap
 import com.justb81.watchbuddy.core.justwatch.JustWatchTitle
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
-import java.util.ArrayDeque
-import java.util.concurrent.ConcurrentHashMap
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import retrofit2.Response
+import java.util.ArrayDeque
+import java.util.concurrent.ConcurrentHashMap
+import javax.inject.Inject
+import javax.inject.Singleton
 
 private val ALLOWED_MONETIZATION = setOf("FLATRATE", "ADS", "FREE")
 private const val SEARCH_RESULT_LIMIT = 5
