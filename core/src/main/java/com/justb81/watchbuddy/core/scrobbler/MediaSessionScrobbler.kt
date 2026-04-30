@@ -175,6 +175,7 @@ class MediaSessionScrobbler @Inject constructor(
     val isListening: StateFlow<Boolean> = _isListening.asStateFlow()
 
     private val _lastCandidate = MutableStateFlow<LastCandidate?>(null)
+
     /**
      * Most recent candidate observed — regardless of whether it was auto-scrobbled
      * or emitted to [pendingConfirmation]. Populated only for candidates that
