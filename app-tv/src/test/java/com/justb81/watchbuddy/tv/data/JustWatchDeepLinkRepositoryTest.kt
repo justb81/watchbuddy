@@ -4,6 +4,7 @@ import com.justb81.watchbuddy.core.justwatch.JustWatchApiService
 import com.justb81.watchbuddy.core.justwatch.JustWatchContent
 import com.justb81.watchbuddy.core.justwatch.JustWatchData
 import com.justb81.watchbuddy.core.justwatch.JustWatchEpisode
+import com.justb81.watchbuddy.core.justwatch.JustWatchEpisodeContent
 import com.justb81.watchbuddy.core.justwatch.JustWatchExternalIds
 import com.justb81.watchbuddy.core.justwatch.JustWatchGraphQlResponse
 import com.justb81.watchbuddy.core.justwatch.JustWatchNode
@@ -205,8 +206,7 @@ class JustWatchDeepLinkRepositoryTest {
                 makeEpisodesResponse(
                     listOf(
                         JustWatchEpisode(
-                            episodeNumber = 2,
-                            seasonNumber = 1,
+                            content = JustWatchEpisodeContent(episodeNumber = 2, seasonNumber = 1),
                             offers = listOf(episodeOffer),
                         )
                     )
@@ -565,7 +565,7 @@ class JustWatchDeepLinkRepositoryTest {
                     makeSeasonsResponse(listOf("season-1-id"))
                 coEvery { api.query(match { it.query == JustWatchApiService.EPISODES_QUERY }) } returns
                     makeEpisodesResponse(
-                        listOf(JustWatchEpisode(episodeNumber = 2, seasonNumber = 1, offers = listOf(episodeOffer)))
+                        listOf(JustWatchEpisode(content = JustWatchEpisodeContent(episodeNumber = 2, seasonNumber = 1), offers = listOf(episodeOffer)))
                     )
 
                 val repo = JustWatchDeepLinkRepository(fakeDao, api)

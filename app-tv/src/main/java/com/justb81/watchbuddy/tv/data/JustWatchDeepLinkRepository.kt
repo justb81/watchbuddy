@@ -243,8 +243,6 @@ class JustWatchDeepLinkRepository @Inject constructor(
                 query = JustWatchApiService.SEASONS_QUERY,
                 variables = buildJsonObject {
                     put("nodeId", jwNode.id)
-                    put("country", countryCode)
-                    put("language", language)
                 },
             )
         )
@@ -285,7 +283,7 @@ class JustWatchDeepLinkRepository @Inject constructor(
             return
         }
 
-        val jwEp = jwEpisodes.find { it.seasonNumber == season && it.episodeNumber == episode }
+        val jwEp = jwEpisodes.find { it.content?.seasonNumber == season && it.content?.episodeNumber == episode }
         if (jwEp != null) {
             cacheOffers(jwEp.offers, tmdbShowId, season, episode, countryCode)
         } else {
