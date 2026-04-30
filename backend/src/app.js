@@ -5,6 +5,7 @@
  * Separated from index.js so the app can be imported for testing.
  */
 
+import { timingSafeEqual } from 'crypto';
 import express from 'express';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
@@ -55,6 +56,7 @@ function maskSecrets(obj) {
  *   limiting how long a slow-loris connection can pin a socket. Override via FETCH_TIMEOUT_MS.
  * @param {boolean} [config.debug]     - Enable request debug logging (default: false)
  * @param {number} [config.healthCacheTtlMs] - TTL for /health response cache in ms (default: 30000, 0 = disabled)
+ * @param {string} [config.healthToken] - Secret token for GET /health/detailed (X-Health-Token header). When omitted, /health/detailed returns 404.
  * @returns {import('express').Express}
  */
 export function createApp(config) {
@@ -67,6 +69,7 @@ export function createApp(config) {
     version = '0.0.0',
     debug = false,
     healthCacheTtlMs = 30_000,
+    healthToken,
   } = config;
 
   const traktHeaders = {
@@ -332,8 +335,39 @@ export function createApp(config) {
     message: { error: 'Too many requests, please try again later.' },
   });
 
-  // Cache state for /health — prevents rapid re-evaluation and amplification
+  // Cache state for /health and /health/detailed — prevents rapid re-evaluation and amplification
   let healthCache = null; // { body: object, status: number, expiresAt: number }
+
+  function computeHealthState() {
+    if (serverMisconfigured && traktStatus === 'pending') {
+      return {
+        status: 503,
+        body: {
+          status: 'misconfigured',
+          trakt: 'missing_client_secret',
+          error: 'TRAKT_CLIENT_SECRET is not set — token exchange is disabled.',
+        },
+      };
+    }
+    if (traktStatus === 'pending') {
+      return { status: 503, body: { status: 'starting', trakt: 'pending' } };
+    }
+    if (credentialsVerified) {
+      return {
+        status: 200,
+        body: { status: 'ok', trakt: 'connected', validated: 'client_id_via_oauth' },
+      };
+    }
+    return { status: 503, body: { status: 'unhealthy', trakt: traktStatus, error: traktError } };
+  }
+
+  function safeTokenCompare(expected, provided) {
+    try {
+      return timingSafeEqual(Buffer.from(expected), Buffer.from(provided));
+    } catch {
+      return false;
+    }
+  }
 
   // ── POST /trakt/token ───────────────────────────────────────────────────────
   // Body: { "code": "<device_code>" }
@@ -451,30 +485,44 @@ export function createApp(config) {
   });
 
   // ── GET /health ─────────────────────────────────────────────────────────────
+  // Unauthenticated liveness check. Returns only { status: 'ok' | 'unhealthy' }
+  // so operational state is never exposed to unauthenticated callers.
   app.get('/health', healthLimiter, (_req, res) => {
+    const now = Date.now();
+    if (healthCache && healthCache.expiresAt > now) {
+      const isOk = healthCache.status === 200;
+      return res.status(healthCache.status).json({ status: isOk ? 'ok' : 'unhealthy' });
+    }
+
+    const { status, body } = computeHealthState();
+
+    if (healthCacheTtlMs > 0) {
+      healthCache = { body, status, expiresAt: now + healthCacheTtlMs };
+    }
+    const isOk = status === 200;
+    return res.status(status).json({ status: isOk ? 'ok' : 'unhealthy' });
+  });
+
+  // ── GET /health/detailed ─────────────────────────────────────────────────────
+  // Authenticated verbose health check. Requires the X-Health-Token header to
+  // match the HEALTH_TOKEN env var. Returns the full diagnostic payload.
+  // Returns 404 when HEALTH_TOKEN is not configured so the endpoint stays dark.
+  app.get('/health/detailed', healthLimiter, (req, res) => {
+    if (!healthToken) {
+      return res.status(404).json({ error: 'not_found' });
+    }
+
+    const provided = req.headers['x-health-token'];
+    if (!provided || !safeTokenCompare(healthToken, provided)) {
+      return res.status(401).json({ error: 'unauthorized' });
+    }
+
     const now = Date.now();
     if (healthCache && healthCache.expiresAt > now) {
       return res.status(healthCache.status).json(healthCache.body);
     }
 
-    let status, body;
-    if (serverMisconfigured && traktStatus === 'pending') {
-      status = 503;
-      body = {
-        status: 'misconfigured',
-        trakt: 'missing_client_secret',
-        error: 'TRAKT_CLIENT_SECRET is not set — token exchange is disabled.',
-      };
-    } else if (traktStatus === 'pending') {
-      status = 503;
-      body = { status: 'starting', trakt: 'pending' };
-    } else if (credentialsVerified) {
-      status = 200;
-      body = { status: 'ok', trakt: 'connected', validated: 'client_id_via_oauth' };
-    } else {
-      status = 503;
-      body = { status: 'unhealthy', trakt: traktStatus, error: traktError };
-    }
+    const { status, body } = computeHealthState();
 
     if (healthCacheTtlMs > 0) {
       healthCache = { body, status, expiresAt: now + healthCacheTtlMs };

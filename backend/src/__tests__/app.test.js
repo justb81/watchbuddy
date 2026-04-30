@@ -49,14 +49,14 @@ function buildApp(fetchFn, overrides = {}) {
   });
 }
 
-// ── Health endpoint ─────────────────────────────────────────────────────────
+// ── Health endpoint (unauthenticated) ──────────────────────────────────────
 
 describe('GET /health', () => {
-  it('returns 503 with status starting before verification', async () => {
+  it('returns 503 with status unhealthy before verification', async () => {
     const app = buildApp(mockFetch(200, {}));
     const res = await request(app).get('/health');
     expect(res.status).toBe(503);
-    expect(res.body).toEqual({ status: 'starting', trakt: 'pending' });
+    expect(res.body).toEqual({ status: 'unhealthy' });
   });
 
   it('returns 200 with status ok after successful verification', async () => {
@@ -64,11 +64,17 @@ describe('GET /health', () => {
     await app.verifyCredentials();
     const res = await request(app).get('/health');
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({
-      status: 'ok',
-      trakt: 'connected',
-      validated: 'client_id_via_oauth',
-    });
+    expect(res.body).toEqual({ status: 'ok' });
+  });
+
+  it('does not expose trakt status or error details', async () => {
+    const app = buildApp(mockFetch(403, { error: 'invalid_api_key' }));
+    await app.verifyCredentials();
+    const res = await request(app).get('/health');
+    expect(res.status).toBe(503);
+    expect(res.body).toEqual({ status: 'unhealthy' });
+    expect(res.body).not.toHaveProperty('trakt');
+    expect(res.body).not.toHaveProperty('error');
   });
 });
 
@@ -489,12 +495,11 @@ describe('POST /trakt/token — server_misconfigured', () => {
     expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('misconfigured'));
   });
 
-  it('health returns 503 misconfigured when clientSecret is missing', async () => {
+  it('health returns 503 unhealthy when clientSecret is missing', async () => {
     const app = buildApp(mockFetch(200, {}), { clientSecret: '' });
     const res = await request(app).get('/health');
     expect(res.status).toBe(503);
-    expect(res.body.status).toBe('misconfigured');
-    expect(res.body.error).toMatch(/TRAKT_CLIENT_SECRET/);
+    expect(res.body).toEqual({ status: 'unhealthy' });
   });
 
   it('does not block token exchange when credentials are valid', async () => {
@@ -636,39 +641,32 @@ describe('Credential verification', () => {
     );
   });
 
-  it('health returns 200 connected after successful verification', async () => {
+  it('health returns 200 ok after successful verification', async () => {
     const app = buildApp(mockFetch(200, []));
     await app.verifyCredentials();
     const res = await request(app).get('/health');
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({
-      status: 'ok',
-      trakt: 'connected',
-      validated: 'client_id_via_oauth',
-    });
+    expect(res.body).toEqual({ status: 'ok' });
   });
 
-  it('health returns 503 invalid_client_id when Trakt returns 403', async () => {
+  it('health returns 503 unhealthy when Trakt returns 403', async () => {
     const app = buildApp(mockFetch(403, { error: 'invalid_api_key' }));
     await app.verifyCredentials();
     const res = await request(app).get('/health');
     expect(res.status).toBe(503);
-    expect(res.body.status).toBe('unhealthy');
-    expect(res.body.trakt).toBe('invalid_client_id');
-    expect(res.body.error).toMatch(/TRAKT_CLIENT_ID/);
+    expect(res.body).toEqual({ status: 'unhealthy' });
   });
 
-  it('health returns 503 with trakt_http_500 on server error', async () => {
+  it('health returns 503 unhealthy on server error', async () => {
     const app = buildApp(mockFetch(500, {}));
     await app.verifyCredentials();
     app.clearRetryTimer();
     const res = await request(app).get('/health');
     expect(res.status).toBe(503);
-    expect(res.body.status).toBe('unhealthy');
-    expect(res.body.trakt).toBe('trakt_http_500');
+    expect(res.body).toEqual({ status: 'unhealthy' });
   });
 
-  it('health returns 503 timeout when verification times out', async () => {
+  it('health returns 503 unhealthy when verification times out', async () => {
     const hangingFetch = vi.fn().mockImplementation((_url, options) => {
       return new Promise((_resolve, reject) => {
         if (options?.signal) {
@@ -685,20 +683,17 @@ describe('Credential verification', () => {
     app.clearRetryTimer();
     const res = await request(app).get('/health');
     expect(res.status).toBe(503);
-    expect(res.body.status).toBe('unhealthy');
-    expect(res.body.trakt).toBe('timeout');
+    expect(res.body).toEqual({ status: 'unhealthy' });
   });
 
-  it('health returns 503 network_error when fetch rejects', async () => {
+  it('health returns 503 unhealthy when fetch rejects', async () => {
     const failFetch = vi.fn().mockRejectedValue(new Error('ECONNREFUSED'));
     const app = buildApp(failFetch);
     await app.verifyCredentials();
     app.clearRetryTimer();
     const res = await request(app).get('/health');
     expect(res.status).toBe(503);
-    expect(res.body.status).toBe('unhealthy');
-    expect(res.body.trakt).toBe('network_error');
-    expect(res.body.error).toBe('ECONNREFUSED');
+    expect(res.body).toEqual({ status: 'unhealthy' });
   });
 
   it('logs success message on valid credentials', async () => {
@@ -716,14 +711,12 @@ describe('Credential verification', () => {
     );
   });
 
-  it('health returns 503 invalid_client_id when Trakt returns 401', async () => {
+  it('health returns 503 unhealthy when Trakt returns 401', async () => {
     const app = buildApp(mockFetch(401, { error: 'unauthorized' }));
     await app.verifyCredentials();
     const res = await request(app).get('/health');
     expect(res.status).toBe(503);
-    expect(res.body.status).toBe('unhealthy');
-    expect(res.body.trakt).toBe('invalid_client_id');
-    expect(res.body.error).toMatch(/TRAKT_CLIENT_ID/);
+    expect(res.body).toEqual({ status: 'unhealthy' });
   });
 
   it('logs traktErrorCode in structured context when credential check fails', async () => {
@@ -740,7 +733,7 @@ describe('Credential verification', () => {
     await app.verifyCredentials();
     const res = await request(app).get('/health');
     expect(res.status).toBe(200);
-    expect(res.body.trakt).toBe('connected');
+    expect(res.body).toEqual({ status: 'ok' });
   });
 });
 
@@ -928,14 +921,14 @@ describe('Credential verification retry', () => {
     await app.verifyCredentials();
     let res = await request(app).get('/health');
     expect(res.status).toBe(503);
-    expect(res.body.trakt).toBe('trakt_http_503');
+    expect(res.body).toEqual({ status: 'unhealthy' });
 
     // Advance past first retry delay
     await vi.advanceTimersByTimeAsync(5_000);
 
     res = await request(app).get('/health');
     expect(res.status).toBe(200);
-    expect(res.body.trakt).toBe('connected');
+    expect(res.body).toEqual({ status: 'ok' });
     app.clearRetryTimer();
   });
 
@@ -1090,7 +1083,7 @@ describe('Debug logging (debug: true)', () => {
     await app.verifyCredentials();
     await request(app).get('/health');
     const healthLog = debugSpy.mock.calls.find(([msg]) =>
-      /\[DEBUG\].*GET.*\/health.*200/.test(msg)
+      /\[DEBUG\].*GET.*\/health.*\d+ms/.test(msg)
     );
     expect(healthLog).toBeDefined();
   });
@@ -1752,18 +1745,18 @@ describe('Health response caching (#556)', () => {
     // Build app with a short TTL and credential state that starts as "pending"
     const app = buildApp(mockFetch(200, {}), { healthCacheTtlMs: 5_000 });
 
-    // First call — caches "starting / pending"
+    // First call — caches unhealthy/pending state
     const first = await request(app).get('/health');
     expect(first.status).toBe(503);
-    expect(first.body.status).toBe('starting');
+    expect(first.body.status).toBe('unhealthy');
 
     // Verify credentials so in-memory state changes to "connected"
     await app.verifyCredentials();
 
-    // Second call within TTL — should still return cached "starting"
+    // Second call within TTL — should still return cached unhealthy
     const second = await request(app).get('/health');
     expect(second.status).toBe(503);
-    expect(second.body.status).toBe('starting');
+    expect(second.body.status).toBe('unhealthy');
   });
 
   it('returns fresh response after TTL expires', async () => {
@@ -1771,7 +1764,7 @@ describe('Health response caching (#556)', () => {
     try {
       const app = buildApp(mockFetch(200, {}), { healthCacheTtlMs: 5_000 });
 
-      // First call — caches "starting"
+      // First call — caches unhealthy state
       await request(app).get('/health');
 
       // Verify credentials so underlying state is now "connected"
@@ -1780,7 +1773,7 @@ describe('Health response caching (#556)', () => {
       // Advance past the 5s TTL
       vi.advanceTimersByTime(6_000);
 
-      // Next call should return the fresh "connected" state
+      // Next call should return the fresh ok state
       const res = await request(app).get('/health');
       expect(res.status).toBe(200);
       expect(res.body.status).toBe('ok');
@@ -1795,7 +1788,7 @@ describe('Health response caching (#556)', () => {
 
     // First call — pending state, not cached
     const first = await request(app).get('/health');
-    expect(first.body.status).toBe('starting');
+    expect(first.body.status).toBe('unhealthy');
 
     await app.verifyCredentials();
 
@@ -1808,13 +1801,13 @@ describe('Health response caching (#556)', () => {
   it('clearHealthCache exposes a way to invalidate the cache', async () => {
     const app = buildApp(mockFetch(200, {}), { healthCacheTtlMs: 60_000 });
 
-    // Cache "starting" state
+    // Cache unhealthy state
     await request(app).get('/health');
     await app.verifyCredentials();
 
-    // Without clearing the cache, health still shows "starting"
+    // Without clearing the cache, health still shows unhealthy
     const stale = await request(app).get('/health');
-    expect(stale.body.status).toBe('starting');
+    expect(stale.body.status).toBe('unhealthy');
 
     // After clearing, health reflects the real state
     app.clearHealthCache();
@@ -1933,5 +1926,135 @@ describe('Secure error logging — no raw Trakt response body in production logs
     const allLogs = errorSpy.mock.calls.map((c) => c.map(String).join(' '));
     expect(allLogs.every((l) => !l.includes('internal_msg'))).toBe(true);
     expect(allLogs.every((l) => !l.includes('rate_limit_remaining'))).toBe(true);
+  });
+});
+
+// ── GET /health/detailed — authenticated verbose health (#557) ─────────────
+
+describe('GET /health/detailed — authentication', () => {
+  const TOKEN = 'super-secret-health-token';
+
+  it('returns 404 when healthToken is not configured', async () => {
+    const app = buildApp(mockFetch(200, {}));
+    const res = await request(app).get('/health/detailed');
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({ error: 'not_found' });
+  });
+
+  it('returns 401 when X-Health-Token header is missing', async () => {
+    const app = buildApp(mockFetch(200, {}), { healthToken: TOKEN });
+    const res = await request(app).get('/health/detailed');
+    expect(res.status).toBe(401);
+    expect(res.body).toEqual({ error: 'unauthorized' });
+  });
+
+  it('returns 401 when X-Health-Token header is wrong', async () => {
+    const app = buildApp(mockFetch(200, {}), { healthToken: TOKEN });
+    const res = await request(app).get('/health/detailed').set('X-Health-Token', 'wrong-token');
+    expect(res.status).toBe(401);
+    expect(res.body).toEqual({ error: 'unauthorized' });
+  });
+
+  it('returns 401 when X-Health-Token header is empty string', async () => {
+    const app = buildApp(mockFetch(200, {}), { healthToken: TOKEN });
+    const res = await request(app).get('/health/detailed').set('X-Health-Token', '');
+    expect(res.status).toBe(401);
+    expect(res.body).toEqual({ error: 'unauthorized' });
+  });
+
+  it('returns verbose payload with correct token — pending state', async () => {
+    const app = buildApp(mockFetch(200, {}), { healthToken: TOKEN });
+    const res = await request(app).get('/health/detailed').set('X-Health-Token', TOKEN);
+    expect(res.status).toBe(503);
+    expect(res.body).toEqual({ status: 'starting', trakt: 'pending' });
+  });
+
+  it('returns verbose payload with correct token — ok state', async () => {
+    const app = buildApp(mockFetch(200, {}), { healthToken: TOKEN });
+    await app.verifyCredentials();
+    const res = await request(app).get('/health/detailed').set('X-Health-Token', TOKEN);
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      status: 'ok',
+      trakt: 'connected',
+      validated: 'client_id_via_oauth',
+    });
+  });
+
+  it('returns verbose payload with correct token — invalid_client_id state', async () => {
+    const app = buildApp(mockFetch(403, { error: 'invalid_api_key' }), { healthToken: TOKEN });
+    await app.verifyCredentials();
+    const res = await request(app).get('/health/detailed').set('X-Health-Token', TOKEN);
+    expect(res.status).toBe(503);
+    expect(res.body.status).toBe('unhealthy');
+    expect(res.body.trakt).toBe('invalid_client_id');
+    expect(res.body.error).toMatch(/TRAKT_CLIENT_ID/);
+  });
+
+  it('returns verbose payload with correct token — network_error state', async () => {
+    const failFetch = vi.fn().mockRejectedValue(new Error('ECONNREFUSED'));
+    const app = buildApp(failFetch, { healthToken: TOKEN });
+    await app.verifyCredentials();
+    app.clearRetryTimer();
+    const res = await request(app).get('/health/detailed').set('X-Health-Token', TOKEN);
+    expect(res.status).toBe(503);
+    expect(res.body.status).toBe('unhealthy');
+    expect(res.body.trakt).toBe('network_error');
+    expect(res.body.error).toBe('ECONNREFUSED');
+  });
+
+  it('returns verbose payload with correct token — misconfigured state', async () => {
+    const app = buildApp(mockFetch(200, {}), { clientSecret: '', healthToken: TOKEN });
+    const res = await request(app).get('/health/detailed').set('X-Health-Token', TOKEN);
+    expect(res.status).toBe(503);
+    expect(res.body.status).toBe('misconfigured');
+    expect(res.body.error).toMatch(/TRAKT_CLIENT_SECRET/);
+  });
+
+  it('unauthenticated /health never exposes trakt or error fields regardless of state', async () => {
+    const failFetch = vi.fn().mockRejectedValue(new Error('ECONNREFUSED'));
+    const app = buildApp(failFetch, { healthToken: TOKEN });
+    await app.verifyCredentials();
+    app.clearRetryTimer();
+    const res = await request(app).get('/health');
+    expect(res.status).toBe(503);
+    expect(res.body).toEqual({ status: 'unhealthy' });
+    expect(Object.keys(res.body)).toEqual(['status']);
+  });
+});
+
+describe('GET /health/detailed — caching shared with /health', () => {
+  const TOKEN = 'shared-cache-token';
+
+  it('detailed endpoint uses the same cache as /health', async () => {
+    const app = buildApp(mockFetch(200, {}), { healthToken: TOKEN, healthCacheTtlMs: 60_000 });
+
+    // Prime the cache via /health
+    await request(app).get('/health');
+    await app.verifyCredentials();
+
+    // /health/detailed still returns the cached unhealthy state
+    const detailed = await request(app).get('/health/detailed').set('X-Health-Token', TOKEN);
+    expect(detailed.status).toBe(503);
+    expect(detailed.body.status).toBe('starting');
+
+    // After clearing, /health/detailed returns fresh state
+    app.clearHealthCache();
+    const fresh = await request(app).get('/health/detailed').set('X-Health-Token', TOKEN);
+    expect(fresh.status).toBe(200);
+    expect(fresh.body).toEqual({
+      status: 'ok',
+      trakt: 'connected',
+      validated: 'client_id_via_oauth',
+    });
+  });
+
+  it('/health/detailed also obeys the rate limiter', async () => {
+    const app = buildApp(mockFetch(200, {}), { healthToken: TOKEN });
+    for (let i = 0; i < 10; i++) {
+      await request(app).get('/health/detailed').set('X-Health-Token', TOKEN);
+    }
+    const res = await request(app).get('/health/detailed').set('X-Health-Token', TOKEN);
+    expect(res.status).toBe(429);
   });
 });
