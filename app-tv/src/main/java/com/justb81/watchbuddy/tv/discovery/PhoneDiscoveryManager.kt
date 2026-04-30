@@ -8,6 +8,7 @@ import android.net.NetworkRequest
 import android.net.nsd.NsdServiceInfo
 import android.util.Log
 import androidx.annotation.VisibleForTesting
+import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.model.DeviceCapability
 import com.justb81.watchbuddy.core.model.LlmBackend
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -27,6 +28,7 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -75,6 +77,28 @@ class PhoneDiscoveryManager(
     companion object {
         const val CAPABILITY_PATH = "/capability"
         private const val TAG = "PhoneDiscoveryManager"
+
+        // Intentionally NOT WatchBuddyJson: capability traffic must be strict so
+        // a truncated or malicious peer can't pass a partially-defaulted payload
+        // through the lenient shared decoder. Missing optional fields with
+        // `= default` still resolve normally; only unknown keys, lenient number
+        // parsing, and null→default coercion are disabled.
+        private val STRICT_CAPABILITY_JSON: Json = Json {
+            ignoreUnknownKeys = false
+            isLenient = false
+            coerceInputValues = false
+        }
+    }
+
+    /** Outcome of a `/capability` fetch + parse + validate. */
+    private sealed interface CapabilityResult {
+        data class Ok(val capability: DeviceCapability) : CapabilityResult
+
+        /** Network error, non-2xx, or missing body — recoverable, may retry. */
+        data class TransportFailure(val reason: String) : CapabilityResult
+
+        /** Decoded JSON but it failed schema or post-deserialize validation. */
+        data class Invalid(val reason: String) : CapabilityResult
     }
 
     enum class BleScanState { IDLE, SCANNING, FAILED }
@@ -312,44 +336,113 @@ class PhoneDiscoveryManager(
      * Polls a single phone's `/capability`, updates its schedule, and returns
      * either a copy of the phone (refreshed or with bumped `failCount`) or
      * null if the phone should be evicted.
+     *
+     * A peer that returns a structurally invalid `/capability` (malformed JSON
+     * or values that fail [validateCapability]) is evicted immediately rather
+     * than backed off — the phone is misbehaving, not flaky, so additional
+     * polls won't help and ranking it is a security risk.
      */
     private fun checkOne(phone: DiscoveredPhone): DiscoveredPhone? {
-        val url = capabilityUrl(phone.baseUrl)
         val now = clock()
-        return try {
-            val response = httpClient.newCall(Request.Builder().url(url).build()).execute()
-            val capability = response.body.string().let {
-                Json.decodeFromString<DeviceCapability>(it)
-            }
-            val newScore = calculateScore(phone.txtRecord, capability)
-            pollSchedules[phone.baseUrl] = PollSchedule(
-                nextPollAt = now + DiscoveryConstants.POLL_BASE_INTERVAL_MS,
-                backoffMs = DiscoveryConstants.POLL_BACKOFF_INITIAL_MS,
-            )
-            phone.copy(
-                capability = capability,
-                score = newScore,
-                failCount = 0,
-                lastSuccessfulCheck = now,
-            )
-        } catch (_: Exception) {
-            val newFailCount = phone.failCount + 1
-            if (newFailCount >= DiscoveryConstants.MAX_CONSECUTIVE_FAILURES) {
-                Log.i(
-                    TAG,
-                    "Removing phone ${phone.baseUrl} after $newFailCount failed heartbeats"
+        return when (val result = fetchCapability(phone.baseUrl)) {
+            is CapabilityResult.Ok -> {
+                val newScore = calculateScore(phone.txtRecord, result.capability)
+                pollSchedules[phone.baseUrl] = PollSchedule(
+                    nextPollAt = now + DiscoveryConstants.POLL_BASE_INTERVAL_MS,
+                    backoffMs = DiscoveryConstants.POLL_BACKOFF_INITIAL_MS,
                 )
-                return null
+                phone.copy(
+                    capability = result.capability,
+                    score = newScore,
+                    failCount = 0,
+                    lastSuccessfulCheck = now,
+                )
             }
-            val previousBackoff = pollSchedules[phone.baseUrl]?.backoffMs
-                ?: DiscoveryConstants.POLL_BACKOFF_INITIAL_MS
-            val nextBackoff = nextBackoffMs(newFailCount, previousBackoff)
-            pollSchedules[phone.baseUrl] = PollSchedule(
-                nextPollAt = now + nextBackoff,
-                backoffMs = nextBackoff,
-            )
-            phone.copy(failCount = newFailCount)
+            is CapabilityResult.Invalid -> {
+                DiagnosticLog.warn(
+                    TAG,
+                    "Invalid /capability from ${phone.baseUrl}: ${result.reason}"
+                )
+                Log.w(
+                    TAG,
+                    "Removing phone ${phone.baseUrl}: invalid capability (${result.reason})"
+                )
+                pollSchedules.remove(phone.baseUrl)
+                null
+            }
+            is CapabilityResult.TransportFailure -> {
+                val newFailCount = phone.failCount + 1
+                DiagnosticLog.event(
+                    TAG,
+                    "/capability failed for ${phone.baseUrl} (${result.reason}); fail=$newFailCount"
+                )
+                if (newFailCount >= DiscoveryConstants.MAX_CONSECUTIVE_FAILURES) {
+                    Log.i(
+                        TAG,
+                        "Removing phone ${phone.baseUrl} after $newFailCount failed heartbeats"
+                    )
+                    return null
+                }
+                val previousBackoff = pollSchedules[phone.baseUrl]?.backoffMs
+                    ?: DiscoveryConstants.POLL_BACKOFF_INITIAL_MS
+                val nextBackoff = nextBackoffMs(newFailCount, previousBackoff)
+                pollSchedules[phone.baseUrl] = PollSchedule(
+                    nextPollAt = now + nextBackoff,
+                    backoffMs = nextBackoff,
+                )
+                phone.copy(failCount = newFailCount)
+            }
         }
+    }
+
+    /**
+     * Fetches `/capability` over HTTP, decodes it with [STRICT_CAPABILITY_JSON],
+     * and post-validates the result. Distinguishes recoverable transport
+     * failures from a peer returning a structurally invalid payload — see
+     * [CapabilityResult] — so callers can apply the right policy.
+     */
+    private fun fetchCapability(baseUrl: String): CapabilityResult {
+        val url = capabilityUrl(baseUrl)
+        val response = try {
+            httpClient.newCall(Request.Builder().url(url).build()).execute()
+        } catch (e: Exception) {
+            return CapabilityResult.TransportFailure("HTTP error: ${e.javaClass.simpleName}: ${e.message}")
+        }
+        return response.use { resp ->
+            if (!resp.isSuccessful) {
+                return@use CapabilityResult.TransportFailure("HTTP ${resp.code}")
+            }
+            val body = resp.body?.string()
+            if (body.isNullOrBlank()) {
+                return@use CapabilityResult.TransportFailure("empty body")
+            }
+            val capability = try {
+                STRICT_CAPABILITY_JSON.decodeFromString<DeviceCapability>(body)
+            } catch (e: SerializationException) {
+                return@use CapabilityResult.Invalid("JSON parse failed: ${e.message}")
+            } catch (e: IllegalArgumentException) {
+                return@use CapabilityResult.Invalid("JSON parse failed: ${e.message}")
+            }
+            validateCapability(capability)?.let { reason ->
+                CapabilityResult.Invalid(reason)
+            } ?: CapabilityResult.Ok(capability)
+        }
+    }
+
+    /**
+     * Returns null when the capability is valid; a human-readable reason
+     * string otherwise. `llmBackend` ordinal validity is enforced by
+     * `kotlinx.serialization` itself when [STRICT_CAPABILITY_JSON] decodes
+     * — an unknown enum value throws and surfaces as
+     * [CapabilityResult.Invalid] before this function ever runs.
+     */
+    private fun validateCapability(cap: DeviceCapability): String? = when {
+        cap.deviceId.isBlank()   -> "blank deviceId"
+        cap.userName.isBlank()   -> "blank userName"
+        cap.deviceName.isBlank() -> "blank deviceName"
+        cap.modelQuality < 0     -> "negative modelQuality (${cap.modelQuality})"
+        cap.freeRamMb < 0        -> "negative freeRamMb (${cap.freeRamMb})"
+        else -> null
     }
 
     /**
@@ -484,8 +577,14 @@ class PhoneDiscoveryManager(
 
     /**
      * Fetches `/capability`, ranks the phone, and adds it to the shared list
-     * via [addOrUpdatePhone]. Falls back to a TXT-only entry on HTTP failure
-     * so the phone still shows up for ranking.
+     * via [addOrUpdatePhone].
+     *
+     * Failure policy:
+     * - [CapabilityResult.TransportFailure] → fall back to a TXT-only entry so
+     *   a phone whose HTTP server is temporarily unreachable still appears in
+     *   the ranked list (the heartbeat will retry).
+     * - [CapabilityResult.Invalid] → reject outright; a peer returning a
+     *   malformed or structurally invalid payload should not be ranked.
      */
     private fun fetchCapabilityAndAdd(
         serviceInfo: NsdServiceInfo,
@@ -493,18 +592,31 @@ class PhoneDiscoveryManager(
         baseUrl: String,
         rssi: Int,
     ) {
-        val url = capabilityUrl(baseUrl)
-        try {
-            val response = httpClient.newCall(Request.Builder().url(url).build()).execute()
-            val capability = response.body.string().let {
-                Json.decodeFromString<DeviceCapability>(it)
+        when (val result = fetchCapability(baseUrl)) {
+            is CapabilityResult.Ok -> {
+                val score = calculateScore(txtRecord, result.capability)
+                addOrUpdatePhone(
+                    DiscoveredPhone(serviceInfo, txtRecord, result.capability, score, baseUrl, rssi = rssi)
+                )
             }
-            val score = calculateScore(txtRecord, capability)
-            addOrUpdatePhone(DiscoveredPhone(serviceInfo, txtRecord, capability, score, baseUrl, rssi = rssi))
-        } catch (e: Exception) {
-            Log.w(TAG, "Phone discovered at $url but capability fetch failed: ${e.message}")
-            val score = calculateScore(txtRecord, null)
-            addOrUpdatePhone(DiscoveredPhone(serviceInfo, txtRecord, null, score, baseUrl, rssi = rssi))
+            is CapabilityResult.Invalid -> {
+                DiagnosticLog.warn(
+                    TAG,
+                    "Rejected BLE-discovered phone $baseUrl: invalid /capability (${result.reason})"
+                )
+                Log.w(TAG, "Rejected $baseUrl: invalid capability (${result.reason})")
+            }
+            is CapabilityResult.TransportFailure -> {
+                DiagnosticLog.event(
+                    TAG,
+                    "BLE-discovered phone $baseUrl: /capability ${result.reason}; using BLE-only payload"
+                )
+                Log.w(TAG, "Phone discovered at $baseUrl but capability fetch failed: ${result.reason}")
+                val score = calculateScore(txtRecord, null)
+                addOrUpdatePhone(
+                    DiscoveredPhone(serviceInfo, txtRecord, null, score, baseUrl, rssi = rssi)
+                )
+            }
         }
     }
 

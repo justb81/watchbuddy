@@ -345,16 +345,29 @@ class PhoneDiscoveryManagerTest {
             return phone
         }
 
-        private fun stubCapabilitySuccess() {
-            val cap = DeviceCapability("d1", "u1", null, "P1", LlmBackend.NONE, 70, 4000, true)
-            val json = Json.encodeToString(cap)
-            val responseBody = mockk<ResponseBody>(relaxed = true)
-            every { responseBody.string() } returns json
+        private fun stubCapabilityResponse(code: Int, body: String?) {
+            val responseBody = body?.let {
+                mockk<ResponseBody>(relaxed = true).apply { every { string() } returns it }
+            }
             val response = mockk<Response>(relaxed = true)
+            every { response.code } returns code
+            every { response.isSuccessful } returns (code in 200..299)
             every { response.body } returns responseBody
             val call = mockk<Call>()
             every { call.execute() } returns response
             every { httpClient.newCall(any<Request>()) } returns call
+        }
+
+        private fun stubCapabilitySuccess(
+            cap: DeviceCapability = DeviceCapability(
+                "d1", "u1", null, "P1", LlmBackend.NONE, 70, 4000, true
+            )
+        ) {
+            stubCapabilityResponse(code = 200, body = Json.encodeToString(cap))
+        }
+
+        private fun stubCapabilityRawSuccess(rawJson: String) {
+            stubCapabilityResponse(code = 200, body = rawJson)
         }
 
         private fun stubCapabilityFailure() {
@@ -533,6 +546,111 @@ class PhoneDiscoveryManagerTest {
             runTest(UnconfinedTestDispatcher()) {
                 manager.runTickForTest()
                 assertTrue(manager.discoveredPhones.value.isEmpty())
+            }
+
+        // ── /capability validation & HTTP guarding (issues #538, #541) ────────
+
+        @Test
+        fun `HTTP 500 is a transport failure - increments failCount and applies backoff`() =
+            runTest(UnconfinedTestDispatcher()) {
+                seedPhone()
+                stubCapabilityResponse(code = 500, body = "")
+
+                manager.runTickForTest()
+
+                val phones = manager.discoveredPhones.value
+                assertEquals(1, phones.size, "5xx is a transport failure, not invalid — phone stays")
+                assertEquals(1, phones.single().failCount)
+                assertEquals(
+                    fakeNow + DiscoveryConstants.POLL_BACKOFF_INITIAL_MS,
+                    manager.nextPollAtForTest(baseUrl),
+                )
+            }
+
+        @Test
+        fun `HTTP 200 with empty body is a transport failure - bumps failCount`() =
+            runTest(UnconfinedTestDispatcher()) {
+                seedPhone()
+                stubCapabilityResponse(code = 200, body = "")
+
+                manager.runTickForTest()
+
+                val phones = manager.discoveredPhones.value
+                assertEquals(1, phones.size)
+                assertEquals(1, phones.single().failCount)
+            }
+
+        @Test
+        fun `HTTP 200 with null body is a transport failure - bumps failCount`() =
+            runTest(UnconfinedTestDispatcher()) {
+                seedPhone()
+                stubCapabilityResponse(code = 200, body = null)
+
+                manager.runTickForTest()
+
+                val phones = manager.discoveredPhones.value
+                assertEquals(1, phones.size)
+                assertEquals(1, phones.single().failCount)
+            }
+
+        @Test
+        fun `HTTP 200 with blank deviceId is invalid - phone evicted immediately`() =
+            runTest(UnconfinedTestDispatcher()) {
+                seedPhone()
+                val malicious = DeviceCapability("", "u", null, "P", LlmBackend.NONE, 70, 4000, true)
+                stubCapabilitySuccess(malicious)
+
+                manager.runTickForTest()
+
+                assertTrue(
+                    manager.discoveredPhones.value.isEmpty(),
+                    "Invalid capability must evict immediately, not after MAX_CONSECUTIVE_FAILURES",
+                )
+                assertNull(
+                    manager.nextPollAtForTest(baseUrl),
+                    "Schedule entry must be cleaned up when an invalid peer is evicted",
+                )
+            }
+
+        @Test
+        fun `HTTP 200 with negative modelQuality is invalid - phone evicted`() =
+            runTest(UnconfinedTestDispatcher()) {
+                seedPhone()
+                val malicious = DeviceCapability("d1", "u1", null, "P1", LlmBackend.NONE, -1, 4000, true)
+                stubCapabilitySuccess(malicious)
+
+                manager.runTickForTest()
+
+                assertTrue(manager.discoveredPhones.value.isEmpty())
+            }
+
+        @Test
+        fun `HTTP 200 with malformed JSON is invalid - phone evicted`() =
+            runTest(UnconfinedTestDispatcher()) {
+                seedPhone()
+                stubCapabilityRawSuccess("{not json")
+
+                manager.runTickForTest()
+
+                assertTrue(manager.discoveredPhones.value.isEmpty())
+            }
+
+        @Test
+        fun `HTTP 200 with unknown JSON field is invalid - locks in strict decoder`() =
+            runTest(UnconfinedTestDispatcher()) {
+                seedPhone()
+                // futureField is not on DeviceCapability — strict decoder must reject.
+                stubCapabilityRawSuccess(
+                    """{"deviceId":"d1","userName":"u1","deviceName":"P1","llmBackend":"NONE",""" +
+                        """"modelQuality":70,"freeRamMb":4000,"isAvailable":true,"futureField":1}"""
+                )
+
+                manager.runTickForTest()
+
+                assertTrue(
+                    manager.discoveredPhones.value.isEmpty(),
+                    "Unknown keys must be rejected — capability decoding must not silently default",
+                )
             }
     }
 }
