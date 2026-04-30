@@ -19,7 +19,13 @@ import { createApp } from './app.js';
 
 const { version } = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf-8'));
 
-const { TRAKT_CLIENT_ID, TRAKT_CLIENT_SECRET, PORT = 3000, DEBUG_MODE } = process.env;
+const {
+  TRAKT_CLIENT_ID,
+  TRAKT_CLIENT_SECRET,
+  PORT = 3000,
+  DEBUG_MODE,
+  FETCH_TIMEOUT_MS,
+} = process.env;
 
 if (!TRAKT_CLIENT_ID || !TRAKT_CLIENT_SECRET) {
   console.error(
@@ -30,11 +36,24 @@ if (!TRAKT_CLIENT_ID || !TRAKT_CLIENT_SECRET) {
 
 const debug = DEBUG_MODE === 'true';
 
+let fetchTimeoutMs;
+if (FETCH_TIMEOUT_MS !== undefined && FETCH_TIMEOUT_MS !== '') {
+  const parsed = parseInt(FETCH_TIMEOUT_MS, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    console.warn(
+      `FETCH_TIMEOUT_MS="${FETCH_TIMEOUT_MS}" is not a valid positive integer — using default`
+    );
+  } else {
+    fetchTimeoutMs = parsed;
+  }
+}
+
 const app = createApp({
   clientId: TRAKT_CLIENT_ID,
   clientSecret: TRAKT_CLIENT_SECRET,
   version,
   debug,
+  fetchTimeoutMs,
 });
 
 const server = app.listen(PORT, () => {

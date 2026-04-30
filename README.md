@@ -98,6 +98,14 @@ export TRAKT_CLIENT_SECRET=your_trakt_client_secret_here
 docker-compose up -d
 ```
 
+Optional environment variables:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `3000` | HTTP port the proxy listens on |
+| `DEBUG_MODE` | `false` | Set to `true` to enable request debug logging |
+| `FETCH_TIMEOUT_MS` | `8000` | Upstream Trakt API timeout in milliseconds. Increase only if Trakt responses are consistently slow in your network; keeping it low limits slow-loris-style resource exhaustion. |
+
 ## Play Store
 
 Both apps share the package name `com.justb81.watchbuddy`:

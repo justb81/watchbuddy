@@ -50,7 +50,9 @@ function maskSecrets(obj) {
  * @param {string} config.clientSecret - Trakt client secret
  * @param {string} [config.traktApi]   - Trakt API base URL (default: https://api.trakt.tv)
  * @param {Function} [config.fetchFn]  - fetch implementation (default: global fetch)
- * @param {number} [config.fetchTimeoutMs] - Upstream fetch timeout in ms (default: 15000)
+ * @param {number} [config.fetchTimeoutMs] - Upstream fetch timeout in ms (default: 8000).
+ *   Trakt token exchanges typically complete in < 2 s; 8 s leaves a generous margin while
+ *   limiting how long a slow-loris connection can pin a socket. Override via FETCH_TIMEOUT_MS.
  * @param {boolean} [config.debug]     - Enable request debug logging (default: false)
  * @param {number} [config.healthCacheTtlMs] - TTL for /health response cache in ms (default: 30000, 0 = disabled)
  * @returns {import('express').Express}
@@ -61,7 +63,7 @@ export function createApp(config) {
     clientSecret,
     traktApi = 'https://api.trakt.tv',
     fetchFn = fetch,
-    fetchTimeoutMs = 15_000,
+    fetchTimeoutMs = 8_000,
     version = '0.0.0',
     debug = false,
     healthCacheTtlMs = 30_000,
@@ -499,6 +501,7 @@ export function createApp(config) {
   app.clearHealthCache = () => {
     healthCache = null;
   };
+  app.fetchTimeoutMs = fetchTimeoutMs;
 
   return app;
 }

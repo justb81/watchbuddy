@@ -1371,6 +1371,25 @@ describe('Production-mode safety — no internal details in responses', () => {
   });
 });
 
+// ── Default fetch timeout — 8 s (#560) ────────────────────────────────────
+
+describe('Default fetch timeout — 8 s (#560)', () => {
+  it('uses 8 s as the default fetchTimeoutMs', () => {
+    const app = buildApp(mockFetch(200, {})); // no fetchTimeoutMs override
+    expect(app.fetchTimeoutMs).toBe(8_000);
+  });
+
+  it('exposes a custom fetchTimeoutMs when explicitly provided', () => {
+    const app = buildApp(mockFetch(200, {}), { fetchTimeoutMs: 3_000 });
+    expect(app.fetchTimeoutMs).toBe(3_000);
+  });
+
+  it('previous default of 15 s is no longer in effect', () => {
+    const app = buildApp(mockFetch(200, {}));
+    expect(app.fetchTimeoutMs).not.toBe(15_000);
+  });
+});
+
 // ── filterTokenResponse (shared helper) ────────────────────────────────────
 
 describe('filterTokenResponse — extra Trakt fields are stripped', () => {
