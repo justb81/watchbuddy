@@ -296,8 +296,10 @@ class ShowRepositoryTest {
                         show = TraktShow("Show A", 2024, TraktIds(trakt = 1, tmdb = 100)),
                         seasons = listOf(
                             TraktWatchedSeason(
-                                1,
-                                listOf(TraktWatchedEpisode(5, "2026-04-29T10:00:00Z"))
+                                number = 1,
+                                episodes = listOf(
+                                    TraktWatchedEpisode(number = 5, last_watched_at = "2026-04-29T10:00:00Z")
+                                )
                             )
                         )
                     )
