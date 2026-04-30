@@ -69,6 +69,16 @@ class OnboardingViewModel @Inject constructor(
     @param:Named("managedBackendAvailable") private val managedBackendAvailable: Boolean
 ) : AndroidViewModel(application) {
 
+    /**
+     * `true` when the previous sign-in session was evicted because stored tokens
+     * could not be decrypted (ciphertext corruption or AAD mismatch). The
+     * [com.justb81.watchbuddy.phone.ui.onboarding.OnboardingScreen] reads this once
+     * on launch to show an explanatory snackbar so users know why they are being
+     * asked to sign in again.
+     */
+    val hadDecryptionFailure: Boolean
+        get() = tokenRepository.hadDecryptionFailure
+
     private val _state = MutableStateFlow<OnboardingState>(OnboardingState.Idle)
     val state: StateFlow<OnboardingState> = _state.asStateFlow()
 

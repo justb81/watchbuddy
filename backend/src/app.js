@@ -52,6 +52,7 @@ function maskSecrets(obj) {
  * @param {Function} [config.fetchFn]  - fetch implementation (default: global fetch)
  * @param {number} [config.fetchTimeoutMs] - Upstream fetch timeout in ms (default: 15000)
  * @param {boolean} [config.debug]     - Enable request debug logging (default: false)
+ * @param {number} [config.healthCacheTtlMs] - TTL for /health response cache in ms (default: 30000, 0 = disabled)
  * @returns {import('express').Express}
  */
 export function createApp(config) {
@@ -63,6 +64,7 @@ export function createApp(config) {
     fetchTimeoutMs = 15_000,
     version = '0.0.0',
     debug = false,
+    healthCacheTtlMs = 30_000,
   } = config;
 
   const traktHeaders = {
@@ -310,13 +312,23 @@ export function createApp(config) {
     });
   }
 
-  // Rate limiting — Trakt allows 1000 calls/5min per app
+  // Rate limiting — Trakt allows 1000 calls/5min per app; apply globally
   const limiter = rateLimit({
     windowMs: 60 * 1000, // 1 minute
     limit: 60, // 60 requests per minute per IP
     message: { error: 'Too many requests, please try again later.' },
   });
-  app.use('/trakt', limiter);
+  app.use(limiter);
+
+  // Stricter limit for /health — 10 requests per minute per IP
+  const healthLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    limit: 10,
+    message: { error: 'Too many requests, please try again later.' },
+  });
+
+  // Cache state for /health — prevents rapid re-evaluation and amplification
+  let healthCache = null; // { body: object, status: number, expiresAt: number }
 
   // ── POST /trakt/token ───────────────────────────────────────────────────────
   // Body: { "code": "<device_code>" }
@@ -427,25 +439,35 @@ export function createApp(config) {
   });
 
   // ── GET /health ─────────────────────────────────────────────────────────────
-  app.get('/health', (_req, res) => {
+  app.get('/health', healthLimiter, (_req, res) => {
+    const now = Date.now();
+    if (healthCache && healthCache.expiresAt > now) {
+      return res.status(healthCache.status).json(healthCache.body);
+    }
+
+    let status, body;
     if (serverMisconfigured && traktStatus === 'pending') {
-      return res.status(503).json({
+      status = 503;
+      body = {
         status: 'misconfigured',
         trakt: 'missing_client_secret',
         error: 'TRAKT_CLIENT_SECRET is not set — token exchange is disabled.',
-      });
+      };
+    } else if (traktStatus === 'pending') {
+      status = 503;
+      body = { status: 'starting', trakt: 'pending' };
+    } else if (credentialsVerified) {
+      status = 200;
+      body = { status: 'ok', trakt: 'connected', validated: 'client_id_via_oauth' };
+    } else {
+      status = 503;
+      body = { status: 'unhealthy', trakt: traktStatus, error: traktError };
     }
-    if (traktStatus === 'pending') {
-      return res.status(503).json({ status: 'starting', trakt: 'pending' });
+
+    if (healthCacheTtlMs > 0) {
+      healthCache = { body, status, expiresAt: now + healthCacheTtlMs };
     }
-    if (credentialsVerified) {
-      return res.json({ status: 'ok', trakt: 'connected', validated: 'client_id_via_oauth' });
-    }
-    return res.status(503).json({
-      status: 'unhealthy',
-      trakt: traktStatus,
-      error: traktError,
-    });
+    return res.status(status).json(body);
   });
 
   // Catch-all 404 — keeps unknown paths off Express's default HTML response.
@@ -463,6 +485,9 @@ export function createApp(config) {
   app.verifyCredentials = verifyCredentials;
   app.clearRetryTimer = () => {
     if (retryTimer) clearTimeout(retryTimer);
+  };
+  app.clearHealthCache = () => {
+    healthCache = null;
   };
 
   return app;

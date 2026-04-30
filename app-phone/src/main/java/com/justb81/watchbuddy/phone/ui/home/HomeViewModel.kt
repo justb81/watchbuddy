@@ -13,6 +13,7 @@ import com.justb81.watchbuddy.core.progress.ShowProgress
 import com.justb81.watchbuddy.core.progress.ShowProgressCalculator
 import com.justb81.watchbuddy.core.trakt.ScrobbleBody
 import com.justb81.watchbuddy.core.trakt.TraktApiService
+import com.justb81.watchbuddy.phone.auth.AuthUnavailableException
 import com.justb81.watchbuddy.phone.auth.TokenRefreshManager
 import com.justb81.watchbuddy.phone.auth.TokenRepository
 import com.justb81.watchbuddy.phone.network.WifiStateProvider
@@ -100,12 +101,13 @@ class HomeViewModel @Inject constructor(
     private fun assertTokenAccessible() {
         runCatching { tokenRepository.getAccessToken() }
             .onFailure { e ->
-                _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        error = getApplication<Application>().getString(R.string.home_sync_failed, e.message)
-                    )
+                val message = when (e) {
+                    is AuthUnavailableException ->
+                        getApplication<Application>().getString(R.string.auth_keystore_unavailable)
+                    else ->
+                        getApplication<Application>().getString(R.string.home_sync_failed, e.message)
                 }
+                _uiState.update { it.copy(isLoading = false, error = message) }
             }
     }
 

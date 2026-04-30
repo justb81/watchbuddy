@@ -1,7 +1,10 @@
 package com.justb81.watchbuddy.tv.scrobbler
 
 import android.net.nsd.NsdServiceInfo
+import com.justb81.watchbuddy.core.model.AmbiguousCandidate
+import com.justb81.watchbuddy.core.model.AmbiguousScrobbleEvent
 import com.justb81.watchbuddy.core.model.LlmBackend
+import com.justb81.watchbuddy.core.model.PlaybackTick
 import com.justb81.watchbuddy.tv.TestFixtures
 import com.justb81.watchbuddy.tv.discovery.DiscoveryConstants
 import com.justb81.watchbuddy.tv.discovery.PhoneApiClientFactory
@@ -528,5 +531,158 @@ class TvScrobbleDispatcherTest {
 
             coVerify(exactly = 0) { phoneApiClientFactory.createClient(any()) }
         }
+    }
+
+    // ── dispatchAmbiguous (#542) ───────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("dispatchAmbiguous — at-most-once delivery (#542)")
+    inner class DispatchAmbiguousTest {
+
+        private fun makeEvent(sessionKey: String = "session-abc") = AmbiguousScrobbleEvent(
+            sessionKey = sessionKey,
+            packageName = "com.netflix.mediaclient",
+            candidates = listOf(
+                AmbiguousCandidate(
+                    show = TestFixtures.traktShow(),
+                    episode = TestFixtures.traktEpisode(),
+                    score = 0.65f,
+                    sourceLabel = "library",
+                )
+            ),
+            tick = PlaybackTick(
+                state = PlaybackTick.STATE_PLAYING,
+                positionMs = 600_000L,
+                durationMs = 2_700_000L,
+                capturedAtMs = fakeNow,
+            ),
+            capturedAtMs = fakeNow,
+        )
+
+        @Test
+        fun `dispatches event to all available phones`() = runTest(UnconfinedTestDispatcher()) {
+            dispatcher = TvScrobbleDispatcher(phoneDiscovery, phoneApiClientFactory, backgroundScope) { fakeNow }
+            val apiService1: PhoneApiService = mockk()
+            val apiService2: PhoneApiService = mockk()
+            val phone1 = makePhone(baseUrl = "http://phone1:8765/", name = "phone1")
+            val phone2 = makePhone(baseUrl = "http://phone2:8765/", name = "phone2")
+            phonesFlow.value = listOf(phone1, phone2)
+            coEvery { phoneApiClientFactory.createClient("http://phone1:8765/") } returns apiService1
+            coEvery { phoneApiClientFactory.createClient("http://phone2:8765/") } returns apiService2
+            coEvery { apiService1.scrobblePrompt(any()) } returns mockk()
+            coEvery { apiService2.scrobblePrompt(any()) } returns mockk()
+
+            dispatcher.dispatchAmbiguous(makeEvent())
+
+            coVerify { apiService1.scrobblePrompt(any()) }
+            coVerify { apiService2.scrobblePrompt(any()) }
+        }
+
+        @Test
+        fun `second call with same key is no-op even when phones are available`() = runTest(UnconfinedTestDispatcher()) {
+            dispatcher = TvScrobbleDispatcher(phoneDiscovery, phoneApiClientFactory, backgroundScope) { fakeNow }
+            val phone = makePhone()
+            phonesFlow.value = listOf(phone)
+            coEvery { phoneApiClientFactory.createClient(any()) } returns phoneApiService
+            coEvery { phoneApiService.scrobblePrompt(any()) } returns mockk()
+
+            val event = makeEvent()
+            dispatcher.dispatchAmbiguous(event)
+            dispatcher.dispatchAmbiguous(event)
+
+            coVerify(exactly = 1) { phoneApiService.scrobblePrompt(any()) }
+        }
+
+        @Test
+        fun `key is NOT removed when no phones available — transient failure does not allow re-dispatch`() =
+            runTest(UnconfinedTestDispatcher()) {
+                dispatcher = TvScrobbleDispatcher(phoneDiscovery, phoneApiClientFactory, backgroundScope) { fakeNow }
+                // First call: no phones available — key is registered but nothing is sent.
+                phonesFlow.value = emptyList()
+                val event = makeEvent()
+                dispatcher.dispatchAmbiguous(event)
+
+                // Phone becomes available — but the key is still registered so re-dispatch is blocked.
+                phonesFlow.value = listOf(makePhone())
+                coEvery { phoneApiClientFactory.createClient(any()) } returns phoneApiService
+                coEvery { phoneApiService.scrobblePrompt(any()) } returns mockk()
+                dispatcher.dispatchAmbiguous(event)
+
+                coVerify(exactly = 0) { phoneApiService.scrobblePrompt(any()) }
+            }
+
+        @Test
+        fun `clearResolvedPrompt removes key and allows a fresh dispatch`() = runTest(UnconfinedTestDispatcher()) {
+            dispatcher = TvScrobbleDispatcher(phoneDiscovery, phoneApiClientFactory, backgroundScope) { fakeNow }
+            val phone = makePhone()
+            phonesFlow.value = listOf(phone)
+            coEvery { phoneApiClientFactory.createClient(any()) } returns phoneApiService
+            coEvery { phoneApiService.scrobblePrompt(any()) } returns mockk()
+
+            val event = makeEvent()
+            dispatcher.dispatchAmbiguous(event)
+            coVerify(exactly = 1) { phoneApiService.scrobblePrompt(any()) }
+
+            dispatcher.clearResolvedPrompt(event.sessionKey)
+            dispatcher.dispatchAmbiguous(event)
+
+            coVerify(exactly = 2) { phoneApiService.scrobblePrompt(any()) }
+        }
+
+        @Test
+        fun `expired key (past AMBIGUOUS_KEY_TTL_MS) is evicted and allows re-dispatch`() =
+            runTest(UnconfinedTestDispatcher()) {
+                dispatcher = TvScrobbleDispatcher(phoneDiscovery, phoneApiClientFactory, backgroundScope) { fakeNow }
+                val phone = makePhone()
+                phonesFlow.value = listOf(phone)
+                coEvery { phoneApiClientFactory.createClient(any()) } returns phoneApiService
+                coEvery { phoneApiService.scrobblePrompt(any()) } returns mockk()
+
+                val event = makeEvent()
+                dispatcher.dispatchAmbiguous(event)
+                coVerify(exactly = 1) { phoneApiService.scrobblePrompt(any()) }
+
+                // Advance clock past TTL — the key should be evicted on next call.
+                fakeNow += TvScrobbleDispatcher.AMBIGUOUS_KEY_TTL_MS + 1_000L
+                // Update the phone's lastSuccessfulCheck so it stays fresh at the new clock time.
+                phonesFlow.value = listOf(makePhone(lastSuccessfulCheck = fakeNow))
+
+                dispatcher.dispatchAmbiguous(event)
+
+                coVerify(exactly = 2) { phoneApiService.scrobblePrompt(any()) }
+            }
+
+        @Test
+        fun `different session keys are dispatched independently`() = runTest(UnconfinedTestDispatcher()) {
+            dispatcher = TvScrobbleDispatcher(phoneDiscovery, phoneApiClientFactory, backgroundScope) { fakeNow }
+            val phone = makePhone()
+            phonesFlow.value = listOf(phone)
+            coEvery { phoneApiClientFactory.createClient(any()) } returns phoneApiService
+            coEvery { phoneApiService.scrobblePrompt(any()) } returns mockk()
+
+            dispatcher.dispatchAmbiguous(makeEvent(sessionKey = "session-1"))
+            dispatcher.dispatchAmbiguous(makeEvent(sessionKey = "session-2"))
+
+            coVerify(exactly = 2) { phoneApiService.scrobblePrompt(any()) }
+        }
+
+        @Test
+        fun `IOException on one phone does not prevent dispatch to other phones`() =
+            runTest(UnconfinedTestDispatcher()) {
+                dispatcher = TvScrobbleDispatcher(phoneDiscovery, phoneApiClientFactory, backgroundScope) { fakeNow }
+                val apiService1: PhoneApiService = mockk()
+                val apiService2: PhoneApiService = mockk()
+                val phone1 = makePhone(baseUrl = "http://phone1:8765/", name = "phone1")
+                val phone2 = makePhone(baseUrl = "http://phone2:8765/", name = "phone2")
+                phonesFlow.value = listOf(phone1, phone2)
+                coEvery { phoneApiClientFactory.createClient("http://phone1:8765/") } returns apiService1
+                coEvery { phoneApiClientFactory.createClient("http://phone2:8765/") } returns apiService2
+                coEvery { apiService1.scrobblePrompt(any()) } throws IOException("connection refused")
+                coEvery { apiService2.scrobblePrompt(any()) } returns mockk()
+
+                dispatcher.dispatchAmbiguous(makeEvent())
+
+                coVerify { apiService2.scrobblePrompt(any()) }
+            }
     }
 }

@@ -29,6 +29,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -54,7 +55,9 @@ class TvDiscoveryService : Service() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var observerJob: Job? = null
+    private var idleTimeoutJob: Job? = null
     private var notificationAccessObserver: ContentObserver? = null
+    private val idleTimeoutMonitor = IdleTimeoutMonitor()
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -87,7 +90,9 @@ class TvDiscoveryService : Service() {
                         phoneDiscovery.setEnabled(true)
                         startScrobblerIfPermitted()
                         registerNotificationAccessObserver()
+                        startIdleTimeoutMonitor()
                     } else {
+                        idleTimeoutJob?.cancel()
                         DiagnosticLog.event(TAG, "phone discovery disabled — stopping self")
                         scrobbler.stopListening()
                         stopSelf()
@@ -133,6 +138,29 @@ class TvDiscoveryService : Service() {
     }
 
     /**
+     * Launches (or re-launches) the idle-timeout coroutine so the service self-stops
+     * when no phones are discovered or all phones become unreachable for too long.
+     * Idempotent — cancels any previous job before starting a new one so toggling
+     * discovery off and back on resets the clock.
+     */
+    private fun startIdleTimeoutMonitor() {
+        idleTimeoutJob?.cancel()
+        idleTimeoutJob = scope.launch {
+            val reason = idleTimeoutMonitor.awaitTimeout(
+                phoneDiscovery.discoveredPhones.map { it.isNotEmpty() },
+            )
+            val label = when (reason) {
+                IdleTimeoutMonitor.Reason.NO_DISCOVERY ->
+                    "no phone discovered in ${DiscoveryConstants.NO_DISCOVERY_TIMEOUT_MINUTES} min"
+                IdleTimeoutMonitor.Reason.ALL_UNREACHABLE ->
+                    "all phones unreachable for ${DiscoveryConstants.ALL_UNREACHABLE_TIMEOUT_MINUTES} min"
+            }
+            DiagnosticLog.event(TAG, "idle timeout ($label) — stopping self")
+            stopSelf()
+        }
+    }
+
+    /**
      * Start [MediaSessionScrobbler] if the user has granted Notification Access
      * to [WatchBuddyNotificationListener]. Without that grant,
      * [android.media.session.MediaSessionManager.getActiveSessions] silently
@@ -157,6 +185,7 @@ class TvDiscoveryService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         DiagnosticLog.event(TAG, "service destroyed")
+        idleTimeoutJob?.cancel()
         scrobbler.stopListening()
         notificationAccessObserver?.let { contentResolver.unregisterContentObserver(it) }
         notificationAccessObserver = null

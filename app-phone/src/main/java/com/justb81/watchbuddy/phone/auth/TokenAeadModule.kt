@@ -20,6 +20,12 @@ import javax.inject.Singleton
  * encrypted with a KEK that lives in the Android Keystore. Isolating this plumbing
  * in a Hilt provider keeps [TokenRepository] free of Keystore-specific init logic
  * so it can be unit-tested against a plain [Aead] mock.
+ *
+ * If the Keystore is unavailable (locked, hardware failure, compromised device) the
+ * provider returns a [BrokenAead] sentinel instead of throwing, so the Hilt graph
+ * still builds and the app can show a meaningful error before the first UI frame.
+ * Any call to [BrokenAead.encrypt] or [BrokenAead.decrypt] throws
+ * [AuthUnavailableException], which [TokenRepository] propagates to callers.
  */
 @Module
 @InstallIn(SingletonComponent::class)
@@ -33,16 +39,30 @@ object TokenAeadModule {
     @Provides
     @Singleton
     fun provideTokenAead(@ApplicationContext context: Context): Aead {
-        DiagnosticLog.event(TAG, "registering Tink AEAD config")
-        AeadConfig.register()
+        return try {
+            DiagnosticLog.event(TAG, "registering Tink AEAD config")
+            AeadConfig.register()
+            DiagnosticLog.event(TAG, "opening Keystore-wrapped Tink keyset")
+            AndroidKeysetManager.Builder()
+                .withSharedPref(context, KEYSET_NAME, KEYSET_PREFS_NAME)
+                .withKeyTemplate(KeyTemplates.get("AES256_GCM"))
+                .withMasterKeyUri(KEYSTORE_URI)
+                .build()
+                .keysetHandle
+                .getPrimitive(Aead::class.java)
+        } catch (e: Exception) {
+            DiagnosticLog.error(TAG, "Keystore AEAD init failed — auth storage unavailable", e)
+            BrokenAead(AuthUnavailableException("Keystore unavailable: ${e.message}", e))
+        }
+    }
 
-        DiagnosticLog.event(TAG, "opening Keystore-wrapped Tink keyset")
-        return AndroidKeysetManager.Builder()
-            .withSharedPref(context, KEYSET_NAME, KEYSET_PREFS_NAME)
-            .withKeyTemplate(KeyTemplates.get("AES256_GCM"))
-            .withMasterKeyUri(KEYSTORE_URI)
-            .build()
-            .keysetHandle
-            .getPrimitive(Aead::class.java)
+    /**
+     * Sentinel returned when the Keystore fails to initialise. Every operation
+     * rethrows the original failure as [AuthUnavailableException] so the Hilt
+     * graph builds and the UI can present a typed error instead of crashing.
+     */
+    private class BrokenAead(private val reason: AuthUnavailableException) : Aead {
+        override fun encrypt(plaintext: ByteArray, associatedData: ByteArray): ByteArray = throw reason
+        override fun decrypt(ciphertext: ByteArray, associatedData: ByteArray): ByteArray = throw reason
     }
 }

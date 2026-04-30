@@ -10,6 +10,7 @@ import io.mockk.verify
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -37,8 +38,8 @@ class TokenRepositoryTest {
         every { mockEditor.putString(any(), any()) } returns mockEditor
         every { mockEditor.remove(any()) } returns mockEditor
 
-        // Deterministic AEAD: the ciphertext layout is "enc($aad):$plaintext" so the
-        // tests can round-trip through Base64 without a real crypto backend.
+        // Fixed-AAD AEAD: ciphertext layout is "enc(FIXED_AAD):$plaintext" for v1 format.
+        // Supports both the new fixed-AAD and the legacy key-name AAD for migration tests.
         val plaintextSlot = slot<ByteArray>()
         val encryptAssociatedSlot = slot<ByteArray>()
         every { aead.encrypt(capture(plaintextSlot), capture(encryptAssociatedSlot)) } answers {
@@ -52,20 +53,28 @@ class TokenRepositoryTest {
             val raw = String(cipherSlot.captured, Charsets.UTF_8)
             val aad = String(decryptAssociatedSlot.captured, Charsets.UTF_8)
             val prefix = "enc($aad):"
-            require(raw.startsWith(prefix)) { "aad mismatch" }
+            require(raw.startsWith(prefix)) { "aad mismatch: expected prefix '$prefix' in '$raw'" }
             raw.removePrefix(prefix).toByteArray(Charsets.UTF_8)
         }
 
         repository = TokenRepository(context, aead)
     }
 
-    private fun storedCiphertext(key: String, plaintext: String): String {
+    /** Builds a v1-format storage string using the fixed AAD. */
+    private fun v1Ciphertext(plaintext: String): String {
+        val fixed = "watchbuddy_aead_v1"
+        val raw = "enc($fixed):$plaintext".toByteArray(Charsets.UTF_8)
+        return "v1:" + Base64.getEncoder().encodeToString(raw)
+    }
+
+    /** Builds a legacy-format storage string using the key name as AAD. */
+    private fun legacyCiphertext(key: String, plaintext: String): String {
         val bytes = "enc($key):$plaintext".toByteArray(Charsets.UTF_8)
         return Base64.getEncoder().encodeToString(bytes)
     }
 
     @Nested
-    @DisplayName("legacy migration")
+    @DisplayName("legacy migration (EncryptedSharedPreferences)")
     inner class LegacyMigration {
 
         @Test
@@ -85,6 +94,119 @@ class TokenRepositoryTest {
     }
 
     @Nested
+    @DisplayName("v1 ciphertext format (fixed AAD)")
+    inner class V1Format {
+
+        @Test
+        fun `encrypt produces v1 version prefix`() {
+            val capturedValues = mutableMapOf<String, String>()
+            every { mockEditor.putString(any(), any()) } answers {
+                capturedValues[firstArg()] = secondArg()
+                mockEditor
+            }
+
+            repository.saveTokens("access-123", "refresh-456", 3600)
+
+            assertTrue(capturedValues["access_token"]!!.startsWith("v1:"), "access_token should have v1: prefix")
+            assertTrue(capturedValues["refresh_token"]!!.startsWith("v1:"), "refresh_token should have v1: prefix")
+            assertTrue(capturedValues["expires_at"]!!.startsWith("v1:"), "expires_at should have v1: prefix")
+        }
+
+        @Test
+        fun `encrypt uses fixed AAD (not key name)`() {
+            val capturedAads = mutableListOf<ByteArray>()
+            every { aead.encrypt(any(), any()) } answers {
+                capturedAads.add(secondArg())
+                "enc(watchbuddy_aead_v1):placeholder".toByteArray(Charsets.UTF_8)
+            }
+
+            repository.saveTokens("access", "refresh", 3600)
+
+            assertTrue(capturedAads.isNotEmpty())
+            capturedAads.forEach { aadBytes ->
+                assertEquals("watchbuddy_aead_v1", String(aadBytes, Charsets.UTF_8))
+            }
+        }
+
+        @Test
+        fun `decrypt reads v1-format ciphertext with fixed AAD`() {
+            every { mockPrefs.getString("access_token", null) } returns v1Ciphertext("my-access-token")
+            assertEquals("my-access-token", repository.getAccessToken())
+        }
+
+        @Test
+        fun `getRefreshToken decrypts v1-format ciphertext`() {
+            every { mockPrefs.getString("refresh_token", null) } returns v1Ciphertext("my-refresh-token")
+            assertEquals("my-refresh-token", repository.getRefreshToken())
+        }
+
+        @Test
+        fun `getClientSecret decrypts v1-format ciphertext`() {
+            every { mockPrefs.getString("trakt_client_secret", null) } returns v1Ciphertext("stored-secret")
+            assertEquals("stored-secret", repository.getClientSecret())
+        }
+
+        @Test
+        fun `getClientSecret returns empty string when nothing stored`() {
+            every { mockPrefs.getString("trakt_client_secret", null) } returns null
+            assertEquals("", repository.getClientSecret())
+        }
+    }
+
+    @Nested
+    @DisplayName("legacy AAD migration (key-name to fixed AAD)")
+    inner class LegacyAadMigration {
+
+        @Test
+        fun `decrypts legacy access_token and re-encrypts in v1 format`() {
+            every { mockPrefs.getString("access_token", null) } returns
+                legacyCiphertext("access_token", "legacy-access")
+
+            val result = repository.getAccessToken()
+
+            assertEquals("legacy-access", result)
+            // Verify re-encryption was triggered (putString called with v1: prefix)
+            verify { mockEditor.putString(eq("access_token"), match { it.startsWith("v1:") }) }
+        }
+
+        @Test
+        fun `decrypts legacy refresh_token and re-encrypts in v1 format`() {
+            every { mockPrefs.getString("refresh_token", null) } returns
+                legacyCiphertext("refresh_token", "legacy-refresh")
+
+            val result = repository.getRefreshToken()
+
+            assertEquals("legacy-refresh", result)
+            verify { mockEditor.putString(eq("refresh_token"), match { it.startsWith("v1:") }) }
+        }
+
+        @Test
+        fun `decrypts legacy client_secret and re-encrypts in v1 format`() {
+            every { mockPrefs.getString("trakt_client_secret", null) } returns
+                legacyCiphertext("trakt_client_secret", "old-secret")
+
+            val result = repository.getClientSecret()
+
+            assertEquals("old-secret", result)
+            verify { mockEditor.putString(eq("trakt_client_secret"), match { it.startsWith("v1:") }) }
+        }
+
+        @Test
+        fun `legacy format with wrong key-name AAD fails and sets hadDecryptionFailure`() {
+            // Simulate a ciphertext with AAD "wrong_key" stored under "access_token".
+            // Decrypt with key-name "access_token" will fail due to AAD mismatch.
+            val wrongAad = "enc(wrong_key):bad-plaintext".toByteArray(Charsets.UTF_8)
+            val encoded = Base64.getEncoder().encodeToString(wrongAad)
+            every { mockPrefs.getString("access_token", null) } returns encoded
+
+            val result = repository.getAccessToken()
+
+            assertNull(result)
+            assertTrue(repository.hadDecryptionFailure)
+        }
+    }
+
+    @Nested
     @DisplayName("isTokenValid")
     inner class IsTokenValid {
 
@@ -96,23 +218,23 @@ class TokenRepositoryTest {
 
         @Test
         fun `returns false when access token decrypts to blank`() {
-            every { mockPrefs.getString("access_token", null) } returns storedCiphertext("access_token", "")
+            every { mockPrefs.getString("access_token", null) } returns v1Ciphertext("")
             assertFalse(repository.isTokenValid())
         }
 
         @Test
         fun `returns true when token is present and not expired`() {
-            every { mockPrefs.getString("access_token", null) } returns storedCiphertext("access_token", "valid-token")
+            every { mockPrefs.getString("access_token", null) } returns v1Ciphertext("valid-token")
             every { mockPrefs.getString("expires_at", null) } returns
-                storedCiphertext("expires_at", (System.currentTimeMillis() + 60_000L).toString())
+                v1Ciphertext((System.currentTimeMillis() + 60_000L).toString())
             assertTrue(repository.isTokenValid())
         }
 
         @Test
         fun `returns false when token has expired`() {
-            every { mockPrefs.getString("access_token", null) } returns storedCiphertext("access_token", "expired")
+            every { mockPrefs.getString("access_token", null) } returns v1Ciphertext("expired")
             every { mockPrefs.getString("expires_at", null) } returns
-                storedCiphertext("expires_at", (System.currentTimeMillis() - 1_000L).toString())
+                v1Ciphertext((System.currentTimeMillis() - 1_000L).toString())
             assertFalse(repository.isTokenValid())
         }
     }
@@ -129,23 +251,23 @@ class TokenRepositoryTest {
 
         @Test
         fun `returns true when token decrypts to blank`() {
-            every { mockPrefs.getString("access_token", null) } returns storedCiphertext("access_token", "")
+            every { mockPrefs.getString("access_token", null) } returns v1Ciphertext("")
             assertTrue(repository.isTokenExpiredOrExpiringSoon(5 * 60_000L))
         }
 
         @Test
         fun `returns true when token expires within the buffer window`() {
-            every { mockPrefs.getString("access_token", null) } returns storedCiphertext("access_token", "token")
+            every { mockPrefs.getString("access_token", null) } returns v1Ciphertext("token")
             every { mockPrefs.getString("expires_at", null) } returns
-                storedCiphertext("expires_at", (System.currentTimeMillis() + 1_000L).toString())
+                v1Ciphertext((System.currentTimeMillis() + 1_000L).toString())
             assertTrue(repository.isTokenExpiredOrExpiringSoon(5 * 60_000L))
         }
 
         @Test
         fun `returns false when token expires well beyond the buffer`() {
-            every { mockPrefs.getString("access_token", null) } returns storedCiphertext("access_token", "token")
+            every { mockPrefs.getString("access_token", null) } returns v1Ciphertext("token")
             every { mockPrefs.getString("expires_at", null) } returns
-                storedCiphertext("expires_at", (System.currentTimeMillis() + 10 * 60_000L).toString())
+                v1Ciphertext((System.currentTimeMillis() + 10 * 60_000L).toString())
             assertFalse(repository.isTokenExpiredOrExpiringSoon(5 * 60_000L))
         }
     }
@@ -155,17 +277,23 @@ class TokenRepositoryTest {
     inner class TokenStorage {
 
         @Test
-        fun `saveTokens writes ciphertext for each key`() {
+        fun `saveTokens writes v1-format ciphertext for each key`() {
+            val capturedValues = mutableMapOf<String, String>()
+            every { mockEditor.putString(any(), any()) } answers {
+                capturedValues[firstArg()] = secondArg()
+                mockEditor
+            }
+
             repository.saveTokens("access-123", "refresh-456", 3600)
 
-            verify { mockEditor.putString("access_token", storedCiphertext("access_token", "access-123")) }
-            verify { mockEditor.putString("refresh_token", storedCiphertext("refresh_token", "refresh-456")) }
-            verify { mockEditor.putString(eq("expires_at"), any()) }
+            assertTrue(capturedValues["access_token"]!!.startsWith("v1:"))
+            assertTrue(capturedValues["refresh_token"]!!.startsWith("v1:"))
+            assertTrue(capturedValues["expires_at"]!!.startsWith("v1:"))
         }
 
         @Test
-        fun `getAccessToken decrypts the stored ciphertext`() {
-            every { mockPrefs.getString("access_token", null) } returns storedCiphertext("access_token", "my-access-token")
+        fun `getAccessToken decrypts the stored v1 ciphertext`() {
+            every { mockPrefs.getString("access_token", null) } returns v1Ciphertext("my-access-token")
             assertEquals("my-access-token", repository.getAccessToken())
         }
 
@@ -176,15 +304,39 @@ class TokenRepositoryTest {
         }
 
         @Test
-        fun `getRefreshToken decrypts the stored ciphertext`() {
-            every { mockPrefs.getString("refresh_token", null) } returns storedCiphertext("refresh_token", "my-refresh-token")
+        fun `getRefreshToken decrypts the stored v1 ciphertext`() {
+            every { mockPrefs.getString("refresh_token", null) } returns v1Ciphertext("my-refresh-token")
             assertEquals("my-refresh-token", repository.getRefreshToken())
         }
 
         @Test
-        fun `getAccessToken returns null on ciphertext corruption`() {
+        fun `getAccessToken returns null on corrupted ciphertext and sets hadDecryptionFailure`() {
             every { mockPrefs.getString("access_token", null) } returns "not-base64-or-valid-ciphertext"
             assertNull(repository.getAccessToken())
+            assertTrue(repository.hadDecryptionFailure)
+        }
+
+        @Test
+        fun `getAccessToken returns null on v1 ciphertext with wrong AAD and sets hadDecryptionFailure`() {
+            // Build a v1: blob whose inner ciphertext uses the WRONG AAD.
+            val wrongAad = "enc(wrong_aad):secret".toByteArray(Charsets.UTF_8)
+            val b64 = Base64.getEncoder().encodeToString(wrongAad)
+            every { mockPrefs.getString("access_token", null) } returns "v1:$b64"
+
+            assertNull(repository.getAccessToken())
+            assertTrue(repository.hadDecryptionFailure)
+        }
+
+        @Test
+        fun `hadDecryptionFailure starts false`() {
+            assertFalse(repository.hadDecryptionFailure)
+        }
+
+        @Test
+        fun `hadDecryptionFailure not set when stored value is null`() {
+            every { mockPrefs.getString("access_token", null) } returns null
+            repository.getAccessToken()
+            assertFalse(repository.hadDecryptionFailure)
         }
 
         @Test
@@ -202,21 +354,18 @@ class TokenRepositoryTest {
     inner class ClientSecret {
 
         @Test
-        fun `saveClientSecret writes ciphertext`() {
+        fun `saveClientSecret writes v1-format ciphertext`() {
+            val capturedValue = slot<String>()
+            every { mockEditor.putString(eq("trakt_client_secret"), capture(capturedValue)) } returns mockEditor
+
             repository.saveClientSecret("super-secret")
 
-            verify {
-                mockEditor.putString(
-                    "trakt_client_secret",
-                    storedCiphertext("trakt_client_secret", "super-secret"),
-                )
-            }
+            assertTrue(capturedValue.captured.startsWith("v1:"))
         }
 
         @Test
         fun `getClientSecret decrypts the stored value`() {
-            every { mockPrefs.getString("trakt_client_secret", null) } returns
-                storedCiphertext("trakt_client_secret", "stored-secret")
+            every { mockPrefs.getString("trakt_client_secret", null) } returns v1Ciphertext("stored-secret")
             assertEquals("stored-secret", repository.getClientSecret())
         }
 
@@ -224,6 +373,57 @@ class TokenRepositoryTest {
         fun `getClientSecret returns empty string when prefs returns null`() {
             every { mockPrefs.getString("trakt_client_secret", null) } returns null
             assertEquals("", repository.getClientSecret())
+        }
+    }
+
+    @Nested
+    @DisplayName("AuthUnavailableException propagation")
+    inner class AuthUnavailableExceptionPropagation {
+
+        private fun makeUnvailableAead(): Aead {
+            val brokenAead: Aead = mockk()
+            val reason = AuthUnavailableException("Keystore locked")
+            every { brokenAead.encrypt(any(), any()) } throws reason
+            every { brokenAead.decrypt(any(), any()) } throws reason
+            return brokenAead
+        }
+
+        @Test
+        fun `getAccessToken propagates AuthUnavailableException`() {
+            val brokenRepo = TokenRepository(context, makeUnvailableAead())
+            // Use valid Base64 so Base64.decode succeeds and aead.decrypt() gets to throw
+            val validV1 = "v1:" + Base64.getEncoder().encodeToString("placeholder".toByteArray())
+            every { mockPrefs.getString("access_token", null) } returns validV1
+
+            assertThrows(AuthUnavailableException::class.java) {
+                brokenRepo.getAccessToken()
+            }
+        }
+
+        @Test
+        fun `AuthUnavailableException does NOT set hadDecryptionFailure`() {
+            val brokenRepo = TokenRepository(context, makeUnvailableAead())
+            val validV1 = "v1:" + Base64.getEncoder().encodeToString("placeholder".toByteArray())
+            every { mockPrefs.getString("access_token", null) } returns validV1
+
+            runCatching { brokenRepo.getAccessToken() }
+
+            assertFalse(brokenRepo.hadDecryptionFailure,
+                "hadDecryptionFailure must not be set for Keystore-unavailable failures")
+        }
+
+        @Test
+        fun `isTokenValid returns false and swallows AuthUnavailableException in MainActivity catch block`() {
+            val brokenAead: Aead = mockk()
+            every { brokenAead.encrypt(any(), any()) } throws AuthUnavailableException("locked")
+            every { brokenAead.decrypt(any(), any()) } throws AuthUnavailableException("locked")
+            val brokenRepo = TokenRepository(context, brokenAead)
+            val validV1 = "v1:" + Base64.getEncoder().encodeToString("placeholder".toByteArray())
+            every { mockPrefs.getString("access_token", null) } returns validV1
+
+            // MainActivity wraps isTokenValid() in try/catch — simulate that
+            val result = runCatching { brokenRepo.isTokenValid() }.getOrDefault(false)
+            assertFalse(result)
         }
     }
 }
