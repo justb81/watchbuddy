@@ -524,28 +524,28 @@ class JustWatchDeepLinkRepositoryTest {
         }
     }
 
+    private class FakeDao : JustWatchDeepLinkDao {
+        private val store = ConcurrentHashMap<String, JustWatchDeepLink>()
+
+        private fun key(showId: Int, season: Int, episode: Int, providerId: Int, countryCode: String) =
+            "$showId:$season:$episode:$providerId:$countryCode"
+
+        override suspend fun get(showId: Int, season: Int, episode: Int, providerId: Int, countryCode: String): JustWatchDeepLink? =
+            store[key(showId, season, episode, providerId, countryCode)]
+
+        override suspend fun upsert(entry: JustWatchDeepLink) {
+            store[key(entry.tmdbShowId, entry.season, entry.episode, entry.providerId, entry.countryCode)] = entry
+        }
+
+        override suspend fun deleteAll() = store.clear()
+        override suspend fun countPositive(): Int = store.values.count { it.standardWebUrl != null }
+        override suspend fun countNegative(): Int = store.values.count { it.standardWebUrl == null }
+        override suspend fun lastFetchedAt(): Long? = store.values.maxOfOrNull { it.fetchedAt }
+    }
+
     @Nested
     @DisplayName("fetch deduplication")
     inner class FetchDeduplicationTests {
-
-        private class FakeDao : JustWatchDeepLinkDao {
-            private val store = ConcurrentHashMap<String, JustWatchDeepLink>()
-
-            private fun key(showId: Int, season: Int, episode: Int, providerId: Int, countryCode: String) =
-                "$showId:$season:$episode:$providerId:$countryCode"
-
-            override suspend fun get(showId: Int, season: Int, episode: Int, providerId: Int, countryCode: String): JustWatchDeepLink? =
-                store[key(showId, season, episode, providerId, countryCode)]
-
-            override suspend fun upsert(entry: JustWatchDeepLink) {
-                store[key(entry.tmdbShowId, entry.season, entry.episode, entry.providerId, entry.countryCode)] = entry
-            }
-
-            override suspend fun deleteAll() = store.clear()
-            override suspend fun countPositive(): Int = store.values.count { it.standardWebUrl != null }
-            override suspend fun countNegative(): Int = store.values.count { it.standardWebUrl == null }
-            override suspend fun lastFetchedAt(): Long? = store.values.maxOfOrNull { it.fetchedAt }
-        }
 
         @Test
         fun `100 concurrent requests for same episode deduplicate to a single API roundtrip`() =
