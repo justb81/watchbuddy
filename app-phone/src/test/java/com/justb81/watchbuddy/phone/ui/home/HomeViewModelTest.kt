@@ -691,5 +691,46 @@ class HomeViewModelTest {
 
             assertTrue(vm.uiState.value.canStartCompanion)
         }
+
+        @Test
+        fun `observeWifiState reads isWatchingTv atomically - no spurious toggleWatchingTv when already off`() = runTest {
+            // Guard against the pre-fix race: the old code read wasWatching from
+            // _uiState.value.isWatchingTv and then updated isOnWifi in a separate
+            // _uiState.update{} call. A concurrent toggleWatchingTv(false) between those
+            // two steps could set isWatchingTv=false, yet the stale wasWatching=true would
+            // still trigger an extra toggleWatchingTv(false). With getAndUpdate{}, the
+            // read and write of isOnWifi happen in one atomic step, so wasWatching always
+            // reflects the state at exactly the moment isOnWifi is updated.
+            every { settingsRepository.settings } returns flowOf(AppSettings(companionEnabled = false))
+            wifiFlow.value = true
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+            assertFalse(vm.uiState.value.isWatchingTv)
+
+            // Drop Wi-Fi when companion is NOT running — must not trigger setCompanionEnabled.
+            wifiFlow.value = false
+            advanceUntilIdle()
+
+            coVerify(exactly = 0) { settingsRepository.setCompanionEnabled(any()) }
+            assertFalse(vm.uiState.value.isOnWifi)
+        }
+
+        @Test
+        fun `observeWifiState triggers auto-stop exactly once even if Wi-Fi toggles rapidly`() = runTest {
+            every { settingsRepository.settings } returns flowOf(AppSettings(companionEnabled = true))
+            wifiFlow.value = true
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+            assertTrue(vm.uiState.value.isWatchingTv)
+
+            // Wi-Fi drops — should trigger exactly one auto-stop.
+            wifiFlow.value = false
+            advanceUntilIdle()
+
+            coVerify(exactly = 1) { settingsRepository.setCompanionEnabled(false) }
+            assertFalse(vm.uiState.value.isOnWifi)
+        }
     }
 }

@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
 import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -89,20 +90,21 @@ class ShowRepository @Inject constructor(
         episode: Int,
         watched: Boolean
     ) {
-        val current = _shows.value
-        val index = current.indexOfFirst { it.entry.show.ids.trakt == traktShowId }
-        if (index < 0) return
-        val existing = current[index]
-        val updatedSeasons = if (watched) {
-            addEpisode(existing.entry.seasons, season, episode)
-        } else {
-            removeEpisode(existing.entry.seasons, season, episode)
+        _shows.update { current ->
+            val index = current.indexOfFirst { it.entry.show.ids.trakt == traktShowId }
+            if (index < 0) return@update current
+            val existing = current[index]
+            val updatedSeasons = if (watched) {
+                addEpisode(existing.entry.seasons, season, episode)
+            } else {
+                removeEpisode(existing.entry.seasons, season, episode)
+            }
+            if (updatedSeasons === existing.entry.seasons) return@update current
+            val updatedEntry = existing.copy(entry = existing.entry.copy(seasons = updatedSeasons))
+            current.toMutableList()
+                .also { it[index] = updatedEntry }
+                .sortedWith(showComparator)
         }
-        if (updatedSeasons === existing.entry.seasons) return
-        val updatedEntry = existing.copy(entry = existing.entry.copy(seasons = updatedSeasons))
-        _shows.value = current.toMutableList()
-            .also { it[index] = updatedEntry }
-            .sortedWith(showComparator)
     }
 
     private fun addEpisode(
