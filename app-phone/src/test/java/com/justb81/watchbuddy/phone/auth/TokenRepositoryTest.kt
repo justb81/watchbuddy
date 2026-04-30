@@ -98,7 +98,7 @@ class TokenRepositoryTest {
     inner class V1Format {
 
         @Test
-        fun `encrypt produces v1: prefix`() {
+        fun `encrypt produces v1 version prefix`() {
             val capturedValues = mutableMapOf<String, String>()
             every { mockEditor.putString(any(), any()) } answers {
                 capturedValues[firstArg()] = secondArg()
