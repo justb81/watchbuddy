@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.32.3](https://github.com/justb81/watchbuddy/compare/v0.32.2...v0.32.3) (2026-04-30)
+
+
+### Bug Fixes
+
+* **backend:** rate-limit and cache /health to close DoS amplification gap ([#588](https://github.com/justb81/watchbuddy/issues/588)) ([dc6f32d](https://github.com/justb81/watchbuddy/commit/dc6f32dea43494b5601c96222a4a3702910de81b)), closes [#556](https://github.com/justb81/watchbuddy/issues/556)
+* **backend:** redact Trakt response body from error logs — emit structured traktErrorCode instead ([#596](https://github.com/justb81/watchbuddy/issues/596)) ([22e1af6](https://github.com/justb81/watchbuddy/commit/22e1af6caed74464531aa25fc610263b390f4652)), closes [#558](https://github.com/justb81/watchbuddy/issues/558)
+* **backend:** register SIGTERM/SIGINT handlers for clean shutdown ([#559](https://github.com/justb81/watchbuddy/issues/559)) ([06c8873](https://github.com/justb81/watchbuddy/commit/06c887303dae3193c8a91b6745b7ddb1b256ae20))
+* **backend:** set NODE_ENV=production in Dockerfile and modernise npm ci flag ([#587](https://github.com/justb81/watchbuddy/issues/587)) ([c8d2d9a](https://github.com/justb81/watchbuddy/commit/c8d2d9aeb08d270c90a26ebbe0f515176e720a9c)), closes [#554](https://github.com/justb81/watchbuddy/issues/554)
+* **core:** redact sensitive headers in HttpLoggingInterceptor (Level.BODY → Level.HEADERS) ([#592](https://github.com/justb81/watchbuddy/issues/592)) ([3d593dc](https://github.com/justb81/watchbuddy/commit/3d593dc5fed37041950a144518dca23bc1868618))
+* **phone:** harden AEAD token storage against Keystore failure, key-rename AAD mismatch, and silent decrypt errors ([#590](https://github.com/justb81/watchbuddy/issues/590)) ([f36ac16](https://github.com/justb81/watchbuddy/commit/f36ac1677f14d9d6eb96d3b7139f3957977bff2e))
+* **phone:** plug NetworkCallback leak in WifiStateProvider and CompanionService ([#529](https://github.com/justb81/watchbuddy/issues/529)) ([a611607](https://github.com/justb81/watchbuddy/commit/a6116077e8aa830a4b623a56e91906fe4ccf82ca))
+* **tv:** add idle timeout to TvDiscoveryService to avoid Android 14+ FGS quota exhaustion ([#591](https://github.com/justb81/watchbuddy/issues/591)) ([3d017f0](https://github.com/justb81/watchbuddy/commit/3d017f0f5e86565b5acd33f5fd047200eae6fb58))
+* **tv:** add per-phone backoff and Wi-Fi gating to discovery heartbeat ([#594](https://github.com/justb81/watchbuddy/issues/594)) ([76c4c9f](https://github.com/justb81/watchbuddy/commit/76c4c9f983456439baa135f57805fb9e2bbbcbd1))
+* **tv:** prevent duplicate ambiguous scrobble overlays on transient phone failure ([#593](https://github.com/justb81/watchbuddy/issues/593)) ([301a743](https://github.com/justb81/watchbuddy/commit/301a7439925fdf8e62749a43033e3e6c9e473297))
+* **tv:** restore focus to previously-selected show on back from detail ([#585](https://github.com/justb81/watchbuddy/issues/585)) ([8e843f6](https://github.com/justb81/watchbuddy/commit/8e843f682e964002a4d93a6def49db011c40b884))
+
 ## [0.32.2](https://github.com/justb81/watchbuddy/compare/v0.32.1...v0.32.2) (2026-04-29)
 
 
