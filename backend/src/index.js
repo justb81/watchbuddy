@@ -8,7 +8,8 @@
  * Endpoints:
  *   POST /trakt/token         — exchange device auth_code for tokens
  *   POST /trakt/token/refresh — refresh an expired access token
- *   GET  /health              — liveness check
+ *   GET  /health              — unauthenticated liveness check ({ status: 'ok'|'unhealthy' })
+ *   GET  /health/detailed     — authenticated verbose health check (requires X-Health-Token)
  *
  * Nothing is stored server-side. The proxy is purely a pass-through
  * that injects the server-side client_secret.
@@ -25,6 +26,7 @@ const {
   PORT = 3000,
   DEBUG_MODE,
   FETCH_TIMEOUT_MS,
+  HEALTH_TOKEN,
 } = process.env;
 
 if (!TRAKT_CLIENT_ID || !TRAKT_CLIENT_SECRET) {
@@ -48,12 +50,19 @@ if (FETCH_TIMEOUT_MS !== undefined && FETCH_TIMEOUT_MS !== '') {
   }
 }
 
+if (!HEALTH_TOKEN) {
+  console.warn(
+    'HEALTH_TOKEN is not set — GET /health/detailed is disabled. Set HEALTH_TOKEN to enable the authenticated verbose health endpoint.'
+  );
+}
+
 const app = createApp({
   clientId: TRAKT_CLIENT_ID,
   clientSecret: TRAKT_CLIENT_SECRET,
   version,
   debug,
   fetchTimeoutMs,
+  healthToken: HEALTH_TOKEN,
 });
 
 const server = app.listen(PORT, () => {

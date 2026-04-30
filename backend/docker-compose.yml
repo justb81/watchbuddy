@@ -11,6 +11,7 @@ services:
       - PORT
       - DEBUG_MODE
       - FETCH_TIMEOUT_MS
+      - HEALTH_TOKEN
     healthcheck:
       test: ['CMD', 'wget', '-qO-', 'http://localhost:3000/health']
       interval: 30s
