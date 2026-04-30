@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.Duration
@@ -182,12 +183,10 @@ class HomeViewModel @Inject constructor(
     private fun observeWifiState() {
         viewModelScope.launch {
             wifiStateProvider.isOnWifi.collect { onWifi ->
-                val wasWatching = _uiState.value.isWatchingTv
-                _uiState.update { it.copy(isOnWifi = onWifi) }
-                // Auto-stop a running companion when Wi-Fi drops: without it the
-                // NSD advertisement binds to nothing and the foreground
-                // notification lingers on a non-functional state.
-                if (!onWifi && wasWatching) {
+                // getAndUpdate atomically captures the previous state and writes the new one,
+                // eliminating the read-modify-write race with concurrent toggleWatchingTv calls.
+                val prevState = _uiState.getAndUpdate { it.copy(isOnWifi = onWifi) }
+                if (!onWifi && prevState.isWatchingTv) {
                     toggleWatchingTv(false)
                 }
             }

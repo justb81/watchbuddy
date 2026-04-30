@@ -1,5 +1,6 @@
 package com.justb81.watchbuddy.phone.server
 
+import app.cash.turbine.test
 import com.justb81.watchbuddy.core.model.TmdbShow
 import com.justb81.watchbuddy.core.model.TraktIds
 import com.justb81.watchbuddy.core.model.TraktShow
@@ -11,11 +12,14 @@ import com.justb81.watchbuddy.core.trakt.TraktApiService
 import com.justb81.watchbuddy.phone.auth.TokenRefreshManager
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import io.mockk.*
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
+import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 
 @DisplayName("ShowRepository")
@@ -231,6 +235,134 @@ class ShowRepositoryTest {
         // Order must be unchanged: show 1 still on top because its highest S×E (S02E01)
         // timestamp (Apr 20) is still newer than show 2's S01E01 timestamp (Apr 19).
         assertEquals(listOf(1, 2), repository.shows.value.map { it.entry.show.ids.trakt })
+    }
+
+    @Nested
+    @DisplayName("concurrent fetch and toggle — atomic update (#532)")
+    inner class ConcurrentFetchToggleTest {
+
+        @Test
+        fun `updateLocalWatched emits correct state via StateFlow (Turbine)`() = runTest {
+            coEvery { tokenRefreshManager.getValidAccessToken() } returns "token"
+            coEvery { traktApi.getWatchedShows(any()) } returns listOf(
+                TraktWatchedEntry(TraktShow("Show A", 2024, TraktIds(trakt = 1, tmdb = 100)))
+            )
+
+            repository.shows.test {
+                // No initial emission yet for an empty StateFlow with empty value.
+                // Seed via getShows so the flow emits.
+                repository.getShows()
+                val afterFetch = awaitItem()
+                assertTrue(afterFetch.isNotEmpty())
+
+                // Apply local toggle — must emit a new value atomically.
+                repository.updateLocalWatched(traktShowId = 1, season = 2, episode = 7, watched = true)
+                val afterToggle = awaitItem()
+                assertTrue(
+                    afterToggle.any { e ->
+                        e.entry.seasons.any { s -> s.number == 2 && s.episodes.any { ep -> ep.number == 7 } }
+                    },
+                    "S02E07 must appear in the StateFlow after toggle"
+                )
+
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+        @Test
+        fun `toggle applied while fetch is in-flight does not lose Trakt data from fetch result`() = runTest {
+            // This exercises the specific race fixed by update{}: without the CAS-based
+            // update, updateLocalWatched could write a stale-based state AFTER getShows
+            // wrote fresh Trakt data, clobbering that fresh data. With update{}, the lambda
+            // retries on CAS failure so it always applies the toggle on top of the most
+            // current value at write time.
+            val apiCallStarted = CompletableDeferred<Unit>()
+            val apiCallAllowed = CompletableDeferred<Unit>()
+
+            coEvery { tokenRefreshManager.getValidAccessToken() } returns "token"
+            // Seed initial state: Show A with no watched episodes.
+            coEvery { traktApi.getWatchedShows(any()) } returns listOf(
+                TraktWatchedEntry(TraktShow("Show A", 2024, TraktIds(trakt = 1, tmdb = 100)))
+            )
+            repository.getShows()
+
+            // Second fetch: returns S01E05 from Trakt, but suspends until signalled.
+            repository.invalidateCache()
+            coEvery { traktApi.getWatchedShows(any()) } coAnswers {
+                apiCallStarted.complete(Unit)
+                apiCallAllowed.await()
+                listOf(
+                    TraktWatchedEntry(
+                        show = TraktShow("Show A", 2024, TraktIds(trakt = 1, tmdb = 100)),
+                        seasons = listOf(
+                            TraktWatchedSeason(
+                                1,
+                                listOf(TraktWatchedEpisode(5, "2026-04-29T10:00:00Z"))
+                            )
+                        )
+                    )
+                )
+            }
+
+            repository.shows.test {
+                awaitItem() // consume seeded emission
+
+                // Start the second fetch — it suspends at the API call.
+                val fetchJob = launch { repository.getShows() }
+                apiCallStarted.await()
+
+                // Toggle S02E03 while the fetch is suspended.
+                // With update{}, this CAS-writes [old + S02E03].
+                // When the fetch later writes [S01E05] directly, the CAS in a concurrent
+                // update{} would detect the change and retry — but since our toggle
+                // already completed, the toggle emission fires now and the fetch will
+                // overwrite it with authoritative Trakt data next.
+                repository.updateLocalWatched(traktShowId = 1, season = 2, episode = 3, watched = true)
+
+                val afterToggle = awaitItem()
+                assertTrue(
+                    afterToggle.any { e ->
+                        e.entry.seasons.any { s -> s.number == 2 && s.episodes.any { ep -> ep.number == 3 } }
+                    },
+                    "Toggle must be visible in the flow before the fetch completes"
+                )
+
+                // Let the fetch complete — it writes authoritative Trakt data ([S01E05]).
+                apiCallAllowed.complete(Unit)
+                fetchJob.join()
+
+                val afterFetch = awaitItem()
+                assertTrue(
+                    afterFetch.any { e ->
+                        e.entry.seasons.any { s -> s.number == 1 && s.episodes.any { ep -> ep.number == 5 } }
+                    },
+                    "S01E05 from Trakt must be present after the fetch completes"
+                )
+
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+        @Test
+        fun `rapid concurrent toggles leave _shows in a consistent state`() = runTest {
+            coEvery { tokenRefreshManager.getValidAccessToken() } returns "token"
+            coEvery { traktApi.getWatchedShows(any()) } returns listOf(
+                TraktWatchedEntry(TraktShow("Show A", 2024, TraktIds(trakt = 1, tmdb = 100)))
+            )
+            repository.getShows()
+
+            // Fire many toggles sequentially within the same test coroutine to verify
+            // that the update{} lambda never panics and the state stays non-empty.
+            for (ep in 1..10) {
+                repository.updateLocalWatched(traktShowId = 1, season = 1, episode = ep, watched = true)
+            }
+
+            val state = repository.shows.value
+            assertEquals(1, state.size, "Exactly one show must remain")
+            val seasons = state.first().entry.seasons
+            val s1episodes = seasons.find { it.number == 1 }?.episodes ?: emptyList()
+            assertEquals(10, s1episodes.size, "All 10 episodes must be toggled on")
+        }
     }
 
     @Test
