@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.33.0](https://github.com/justb81/watchbuddy/compare/v0.32.4...v0.33.0) (2026-04-30)
+
+
+### Features
+
+* **core:** centralize MediaSessionScrobbler tuning knobs in ScrobbleTuning ([#603](https://github.com/justb81/watchbuddy/issues/603)) ([73fcdbe](https://github.com/justb81/watchbuddy/commit/73fcdbebea9ca3e09fcb0de22faf5ad141a74942))
+
+
+### Bug Fixes
+
+* **backend:** reduce default upstream timeout from 15 s to 8 s; add FETCH_TIMEOUT_MS override ([#607](https://github.com/justb81/watchbuddy/issues/607)) ([0b99614](https://github.com/justb81/watchbuddy/commit/0b996148a6b52b2b14c5927e51f944211ff91a9d)), closes [#560](https://github.com/justb81/watchbuddy/issues/560)
+* **backend:** split /health into public minimal + authenticated /health/detailed ([#608](https://github.com/justb81/watchbuddy/issues/608)) ([cd057a1](https://github.com/justb81/watchbuddy/commit/cd057a1a2635d1b52877247c01428925afb6b4f8)), closes [#557](https://github.com/justb81/watchbuddy/issues/557)
+* **ci:** replace continue-on-error SARIF uploads with retried REST API step ([#605](https://github.com/justb81/watchbuddy/issues/605)) ([e8129b8](https://github.com/justb81/watchbuddy/commit/e8129b8c414aa31ef93d0452436deda338d004a9))
+* **phone:** eliminate read-modify-write races in ShowRepository and HomeViewModel ([#609](https://github.com/justb81/watchbuddy/issues/609)) ([8559458](https://github.com/justb81/watchbuddy/commit/8559458b7678c0137babf40109fc173db731ca1d)), closes [#532](https://github.com/justb81/watchbuddy/issues/532)
+* **tv:** atomic Mutex creation in JustWatchDeepLinkRepository via ConcurrentHashMap ([#602](https://github.com/justb81/watchbuddy/issues/602)) ([bfb9c41](https://github.com/justb81/watchbuddy/commit/bfb9c41186969cca19ee2c24061ad6e7b8a74035))
+
 ## [0.32.4](https://github.com/justb81/watchbuddy/compare/v0.32.3...v0.32.4) (2026-04-30)
 
 
