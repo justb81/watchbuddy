@@ -4,6 +4,7 @@ import android.util.Log
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.model.AmbiguousScrobbleEvent
 import com.justb81.watchbuddy.core.model.PhoneAddToLibraryRequest
+import com.justb81.watchbuddy.core.model.ScrobbleAction
 import com.justb81.watchbuddy.core.model.TraktEpisode
 import com.justb81.watchbuddy.core.model.TraktShow
 import com.justb81.watchbuddy.core.scrobbler.ScrobbleDispatcher
@@ -65,8 +66,6 @@ class TvScrobbleDispatcher(
         /** At-most-once delivery window for ambiguous prompts. Keys older than this are evicted. */
         internal const val AMBIGUOUS_KEY_TTL_MS = 30 * 60 * 1_000L
     }
-
-    internal enum class ScrobbleAction { START, PAUSE, STOP }
 
     internal data class QueuedScrobble(
         val action: ScrobbleAction,
