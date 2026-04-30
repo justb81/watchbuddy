@@ -14,6 +14,8 @@ import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import com.justb81.watchbuddy.service.CompanionStateManager
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -26,15 +28,21 @@ class DeviceCapabilityProvider @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val stateManager: CompanionStateManager
 ) {
-    private var cachedProfile: TraktUserProfile? = null
+    private val profileMutex = Mutex()
+    @Volatile private var cachedProfile: TraktUserProfile? = null
 
     private suspend fun getCachedProfile(): TraktUserProfile? {
+        // Fast path: @Volatile read avoids mutex acquisition when cache is warm.
         cachedProfile?.let { return it }
-        val token = tokenRepository.getAccessToken() ?: return null
-        return try {
-            traktApiService.getProfile("Bearer $token").also { cachedProfile = it }
-        } catch (_: Exception) {
-            null
+        return profileMutex.withLock {
+            // Re-check inside the lock: a concurrent call may have already populated it.
+            cachedProfile?.let { return@withLock it }
+            val token = tokenRepository.getAccessToken() ?: return@withLock null
+            try {
+                traktApiService.getProfile("Bearer $token").also { cachedProfile = it }
+            } catch (_: Exception) {
+                null
+            }
         }
     }
 
