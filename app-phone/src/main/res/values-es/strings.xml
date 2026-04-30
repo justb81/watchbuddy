@@ -29,6 +29,8 @@
     <string name="onboarding_error_server_misconfigured">El servidor de autenticación está mal configurado. Por favor, inténtalo más tarde o contacta al mantenedor.</string>
     <string name="onboarding_skip">Omitir por ahora</string>
     <string name="onboarding_reconnect_title">Conectar con Trakt</string>
+    <string name="onboarding_decrypt_failed_banner">Tu inicio de sesión anterior no pudo leerse. Por favor, inicia sesión de nuevo.</string>
+    <string name="auth_keystore_unavailable">El almacenamiento seguro de tu dispositivo no está disponible. La protección de tokens está desactivada — reinicia la app o comprueba los ajustes de seguridad de tu dispositivo.</string>
 
     <!-- Home -->
     <string name="home_title">Mis series</string>
