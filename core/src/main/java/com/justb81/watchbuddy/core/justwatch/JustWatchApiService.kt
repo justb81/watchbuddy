@@ -55,7 +55,7 @@ interface JustWatchApiService {
         """.trimIndent()
 
         val SEASONS_QUERY = """
-            query GetShowSeasons(${'$'}nodeId: ID!, ${'$'}country: Country!, ${'$'}language: Language!) {
+            query GetShowSeasons(${'$'}nodeId: ID!) {
               node(id: ${'$'}nodeId) {
                 ... on Show {
                   seasons { id }
@@ -69,8 +69,10 @@ interface JustWatchApiService {
               node(id: ${'$'}nodeId) {
                 ... on Season {
                   episodes {
-                    episodeNumber
-                    seasonNumber
+                    content(country: ${'$'}country, language: ${'$'}language) {
+                      episodeNumber
+                      seasonNumber
+                    }
                     offers(country: ${'$'}country, platform: WEB) {
                       standardWebURL
                       monetizationType
@@ -137,9 +139,14 @@ data class JustWatchSeasonRef(
 
 @Serializable
 data class JustWatchEpisode(
+    val content: JustWatchEpisodeContent? = null,
+    val offers: List<JustWatchOffer> = emptyList(),
+)
+
+@Serializable
+data class JustWatchEpisodeContent(
     val episodeNumber: Int,
     val seasonNumber: Int,
-    val offers: List<JustWatchOffer> = emptyList(),
 )
 
 @Serializable
