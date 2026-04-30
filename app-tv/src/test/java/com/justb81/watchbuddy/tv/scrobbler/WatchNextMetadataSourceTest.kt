@@ -28,6 +28,11 @@ import org.junit.jupiter.api.Test
  *
  * ContentResolver is mocked with a mock [Cursor] so no Android runtime is required.
  * (MatrixCursor is an Android stub in unit tests — its methods return default values.)
+ *
+ * `ContextCompat.checkSelfPermission` is statically mocked to default to `PERMISSION_GRANTED`
+ * — the production code now pre-checks `READ_TV_LISTINGS` before issuing any provider query
+ * (the `Selection not allowed for ...` SecurityException is a TvProvider quirk we route
+ * around by never sending a selection clause; see KDoc on [WatchNextMetadataSource]).
  */
 @DisplayName("WatchNextMetadataSource")
 class WatchNextMetadataSourceTest {
@@ -40,31 +45,56 @@ class WatchNextMetadataSourceTest {
 
     private val freshMs = System.currentTimeMillis() - 30_000L // 30 s ago — well within 5 min
 
-    // Column indices matching the PROJECTION in WatchNextMetadataSource
-    private val colTitle = 0
-    private val colSeason = 1
-    private val colEpisode = 2
-    private val colEpisodeTitle = 3
-    private val colShortDesc = 4
-    private val colContentId = 5
-    private val colLastEngagement = 6
+    // Column indices for the row PROJECTION in WatchNextMetadataSource (package-name first).
+    private val colPackage = 0
+    private val colTitle = 1
+    private val colSeason = 2
+    private val colEpisode = 3
+    private val colEpisodeTitle = 4
+    private val colShortDesc = 5
+    private val colContentId = 6
+    private val colLastEngagement = 7
+
+    @BeforeEach
+    fun grantReadTvListingsByDefault() {
+        // The production pre-check in countPublishingApps() consults checkSelfPermission()
+        // before any provider round-trip. Tests that exercise the provider must default to
+        // PERMISSION_GRANTED; tests asserting denial behaviour override per-test.
+        mockkStatic(ContextCompat::class)
+        every {
+            ContextCompat.checkSelfPermission(any(), "android.permission.READ_TV_LISTINGS")
+        } returns PackageManager.PERMISSION_GRANTED
+    }
+
+    @AfterEach
+    fun unmockContextCompat() {
+        unmockkStatic(ContextCompat::class)
+    }
+
+    private data class EpisodeRow(
+        val packageName: String,
+        val title: String? = null,
+        val season: String? = null,
+        val episode: String? = null,
+        val episodeTitle: String? = null,
+        val shortDesc: String? = null,
+        val contentId: String? = null,
+        val lastEngagementMs: Long? = null,
+    )
 
     /**
-     * Builds a mock Cursor for the episode-lookup query (PROJECTION with 7 columns).
-     * Pass [empty] = true to simulate an empty cursor (moveToFirst returns false).
+     * Builds a mock Cursor that walks `rows` via `moveToNext()`. The current row index is
+     * tracked in a single-element array so `getString(idx)` / `getLong(idx)` / `isNull(idx)`
+     * answer values for the right row.
      */
-    private fun buildEpisodeCursor(
-        title: String?,
-        season: String?,
-        episode: String?,
-        episodeTitle: String?,
-        shortDesc: String?,
-        contentId: String?,
-        lastEngagementMs: Long?,
-        empty: Boolean = false,
-    ): Cursor {
+    private fun buildEpisodeCursor(vararg rows: EpisodeRow): Cursor {
         val cursor = mockk<Cursor>(relaxed = true)
-        every { cursor.moveToFirst() } returns !empty
+        val cursorPos = intArrayOf(-1)
+        every { cursor.moveToNext() } answers {
+            cursorPos[0]++
+            cursorPos[0] < rows.size
+        }
+        every { cursor.getColumnIndex(TvContractCompat.WatchNextPrograms.COLUMN_PACKAGE_NAME) } returns colPackage
         every { cursor.getColumnIndex(TvContractCompat.WatchNextPrograms.COLUMN_TITLE) } returns colTitle
         every {
             cursor.getColumnIndex(TvContractCompat.WatchNextPrograms.COLUMN_SEASON_DISPLAY_NUMBER)
@@ -86,35 +116,48 @@ class WatchNextMetadataSourceTest {
                 TvContractCompat.WatchNextPrograms.COLUMN_LAST_ENGAGEMENT_TIME_UTC_MILLIS,
             )
         } returns colLastEngagement
-        every { cursor.getString(colTitle) } returns title
-        every { cursor.getString(colSeason) } returns season
-        every { cursor.getString(colEpisode) } returns episode
-        every { cursor.getString(colEpisodeTitle) } returns episodeTitle
-        every { cursor.getString(colShortDesc) } returns shortDesc
-        every { cursor.getString(colContentId) } returns contentId
-        every { cursor.isNull(colLastEngagement) } returns (lastEngagementMs == null)
-        every { cursor.getLong(colLastEngagement) } returns (lastEngagementMs ?: 0L)
-        return cursor
-    }
 
-    /**
-     * Builds a mock Cursor for the package-count query (single COLUMN_PACKAGE_NAME column).
-     */
-    private fun buildPackageCursor(vararg packageNames: String): Cursor {
-        val cursor = mockk<Cursor>(relaxed = true)
-        val callCount = intArrayOf(0)
-        every { cursor.moveToNext() } answers { callCount[0]++ < packageNames.size }
-        if (packageNames.isNotEmpty()) {
-            every { cursor.getString(0) } answers { packageNames[callCount[0] - 1] }
+        every { cursor.getString(colPackage) } answers { rows.getOrNull(cursorPos[0])?.packageName }
+        every { cursor.getString(colTitle) } answers { rows.getOrNull(cursorPos[0])?.title }
+        every { cursor.getString(colSeason) } answers { rows.getOrNull(cursorPos[0])?.season }
+        every { cursor.getString(colEpisode) } answers { rows.getOrNull(cursorPos[0])?.episode }
+        every { cursor.getString(colEpisodeTitle) } answers { rows.getOrNull(cursorPos[0])?.episodeTitle }
+        every { cursor.getString(colShortDesc) } answers { rows.getOrNull(cursorPos[0])?.shortDesc }
+        every { cursor.getString(colContentId) } answers { rows.getOrNull(cursorPos[0])?.contentId }
+        every { cursor.isNull(colPackage) } answers { rows.getOrNull(cursorPos[0])?.packageName == null }
+        every { cursor.isNull(colLastEngagement) } answers {
+            rows.getOrNull(cursorPos[0])?.lastEngagementMs == null
+        }
+        every { cursor.getLong(colLastEngagement) } answers {
+            rows.getOrNull(cursorPos[0])?.lastEngagementMs ?: 0L
         }
         return cursor
     }
 
+    /**
+     * Convenience for the count query, which only reads `COLUMN_PACKAGE_NAME` and
+     * `COLUMN_LAST_ENGAGEMENT_TIME_UTC_MILLIS`. We reuse [buildEpisodeCursor] with minimal
+     * rows so the same cursor can serve either query path (the production code uses two
+     * different projections but the mock only cares about which column indices are read).
+     */
+    private fun buildPackageCursor(vararg packageNames: String): Cursor =
+        buildEpisodeCursor(
+            *packageNames.map { EpisodeRow(packageName = it, lastEngagementMs = freshMs) }.toTypedArray(),
+        )
+
+    /**
+     * Asserts that the production code passes `selection = null` AND `selectionArgs = null` —
+     * any non-null selection triggers AOSP TvProvider's
+     * `SecurityException("Selection not allowed for ...")`.
+     */
     private fun givenEpisodeQuery(cursor: Cursor) {
         every {
             contentResolver.query(
                 TvContractCompat.WatchNextPrograms.CONTENT_URI,
-                any(), any(), any(), any(),
+                any(),
+                isNull<String>(),
+                isNull<Array<String>>(),
+                isNull<String>(),
             )
         } returns cursor
     }
@@ -123,7 +166,10 @@ class WatchNextMetadataSourceTest {
         every {
             contentResolver.query(
                 TvContractCompat.WatchNextPrograms.CONTENT_URI,
-                any(), any(), any(), null,
+                any(),
+                isNull<String>(),
+                isNull<Array<String>>(),
+                isNull<String>(),
             )
         } returns cursor
     }
@@ -175,13 +221,16 @@ class WatchNextMetadataSourceTest {
         fun `adds watchNext lines for a fresh episode row`() = runTest {
             givenEpisodeQuery(
                 buildEpisodeCursor(
-                    title = "Stranger Things",
-                    season = "4",
-                    episode = "1",
-                    episodeTitle = "Chapter One",
-                    shortDesc = "A short description",
-                    contentId = "tmdb:66732",
-                    lastEngagementMs = freshMs,
+                    EpisodeRow(
+                        packageName = "com.disney.disneyplus",
+                        title = "Stranger Things",
+                        season = "4",
+                        episode = "1",
+                        episodeTitle = "Chapter One",
+                        shortDesc = "A short description",
+                        contentId = "tmdb:66732",
+                        lastEngagementMs = freshMs,
+                    ),
                 ),
             )
             val tick = PlaybackTick(
@@ -207,13 +256,13 @@ class WatchNextMetadataSourceTest {
         fun `synthesises S##E## marker only when both numbers are integer-parseable`() = runTest {
             givenEpisodeQuery(
                 buildEpisodeCursor(
-                    title = "Some Show",
-                    season = "Season 4", // not a bare integer — marker should be omitted
-                    episode = "E1", // not a bare integer — marker should be omitted
-                    episodeTitle = null,
-                    shortDesc = null,
-                    contentId = null,
-                    lastEngagementMs = freshMs,
+                    EpisodeRow(
+                        packageName = "com.example.streaming",
+                        title = "Some Show",
+                        season = "Season 4", // not a bare integer — marker should be omitted
+                        episode = "E1", // not a bare integer — marker should be omitted
+                        lastEngagementMs = freshMs,
+                    ),
                 ),
             )
             val tick = PlaybackTick(
@@ -237,13 +286,13 @@ class WatchNextMetadataSourceTest {
             val staleMs = System.currentTimeMillis() - WatchNextMetadataSource.ROW_FRESHNESS_MS - 1_000L
             givenEpisodeQuery(
                 buildEpisodeCursor(
-                    title = "Old Show",
-                    season = "3",
-                    episode = "5",
-                    episodeTitle = null,
-                    shortDesc = null,
-                    contentId = null,
-                    lastEngagementMs = staleMs,
+                    EpisodeRow(
+                        packageName = "com.example.streaming",
+                        title = "Old Show",
+                        season = "3",
+                        episode = "5",
+                        lastEngagementMs = staleMs,
+                    ),
                 ),
             )
             val tick = PlaybackTick(
@@ -261,12 +310,7 @@ class WatchNextMetadataSourceTest {
 
         @Test
         fun `produces no watchNext lines when no rows exist for package`() = runTest {
-            givenEpisodeQuery(
-                buildEpisodeCursor(
-                    title = null, season = null, episode = null, episodeTitle = null,
-                    shortDesc = null, contentId = null, lastEngagementMs = null, empty = true,
-                ),
-            )
+            givenEpisodeQuery(buildEpisodeCursor()) // empty
             val tick = PlaybackTick(
                 state = PlaybackTick.STATE_PLAYING,
                 positionMs = 0L,
@@ -280,16 +324,89 @@ class WatchNextMetadataSourceTest {
         }
 
         @Test
+        fun `ignores rows belonging to other packages`() = runTest {
+            // Cursor mixes Netflix + Disney rows. enrich() asks for Disney and must not
+            // accidentally surface Netflix metadata even though it's freshest.
+            givenEpisodeQuery(
+                buildEpisodeCursor(
+                    EpisodeRow(
+                        packageName = "com.netflix.ninja",
+                        title = "Stranger Things",
+                        season = "4",
+                        episode = "9",
+                        lastEngagementMs = freshMs,
+                    ),
+                    EpisodeRow(
+                        packageName = "com.disney.disneyplus",
+                        title = "The Mandalorian",
+                        season = "3",
+                        episode = "2",
+                        lastEngagementMs = freshMs - 60_000L, // older but matches package
+                    ),
+                ),
+            )
+            val tick = PlaybackTick(
+                state = PlaybackTick.STATE_PLAYING,
+                positionMs = 0L,
+                durationMs = 2_700_000L,
+                capturedAtMs = System.currentTimeMillis(),
+            )
+
+            source.enrich("com.disney.disneyplus", tick, builder)
+
+            val snapshot = builder.build()
+            assertTrue(snapshot.text.contains("watchNext.title: The Mandalorian"))
+            assertFalse(snapshot.text.contains("Stranger Things"), "Netflix row leaked into Disney lookup")
+        }
+
+        @Test
+        fun `picks the most recent row when a package has multiple matching entries`() = runTest {
+            val older = freshMs - 90_000L
+            val newer = freshMs - 1_000L
+            givenEpisodeQuery(
+                buildEpisodeCursor(
+                    EpisodeRow(
+                        packageName = "com.netflix.ninja",
+                        title = "Old Episode",
+                        season = "1",
+                        episode = "1",
+                        lastEngagementMs = older,
+                    ),
+                    EpisodeRow(
+                        packageName = "com.netflix.ninja",
+                        title = "New Episode",
+                        season = "1",
+                        episode = "2",
+                        lastEngagementMs = newer,
+                    ),
+                ),
+            )
+            val tick = PlaybackTick(
+                state = PlaybackTick.STATE_PLAYING,
+                positionMs = 0L,
+                durationMs = 2_700_000L,
+                capturedAtMs = System.currentTimeMillis(),
+            )
+
+            source.enrich("com.netflix.ninja", tick, builder)
+
+            val snapshot = builder.build()
+            assertTrue(snapshot.text.contains("watchNext.title: New Episode"))
+            assertFalse(snapshot.text.contains("Old Episode"))
+        }
+
+        @Test
         fun `handles missing season column gracefully — no marker emitted`() = runTest {
             givenEpisodeQuery(
                 buildEpisodeCursor(
-                    title = "My Show",
-                    season = null,
-                    episode = "3",
-                    episodeTitle = "Episode Title",
-                    shortDesc = null,
-                    contentId = null,
-                    lastEngagementMs = freshMs,
+                    EpisodeRow(
+                        packageName = "com.example.streaming",
+                        title = "My Show",
+                        season = null,
+                        episode = "3",
+                        episodeTitle = "Episode Title",
+                        lastEngagementMs = freshMs,
+                    ),
                 ),
             )
             val tick = PlaybackTick(
@@ -311,7 +428,7 @@ class WatchNextMetadataSourceTest {
         fun `produces no watchNext lines on SecurityException`() = runTest {
             every {
                 contentResolver.query(any(), any(), any(), any(), any())
-            } throws SecurityException("READ_TV_LISTINGS denied")
+            } throws SecurityException("provider rejected query")
             val tick = PlaybackTick(
                 state = PlaybackTick.STATE_PLAYING,
                 positionMs = 0L,
@@ -348,6 +465,21 @@ class WatchNextMetadataSourceTest {
         }
 
         @Test
+        fun `excludes stale rows from the distinct-package count`() {
+            val stale = System.currentTimeMillis() - WatchNextMetadataSource.ROW_FRESHNESS_MS - 1_000L
+            givenCountQuery(
+                buildEpisodeCursor(
+                    EpisodeRow(packageName = "com.netflix.ninja", lastEngagementMs = freshMs),
+                    EpisodeRow(packageName = "com.disney.disneyplus", lastEngagementMs = stale),
+                ),
+            )
+
+            val result = source.countPublishingApps()
+
+            assertEquals(WatchNextMetadataSource.CountResult.Success(1), result)
+        }
+
+        @Test
         fun `returns Success(0) when cursor is empty`() {
             givenCountQuery(buildPackageCursor())
 
@@ -359,7 +491,7 @@ class WatchNextMetadataSourceTest {
         @Test
         fun `returns Success(0) when contentResolver returns null cursor`() {
             every {
-                contentResolver.query(any(), any(), any(), any(), null)
+                contentResolver.query(any(), any(), isNull<String>(), isNull<Array<String>>(), isNull<String>())
             } returns null
 
             val result = source.countPublishingApps()
@@ -368,10 +500,23 @@ class WatchNextMetadataSourceTest {
         }
 
         @Test
+        fun `returns PermissionDenied without querying when checkSelfPermission is DENIED`() {
+            every {
+                ContextCompat.checkSelfPermission(any(), "android.permission.READ_TV_LISTINGS")
+            } returns PackageManager.PERMISSION_DENIED
+
+            val result = source.countPublishingApps()
+
+            assertTrue(result is WatchNextMetadataSource.CountResult.PermissionDenied)
+            verify(exactly = 0) { contentResolver.query(any(), any(), any(), any(), any()) }
+            assertTrue(source.isPermissionDenied(), "denial flag should latch for subsequent ticks")
+        }
+
+        @Test
         fun `returns PermissionDenied on SecurityException`() {
             every {
                 contentResolver.query(any(), any(), any(), any(), any())
-            } throws SecurityException("READ_TV_LISTINGS denied")
+            } throws SecurityException("provider rejected query")
 
             val result = source.countPublishingApps()
 
@@ -393,25 +538,20 @@ class WatchNextMetadataSourceTest {
         )
 
         @BeforeEach
-        fun setUpPermissionStillDenied() {
-            // Default for all tests in this class: the live permission check confirms denial
-            // so the cached flag continues to short-circuit correctly.
-            mockkStatic(ContextCompat::class)
+        fun overridePermissionToDenied() {
+            // Override the outer @BeforeEach's GRANTED default: when the cached denial flag
+            // is set, the live re-check inside isPermissionCurrentlyDenied() must still
+            // report DENIED for the short-circuit to remain in effect.
             every {
                 ContextCompat.checkSelfPermission(any(), "android.permission.READ_TV_LISTINGS")
             } returns PackageManager.PERMISSION_DENIED
-        }
-
-        @AfterEach
-        fun tearDownPermissionMock() {
-            unmockkStatic(ContextCompat::class)
         }
 
         @Test
         fun `enrich short-circuits subsequent calls after first SecurityException`() = runTest {
             every {
                 contentResolver.query(any(), any(), any(), any(), any())
-            } throws SecurityException("READ_TV_LISTINGS denied")
+            } throws SecurityException("provider rejected query")
             val builder1 = MediaSnapshotBuilder("com.netflix.ninja")
             val builder2 = MediaSnapshotBuilder("com.disney.disneyplus")
 
@@ -429,30 +569,34 @@ class WatchNextMetadataSourceTest {
         fun `countPublishingApps short-circuits after a prior denial`() = runTest {
             every {
                 contentResolver.query(any(), any(), any(), any(), any())
-            } throws SecurityException("READ_TV_LISTINGS denied")
+            } throws SecurityException("provider rejected query")
 
-            // First call records the denial.
+            // First call records the denial via the live pre-check (DENIED).
             val first = source.countPublishingApps()
             // Second call must NOT hit the resolver again.
             val second = source.countPublishingApps()
 
             assertTrue(first is WatchNextMetadataSource.CountResult.PermissionDenied)
             assertTrue(second is WatchNextMetadataSource.CountResult.PermissionDenied)
-            verify(exactly = 1) { contentResolver.query(any(), any(), any(), any(), any()) }
+            // The pre-check returns DENIED so the resolver is never consulted on either call.
+            verify(exactly = 0) { contentResolver.query(any(), any(), any(), any(), any()) }
         }
 
         @Test
         fun `resetPermissionState re-enables queries after a prior denial`() = runTest {
             every {
                 contentResolver.query(any(), any(), any(), any(), any())
-            } throws SecurityException("READ_TV_LISTINGS denied")
-            source.countPublishingApps() // caches denial
+            } throws SecurityException("provider rejected query")
+            source.countPublishingApps() // caches denial via pre-check
             assertTrue(source.isPermissionDenied())
 
             // Permission has been granted — diagnostics screen calls reset, then the next
             // query should hit the resolver again instead of short-circuiting.
             source.resetPermissionState()
             assertFalse(source.isPermissionDenied())
+            every {
+                ContextCompat.checkSelfPermission(any(), "android.permission.READ_TV_LISTINGS")
+            } returns PackageManager.PERMISSION_GRANTED
             givenCountQuery(buildPackageCursor("com.netflix.ninja"))
 
             val result = source.countPublishingApps()
@@ -465,7 +609,7 @@ class WatchNextMetadataSourceTest {
             // Seed the denial flag by having the first call throw SecurityException.
             every {
                 contentResolver.query(any(), any(), any(), any(), any())
-            } throws SecurityException("READ_TV_LISTINGS denied")
+            } throws SecurityException("provider rejected query")
             source.enrich("com.netflix.ninja", tick, MediaSnapshotBuilder("com.netflix.ninja"))
             assertTrue(source.isPermissionDenied())
 
@@ -475,13 +619,13 @@ class WatchNextMetadataSourceTest {
             } returns PackageManager.PERMISSION_GRANTED
             givenEpisodeQuery(
                 buildEpisodeCursor(
-                    title = "Stranger Things",
-                    season = "4",
-                    episode = "9",
-                    episodeTitle = null,
-                    shortDesc = null,
-                    contentId = null,
-                    lastEngagementMs = freshMs,
+                    EpisodeRow(
+                        packageName = "com.netflix.ninja",
+                        title = "Stranger Things",
+                        season = "4",
+                        episode = "9",
+                        lastEngagementMs = freshMs,
+                    ),
                 ),
             )
             val builder = MediaSnapshotBuilder("com.netflix.ninja")
@@ -491,15 +635,15 @@ class WatchNextMetadataSourceTest {
             // Flag must have been cleared by the live permission check.
             assertFalse(source.isPermissionDenied())
             val snapshot = builder.build()
-            assertTrue(snapshot.text.contains("watchNext.title: Stranger Things"), "enrichment should resume after auto-heal")
+            assertTrue(
+                snapshot.text.contains("watchNext.title: Stranger Things"),
+                "enrichment should resume after auto-heal",
+            )
         }
 
         @Test
         fun `countPublishingApps auto-heals when READ_TV_LISTINGS was granted out-of-band`() {
-            // Seed the denial flag.
-            every {
-                contentResolver.query(any(), any(), any(), any(), any())
-            } throws SecurityException("READ_TV_LISTINGS denied")
+            // Seed the denial flag via the pre-check.
             source.countPublishingApps()
             assertTrue(source.isPermissionDenied())
 

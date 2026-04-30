@@ -45,15 +45,23 @@ import javax.inject.Singleton
  * Most Android TV firmwares auto-grant it to apps with the leanback launcher feature, but a
  * growing number of Google TV / Chromecast-with-Google-TV / 3rd-party Android TV builds do
  * not — they require either an explicit `requestPermissions(...)` flow or a manual toggle in
- * App Info → Permissions. [TvMainActivity] requests the permission at runtime; the system
+ * App Info → "Additional Permissions". [TvMainActivity] requests it at runtime; the system
  * suppresses the dialog when it is auto-granted or the user has already answered.
  *
- * On non-TV form-factor (e.g. test runners) the query returns an empty cursor, which is
- * handled gracefully. The first [SecurityException] flips a process-wide [permissionDenied]
- * flag so subsequent scrobble cycles short-circuit before issuing the content-provider query
- * — without that, every tick throws and logs once per package. The flag is cleared via
- * [resetPermissionState] once the user grants the permission and the diagnostics screen
- * resumes.
+ * ### Why we never pass a `selection` clause to the WatchNext provider
+ * AOSP `TvProvider.createSqlParams(...)` throws
+ * `SecurityException("Selection not allowed for content://android.media.tv/watch_next_program…")`
+ * for any non-empty `selection`/`selectionArgs` unless the caller holds
+ * `com.android.providers.tv.permission.ACCESS_ALL_EPG_DATA`. That permission is
+ * `signature|privileged` and unattainable for normal apps — `READ_TV_LISTINGS` does **not**
+ * exempt the caller. With `READ_TV_LISTINGS` granted the provider returns every "searchable"
+ * row from every package; without it, only the caller's own rows. Either way the cursor is
+ * filtered by package-name and freshness in app code below — see [lookup] / [countPublishingApps].
+ *
+ * The canonical signal for the diagnostics red/yellow/green dot is therefore
+ * [ContextCompat.checkSelfPermission] for `READ_TV_LISTINGS`, not a cached [SecurityException].
+ * The `permissionDenied` latch is kept as a defensive backstop so a surprise SecurityException
+ * (e.g. from a downstream OEM fork) doesn't spam the log on every scrobble tick.
  */
 // TvContractCompat.WatchNextPrograms inherits column-name constants from internal
 // ProgramColumns / PreviewProgramColumns interfaces annotated @RestrictTo(LIBRARY_GROUP).
@@ -144,22 +152,38 @@ class WatchNextMetadataSource @Inject constructor(
     private fun lookup(packageName: String): WatchNextSnippet? {
         if (isPermissionCurrentlyDenied()) return null
         return try {
+            // No selection / sortOrder: TvProvider rejects either with
+            // SecurityException("Selection not allowed for ...") unless the caller holds
+            // ACCESS_ALL_EPG_DATA (signature|privileged). Filter and rank in app code.
             val now = System.currentTimeMillis()
             context.contentResolver.query(
                 TvContractCompat.WatchNextPrograms.CONTENT_URI,
                 PROJECTION,
-                "${TvContractCompat.WatchNextPrograms.COLUMN_PACKAGE_NAME} = ?",
-                arrayOf(packageName),
-                "${TvContractCompat.WatchNextPrograms.COLUMN_LAST_ENGAGEMENT_TIME_UTC_MILLIS} DESC",
+                null,
+                null,
+                null,
             )?.use { cursor ->
-                if (!cursor.moveToFirst()) return null
-                val snippet = cursor.toSnippet()
-                val age = snippet.lastEngagementMs?.let { now - it } ?: Long.MAX_VALUE
-                if (age > ROW_FRESHNESS_MS) null else snippet
+                var freshest: WatchNextSnippet? = null
+                while (cursor.moveToNext()) {
+                    val rowPackage = cursor.getStringOrNull(
+                        TvContractCompat.WatchNextPrograms.COLUMN_PACKAGE_NAME,
+                    )
+                    if (rowPackage != packageName) continue
+                    val snippet = cursor.toSnippet()
+                    val engagement = snippet.lastEngagementMs ?: continue
+                    if (now - engagement > ROW_FRESHNESS_MS) continue
+                    val incumbent = freshest?.lastEngagementMs ?: Long.MIN_VALUE
+                    if (engagement > incumbent) freshest = snippet
+                }
+                freshest
             }
         } catch (e: SecurityException) {
             permissionDenied = true
-            DiagnosticLog.warn(TAG, "WatchNext: READ_TV_LISTINGS denied — disabling source", e)
+            DiagnosticLog.warn(
+                TAG,
+                "WatchNext: provider rejected query unexpectedly — disabling source",
+                e,
+            )
             null
         }
     }
@@ -167,32 +191,64 @@ class WatchNextMetadataSource @Inject constructor(
     /**
      * Counts distinct package names that have published a fresh WatchNext row within
      * [ROW_FRESHNESS_MS]. Used by TV Diagnostics to show how many apps are reachable.
-     * Returns [CountResult.PermissionDenied] when the system denies `READ_TV_LISTINGS`.
+     * Returns [CountResult.PermissionDenied] when `READ_TV_LISTINGS` is not granted (the
+     * canonical red-dot signal — checked via [ContextCompat.checkSelfPermission] before any
+     * provider round-trip).
      */
     fun countPublishingApps(): CountResult {
         if (isPermissionCurrentlyDenied()) return CountResult.PermissionDenied
+        if (ContextCompat.checkSelfPermission(context, READ_TV_LISTINGS)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            permissionDenied = true
+            return CountResult.PermissionDenied
+        }
         return try {
-            val cutoffMs = System.currentTimeMillis() - ROW_FRESHNESS_MS
+            // No selection / sortOrder — see lookup() for the AOSP rationale.
+            val now = System.currentTimeMillis()
             context.contentResolver.query(
                 TvContractCompat.WatchNextPrograms.CONTENT_URI,
-                arrayOf(TvContractCompat.WatchNextPrograms.COLUMN_PACKAGE_NAME),
-                "${TvContractCompat.WatchNextPrograms.COLUMN_LAST_ENGAGEMENT_TIME_UTC_MILLIS} > ?",
-                arrayOf(cutoffMs.toString()),
+                COUNT_PROJECTION,
                 null,
-            )?.use(::readDistinctPackageCount) ?: CountResult.Success(0)
+                null,
+                null,
+            )?.use { cursor -> readFreshDistinctPackageCount(cursor, now) }
+                ?: CountResult.Success(0)
         } catch (e: SecurityException) {
             permissionDenied = true
-            DiagnosticLog.warn(TAG, "WatchNext: READ_TV_LISTINGS denied — disabling source", e)
+            DiagnosticLog.warn(
+                TAG,
+                "WatchNext: provider rejected query unexpectedly — disabling source",
+                e,
+            )
             CountResult.PermissionDenied
         }
     }
 
-    private fun readDistinctPackageCount(cursor: Cursor): CountResult.Success {
+    private fun readFreshDistinctPackageCount(cursor: Cursor, nowMs: Long): CountResult.Success {
         val packages = mutableSetOf<String>()
         while (cursor.moveToNext()) {
-            cursor.getString(0)?.let { packages += it }
+            val pkg = cursor.getStringOrNull(
+                TvContractCompat.WatchNextPrograms.COLUMN_PACKAGE_NAME,
+            ) ?: continue
+            val engagement = cursor.getLongOrNull(
+                TvContractCompat.WatchNextPrograms.COLUMN_LAST_ENGAGEMENT_TIME_UTC_MILLIS,
+            ) ?: continue
+            if (nowMs - engagement <= ROW_FRESHNESS_MS) packages += pkg
         }
         return CountResult.Success(packages.size)
+    }
+
+    private fun Cursor.getStringOrNull(columnName: String): String? {
+        val idx = getColumnIndex(columnName)
+        if (idx < 0 || isNull(idx)) return null
+        return getString(idx)?.takeIf { it.isNotBlank() }
+    }
+
+    private fun Cursor.getLongOrNull(columnName: String): Long? {
+        val idx = getColumnIndex(columnName)
+        if (idx < 0 || isNull(idx)) return null
+        return getLong(idx)
     }
 
     private fun Cursor.toSnippet(): WatchNextSnippet {
@@ -237,12 +293,18 @@ class WatchNextMetadataSource @Inject constructor(
         private const val READ_TV_LISTINGS = "android.permission.READ_TV_LISTINGS"
 
         private val PROJECTION = arrayOf(
+            TvContractCompat.WatchNextPrograms.COLUMN_PACKAGE_NAME,
             TvContractCompat.WatchNextPrograms.COLUMN_TITLE,
             TvContractCompat.WatchNextPrograms.COLUMN_SEASON_DISPLAY_NUMBER,
             TvContractCompat.WatchNextPrograms.COLUMN_EPISODE_DISPLAY_NUMBER,
             TvContractCompat.WatchNextPrograms.COLUMN_EPISODE_TITLE,
             TvContractCompat.WatchNextPrograms.COLUMN_SHORT_DESCRIPTION,
             TvContractCompat.WatchNextPrograms.COLUMN_CONTENT_ID,
+            TvContractCompat.WatchNextPrograms.COLUMN_LAST_ENGAGEMENT_TIME_UTC_MILLIS,
+        )
+
+        private val COUNT_PROJECTION = arrayOf(
+            TvContractCompat.WatchNextPrograms.COLUMN_PACKAGE_NAME,
             TvContractCompat.WatchNextPrograms.COLUMN_LAST_ENGAGEMENT_TIME_UTC_MILLIS,
         )
     }
