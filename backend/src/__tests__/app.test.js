@@ -738,6 +738,75 @@ describe('Credential verification', () => {
   });
 });
 
+// ── Graceful shutdown — clearRetryTimer (#559) ────────────────────────────
+
+describe('Graceful shutdown — clearRetryTimer', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it('clearRetryTimer is a no-op when no retry is pending', () => {
+    const app = buildApp(mockFetch(200, {}));
+    // Should not throw when called with no pending timer
+    expect(() => app.clearRetryTimer()).not.toThrow();
+  });
+
+  it('clearRetryTimer cancels a pending retry so it never fires', async () => {
+    const fetchFn = mockFetch(503, {});
+    const app = buildApp(fetchFn);
+
+    await app.verifyCredentials();
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+
+    // Cancel before the first retry delay (5s) elapses
+    app.clearRetryTimer();
+
+    // Advancing well past all retry windows must not trigger another call
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+  });
+
+  it('clearRetryTimer can be called multiple times safely', async () => {
+    const fetchFn = mockFetch(503, {});
+    const app = buildApp(fetchFn);
+
+    await app.verifyCredentials();
+
+    app.clearRetryTimer();
+    expect(() => app.clearRetryTimer()).not.toThrow();
+    expect(() => app.clearRetryTimer()).not.toThrow();
+
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+  });
+
+  it('clearRetryTimer stops retries mid-sequence', async () => {
+    const fetchFn = mockFetch(503, {});
+    const app = buildApp(fetchFn);
+
+    await app.verifyCredentials();
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+
+    // Let the first retry fire
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+
+    // Cancel before the second retry (15s) fires
+    app.clearRetryTimer();
+
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+  });
+});
+
 // ── Credential verification retry ─────────────────────────────────────────
 
 describe('Credential verification retry', () => {
