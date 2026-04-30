@@ -247,13 +247,13 @@ class ShowRepositoryTest {
             coEvery { traktApi.getWatchedShows(any()) } returns listOf(
                 TraktWatchedEntry(TraktShow("Show A", 2024, TraktIds(trakt = 1, tmdb = 100)))
             )
+            // Seed state BEFORE subscribing so the initial StateFlow emission is non-empty.
+            // StateFlow always replays its current value to new collectors; subscribing before
+            // the fetch would deliver the empty-list snapshot as the first item.
+            repository.getShows()
 
             repository.shows.test {
-                // No initial emission yet for an empty StateFlow with empty value.
-                // Seed via getShows so the flow emits.
-                repository.getShows()
-                val afterFetch = awaitItem()
-                assertTrue(afterFetch.isNotEmpty())
+                awaitItem() // consume the seeded [Show A] emission
 
                 // Apply local toggle — must emit a new value atomically.
                 repository.updateLocalWatched(traktShowId = 1, season = 2, episode = 7, watched = true)
