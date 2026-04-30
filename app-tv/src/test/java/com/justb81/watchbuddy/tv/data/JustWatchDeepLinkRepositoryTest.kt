@@ -565,7 +565,12 @@ class JustWatchDeepLinkRepositoryTest {
                     makeSeasonsResponse(listOf("season-1-id"))
                 coEvery { api.query(match { it.query == JustWatchApiService.EPISODES_QUERY }) } returns
                     makeEpisodesResponse(
-                        listOf(JustWatchEpisode(content = JustWatchEpisodeContent(episodeNumber = 2, seasonNumber = 1), offers = listOf(episodeOffer)))
+                        listOf(
+                            JustWatchEpisode(
+                                content = JustWatchEpisodeContent(episodeNumber = 2, seasonNumber = 1),
+                                offers = listOf(episodeOffer),
+                            )
+                        )
                     )
 
                 val repo = JustWatchDeepLinkRepository(fakeDao, api)
