@@ -79,17 +79,57 @@ class NetworkModuleTest {
         }
 
         @Test
-        fun `logging interceptor level matches BuildConfig DEBUG`() {
+        fun `logging interceptor uses HEADERS level in DEBUG and NONE in release`() {
             val client = NetworkModule.provideOkHttpClient(traktClientId = "test-id")
             val loggingInterceptor = client.interceptors
                 .filterIsInstance<HttpLoggingInterceptor>()
                 .firstOrNull()
             assertNotNull(loggingInterceptor, "HttpLoggingInterceptor should be present")
             val expectedLevel = if (com.justb81.watchbuddy.core.BuildConfig.DEBUG)
-                HttpLoggingInterceptor.Level.BODY
+                HttpLoggingInterceptor.Level.HEADERS
             else
                 HttpLoggingInterceptor.Level.NONE
             assertEquals(expectedLevel, loggingInterceptor!!.level)
+        }
+
+        @Test
+        fun `logging interceptor never logs body in any build type`() {
+            val client = NetworkModule.provideOkHttpClient(traktClientId = "test-id")
+            val loggingInterceptor = client.interceptors
+                .filterIsInstance<HttpLoggingInterceptor>()
+                .firstOrNull()
+            assertNotNull(loggingInterceptor)
+            assertNotEquals(HttpLoggingInterceptor.Level.BODY, loggingInterceptor!!.level)
+        }
+
+        @Test
+        fun `logging interceptor redacts Authorization header in DEBUG builds`() {
+            if (!com.justb81.watchbuddy.core.BuildConfig.DEBUG) return
+            server.enqueue(MockResponse().setBody("{}"))
+            val logLines = mutableListOf<String>()
+            val client = NetworkModule.provideOkHttpClient(traktClientId = "test-id").newBuilder()
+                .also { builder ->
+                    val interceptor = HttpLoggingInterceptor { logLines.add(it) }.apply {
+                        level = HttpLoggingInterceptor.Level.HEADERS
+                        redactHeader("Authorization")
+                        redactHeader("trakt-api-key")
+                        redactHeader("X-API-Key")
+                    }
+                    builder.addInterceptor(interceptor)
+                }
+                .build()
+            client.newCall(
+                Request.Builder()
+                    .url(server.url("/test"))
+                    .addHeader("Authorization", "Bearer secret-token")
+                    .build()
+            ).execute()
+            val authLines = logLines.filter { it.contains("Authorization", ignoreCase = true) }
+            assertTrue(authLines.isNotEmpty(), "Authorization header should appear in logs")
+            assertTrue(
+                authLines.all { !it.contains("secret-token") },
+                "Authorization header value must not appear in logs: $authLines"
+            )
         }
     }
 
