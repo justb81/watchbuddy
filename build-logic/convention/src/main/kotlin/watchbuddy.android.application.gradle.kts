@@ -12,7 +12,9 @@ plugins {
 
 val libs = the<LibrariesForLibs>()
 
-// CI signing: keystore path + credentials via environment variables.
+// CI signing: keystore path via environment variable; credentials via Gradle
+// properties (watchbuddy.signing.*) written to ~/.gradle/gradle.properties by
+// the workflow with chmod 600, so they never appear in env-var dumps or logs.
 // takeIf guards against KEYSTORE_FILE being set to an empty string (e.g. when
 // the secret is absent and the workflow sets the variable to '' as a fallback).
 val keystoreFile = providers.environmentVariable("KEYSTORE_FILE").orNull?.takeIf { it.isNotBlank() }
@@ -34,9 +36,9 @@ android {
         signingConfigs {
             create("release") {
                 storeFile = file(keystoreFile)
-                storePassword = providers.environmentVariable("KEYSTORE_PASSWORD").orNull
-                keyAlias = providers.environmentVariable("KEY_ALIAS").orNull
-                keyPassword = providers.environmentVariable("KEY_PASSWORD").orNull
+                storePassword = providers.gradleProperty("watchbuddy.signing.storePassword").orNull
+                keyAlias = providers.gradleProperty("watchbuddy.signing.keyAlias").orNull
+                keyPassword = providers.gradleProperty("watchbuddy.signing.keyPassword").orNull
             }
         }
     }

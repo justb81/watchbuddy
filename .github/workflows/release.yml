@@ -7,6 +7,12 @@ on:
 permissions:
   contents: read
 
+# Prevent concurrent release runs — queues new pushes rather than running them
+# in parallel, which would create conflicting GitHub Releases and Play edits.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   release-please:
     name: Release Please
@@ -47,6 +53,18 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-android-build
 
+      # -- Re-mask signing secrets so they are redacted even if a Gradle
+      # plugin, stack trace, or diagnostic task echoes environment state.
+      - name: Mask signing secrets
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          echo "::add-mask::$KEYSTORE_PASSWORD"
+          echo "::add-mask::$KEY_ALIAS"
+          echo "::add-mask::$KEY_PASSWORD"
+
       # -- Prepare release signing ----------------------------------------
       - name: Decode Keystore
         id: keystore
@@ -57,6 +75,24 @@ jobs:
           else
             echo "available=false" >> "$GITHUB_OUTPUT"
           fi
+
+      # Write signing credentials to ~/.gradle/gradle.properties (chmod 600)
+      # instead of exporting them as plain environment variables. Gradle reads
+      # project properties from this file without ever printing them.
+      - name: Write signing credentials to Gradle properties
+        if: steps.keystore.outputs.available == 'true'
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          mkdir -p ~/.gradle
+          {
+            printf 'watchbuddy.signing.storePassword=%s\n' "$KEYSTORE_PASSWORD"
+            printf 'watchbuddy.signing.keyAlias=%s\n' "$KEY_ALIAS"
+            printf 'watchbuddy.signing.keyPassword=%s\n' "$KEY_PASSWORD"
+          } >> ~/.gradle/gradle.properties
+          chmod 600 ~/.gradle/gradle.properties
 
       # -- Check Play Store credentials -----------------------------------
       - name: Check Play Store credentials
@@ -74,13 +110,14 @@ jobs:
       # -- Signed release builds (APK + AAB) ------------------------------
       # Build phone + TV in a single Gradle invocation so the `core` module
       # compiles once and the task graph is resolved once.
+      # Signing credentials (KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD) are
+      # intentionally absent here — they were written to ~/.gradle/gradle.properties
+      # above and Gradle reads them as project properties, keeping them out of
+      # the environment and therefore out of any env-dump diagnostics or logs.
       - name: Build signed Phone + TV release (APK + AAB)
         if: steps.keystore.outputs.available == 'true'
         env:
           KEYSTORE_FILE: /tmp/release.keystore
-          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           VERSION_NAME: ${{ needs.release-please.outputs.version }}
           VERSION_CODE: ${{ github.run_number }}
           TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
@@ -285,6 +322,17 @@ jobs:
             release-assets/*.aab
             release-assets/*-native-debug-symbols.zip
             release-assets/*-mapping.txt
+
+      # -- Clean up sensitive files on disk ----------------------------------
+      # Runs unconditionally (even on failure) so secrets are never left on a
+      # potentially-reused runner between jobs.
+      - name: Clean up signing credentials
+        if: always()
+        run: |
+          rm -f /tmp/release.keystore /tmp/gpp-sa.json
+          if [ -f ~/.gradle/gradle.properties ]; then
+            sed -i '/^watchbuddy\.signing\./d' ~/.gradle/gradle.properties
+          fi
 
   update-stable:
     name: Update stable branch
