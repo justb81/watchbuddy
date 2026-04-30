@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.32.4](https://github.com/justb81/watchbuddy/compare/v0.32.3...v0.32.4) (2026-04-30)
+
+
+### Bug Fixes
+
+* **core:** add explicit OkHttpClient timeouts and fix TokenProxyServiceFactory client reuse ([#599](https://github.com/justb81/watchbuddy/issues/599)) ([5779957](https://github.com/justb81/watchbuddy/commit/577995787f19fc0a3c50256d7d9a5a7c8932bec8)), closes [#564](https://github.com/justb81/watchbuddy/issues/564)
+* **release:** harden signing-secret hygiene in release workflow ([#597](https://github.com/justb81/watchbuddy/issues/597)) ([5826d52](https://github.com/justb81/watchbuddy/commit/5826d525763ff16dad90f4f704937a0e9c9d8dee))
+* **tv:** auto-heal WatchNextMetadataSource permissionDenied flag on out-of-band grant ([#600](https://github.com/justb81/watchbuddy/issues/600)) ([0a316fd](https://github.com/justb81/watchbuddy/commit/0a316fd7d6b4fa2841f586a68dff236325010cac))
+* **tv:** validate /capability response and guard HTTP body access ([#601](https://github.com/justb81/watchbuddy/issues/601)) ([cf0ec7f](https://github.com/justb81/watchbuddy/commit/cf0ec7fea986bf6213db961b6308f0d7f405d7f9))
+
 ## [0.32.3](https://github.com/justb81/watchbuddy/compare/v0.32.2...v0.32.3) (2026-04-30)
 
 
