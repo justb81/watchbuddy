@@ -6,8 +6,18 @@ import com.justb81.watchbuddy.core.model.DeviceCapability
 import com.justb81.watchbuddy.core.model.LlmBackend
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+import okhttp3.Call
 import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.Response
+import okhttp3.ResponseBody
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -15,6 +25,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import java.io.IOException
 
 @DisplayName("PhoneDiscoveryManager")
 class PhoneDiscoveryManagerTest {
@@ -23,10 +34,12 @@ class PhoneDiscoveryManagerTest {
     private val httpClient: OkHttpClient = mockk(relaxed = true)
     private val bleScanner: PhoneBleScanner = mockk(relaxed = true)
     private lateinit var manager: PhoneDiscoveryManager
+    private var fakeNow: Long = 1_700_000_000_000L
 
     @BeforeEach
     fun setUp() {
-        manager = PhoneDiscoveryManager(context, httpClient, bleScanner)
+        fakeNow = 1_700_000_000_000L
+        manager = PhoneDiscoveryManager(context, httpClient, bleScanner) { fakeNow }
     }
 
     private fun makePhone(
@@ -262,26 +275,264 @@ class PhoneDiscoveryManagerTest {
     inner class DiscoveryConstantsTest {
 
         @Test
-        fun `PRESENCE_STALENESS_MS is strictly greater than HEARTBEAT_INTERVAL_MS`() {
-            assertTrue(
-                DiscoveryConstants.PRESENCE_STALENESS_MS > DiscoveryConstants.HEARTBEAT_INTERVAL_MS,
-                "A single missed heartbeat must not immediately evict a healthy phone"
+        fun `POLL_BASE_INTERVAL_MS is 60 seconds`() {
+            assertEquals(60_000L, DiscoveryConstants.POLL_BASE_INTERVAL_MS)
+        }
+
+        @Test
+        fun `HEARTBEAT_TICK_MS is 10 seconds`() {
+            assertEquals(10_000L, DiscoveryConstants.HEARTBEAT_TICK_MS)
+        }
+
+        @Test
+        fun `PRESENCE_STALENESS_MS is 2x the steady-state poll cadence`() {
+            assertEquals(
+                2 * DiscoveryConstants.POLL_BASE_INTERVAL_MS,
+                DiscoveryConstants.PRESENCE_STALENESS_MS,
             )
         }
 
         @Test
-        fun `HEARTBEAT_INTERVAL_MS is 60 seconds`() {
-            assertEquals(60_000L, DiscoveryConstants.HEARTBEAT_INTERVAL_MS)
+        fun `POLL_BASE_INTERVAL_MS is strictly less than PRESENCE_STALENESS_MS`() {
+            assertTrue(
+                DiscoveryConstants.POLL_BASE_INTERVAL_MS < DiscoveryConstants.PRESENCE_STALENESS_MS,
+                "A steady-state poll must keep a healthy phone fresh for scrobble dispatch",
+            )
         }
 
         @Test
-        fun `PRESENCE_STALENESS_MS is 2x the heartbeat interval`() {
-            assertEquals(2 * DiscoveryConstants.HEARTBEAT_INTERVAL_MS, DiscoveryConstants.PRESENCE_STALENESS_MS)
+        fun `POLL_BACKOFF_INITIAL_MS is strictly less than POLL_BACKOFF_MAX_MS`() {
+            assertTrue(
+                DiscoveryConstants.POLL_BACKOFF_INITIAL_MS < DiscoveryConstants.POLL_BACKOFF_MAX_MS,
+                "Backoff must have room to grow before being capped",
+            )
         }
 
         @Test
-        fun `MAX_CONSECUTIVE_FAILURES is 3`() {
-            assertEquals(3, DiscoveryConstants.MAX_CONSECUTIVE_FAILURES)
+        fun `HEARTBEAT_TICK_MS is at most POLL_BACKOFF_INITIAL_MS`() {
+            assertTrue(
+                DiscoveryConstants.HEARTBEAT_TICK_MS <= DiscoveryConstants.POLL_BACKOFF_INITIAL_MS,
+                "Driver tick must wake up at least once per backoff interval",
+            )
         }
+
+        @Test
+        fun `MAX_CONSECUTIVE_FAILURES is 5`() {
+            assertEquals(5, DiscoveryConstants.MAX_CONSECUTIVE_FAILURES)
+        }
+    }
+
+    @Nested
+    @DisplayName("Heartbeat backoff & Wi-Fi gate")
+    @OptIn(ExperimentalCoroutinesApi::class)
+    inner class HeartbeatBackoffTest {
+
+        private val baseUrl = "http://192.168.1.10:8765/"
+
+        private fun seedPhone(failCount: Int = 0): PhoneDiscoveryManager.DiscoveredPhone {
+            val phone = PhoneDiscoveryManager.DiscoveredPhone(
+                serviceInfo = mockk<NsdServiceInfo>().also {
+                    every { it.serviceName } returns "phone"
+                },
+                txtRecord = makeTxtRecord(),
+                capability = DeviceCapability("d1", "u1", null, "P1", LlmBackend.NONE, 70, 4000, true),
+                score = 76,
+                baseUrl = baseUrl,
+                failCount = failCount,
+                lastSuccessfulCheck = fakeNow,
+            )
+            manager.setDiscoveredPhonesForTest(listOf(phone))
+            return phone
+        }
+
+        private fun stubCapabilitySuccess() {
+            val cap = DeviceCapability("d1", "u1", null, "P1", LlmBackend.NONE, 70, 4000, true)
+            val json = Json.encodeToString(cap)
+            val responseBody = mockk<ResponseBody>(relaxed = true)
+            every { responseBody.string() } returns json
+            val response = mockk<Response>(relaxed = true)
+            every { response.body } returns responseBody
+            val call = mockk<Call>()
+            every { call.execute() } returns response
+            every { httpClient.newCall(any<Request>()) } returns call
+        }
+
+        private fun stubCapabilityFailure() {
+            val call = mockk<Call>()
+            every { call.execute() } throws IOException("boom")
+            every { httpClient.newCall(any<Request>()) } returns call
+        }
+
+        private fun advanceTimeTo(epochMs: Long) {
+            fakeNow = epochMs
+        }
+
+        @Test
+        fun `single failure does not evict and schedules next poll after initial backoff`() =
+            runTest(UnconfinedTestDispatcher()) {
+                seedPhone()
+                stubCapabilityFailure()
+
+                manager.runTickForTest()
+
+                val phones = manager.discoveredPhones.value
+                assertEquals(1, phones.size, "A single failure must not evict")
+                assertEquals(1, phones.single().failCount)
+                assertEquals(
+                    fakeNow + DiscoveryConstants.POLL_BACKOFF_INITIAL_MS,
+                    manager.nextPollAtForTest(baseUrl),
+                )
+            }
+
+        @Test
+        fun `Wi-Fi unavailable suppresses polling and does not advance failCount`() =
+            runTest(UnconfinedTestDispatcher()) {
+                seedPhone()
+                stubCapabilityFailure()
+                manager.setWifiAvailableForTest(false)
+
+                // Simulate ticks during a 2-minute Wi-Fi blip — 12 ticks at 10 s each.
+                repeat(12) {
+                    advanceTimeTo(fakeNow + DiscoveryConstants.HEARTBEAT_TICK_MS)
+                    manager.runTickForTest()
+                }
+
+                val phones = manager.discoveredPhones.value
+                assertEquals(1, phones.size, "Phone must not be evicted during Wi-Fi outage")
+                assertEquals(0, phones.single().failCount, "failCount must not advance while Wi-Fi is down")
+            }
+
+        @Test
+        fun `resetAllSchedulesNow brings every phone back to due-now and initial backoff`() =
+            runTest(UnconfinedTestDispatcher()) {
+                seedPhone()
+                stubCapabilityFailure()
+
+                // One failure pushes the schedule into the future.
+                manager.runTickForTest()
+                assertEquals(1, manager.discoveredPhones.value.single().failCount)
+                val backoffAfterFailure = manager.backoffForTest(baseUrl)
+                assertNotNull(backoffAfterFailure)
+
+                // Simulate Wi-Fi return.
+                advanceTimeTo(fakeNow + 30_000L)
+                manager.resetAllSchedulesNow()
+
+                assertEquals(
+                    fakeNow,
+                    manager.nextPollAtForTest(baseUrl),
+                    "Reset must bring nextPollAt back to now so the next tick polls immediately",
+                )
+                assertEquals(
+                    DiscoveryConstants.POLL_BACKOFF_INITIAL_MS,
+                    manager.backoffForTest(baseUrl),
+                    "Reset must restore initial backoff",
+                )
+                assertEquals(
+                    1,
+                    manager.discoveredPhones.value.single().failCount,
+                    "Reset must NOT zero failCount — a phone that was already failing keeps its tally",
+                )
+            }
+
+        @Test
+        fun `5 consecutive failures evict the phone`() =
+            runTest(UnconfinedTestDispatcher()) {
+                seedPhone()
+                stubCapabilityFailure()
+
+                // Failure 1 — schedules next poll at +10 s.
+                manager.runTickForTest()
+                assertEquals(1, manager.discoveredPhones.value.single().failCount)
+
+                // Failure 2 — at +10 s, schedules +20 s.
+                advanceTimeTo(fakeNow + DiscoveryConstants.POLL_BACKOFF_INITIAL_MS)
+                manager.runTickForTest()
+                assertEquals(2, manager.discoveredPhones.value.single().failCount)
+                assertEquals(20_000L, manager.backoffForTest(baseUrl))
+
+                // Failure 3 — at +20 s, schedules +40 s.
+                advanceTimeTo(fakeNow + 20_000L)
+                manager.runTickForTest()
+                assertEquals(3, manager.discoveredPhones.value.single().failCount)
+                assertEquals(40_000L, manager.backoffForTest(baseUrl))
+
+                // Failure 4 — at +40 s, schedules +80 s.
+                advanceTimeTo(fakeNow + 40_000L)
+                manager.runTickForTest()
+                assertEquals(4, manager.discoveredPhones.value.single().failCount)
+                assertEquals(80_000L, manager.backoffForTest(baseUrl))
+
+                // Failure 5 — eviction.
+                advanceTimeTo(fakeNow + 80_000L)
+                manager.runTickForTest()
+                assertTrue(
+                    manager.discoveredPhones.value.isEmpty(),
+                    "Phone must be evicted after MAX_CONSECUTIVE_FAILURES failures",
+                )
+                assertNull(manager.nextPollAtForTest(baseUrl), "Schedule entry must be cleaned up on eviction")
+            }
+
+        @Test
+        fun `successful poll after failures resets failCount and backoff`() =
+            runTest(UnconfinedTestDispatcher()) {
+                seedPhone()
+
+                // Two consecutive failures.
+                stubCapabilityFailure()
+                manager.runTickForTest()
+                advanceTimeTo(fakeNow + DiscoveryConstants.POLL_BACKOFF_INITIAL_MS)
+                manager.runTickForTest()
+                assertEquals(2, manager.discoveredPhones.value.single().failCount)
+
+                // Success on the next poll.
+                stubCapabilitySuccess()
+                advanceTimeTo(fakeNow + 20_000L)
+                manager.runTickForTest()
+
+                val phone = manager.discoveredPhones.value.single()
+                assertEquals(0, phone.failCount, "failCount must reset on success")
+                assertEquals(fakeNow, phone.lastSuccessfulCheck)
+                assertEquals(
+                    DiscoveryConstants.POLL_BACKOFF_INITIAL_MS,
+                    manager.backoffForTest(baseUrl),
+                    "Backoff must reset to initial after success",
+                )
+                assertEquals(
+                    fakeNow + DiscoveryConstants.POLL_BASE_INTERVAL_MS,
+                    manager.nextPollAtForTest(baseUrl),
+                    "Next poll scheduled at steady-state cadence after success",
+                )
+            }
+
+        @Test
+        fun `phones whose nextPollAt is in the future are not polled this tick`() =
+            runTest(UnconfinedTestDispatcher()) {
+                seedPhone()
+                // Override the default due-now schedule to push the phone 60 s
+                // into the future, then advance only a partial tick.
+                manager.setNextPollAtForTest(baseUrl, fakeNow + 60_000L)
+                stubCapabilitySuccess()
+
+                advanceTimeTo(fakeNow + DiscoveryConstants.HEARTBEAT_TICK_MS)
+                manager.runTickForTest()
+
+                val phone = manager.discoveredPhones.value.single()
+                // lastSuccessfulCheck unchanged → no /capability call happened.
+                assertEquals(
+                    1_700_000_000_000L,
+                    phone.lastSuccessfulCheck,
+                    "Polling must skip phones whose nextPollAt is in the future",
+                )
+                io.mockk.verify(exactly = 0) { httpClient.newCall(any<Request>()) }
+                assertFalse(phone.failCount > 0, "No failure should be recorded for a not-due phone")
+            }
+
+        @Test
+        fun `tick without phones is a no-op and does not crash`() =
+            runTest(UnconfinedTestDispatcher()) {
+                manager.runTickForTest()
+                assertTrue(manager.discoveredPhones.value.isEmpty())
+            }
     }
 }

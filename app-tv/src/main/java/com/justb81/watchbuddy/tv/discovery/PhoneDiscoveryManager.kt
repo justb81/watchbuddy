@@ -15,14 +15,24 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.net.Inet4Address
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -37,15 +47,32 @@ import javax.inject.Singleton
  *   3. If `/capability` fails, the phone is still added using the BLE payload
  *      alone so it shows up in the ranked list.
  *
+ * Heartbeat:
+ *   A fast driver tick ([DiscoveryConstants.HEARTBEAT_TICK_MS]) consults a
+ *   per-phone schedule. Each phone is polled independently with exponential
+ *   backoff on failure (`POLL_BACKOFF_INITIAL_MS` doubling up to
+ *   `POLL_BACKOFF_MAX_MS`). The driver is gated on Wi-Fi availability — when
+ *   Wi-Fi is unavailable no polling happens and `failCount` does not advance,
+ *   so a transient blip cannot evict a healthy phone. On Wi-Fi return every
+ *   schedule is reset so the next tick re-probes immediately.
+ *
  * Ranking formula:
  *   Score = modelQuality (0–150) + ramBonus (0–10, only when capability is available)
  */
 @Singleton
-class PhoneDiscoveryManager @Inject constructor(
+class PhoneDiscoveryManager(
     @param:ApplicationContext private val context: Context,
     private val httpClient: OkHttpClient,
     private val bleScanner: PhoneBleScanner,
+    private val clock: () -> Long,
 ) {
+    @Inject
+    constructor(
+        @ApplicationContext context: Context,
+        httpClient: OkHttpClient,
+        bleScanner: PhoneBleScanner,
+    ) : this(context, httpClient, bleScanner, System::currentTimeMillis)
+
     companion object {
         const val CAPABILITY_PATH = "/capability"
         private const val TAG = "PhoneDiscoveryManager"
@@ -73,10 +100,22 @@ class PhoneDiscoveryManager @Inject constructor(
     /** Epoch millis of the last heartbeat loop pass, or 0 before the first tick. */
     val lastHeartbeatTick: StateFlow<Long> = _lastHeartbeatTick
 
+    // Defaults to true so that if Wi-Fi observation is unavailable (e.g.
+    // ConnectivityManager service missing), polling still proceeds — degrading
+    // to the previous always-poll behaviour rather than silently disabling
+    // the heartbeat.
+    private val _isWifiAvailable = MutableStateFlow(true)
+
     private val heartbeatScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var heartbeatJob: Job? = null
+    private var wifiResetJob: Job? = null
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
     @Volatile private var isDiscovering: Boolean = false
+
+    /** Per-phone next-poll-due timestamp + current backoff, keyed by `baseUrl`. */
+    private data class PollSchedule(val nextPollAt: Long, val backoffMs: Long)
+
+    private val pollSchedules = ConcurrentHashMap<String, PollSchedule>()
 
     /**
      * Lightweight device info reconstructed from the BLE payload (or the
@@ -112,6 +151,7 @@ class PhoneDiscoveryManager @Inject constructor(
         _discoveryActive.value = true
         startBleScan()
         startHeartbeat()
+        startWifiResetWatcher()
         registerNetworkCallback()
     }
 
@@ -120,6 +160,9 @@ class PhoneDiscoveryManager @Inject constructor(
         isDiscovering = false
         _discoveryActive.value = false
         heartbeatJob?.cancel()
+        heartbeatJob = null
+        wifiResetJob?.cancel()
+        wifiResetJob = null
         unregisterNetworkCallback()
         bleScanner.stop()
         _bleScanState.value = BleScanState.IDLE
@@ -138,12 +181,14 @@ class PhoneDiscoveryManager @Inject constructor(
         } else {
             if (isDiscovering) stopDiscovery()
             _discoveredPhones.value = emptyList()
+            pollSchedules.clear()
         }
     }
 
     // Mirrors the phone's CompanionService network callback: if the TV's Wi-Fi
     // flickers, the BLE stack can silently go dead. Restart the scanner when
-    // Wi-Fi becomes available again.
+    // Wi-Fi becomes available again, and gate the heartbeat loop on Wi-Fi
+    // availability so a transient blip can't accumulate spurious failures.
     private fun registerNetworkCallback() {
         if (networkCallback != null) return
         val cm = runCatching {
@@ -156,11 +201,27 @@ class PhoneDiscoveryManager @Inject constructor(
             override fun onAvailable(network: Network) {
                 if (!isDiscovering) return
                 Log.i(TAG, "Wi-Fi available — restarting BLE scanner")
+                _isWifiAvailable.value = true
                 startBleScan()
+            }
+
+            override fun onLost(network: Network) {
+                Log.i(TAG, "Wi-Fi lost — suspending heartbeat polling")
+                _isWifiAvailable.value = false
             }
         }
         runCatching { cm.registerNetworkCallback(request, callback) }
-            .onSuccess { networkCallback = callback }
+            .onSuccess {
+                networkCallback = callback
+                // Seed initial state from the active network so we don't poll
+                // until Wi-Fi is actually up.
+                val activeWifi = runCatching {
+                    val active = cm.activeNetwork ?: return@runCatching false
+                    cm.getNetworkCapabilities(active)
+                        ?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true
+                }.getOrDefault(true)
+                _isWifiAvailable.value = activeWifi
+            }
             .onFailure { Log.w(TAG, "registerNetworkCallback failed", it) }
     }
 
@@ -174,45 +235,122 @@ class PhoneDiscoveryManager @Inject constructor(
         networkCallback = null
     }
 
+    /**
+     * Watches for Wi-Fi-return transitions (false → true) and resets every
+     * phone's schedule so the next driver tick re-probes immediately. We drop
+     * the initial replay so we only react to actual transitions, and skip the
+     * very first emission (the seeded value).
+     */
+    private fun startWifiResetWatcher() {
+        wifiResetJob = heartbeatScope.launch {
+            _isWifiAvailable
+                .distinctUntilChanged()
+                .drop(1)
+                .filter { it }
+                .collect { resetAllSchedulesNow() }
+        }
+    }
+
+    /**
+     * Resets every phone's `nextPollAt` to now and `backoffMs` to the initial
+     * backoff so the next driver tick re-probes immediately. `failCount` is
+     * intentionally **not** zeroed — a phone that was genuinely unreachable
+     * before this reset should still evict on schedule if it stays down.
+     */
+    @VisibleForTesting
+    internal fun resetAllSchedulesNow() {
+        val now = clock()
+        pollSchedules.replaceAll { _, _ ->
+            PollSchedule(
+                nextPollAt = now,
+                backoffMs = DiscoveryConstants.POLL_BACKOFF_INITIAL_MS,
+            )
+        }
+    }
+
     private fun startHeartbeat() {
         heartbeatJob = heartbeatScope.launch {
-            while (true) {
-                delay(DiscoveryConstants.HEARTBEAT_INTERVAL_MS)
-                _lastHeartbeatTick.value = System.currentTimeMillis()
-                checkAllPhones()
+            flow {
+                while (currentCoroutineContext().isActive) {
+                    delay(DiscoveryConstants.HEARTBEAT_TICK_MS)
+                    emit(Unit)
+                }
+            }.collect {
+                _lastHeartbeatTick.value = clock()
+                tick()
             }
         }
     }
 
-    private suspend fun checkAllPhones() {
+    private suspend fun tick() {
+        if (!_isWifiAvailable.value) return
+        val now = clock()
         val phones = _discoveredPhones.value
         if (phones.isEmpty()) return
 
+        val due = phones.filter { phone ->
+            val schedule = pollSchedules[phone.baseUrl]
+            schedule == null || schedule.nextPollAt <= now
+        }
+        if (due.isEmpty()) return
+
+        val results: Map<String, DiscoveredPhone?> = coroutineScope {
+            due.map { phone -> async { phone.baseUrl to checkOne(phone) } }
+                .awaitAll()
+                .toMap()
+        }
+
         val updated = phones.mapNotNull { phone ->
-            val url = capabilityUrl(phone.baseUrl)
-            try {
-                val response = httpClient.newCall(Request.Builder().url(url).build()).execute()
-                val capability = response.body.string().let {
-                    Json.decodeFromString<DeviceCapability>(it)
-                }
-                val newScore = calculateScore(phone.txtRecord, capability)
-                phone.copy(
-                    capability = capability,
-                    score = newScore,
-                    failCount = 0,
-                    lastSuccessfulCheck = System.currentTimeMillis()
-                )
-            } catch (_: Exception) {
-                val newFailCount = phone.failCount + 1
-                if (newFailCount >= DiscoveryConstants.MAX_CONSECUTIVE_FAILURES) {
-                    Log.i(TAG, "Removing phone ${phone.baseUrl} after ${DiscoveryConstants.MAX_CONSECUTIVE_FAILURES} failed heartbeats")
-                    null
-                } else {
-                    phone.copy(failCount = newFailCount)
-                }
-            }
+            if (results.containsKey(phone.baseUrl)) results[phone.baseUrl] else phone
         }
         _discoveredPhones.value = updated.sortedByDescending { it.score }
+        results.forEach { (baseUrl, replacement) ->
+            if (replacement == null) pollSchedules.remove(baseUrl)
+        }
+    }
+
+    /**
+     * Polls a single phone's `/capability`, updates its schedule, and returns
+     * either a copy of the phone (refreshed or with bumped `failCount`) or
+     * null if the phone should be evicted.
+     */
+    private fun checkOne(phone: DiscoveredPhone): DiscoveredPhone? {
+        val url = capabilityUrl(phone.baseUrl)
+        val now = clock()
+        return try {
+            val response = httpClient.newCall(Request.Builder().url(url).build()).execute()
+            val capability = response.body.string().let {
+                Json.decodeFromString<DeviceCapability>(it)
+            }
+            val newScore = calculateScore(phone.txtRecord, capability)
+            pollSchedules[phone.baseUrl] = PollSchedule(
+                nextPollAt = now + DiscoveryConstants.POLL_BASE_INTERVAL_MS,
+                backoffMs = DiscoveryConstants.POLL_BACKOFF_INITIAL_MS,
+            )
+            phone.copy(
+                capability = capability,
+                score = newScore,
+                failCount = 0,
+                lastSuccessfulCheck = now,
+            )
+        } catch (_: Exception) {
+            val newFailCount = phone.failCount + 1
+            if (newFailCount >= DiscoveryConstants.MAX_CONSECUTIVE_FAILURES) {
+                Log.i(
+                    TAG,
+                    "Removing phone ${phone.baseUrl} after $newFailCount failed heartbeats"
+                )
+                return null
+            }
+            val previousBackoff = pollSchedules[phone.baseUrl]?.backoffMs
+                ?: DiscoveryConstants.POLL_BACKOFF_INITIAL_MS
+            val nextBackoff = nextBackoffMs(newFailCount, previousBackoff)
+            pollSchedules[phone.baseUrl] = PollSchedule(
+                nextPollAt = now + nextBackoff,
+                backoffMs = nextBackoff,
+            )
+            phone.copy(failCount = newFailCount)
+        }
     }
 
     /**
@@ -227,9 +365,50 @@ class PhoneDiscoveryManager @Inject constructor(
             .filter { it.capability?.isAvailable != false }
             .maxByOrNull { it.score }
 
+    /**
+     * Seeds the discovered list and schedule map with `nextPollAt = clock()`
+     * so the very next [tick] polls every phone — which matches what tests
+     * almost always want. Production seeding goes through [addOrUpdatePhone]
+     * with the steady-state cadence.
+     */
     @VisibleForTesting
     internal fun setDiscoveredPhonesForTest(phones: List<DiscoveredPhone>) {
         _discoveredPhones.value = phones
+        pollSchedules.clear()
+        val now = clock()
+        phones.forEach {
+            pollSchedules[it.baseUrl] = PollSchedule(
+                nextPollAt = now,
+                backoffMs = DiscoveryConstants.POLL_BACKOFF_INITIAL_MS,
+            )
+        }
+    }
+
+    @VisibleForTesting
+    internal fun setWifiAvailableForTest(available: Boolean) {
+        _isWifiAvailable.value = available
+    }
+
+    @VisibleForTesting
+    internal suspend fun runTickForTest() {
+        tick()
+    }
+
+    @VisibleForTesting
+    internal fun nextPollAtForTest(baseUrl: String): Long? =
+        pollSchedules[baseUrl]?.nextPollAt
+
+    @VisibleForTesting
+    internal fun backoffForTest(baseUrl: String): Long? =
+        pollSchedules[baseUrl]?.backoffMs
+
+    @VisibleForTesting
+    internal fun setNextPollAtForTest(baseUrl: String, nextPollAt: Long) {
+        val current = pollSchedules[baseUrl] ?: PollSchedule(
+            nextPollAt = nextPollAt,
+            backoffMs = DiscoveryConstants.POLL_BACKOFF_INITIAL_MS,
+        )
+        pollSchedules[baseUrl] = current.copy(nextPollAt = nextPollAt)
     }
 
     private fun addOrUpdatePhone(phone: DiscoveredPhone) {
@@ -238,6 +417,13 @@ class PhoneDiscoveryManager @Inject constructor(
         _discoveredPhones.value = (_discoveredPhones.value
             .filter { it.baseUrl != phone.baseUrl } + phone)
             .sortedByDescending { it.score }
+        pollSchedules.putIfAbsent(
+            phone.baseUrl,
+            PollSchedule(
+                nextPollAt = clock() + DiscoveryConstants.POLL_BASE_INTERVAL_MS,
+                backoffMs = DiscoveryConstants.POLL_BACKOFF_INITIAL_MS,
+            )
+        )
     }
 
     /**
@@ -361,5 +547,14 @@ class PhoneDiscoveryManager @Inject constructor(
             return cap.modelQuality + ramBonus
         }
         return txt?.modelQuality ?: 0
+    }
+
+    private fun nextBackoffMs(failCount: Int, previousBackoff: Long): Long {
+        val candidate = if (failCount <= 1) {
+            DiscoveryConstants.POLL_BACKOFF_INITIAL_MS
+        } else {
+            previousBackoff * 2
+        }
+        return candidate.coerceAtMost(DiscoveryConstants.POLL_BACKOFF_MAX_MS)
     }
 }
