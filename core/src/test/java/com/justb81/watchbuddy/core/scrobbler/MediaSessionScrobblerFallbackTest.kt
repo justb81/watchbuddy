@@ -130,7 +130,7 @@ class MediaSessionScrobblerFallbackTest {
         val result = scrobbler.matchTitle("com.netflix", "Braking Bad")
 
         assertNotNull(result)
-        assertTrue(result!!.confidence < MediaSessionScrobbler.AUTO_SCROBBLE_THRESHOLD)
+        assertTrue(result!!.confidence < ScrobbleTuning.DEFAULT.autoScrobbleThreshold)
         assertNull(result.matchedEpisode)
         coVerify(exactly = 0) { watchedShowSource.getShowHint(any()) }
     }

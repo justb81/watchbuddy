@@ -3,6 +3,7 @@ package com.justb81.watchbuddy.tv.di
 import com.justb81.watchbuddy.core.scrobbler.MetadataEnricher
 import com.justb81.watchbuddy.core.scrobbler.PlaybackIntentProvider
 import com.justb81.watchbuddy.core.scrobbler.ScrobbleDispatcher
+import com.justb81.watchbuddy.core.scrobbler.ScrobbleTuning
 import com.justb81.watchbuddy.core.scrobbler.TitleExtractor
 import com.justb81.watchbuddy.core.scrobbler.WatchedShowSource
 import com.justb81.watchbuddy.tv.discovery.PhoneTitleExtractionClient
@@ -64,5 +65,14 @@ abstract class AppModule {
             watchNext: WatchNextMetadataSource,
             notification: NotificationMetadataSource,
         ): List<MetadataEnricher> = listOf(watchNext, notification)
+
+        /**
+         * Production scrobble-tuning constants. Inject [ScrobbleTuning] rather than
+         * reading [ScrobbleTuning.DEFAULT] directly so tests can substitute a custom
+         * instance without subclassing [MediaSessionScrobbler].
+         */
+        @Provides
+        @Singleton
+        fun provideScrobbleTuning(): ScrobbleTuning = ScrobbleTuning.DEFAULT
     }
 }

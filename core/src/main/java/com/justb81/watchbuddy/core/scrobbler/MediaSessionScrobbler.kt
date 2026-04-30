@@ -41,7 +41,9 @@ import kotlin.math.abs
  *   - Phone: [WatchedShowSource] reads from ShowRepository (Trakt cache);
  *     [ScrobbleDispatcher] calls the Trakt scrobble API directly with the phone's own token.
  *
- * Confidence thresholds: ≥ 0.95 auto-scrobble; 0.70–0.95 emit for UI confirmation; < 0.70 ignore.
+ * Confidence thresholds: ≥ [ScrobbleTuning.autoScrobbleThreshold] auto-scrobble;
+ * [ScrobbleTuning.overlayThreshold]–[ScrobbleTuning.autoScrobbleThreshold] emit for UI confirmation;
+ * below [ScrobbleTuning.overlayThreshold] ignore. Production values live in [ScrobbleTuning.DEFAULT].
  */
 @Suppress("LargeClass")
 @Singleton
@@ -55,33 +57,12 @@ class MediaSessionScrobbler @Inject constructor(
     private val metadataEnrichers: List<@JvmSuppressWildcards MetadataEnricher> = emptyList(),
     /** TV-side Watch-Now intent store. Phone app binds NoOpPlaybackIntentProvider. */
     private val playbackIntentProvider: PlaybackIntentProvider = NoOpPlaybackIntentProvider(),
+    /** Behavioural tuning constants — see [ScrobbleTuning] for rationale per field. */
+    private val tuning: ScrobbleTuning = ScrobbleTuning.DEFAULT,
 ) {
     companion object {
         private const val TAG = "MediaSessionScrobbler"
-        internal const val AUTO_SCROBBLE_THRESHOLD = 0.95f
-        internal const val OVERLAY_THRESHOLD = 0.70f
-
-        /** Minimum confidence to show the user an ambiguous-prompt with top-3 candidates. */
-        internal const val AMBIGUOUS_THRESHOLD = 0.40f
-
-        /** Minimum text score for a Watch-Now intent to be confirmed in Phase 0. */
-        internal const val INTENT_CONFIRM_THRESHOLD = 0.40f
-
-        /** Bonus applied to a Phase-0 fallthrough intent candidate's text score. */
-        private const val INTENT_FALLTHROUGH_BONUS = 0.15f
-
-        /** Maximum score a fallthrough-intent candidate may be given (stays below auto-scrobble). */
-        private const val INTENT_FALLTHROUGH_CAP = 0.94f
-        private const val AMBIGUOUS_CANDIDATES_MAX = 3
-
         private const val MS_PER_MINUTE = 60_000.0
-        private const val RUNTIME_DELTA_CLOSE_MIN = 5
-        private const val RUNTIME_DELTA_MEDIUM_MIN = 10
-        private const val RUNTIME_DELTA_FAR_MIN = 20
-        private const val RUNTIME_AFFINITY_BOOST = 1.10f
-        private const val RUNTIME_AFFINITY_NEUTRAL = 1.00f
-        private const val RUNTIME_AFFINITY_PENALTY_FAR = 0.90f
-        private const val RUNTIME_AFFINITY_PENALTY_VERY_FAR = 0.75f
     }
 
     /**
@@ -182,7 +163,7 @@ class MediaSessionScrobbler @Inject constructor(
 
     private val _pendingAmbiguousEvent = MutableSharedFlow<AmbiguousScrobbleEvent>()
 
-    /** Emits when a session's best score is in [AMBIGUOUS_THRESHOLD, OVERLAY_THRESHOLD). */
+    /** Emits when a session's best score is in [ScrobbleTuning.ambiguousThreshold, ScrobbleTuning.overlayThreshold). */
     val pendingAmbiguousEvent: SharedFlow<AmbiguousScrobbleEvent> = _pendingAmbiguousEvent
 
     /** Session keys for which an ambiguous prompt has already been emitted this session. */
@@ -194,10 +175,11 @@ class MediaSessionScrobbler @Inject constructor(
     val isListening: StateFlow<Boolean> = _isListening.asStateFlow()
 
     private val _lastCandidate = MutableStateFlow<LastCandidate?>(null)
+
     /**
      * Most recent candidate observed — regardless of whether it was auto-scrobbled
      * or emitted to [pendingConfirmation]. Populated only for candidates that
-     * clear [OVERLAY_THRESHOLD]. Intended for diagnostics/UI surfacing so the
+     * clear [ScrobbleTuning.overlayThreshold]. Intended for diagnostics/UI surfacing so the
      * user can see "the scrobbler *is* seeing things" even when no match auto-fires.
      */
     val lastCandidate: StateFlow<LastCandidate?> = _lastCandidate.asStateFlow()
@@ -228,7 +210,7 @@ class MediaSessionScrobbler @Inject constructor(
     /**
      * Debug firehose toggle. When true, every poll tick writes a per-session breadcrumb
      * to [DiagnosticLog] (package, title, state, position, duration) regardless of
-     * confidence, plus a near-miss line when a title fails to clear [OVERLAY_THRESHOLD].
+     * confidence, plus a near-miss line when a title fails to clear [ScrobbleTuning.overlayThreshold].
      *
      * Set from the TV layer (see `TvDiscoveryService.observePreferences`) based on the
      * "Debug: log every media session" setting. The phone leaves this `false`.
@@ -528,14 +510,14 @@ class MediaSessionScrobbler @Inject constructor(
                     "tmdb=${candidate.matchedShow?.ids?.tmdb} confidence=${candidate.confidence}",
             )
         }
-        if (candidate.confidence >= AUTO_SCROBBLE_THRESHOLD && !isUnknown) {
+        if (candidate.confidence >= tuning.autoScrobbleThreshold && !isUnknown) {
             if (intent != null) {
                 playbackIntentProvider.recordHit()
                 playbackIntentProvider.consumeIntent(snapshot.packageName)
             }
             autoScrobble(candidate, progress, sessionKey)
             _lastCandidate.value = LastCandidate(candidate, System.currentTimeMillis(), autoScrobbled = true)
-        } else if (candidate.confidence >= OVERLAY_THRESHOLD) {
+        } else if (candidate.confidence >= tuning.overlayThreshold) {
             _pendingConfirmation.emit(candidate)
             _lastCandidate.value = LastCandidate(candidate, System.currentTimeMillis(), autoScrobbled = false)
         } else if (debugLogMediaSession) {
@@ -547,13 +529,15 @@ class MediaSessionScrobbler @Inject constructor(
     }
 
     /**
-     * Collects up to [AMBIGUOUS_CANDIDATES_MAX] library entries scoring in
-     * [AMBIGUOUS_THRESHOLD, OVERLAY_THRESHOLD) and emits them as an [AmbiguousScrobbleEvent].
-     * Idempotent per session key — each key is only emitted once until [stopListening].
+     * Collects up to [ScrobbleTuning.ambiguousCandidatesMax] library entries scoring in
+     * [ScrobbleTuning.ambiguousThreshold, ScrobbleTuning.overlayThreshold) and emits them as an
+     * [AmbiguousScrobbleEvent]. Idempotent per session key — each key is only emitted once until
+     * [stopListening].
      *
      * [fallthroughIntent] is the Watch-Now intent that fired in Phase 0 but whose text score
-     * was below [INTENT_CONFIRM_THRESHOLD]; it is injected as an extra Top-3 candidate with a
-     * +0.15 score bonus so the user sees a "From Watch Now" hint in the ambiguous prompt.
+     * was below [ScrobbleTuning.intentConfirmThreshold]; it is injected as an extra Top-3 candidate
+     * with a [ScrobbleTuning.intentFallthroughBonus] score boost so the user sees a "From Watch Now"
+     * hint in the ambiguous prompt.
      */
     private suspend fun maybeEmitAmbiguousPrompt(
         snapshot: MediaMetadataSnapshot,
@@ -592,12 +576,12 @@ class MediaSessionScrobbler @Inject constructor(
     }
 
     /**
-     * Returns up to [AMBIGUOUS_CANDIDATES_MAX] library entries whose runtimeAffinity-weighted
-     * fuzzy score falls in [AMBIGUOUS_THRESHOLD, OVERLAY_THRESHOLD), sorted DESC by score.
-     * Deduplicates by Trakt ID so the same show doesn't appear more than once.
+     * Returns up to [ScrobbleTuning.ambiguousCandidatesMax] library entries whose runtimeAffinity-weighted
+     * fuzzy score falls in [ScrobbleTuning.ambiguousThreshold, ScrobbleTuning.overlayThreshold), sorted
+     * DESC by score. Deduplicates by Trakt ID so the same show doesn't appear more than once.
      *
-     * When [fallthroughIntent] is non-null (Phase 0 fired but text score < [INTENT_CONFIRM_THRESHOLD]),
-     * the intent's show is injected as an extra candidate with a +[INTENT_FALLTHROUGH_BONUS] score
+     * When [fallthroughIntent] is non-null (Phase 0 fired but text score < [ScrobbleTuning.intentConfirmThreshold]),
+     * the intent's show is injected as an extra candidate with a +[ScrobbleTuning.intentFallthroughBonus] score
      * boost and [AmbiguousCandidate.sourceLabel] = `"watch-now-intent"`.
      */
     internal fun collectAmbiguousCandidates(
@@ -626,7 +610,7 @@ class MediaSessionScrobbler @Inject constructor(
                 val weighted = (base * runtimeAffinity(tick.durationMs, entry.show.runtime))
                     .coerceIn(0f, 1f)
                 val key = entry.show.ids.trakt ?: return@forEach
-                if (weighted < AMBIGUOUS_THRESHOLD || weighted >= OVERLAY_THRESHOLD) return@forEach
+                if (weighted < tuning.ambiguousThreshold || weighted >= tuning.overlayThreshold) return@forEach
                 val existing = bestByTraktId[key]
                 if (existing == null || weighted > existing.score) {
                     bestByTraktId[key] = ScoredEntry(
@@ -646,7 +630,7 @@ class MediaSessionScrobbler @Inject constructor(
 
         return bestByTraktId.values
             .sortedByDescending { it.score }
-            .take(AMBIGUOUS_CANDIDATES_MAX)
+            .take(tuning.ambiguousCandidatesMax)
             .map { se ->
                 AmbiguousCandidate(
                     show = se.entry.show,
@@ -672,8 +656,8 @@ class MediaSessionScrobbler @Inject constructor(
         }
         val traktId = intentEntry?.show?.ids?.trakt ?: return
         val rawScore = scoreSnapshotAgainstTitle(candidates, intent.showTitle, profile)
-        val bonusScore = (rawScore + INTENT_FALLTHROUGH_BONUS).coerceAtMost(INTENT_FALLTHROUGH_CAP)
-        if (bonusScore < AMBIGUOUS_THRESHOLD) return
+        val bonusScore = (rawScore + tuning.intentFallthroughBonus).coerceAtMost(tuning.intentFallthroughCap)
+        if (bonusScore < tuning.ambiguousThreshold) return
         val existing = bestByTraktId[traktId]
         if (existing != null && bonusScore <= existing.score) return
         bestByTraktId[traktId] = ScoredEntry(
@@ -702,7 +686,7 @@ class MediaSessionScrobbler @Inject constructor(
      * a hard filter — so noisy streaming durations (ads, recaps) don't cause
      * incorrect auto-rejects.
      *
-     * Clamped to ≤ `1/AUTO_SCROBBLE_THRESHOLD` so a borderline text score can't
+     * Clamped to ≤ `1/tuning.autoScrobbleThreshold` so a borderline text score can't
      * jump to auto-scrobble territory purely from a runtime boost.
      */
     internal fun runtimeAffinity(tickDurationMs: Long, candidateRuntimeMin: Int?): Float {
@@ -710,11 +694,11 @@ class MediaSessionScrobbler @Inject constructor(
         val tickMin = tickDurationMs / MS_PER_MINUTE
         val deltaMin = abs(tickMin - candidateRuntimeMin)
         return when {
-            deltaMin <= RUNTIME_DELTA_CLOSE_MIN -> RUNTIME_AFFINITY_BOOST
-            deltaMin <= RUNTIME_DELTA_MEDIUM_MIN -> RUNTIME_AFFINITY_NEUTRAL
-            deltaMin <= RUNTIME_DELTA_FAR_MIN -> RUNTIME_AFFINITY_PENALTY_FAR
-            else -> RUNTIME_AFFINITY_PENALTY_VERY_FAR
-        }.coerceAtMost(1.0f / AUTO_SCROBBLE_THRESHOLD)
+            deltaMin <= tuning.runtimeDeltaCloseMin -> tuning.runtimeAffinityBoost
+            deltaMin <= tuning.runtimeDeltaMediumMin -> tuning.runtimeAffinityNeutral
+            deltaMin <= tuning.runtimeDeltaFarMin -> tuning.runtimeAffinityPenaltyFar
+            else -> tuning.runtimeAffinityPenaltyVeryFar
+        }.coerceAtMost(1.0f / tuning.autoScrobbleThreshold)
     }
 
     internal fun computeProgress(
@@ -767,8 +751,8 @@ class MediaSessionScrobbler @Inject constructor(
      *
      *   0  **Watch-Now intent gate** — when [intent] is non-null and its package matches
      *      [snapshot.packageName], score the snapshot against the intent's show title. If the
-     *      score ≥ [INTENT_CONFIRM_THRESHOLD] (0.40), return a high-confidence candidate
-     *      immediately (confidence = max(textScore, [AUTO_SCROBBLE_THRESHOLD])). On a
+     *      score ≥ [ScrobbleTuning.intentConfirmThreshold], return a high-confidence candidate
+     *      immediately (confidence = max(textScore, [ScrobbleTuning.autoScrobbleThreshold])). On a
      *      miss the cascade continues normally; the caller is responsible for passing the
      *      intent to [maybeEmitAmbiguousPrompt] as a fallthrough candidate.
      *   0.5 **Content-ID short-circuit** — if a `watchNext.contentId: tmdb:XXXX` line is
@@ -778,7 +762,7 @@ class MediaSessionScrobbler @Inject constructor(
      *   1. **Phase 1 (cheap)** — try every MediaMetadata field from [snapshot] as
      *      a candidate show title, parse any `S##E##` marker, score against the
      *      cached library with [fuzzyScore], keep the highest-scoring cache hit.
-     *   2. **LLM fallback** — if no field clears [OVERLAY_THRESHOLD], ask the
+     *   2. **LLM fallback** — if no field clears [ScrobbleTuning.overlayThreshold], ask the
      *      injected [TitleExtractor] for a normalized `(showTitle, season?,
      *      episode?)` and retry the cache match with it.
      *   3. **TMDB fallback** — if the library still has no match, search TMDB
@@ -805,7 +789,7 @@ class MediaSessionScrobbler @Inject constructor(
         // Phase 0: Watch-Now intent gate.
         if (intent != null) {
             val textScore = scoreSnapshotAgainstTitle(candidates, intent.showTitle, profile)
-            if (textScore >= INTENT_CONFIRM_THRESHOLD) {
+            if (textScore >= tuning.intentConfirmThreshold) {
                 val cachedEntry = cachedShows.firstOrNull { entry ->
                     (intent.showIds.trakt != null && entry.show.ids.trakt == intent.showIds.trakt) ||
                     (intent.showIds.tmdb != null && entry.show.ids.tmdb == intent.showIds.tmdb)
@@ -820,7 +804,7 @@ class MediaSessionScrobbler @Inject constructor(
                 return ScrobbleCandidate(
                     packageName = snapshot.packageName,
                     mediaTitle = mediaTitle,
-                    confidence = maxOf(textScore, AUTO_SCROBBLE_THRESHOLD),
+                    confidence = maxOf(textScore, tuning.autoScrobbleThreshold),
                     matchedShow = show,
                     matchedEpisode = TraktEpisode(season = intent.season, number = intent.episode),
                 )
@@ -983,7 +967,7 @@ class MediaSessionScrobbler @Inject constructor(
         mediaTitle: String,
     ): ScrobbleCandidate? {
         val entry = bestCheap?.cacheEntry ?: return null
-        if (bestCheap.score < OVERLAY_THRESHOLD) return null
+        if (bestCheap.score < tuning.overlayThreshold) return null
         val matchedEpisode = resolveEpisode(
             bestCheap.season ?: globalSeason,
             bestCheap.episode ?: globalEpisode,
@@ -1015,7 +999,7 @@ class MediaSessionScrobbler @Inject constructor(
             val tmdbResults = tmdbApiService.searchTv(tmdbQuery, tmdbApiKey).results
             val bestTmdbMatch = tmdbResults.maxByOrNull { fuzzyScore(it.name, tmdbQuery) }
             val tmdbScore = bestTmdbMatch?.let { fuzzyScore(it.name, tmdbQuery) } ?: 0f
-            if (tmdbScore < 0.50f || bestTmdbMatch == null) {
+            if (tmdbScore < tuning.tmdbMinScore || bestTmdbMatch == null) {
                 null
             } else {
                 ScrobbleCandidate(
@@ -1102,7 +1086,7 @@ class MediaSessionScrobbler @Inject constructor(
         val bestCacheMatch = cachedShows.maxByOrNull { fuzzyScore(it.show.title, showTitle) }
             ?: return null
         val score = fuzzyScore(bestCacheMatch.show.title, showTitle)
-        if (score < OVERLAY_THRESHOLD) return null
+        if (score < tuning.overlayThreshold) return null
         val matchedEpisode = resolveEpisode(
             extraction.season,
             extraction.episode,
@@ -1129,7 +1113,7 @@ class MediaSessionScrobbler @Inject constructor(
      * pair parsed from MediaMetadata when available; otherwise falls back to the progress
      * hint so scrobbles from Netflix / Prime / Disney+ (which ship only the episode title
      * in `METADATA_KEY_TITLE`) aren't silently dropped (issue #401). The fallback only
-     * activates when show-match confidence clears [AUTO_SCROBBLE_THRESHOLD] — below that
+     * activates when show-match confidence clears [ScrobbleTuning.autoScrobbleThreshold] — below that
      * the overlay path still asks the user to confirm.
      */
     private suspend fun resolveEpisode(
@@ -1141,7 +1125,7 @@ class MediaSessionScrobbler @Inject constructor(
         if (explicitSeason != null && explicitEpisode != null) {
             return TraktEpisode(season = explicitSeason, number = explicitEpisode)
         }
-        if (confidence < AUTO_SCROBBLE_THRESHOLD) return null
+        if (confidence < tuning.autoScrobbleThreshold) return null
         val hint = watchedShowSource.getShowHint(cacheEntry.show.ids)
         if (hint == null) {
             DiagnosticLog.warn(
