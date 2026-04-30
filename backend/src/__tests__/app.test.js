@@ -44,6 +44,7 @@ function buildApp(fetchFn, overrides = {}) {
     clientSecret: 'test-client-secret',
     traktApi: 'https://api.trakt.tv',
     fetchFn,
+    healthCacheTtlMs: 0, // disable caching in tests unless explicitly overridden
     ...overrides,
   });
 }
@@ -1538,5 +1539,130 @@ describe('Body parser hardening — content type and size limits', () => {
     const app = buildApp(mockFetch(200, {}));
     const res = await request(app).get('/health');
     expect(res.status).not.toBe(415);
+  });
+});
+
+// ── Rate limiter — /health (#556) ──────────────────────────────────────────
+
+describe('Rate limiter — /health endpoint (#556)', () => {
+  it('allows up to 10 requests per minute to /health', async () => {
+    const app = buildApp(mockFetch(200, {}));
+    for (let i = 0; i < 10; i++) {
+      const res = await request(app).get('/health');
+      expect(res.status).not.toBe(429);
+    }
+  });
+
+  it('returns 429 on the 11th /health request within a window', async () => {
+    const app = buildApp(mockFetch(200, {}));
+    for (let i = 0; i < 10; i++) {
+      await request(app).get('/health');
+    }
+    const res = await request(app).get('/health');
+    expect(res.status).toBe(429);
+    expect(res.body).toEqual({ error: 'Too many requests, please try again later.' });
+  });
+
+  it('still applies the global rate limiter to /trakt routes', async () => {
+    const app = buildApp(
+      mockFetch(200, {
+        access_token: 'acc',
+        refresh_token: 'ref',
+        expires_in: 7776000,
+        token_type: 'Bearer',
+        scope: 'public',
+      })
+    );
+    // A single /trakt/token request should succeed (well within the 60/min global limit)
+    const res = await request(app).post('/trakt/token').send({ code: 'device-code-abc' });
+    expect(res.status).toBe(200);
+  });
+
+  it('/health rate limit response is JSON', async () => {
+    const app = buildApp(mockFetch(200, {}));
+    for (let i = 0; i < 11; i++) {
+      await request(app).get('/health');
+    }
+    const res = await request(app).get('/health');
+    expect(res.headers['content-type']).toMatch(/application\/json/);
+  });
+});
+
+// ── Health response caching (#556) ─────────────────────────────────────────
+
+describe('Health response caching (#556)', () => {
+  it('returns cached response within TTL', async () => {
+    // Build app with a short TTL and credential state that starts as "pending"
+    const app = buildApp(mockFetch(200, {}), { healthCacheTtlMs: 5_000 });
+
+    // First call — caches "starting / pending"
+    const first = await request(app).get('/health');
+    expect(first.status).toBe(503);
+    expect(first.body.status).toBe('starting');
+
+    // Verify credentials so in-memory state changes to "connected"
+    await app.verifyCredentials();
+
+    // Second call within TTL — should still return cached "starting"
+    const second = await request(app).get('/health');
+    expect(second.status).toBe(503);
+    expect(second.body.status).toBe('starting');
+  });
+
+  it('returns fresh response after TTL expires', async () => {
+    vi.useFakeTimers();
+    try {
+      const app = buildApp(mockFetch(200, {}), { healthCacheTtlMs: 5_000 });
+
+      // First call — caches "starting"
+      await request(app).get('/health');
+
+      // Verify credentials so underlying state is now "connected"
+      await app.verifyCredentials();
+
+      // Advance past the 5s TTL
+      vi.advanceTimersByTime(6_000);
+
+      // Next call should return the fresh "connected" state
+      const res = await request(app).get('/health');
+      expect(res.status).toBe(200);
+      expect(res.body.status).toBe('ok');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not cache when healthCacheTtlMs is 0', async () => {
+    // buildApp defaults to healthCacheTtlMs: 0
+    const app = buildApp(mockFetch(200, {}));
+
+    // First call — pending state, not cached
+    const first = await request(app).get('/health');
+    expect(first.body.status).toBe('starting');
+
+    await app.verifyCredentials();
+
+    // Second call — should reflect updated state immediately
+    const second = await request(app).get('/health');
+    expect(second.status).toBe(200);
+    expect(second.body.status).toBe('ok');
+  });
+
+  it('clearHealthCache exposes a way to invalidate the cache', async () => {
+    const app = buildApp(mockFetch(200, {}), { healthCacheTtlMs: 60_000 });
+
+    // Cache "starting" state
+    await request(app).get('/health');
+    await app.verifyCredentials();
+
+    // Without clearing the cache, health still shows "starting"
+    const stale = await request(app).get('/health');
+    expect(stale.body.status).toBe('starting');
+
+    // After clearing, health reflects the real state
+    app.clearHealthCache();
+    const fresh = await request(app).get('/health');
+    expect(fresh.status).toBe(200);
+    expect(fresh.body.status).toBe('ok');
   });
 });
