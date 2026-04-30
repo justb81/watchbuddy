@@ -299,8 +299,7 @@ private fun PhoneDiagnosticsCard(phone: PhoneDiscoveryManager.DiscoveredPhone) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
                 text = phone.capability?.userName
-                    ?: phone.serviceInfo.serviceName
-                    ?: phone.baseUrl,
+                    ?: phone.serviceName,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Medium,
                 color = Color.White,

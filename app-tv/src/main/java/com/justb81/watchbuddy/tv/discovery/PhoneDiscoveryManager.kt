@@ -5,7 +5,6 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
-import android.net.nsd.NsdServiceInfo
 import android.util.Log
 import androidx.annotation.VisibleForTesting
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
@@ -151,7 +150,7 @@ class PhoneDiscoveryManager(
     )
 
     data class DiscoveredPhone(
-        val serviceInfo: NsdServiceInfo,
+        val serviceName: String,
         val txtRecord: PhoneTxtRecord?,
         val capability: DeviceCapability?,
         val score: Int,
@@ -558,10 +557,7 @@ class PhoneDiscoveryManager(
             return
         }
 
-        val synthInfo = NsdServiceInfo().apply {
-            serviceName = "watchbuddy-ble-$hostAddress-$port"
-            this.port = port
-        }
+        val serviceName = "watchbuddy-ble-$hostAddress-$port"
         val txtRecord = PhoneTxtRecord(
             version = "", // unknown until /capability is fetched
             modelQuality = modelQuality,
@@ -570,7 +566,7 @@ class PhoneDiscoveryManager(
         )
         Log.i(TAG, "BLE advertisement → resolving phone at $baseUrl (rssi=$rssi dBm)")
         heartbeatScope.launch {
-            fetchCapabilityAndAdd(synthInfo, txtRecord, baseUrl, rssi)
+            fetchCapabilityAndAdd(serviceName, txtRecord, baseUrl, rssi)
         }
     }
 
@@ -586,7 +582,7 @@ class PhoneDiscoveryManager(
      *   malformed or structurally invalid payload should not be ranked.
      */
     private fun fetchCapabilityAndAdd(
-        serviceInfo: NsdServiceInfo,
+        serviceName: String,
         txtRecord: PhoneTxtRecord,
         baseUrl: String,
         rssi: Int,
@@ -595,7 +591,7 @@ class PhoneDiscoveryManager(
             is CapabilityResult.Ok -> {
                 val score = calculateScore(txtRecord, result.capability)
                 addOrUpdatePhone(
-                    DiscoveredPhone(serviceInfo, txtRecord, result.capability, score, baseUrl, rssi = rssi)
+                    DiscoveredPhone(serviceName, txtRecord, result.capability, score, baseUrl, rssi = rssi)
                 )
             }
             is CapabilityResult.Invalid -> {
@@ -613,7 +609,7 @@ class PhoneDiscoveryManager(
                 Log.w(TAG, "Phone discovered at $baseUrl but capability fetch failed: ${result.reason}")
                 val score = calculateScore(txtRecord, null)
                 addOrUpdatePhone(
-                    DiscoveredPhone(serviceInfo, txtRecord, null, score, baseUrl, rssi = rssi)
+                    DiscoveredPhone(serviceName, txtRecord, null, score, baseUrl, rssi = rssi)
                 )
             }
         }

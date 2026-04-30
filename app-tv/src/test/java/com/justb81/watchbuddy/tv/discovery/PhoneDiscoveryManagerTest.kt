@@ -1,7 +1,6 @@
 package com.justb81.watchbuddy.tv.discovery
 
 import android.content.Context
-import android.net.nsd.NsdServiceInfo
 import com.justb81.watchbuddy.core.model.DeviceCapability
 import com.justb81.watchbuddy.core.model.LlmBackend
 import io.mockk.every
@@ -49,18 +48,15 @@ class PhoneDiscoveryManagerTest {
         name: String = "test",
         baseUrl: String = "http://test/",
         rssi: Int? = null,
-    ): PhoneDiscoveryManager.DiscoveredPhone {
-        val serviceInfo = mockk<NsdServiceInfo>()
-        every { serviceInfo.serviceName } returns name
-        return PhoneDiscoveryManager.DiscoveredPhone(
-            serviceInfo = serviceInfo,
+    ): PhoneDiscoveryManager.DiscoveredPhone =
+        PhoneDiscoveryManager.DiscoveredPhone(
+            serviceName = name,
             txtRecord = txtRecord,
             capability = capability,
             score = score,
             baseUrl = baseUrl,
             rssi = rssi,
         )
-    }
 
     private fun makeTxtRecord(
         modelQuality: Int = 70,
@@ -136,7 +132,7 @@ class PhoneDiscoveryManagerTest {
             setPhones(txtPhone, capPhone)
 
             val best = manager.getBestPhone()
-            assertEquals("cap-phone", best?.serviceInfo?.serviceName)
+            assertEquals("cap-phone", best?.serviceName)
         }
     }
 
@@ -331,9 +327,7 @@ class PhoneDiscoveryManagerTest {
 
         private fun seedPhone(failCount: Int = 0): PhoneDiscoveryManager.DiscoveredPhone {
             val phone = PhoneDiscoveryManager.DiscoveredPhone(
-                serviceInfo = mockk<NsdServiceInfo>().also {
-                    every { it.serviceName } returns "phone"
-                },
+                serviceName = "phone",
                 txtRecord = makeTxtRecord(),
                 capability = DeviceCapability("d1", "u1", null, "P1", LlmBackend.NONE, 70, 4000, true),
                 score = 76,

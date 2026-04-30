@@ -1,6 +1,5 @@
 package com.justb81.watchbuddy.tv.scrobbler
 
-import android.net.nsd.NsdServiceInfo
 import com.justb81.watchbuddy.core.model.AmbiguousCandidate
 import com.justb81.watchbuddy.core.model.AmbiguousScrobbleEvent
 import com.justb81.watchbuddy.core.model.LlmBackend
@@ -48,8 +47,6 @@ class TvScrobbleDispatcherTest {
         lastSuccessfulCheck: Long = fakeNow,
         name: String = "test-phone"
     ): PhoneDiscoveryManager.DiscoveredPhone {
-        val serviceInfo = mockk<NsdServiceInfo>()
-        every { serviceInfo.serviceName } returns name
         val capability = TestFixtures.deviceCapability(isAvailable = isAvailable)
         val txt = PhoneDiscoveryManager.PhoneTxtRecord(
             version = "1.0.0",
@@ -57,7 +54,7 @@ class TvScrobbleDispatcherTest {
             llmBackend = LlmBackend.LITERT
         )
         return PhoneDiscoveryManager.DiscoveredPhone(
-            serviceInfo = serviceInfo,
+            serviceName = name,
             txtRecord = txt,
             capability = capability,
             score = 75,
