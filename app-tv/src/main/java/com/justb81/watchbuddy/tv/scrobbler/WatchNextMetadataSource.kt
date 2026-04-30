@@ -152,31 +152,7 @@ class WatchNextMetadataSource @Inject constructor(
     private fun lookup(packageName: String): WatchNextSnippet? {
         if (isPermissionCurrentlyDenied()) return null
         return try {
-            // No selection / sortOrder: TvProvider rejects either with
-            // SecurityException("Selection not allowed for ...") unless the caller holds
-            // ACCESS_ALL_EPG_DATA (signature|privileged). Filter and rank in app code.
-            val now = System.currentTimeMillis()
-            context.contentResolver.query(
-                TvContractCompat.WatchNextPrograms.CONTENT_URI,
-                PROJECTION,
-                null,
-                null,
-                null,
-            )?.use { cursor ->
-                var freshest: WatchNextSnippet? = null
-                while (cursor.moveToNext()) {
-                    val rowPackage = cursor.getStringOrNull(
-                        TvContractCompat.WatchNextPrograms.COLUMN_PACKAGE_NAME,
-                    )
-                    if (rowPackage != packageName) continue
-                    val snippet = cursor.toSnippet()
-                    val engagement = snippet.lastEngagementMs ?: continue
-                    if (now - engagement > ROW_FRESHNESS_MS) continue
-                    val incumbent = freshest?.lastEngagementMs ?: Long.MIN_VALUE
-                    if (engagement > incumbent) freshest = snippet
-                }
-                freshest
-            }
+            queryAndPickFreshest(packageName)
         } catch (e: SecurityException) {
             permissionDenied = true
             DiagnosticLog.warn(
@@ -186,6 +162,38 @@ class WatchNextMetadataSource @Inject constructor(
             )
             null
         }
+    }
+
+    private fun queryAndPickFreshest(packageName: String): WatchNextSnippet? {
+        // No selection / sortOrder: TvProvider rejects either with
+        // SecurityException("Selection not allowed for ...") unless the caller holds
+        // ACCESS_ALL_EPG_DATA (signature|privileged). Filter and rank in app code.
+        val now = System.currentTimeMillis()
+        return context.contentResolver.query(
+            TvContractCompat.WatchNextPrograms.CONTENT_URI,
+            PROJECTION,
+            null,
+            null,
+            null,
+        )?.use { cursor -> pickFreshestRow(cursor, packageName, now) }
+    }
+
+    private fun pickFreshestRow(cursor: Cursor, packageName: String, nowMs: Long): WatchNextSnippet? {
+        var freshest: WatchNextSnippet? = null
+        while (cursor.moveToNext()) {
+            val candidate = cursor.takeIfFreshFor(packageName, nowMs) ?: continue
+            val incumbent = freshest?.lastEngagementMs ?: Long.MIN_VALUE
+            if ((candidate.lastEngagementMs ?: Long.MIN_VALUE) > incumbent) freshest = candidate
+        }
+        return freshest
+    }
+
+    private fun Cursor.takeIfFreshFor(packageName: String, nowMs: Long): WatchNextSnippet? {
+        val rowPackage = getStringOrNull(TvContractCompat.WatchNextPrograms.COLUMN_PACKAGE_NAME)
+        if (rowPackage != packageName) return null
+        val snippet = toSnippet()
+        val engagement = snippet.lastEngagementMs ?: return null
+        return if (nowMs - engagement <= ROW_FRESHNESS_MS) snippet else null
     }
 
     /**
@@ -228,15 +236,17 @@ class WatchNextMetadataSource @Inject constructor(
     private fun readFreshDistinctPackageCount(cursor: Cursor, nowMs: Long): CountResult.Success {
         val packages = mutableSetOf<String>()
         while (cursor.moveToNext()) {
-            val pkg = cursor.getStringOrNull(
-                TvContractCompat.WatchNextPrograms.COLUMN_PACKAGE_NAME,
-            ) ?: continue
-            val engagement = cursor.getLongOrNull(
-                TvContractCompat.WatchNextPrograms.COLUMN_LAST_ENGAGEMENT_TIME_UTC_MILLIS,
-            ) ?: continue
-            if (nowMs - engagement <= ROW_FRESHNESS_MS) packages += pkg
+            cursor.freshPackageOrNull(nowMs)?.let { packages += it }
         }
         return CountResult.Success(packages.size)
+    }
+
+    private fun Cursor.freshPackageOrNull(nowMs: Long): String? {
+        val pkg = getStringOrNull(TvContractCompat.WatchNextPrograms.COLUMN_PACKAGE_NAME) ?: return null
+        val engagement = getLongOrNull(
+            TvContractCompat.WatchNextPrograms.COLUMN_LAST_ENGAGEMENT_TIME_UTC_MILLIS,
+        ) ?: return null
+        return if (nowMs - engagement <= ROW_FRESHNESS_MS) pkg else null
     }
 
     private fun Cursor.getStringOrNull(columnName: String): String? {
