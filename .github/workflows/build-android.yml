@@ -105,16 +105,15 @@ jobs:
             local payload_file
             payload_file=$(mktemp --suffix=.json)
 
-            python3 - "$sarif_file" "$category" > "$payload_file" <<'PYEOF'
+            python3 - "$sarif_file" > "$payload_file" <<'PYEOF'
           import sys, json, gzip, base64, os
-          sarif_file, category = sys.argv[1], sys.argv[2]
+          sarif_file = sys.argv[1]
           with open(sarif_file, 'rb') as f:
               encoded = base64.b64encode(gzip.compress(f.read())).decode()
           print(json.dumps({
               "commit_sha": os.environ["GITHUB_SHA"],
               "ref":        os.environ["GITHUB_REF"],
               "sarif":      encoded,
-              "category":   category,
           }))
           PYEOF
 
@@ -156,7 +155,7 @@ jobs:
               printf '## Warning: SARIF upload failures\n\n'
               printf 'The following uploads failed after 2 attempts:\n\n'
               for cat in "${failed_categories[@]}"; do
-                printf '- `%s`\n' "$cat"
+                printf -- '- `%s`\n' "$cat"
               done
               printf '\nCode-scanning annotations may be incomplete.\n'
             } >> "$GITHUB_STEP_SUMMARY"
