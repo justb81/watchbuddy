@@ -29,6 +29,7 @@ class DeviceCapabilityProvider @Inject constructor(
     private val stateManager: CompanionStateManager
 ) {
     private val profileMutex = Mutex()
+
     @Volatile private var cachedProfile: TraktUserProfile? = null
 
     private suspend fun getCachedProfile(): TraktUserProfile? {
