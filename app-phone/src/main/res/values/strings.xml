@@ -28,6 +28,8 @@
     <string name="onboarding_error_server_misconfigured">The authentication server is misconfigured. Please try again later or contact the maintainer.</string>
     <string name="onboarding_skip">Skip for now</string>
     <string name="onboarding_reconnect_title">Connect to Trakt</string>
+    <string name="onboarding_decrypt_failed_banner">Your previous sign-in could not be read. Please sign in again.</string>
+    <string name="auth_keystore_unavailable">Your device\'s secure storage is unavailable. Token protection is disabled — please restart the app or check your device security settings.</string>
 
     <!-- Home -->
     <string name="home_title">My Shows</string>

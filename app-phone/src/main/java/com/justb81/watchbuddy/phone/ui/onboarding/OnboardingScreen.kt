@@ -41,6 +41,8 @@ fun OnboardingScreen(
     viewModel: OnboardingViewModel = hiltViewModel()
 ) {
     val state by viewModel.state.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val decryptFailedMessage = stringResource(R.string.onboarding_decrypt_failed_banner)
 
     LaunchedEffect(state) {
         if (state is OnboardingState.Success) onSuccess()
@@ -50,98 +52,113 @@ fun OnboardingScreen(
         viewModel.requestDeviceCode()
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(24.dp),
+    LaunchedEffect(Unit) {
+        if (viewModel.hadDecryptionFailure) {
+            snackbarHostState.showSnackbar(
+                message = decryptFailedMessage,
+                withDismissAction = true,
+                duration = SnackbarDuration.Long,
+            )
+        }
+    }
+
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        containerColor = MaterialTheme.colorScheme.background,
+    ) { innerPadding ->
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 32.dp)
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentAlignment = Alignment.Center
         ) {
-            // Logo / Title
-            Text(
-                text = if (isReconnect) stringResource(R.string.onboarding_reconnect_title)
-                       else stringResource(R.string.app_name),
-                style = MaterialTheme.typography.displaySmall,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Bold
-            )
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(24.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 32.dp)
+            ) {
+                // Logo / Title
+                Text(
+                    text = if (isReconnect) stringResource(R.string.onboarding_reconnect_title)
+                           else stringResource(R.string.app_name),
+                    style = MaterialTheme.typography.displaySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
+                )
 
-            Text(
-                text = stringResource(R.string.onboarding_subtitle),
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
-                textAlign = TextAlign.Center
-            )
+                Text(
+                    text = stringResource(R.string.onboarding_subtitle),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                    textAlign = TextAlign.Center
+                )
 
-            Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(8.dp))
 
-            AnimatedContent(
-                targetState = state,
-                transitionSpec = { fadeIn() togetherWith fadeOut() }
-            ) { currentState ->
-                when (currentState) {
-                    is OnboardingState.LoadingCode -> {
-                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                    }
-
-                    is OnboardingState.WaitingForPin -> {
-                        PinCard(
-                            userCode        = currentState.userCode,
-                            verificationUrl = currentState.verificationUrl,
-                            expiresIn       = currentState.expiresInSeconds
-                        )
-                    }
-
-                    is OnboardingState.Polling -> {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                AnimatedContent(
+                    targetState = state,
+                    transitionSpec = { fadeIn() togetherWith fadeOut() }
+                ) { currentState ->
+                    when (currentState) {
+                        is OnboardingState.LoadingCode -> {
                             CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                            Spacer(Modifier.height(12.dp))
-                            Text(
-                                stringResource(R.string.onboarding_waiting),
-                                color = MaterialTheme.colorScheme.onBackground
+                        }
+
+                        is OnboardingState.WaitingForPin -> {
+                            PinCard(
+                                userCode        = currentState.userCode,
+                                verificationUrl = currentState.verificationUrl,
+                                expiresIn       = currentState.expiresInSeconds
                             )
                         }
-                    }
 
-                    is OnboardingState.Error -> {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                text  = currentState.message,
-                                color = MaterialTheme.colorScheme.error,
-                                textAlign = TextAlign.Center
-                            )
-                            Spacer(Modifier.height(16.dp))
-                            Button(onClick = { viewModel.requestDeviceCode() }) {
-                                Text(stringResource(R.string.onboarding_retry))
+                        is OnboardingState.Polling -> {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                                Spacer(Modifier.height(12.dp))
+                                Text(
+                                    stringResource(R.string.onboarding_waiting),
+                                    color = MaterialTheme.colorScheme.onBackground
+                                )
                             }
                         }
-                    }
 
-                    is OnboardingState.NotConfigured -> {
-                        NotConfiguredCard(
-                            reason = currentState.reason,
-                            onOpenSettings = onOpenSettings
-                        )
-                    }
+                        is OnboardingState.Error -> {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text  = currentState.message,
+                                    color = MaterialTheme.colorScheme.error,
+                                    textAlign = TextAlign.Center
+                                )
+                                Spacer(Modifier.height(16.dp))
+                                Button(onClick = { viewModel.requestDeviceCode() }) {
+                                    Text(stringResource(R.string.onboarding_retry))
+                                }
+                            }
+                        }
 
-                    else -> {}
+                        is OnboardingState.NotConfigured -> {
+                            NotConfiguredCard(
+                                reason = currentState.reason,
+                                onOpenSettings = onOpenSettings
+                            )
+                        }
+
+                        else -> {}
+                    }
                 }
-            }
 
-            TextButton(onClick = onSkip) {
-                Text(
-                    stringResource(
-                        if (isReconnect) R.string.settings_cancel
-                        else R.string.onboarding_skip
-                    ),
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
-                )
+                TextButton(onClick = onSkip) {
+                    Text(
+                        stringResource(
+                            if (isReconnect) R.string.settings_cancel
+                            else R.string.onboarding_skip
+                        ),
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                    )
+                }
             }
         }
     }
