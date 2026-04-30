@@ -85,10 +85,11 @@ class NetworkModuleTest {
                 .filterIsInstance<HttpLoggingInterceptor>()
                 .firstOrNull()
             assertNotNull(loggingInterceptor, "HttpLoggingInterceptor should be present")
-            val expectedLevel = if (com.justb81.watchbuddy.core.BuildConfig.DEBUG)
+            val expectedLevel = if (com.justb81.watchbuddy.core.BuildConfig.DEBUG) {
                 HttpLoggingInterceptor.Level.HEADERS
-            else
+            } else {
                 HttpLoggingInterceptor.Level.NONE
+            }
             assertEquals(expectedLevel, loggingInterceptor!!.level)
         }
 
