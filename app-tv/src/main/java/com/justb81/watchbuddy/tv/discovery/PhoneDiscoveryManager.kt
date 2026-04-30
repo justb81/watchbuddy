@@ -22,7 +22,6 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.flow
@@ -237,14 +236,14 @@ class PhoneDiscoveryManager(
 
     /**
      * Watches for Wi-Fi-return transitions (false → true) and resets every
-     * phone's schedule so the next driver tick re-probes immediately. We drop
-     * the initial replay so we only react to actual transitions, and skip the
-     * very first emission (the seeded value).
+     * phone's schedule so the next driver tick re-probes immediately.
+     * StateFlow already conflates equal values, so the only emissions we
+     * see are real transitions. We drop the initial replay so we don't
+     * reset on subscription.
      */
     private fun startWifiResetWatcher() {
         wifiResetJob = heartbeatScope.launch {
             _isWifiAvailable
-                .distinctUntilChanged()
                 .drop(1)
                 .filter { it }
                 .collect { resetAllSchedulesNow() }
