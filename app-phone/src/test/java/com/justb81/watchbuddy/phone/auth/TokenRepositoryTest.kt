@@ -391,8 +391,9 @@ class TokenRepositoryTest {
         @Test
         fun `getAccessToken propagates AuthUnavailableException`() {
             val brokenRepo = TokenRepository(context, makeUnvailableAead())
-            // Store a non-null value so decrypt is attempted
-            every { mockPrefs.getString("access_token", null) } returns "v1:anyciphertext"
+            // Use valid Base64 so Base64.decode succeeds and aead.decrypt() gets to throw
+            val validV1 = "v1:" + Base64.getEncoder().encodeToString("placeholder".toByteArray())
+            every { mockPrefs.getString("access_token", null) } returns validV1
 
             assertThrows(AuthUnavailableException::class.java) {
                 brokenRepo.getAccessToken()
@@ -402,7 +403,8 @@ class TokenRepositoryTest {
         @Test
         fun `AuthUnavailableException does NOT set hadDecryptionFailure`() {
             val brokenRepo = TokenRepository(context, makeUnvailableAead())
-            every { mockPrefs.getString("access_token", null) } returns "v1:anyciphertext"
+            val validV1 = "v1:" + Base64.getEncoder().encodeToString("placeholder".toByteArray())
+            every { mockPrefs.getString("access_token", null) } returns validV1
 
             runCatching { brokenRepo.getAccessToken() }
 
@@ -416,7 +418,8 @@ class TokenRepositoryTest {
             every { brokenAead.encrypt(any(), any()) } throws AuthUnavailableException("locked")
             every { brokenAead.decrypt(any(), any()) } throws AuthUnavailableException("locked")
             val brokenRepo = TokenRepository(context, brokenAead)
-            every { mockPrefs.getString("access_token", null) } returns "v1:data"
+            val validV1 = "v1:" + Base64.getEncoder().encodeToString("placeholder".toByteArray())
+            every { mockPrefs.getString("access_token", null) } returns validV1
 
             // MainActivity wraps isTokenValid() in try/catch — simulate that
             val result = runCatching { brokenRepo.isTokenValid() }.getOrDefault(false)
