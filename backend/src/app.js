@@ -136,6 +136,13 @@ export function createApp(config) {
     return out;
   }
 
+  // Returns the OAuth `error` code from a Trakt response body, or undefined
+  // when absent or not a string.  Used to build safe structured log context
+  // without leaking raw body content to log aggregators.
+  function extractTraktErrorCode(data) {
+    return data && typeof data.error === 'string' ? data.error : undefined;
+  }
+
   /**
    * Handles a caught fetch error (AbortError / network error) and writes the
    * appropriate HTTP error response.  fetchTimeoutMs is read from the outer closure.
@@ -239,12 +246,9 @@ export function createApp(config) {
         traktStatus = 'invalid_client_id';
         traktError = `Trakt returned ${res.status} — check that TRAKT_CLIENT_ID is correct.`;
         credentialsVerified = false;
-        if (data !== undefined) {
-          const bodySnippet = JSON.stringify(data).slice(0, 200);
-          console.error(`Credential check: Trakt response body: ${bodySnippet}`);
-        }
         console.error(
-          `Trakt credential verification failed: HTTP ${res.status} — TRAKT_CLIENT_ID may be invalid.`
+          `Trakt credential verification failed: HTTP ${res.status} — TRAKT_CLIENT_ID may be invalid.`,
+          { status: res.status, traktErrorCode: extractTraktErrorCode(data) }
         );
         serverMisconfigured = true;
         // Do not retry on 401/403 — credentials are definitively wrong
@@ -252,11 +256,10 @@ export function createApp(config) {
         traktStatus = `trakt_http_${res.status}`;
         traktError = `Trakt returned HTTP ${res.status} during credential check`;
         credentialsVerified = false;
-        if (data !== undefined) {
-          const bodySnippet = JSON.stringify(data).slice(0, 200);
-          console.error(`Credential check: Trakt response body: ${bodySnippet}`);
-        }
-        console.error(`Trakt credential verification failed: HTTP ${res.status}`);
+        console.error(`Trakt credential verification failed: HTTP ${res.status}`, {
+          status: res.status,
+          traktErrorCode: extractTraktErrorCode(data),
+        });
         scheduleRetry(attempt);
       }
     } catch (err) {
@@ -369,13 +372,18 @@ export function createApp(config) {
 
       const { traktRes, data } = result;
       if (!traktRes.ok) {
-        const bodySnippet = JSON.stringify(data).slice(0, 200);
         if (traktRes.status === 400) {
           // Expected during device flow polling — user hasn't authorized yet
         } else if ([409, 410, 418, 429].includes(traktRes.status)) {
-          console.warn(`Token exchange: Trakt returned HTTP ${traktRes.status}: ${bodySnippet}`);
+          console.warn(`Token exchange: Trakt returned HTTP ${traktRes.status}`, {
+            status: traktRes.status,
+            traktErrorCode: extractTraktErrorCode(data),
+          });
         } else {
-          console.error(`Token exchange: Trakt returned HTTP ${traktRes.status}: ${bodySnippet}`);
+          console.error(`Token exchange: Trakt returned HTTP ${traktRes.status}`, {
+            status: traktRes.status,
+            traktErrorCode: extractTraktErrorCode(data),
+          });
           if (traktRes.status === 403) {
             console.error(
               'Hint: HTTP 403 from Trakt usually means TRAKT_CLIENT_ID is invalid or revoked.'
@@ -422,8 +430,10 @@ export function createApp(config) {
 
       const { traktRes, data } = result;
       if (!traktRes.ok) {
-        const bodySnippet = JSON.stringify(data).slice(0, 200);
-        console.error(`Token refresh: Trakt returned HTTP ${traktRes.status}: ${bodySnippet}`);
+        console.error(`Token refresh: Trakt returned HTTP ${traktRes.status}`, {
+          status: traktRes.status,
+          traktErrorCode: extractTraktErrorCode(data),
+        });
         if (traktRes.status === 403) {
           console.error(
             'Hint: HTTP 403 from Trakt usually means TRAKT_CLIENT_ID is invalid or revoked.'

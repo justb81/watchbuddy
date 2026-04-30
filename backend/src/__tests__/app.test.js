@@ -710,7 +710,10 @@ describe('Credential verification', () => {
   it('logs error with TRAKT_CLIENT_ID hint on 403', async () => {
     const app = buildApp(mockFetch(403, {}));
     await app.verifyCredentials();
-    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('TRAKT_CLIENT_ID'));
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('TRAKT_CLIENT_ID'),
+      expect.any(Object)
+    );
   });
 
   it('health returns 503 invalid_client_id when Trakt returns 401', async () => {
@@ -723,10 +726,13 @@ describe('Credential verification', () => {
     expect(res.body.error).toMatch(/TRAKT_CLIENT_ID/);
   });
 
-  it('logs response body snippet when credential check fails', async () => {
+  it('logs traktErrorCode in structured context when credential check fails', async () => {
     const app = buildApp(mockFetch(403, { error: 'invalid_api_key' }));
     await app.verifyCredentials();
-    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('invalid_api_key'));
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('TRAKT_CLIENT_ID'),
+      expect.objectContaining({ traktErrorCode: 'invalid_api_key' })
+    );
   });
 
   it('handles non-JSON response gracefully during credential check', async () => {
@@ -905,11 +911,13 @@ describe('Error logging improvements', () => {
     errorSpy.mockRestore();
   });
 
-  it('logs body snippet when Trakt returns non-OK on token exchange', async () => {
+  it('logs traktErrorCode in structured context when Trakt returns non-OK on token exchange', async () => {
     const app = buildApp(mockFetch(403, { error: 'invalid_api_key' }));
     await request(app).post('/trakt/token').send({ code: 'test-code' });
-    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('HTTP 403'));
-    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('invalid_api_key'));
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('HTTP 403'),
+      expect.objectContaining({ status: 403, traktErrorCode: 'invalid_api_key' })
+    );
   });
 
   it('logs TRAKT_CLIENT_ID hint on 403 for token exchange', async () => {
@@ -938,7 +946,10 @@ describe('Error logging improvements', () => {
 
     const app410 = buildApp(mockFetch(410, { error: 'expired' }));
     await request(app410).post('/trakt/token').send({ code: 'test-code' });
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('HTTP 410'));
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('HTTP 410'),
+      expect.objectContaining({ status: 410 })
+    );
     expect(errorSpy).not.toHaveBeenCalled();
 
     warnSpy.mockClear();
@@ -946,7 +957,10 @@ describe('Error logging improvements', () => {
 
     const app418 = buildApp(mockFetch(418, { error: 'denied' }));
     await request(app418).post('/trakt/token').send({ code: 'test-code' });
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('HTTP 418'));
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('HTTP 418'),
+      expect.objectContaining({ status: 418 })
+    );
     expect(errorSpy).not.toHaveBeenCalled();
 
     warnSpy.mockRestore();
@@ -956,7 +970,10 @@ describe('Error logging improvements', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const app = buildApp(mockFetch(429, { error: 'slow_down' }));
     await request(app).post('/trakt/token').send({ code: 'test-code' });
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('HTTP 429'));
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('HTTP 429'),
+      expect.objectContaining({ status: 429 })
+    );
     expect(errorSpy).not.toHaveBeenCalled();
     warnSpy.mockRestore();
   });
@@ -1507,17 +1524,24 @@ describe('filterErrorResponse — Trakt error bodies are sanitized before forwar
     expect(res.body).toEqual({});
   });
 
-  it('still logs the full Trakt error body server-side at error level', async () => {
+  it('logs only traktErrorCode server-side, not non-standard Trakt response fields', async () => {
     const app = buildApp(
       mockFetch(403, {
         error: 'invalid_api_key',
         rate_limit_remaining: 5,
+        account_id: 99999,
       })
     );
     await request(app).post('/trakt/token').send({ code: 'device-code-abc' });
-    // The original body snippet (incl. the field that was stripped from the
-    // client response) is still logged server-side for debugging.
-    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('rate_limit_remaining'));
+    // The OAuth error code is still available for operators.
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('HTTP 403'),
+      expect.objectContaining({ traktErrorCode: 'invalid_api_key' })
+    );
+    // Non-standard fields (rate_limit_remaining, account_id) must NOT appear in any log.
+    const allLogs = errorSpy.mock.calls.map((c) => c.map(String).join(' '));
+    expect(allLogs.every((l) => !l.includes('rate_limit_remaining'))).toBe(true);
+    expect(allLogs.every((l) => !l.includes('account_id'))).toBe(true);
   });
 });
 
@@ -1709,5 +1733,117 @@ describe('Health response caching (#556)', () => {
     const fresh = await request(app).get('/health');
     expect(fresh.status).toBe(200);
     expect(fresh.body.status).toBe('ok');
+  });
+});
+
+// ── Secure error logging (#558) ────────────────────────────────────────────
+// Trakt error bodies can contain partial tokens, internal IDs, or rate-limit
+// hints.  Production logs must never include raw body content — only the
+// OAuth `error` code is emitted as a structured `traktErrorCode` field.
+
+describe('Secure error logging — no raw Trakt response body in production logs (#558)', () => {
+  let errorSpy;
+  let warnSpy;
+
+  beforeEach(() => {
+    errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    errorSpy.mockRestore();
+    warnSpy.mockRestore();
+  });
+
+  it('does not log raw Trakt response body when token exchange fails (403)', async () => {
+    const sensitiveBody = {
+      error: 'invalid_api_key',
+      access_token: 'super-secret-token',
+      account_id: 12345,
+      debug_hint: 'internal-trakt-state',
+    };
+    const app = buildApp(mockFetch(403, sensitiveBody));
+    await request(app).post('/trakt/token').send({ code: 'test-code' });
+
+    const allLogs = [
+      ...errorSpy.mock.calls.map((c) => c.map(String).join(' ')),
+      ...warnSpy.mock.calls.map((c) => c.map(String).join(' ')),
+    ];
+    expect(allLogs.every((l) => !l.includes('super-secret-token'))).toBe(true);
+    expect(allLogs.every((l) => !l.includes('account_id'))).toBe(true);
+    expect(allLogs.every((l) => !l.includes('debug_hint'))).toBe(true);
+  });
+
+  it('does not log raw Trakt response body when token refresh fails (401)', async () => {
+    const sensitiveBody = {
+      error: 'invalid_token',
+      refresh_token: 'leaked-refresh-token',
+      user_id: 99,
+    };
+    const app = buildApp(mockFetch(401, sensitiveBody));
+    await request(app).post('/trakt/token/refresh').send({ refresh_token: 'old-token' });
+
+    const allLogs = [
+      ...errorSpy.mock.calls.map((c) => c.map(String).join(' ')),
+      ...warnSpy.mock.calls.map((c) => c.map(String).join(' ')),
+    ];
+    expect(allLogs.every((l) => !l.includes('leaked-refresh-token'))).toBe(true);
+    expect(allLogs.every((l) => !l.includes('user_id'))).toBe(true);
+  });
+
+  it('does not log raw Trakt response body during credential check failure', async () => {
+    const sensitiveBody = {
+      error: 'invalid_api_key',
+      client_secret: 'leaked-secret',
+      internal_id: 'trakt-internal-42',
+    };
+    const app = buildApp(mockFetch(403, sensitiveBody));
+    await app.verifyCredentials();
+
+    const allLogs = errorSpy.mock.calls.map((c) => c.map(String).join(' '));
+    expect(allLogs.every((l) => !l.includes('leaked-secret'))).toBe(true);
+    expect(allLogs.every((l) => !l.includes('internal_id'))).toBe(true);
+  });
+
+  it('still emits traktErrorCode in the structured context object for token exchange', async () => {
+    const app = buildApp(mockFetch(500, { error: 'server_error' }));
+    await request(app).post('/trakt/token').send({ code: 'test-code' });
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('HTTP 500'),
+      expect.objectContaining({ status: 500, traktErrorCode: 'server_error' })
+    );
+  });
+
+  it('still emits traktErrorCode in the structured context object for token refresh', async () => {
+    const app = buildApp(mockFetch(401, { error: 'invalid_token' }));
+    await request(app).post('/trakt/token/refresh').send({ refresh_token: 'old-token' });
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('HTTP 401'),
+      expect.objectContaining({ status: 401, traktErrorCode: 'invalid_token' })
+    );
+  });
+
+  it('emits traktErrorCode: undefined when Trakt body has no error field', async () => {
+    const app = buildApp(mockFetch(500, { message: 'internal error', code: 42 }));
+    await request(app).post('/trakt/token').send({ code: 'test-code' });
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('HTTP 500'),
+      expect.objectContaining({ status: 500, traktErrorCode: undefined })
+    );
+  });
+
+  it('does not log raw body for transient HTTP errors during credential check (503)', async () => {
+    const sensitiveBody = {
+      error: 'server_overloaded',
+      rate_limit_remaining: 0,
+      internal_msg: 'overload',
+    };
+    const app = buildApp(mockFetch(503, sensitiveBody));
+    await app.verifyCredentials();
+    app.clearRetryTimer();
+
+    const allLogs = errorSpy.mock.calls.map((c) => c.map(String).join(' '));
+    expect(allLogs.every((l) => !l.includes('internal_msg'))).toBe(true);
+    expect(allLogs.every((l) => !l.includes('rate_limit_remaining'))).toBe(true);
   });
 });
