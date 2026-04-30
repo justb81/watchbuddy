@@ -82,48 +82,86 @@ jobs:
           done < <(find app-phone app-tv core -type f -name "*.sarif" 2>/dev/null)
           ls -la sarif-reports/
 
-      # CodeQL Action v4 requires a unique category per SARIF run, so each file
-      # is uploaded on its own. See
-      # https://github.blog/changelog/2025-07-21-code-scanning-will-stop-combining-multiple-sarif-runs-uploaded-in-the-same-sarif-file/
-      - name: Upload app-phone detekt SARIF
+      # Upload each SARIF file via the REST API with a single retry per file.
+      # A persistent upload failure emits ::error:: annotations and a
+      # workflow-summary entry so failures are never silently hidden.
+      # No continue-on-error — a persistent upload failure is a real signal.
+      - name: Upload SARIF reports
         if: always()
-        continue-on-error: true
-        uses: github/codeql-action/upload-sarif@95e58e9a2cdfd71adc6e0353d5c52f41a045d225 # v4
-        with:
-          sarif_file: sarif-reports/app-phone-detekt.sarif
-          category: app-phone-detekt
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
 
-      - name: Upload app-phone lint SARIF
-        if: always()
-        continue-on-error: true
-        uses: github/codeql-action/upload-sarif@95e58e9a2cdfd71adc6e0353d5c52f41a045d225 # v4
-        with:
-          sarif_file: sarif-reports/app-phone-lint-results-debug.sarif
-          category: app-phone-lint
+          upload_with_retry() {
+            local sarif_file="$1"
+            local category="$2"
 
-      - name: Upload app-tv detekt SARIF
-        if: always()
-        continue-on-error: true
-        uses: github/codeql-action/upload-sarif@95e58e9a2cdfd71adc6e0353d5c52f41a045d225 # v4
-        with:
-          sarif_file: sarif-reports/app-tv-detekt.sarif
-          category: app-tv-detekt
+            if [ ! -f "$sarif_file" ]; then
+              echo "No SARIF file for ${category} — skipping"
+              return 0
+            fi
 
-      - name: Upload app-tv lint SARIF
-        if: always()
-        continue-on-error: true
-        uses: github/codeql-action/upload-sarif@95e58e9a2cdfd71adc6e0353d5c52f41a045d225 # v4
-        with:
-          sarif_file: sarif-reports/app-tv-lint-results-debug.sarif
-          category: app-tv-lint
+            local payload_file
+            payload_file=$(mktemp --suffix=.json)
 
-      - name: Upload core detekt SARIF
-        if: always()
-        continue-on-error: true
-        uses: github/codeql-action/upload-sarif@95e58e9a2cdfd71adc6e0353d5c52f41a045d225 # v4
-        with:
-          sarif_file: sarif-reports/core-detekt.sarif
-          category: core-detekt
+            python3 - "$sarif_file" "$category" > "$payload_file" <<'PYEOF'
+          import sys, json, gzip, base64, os
+          sarif_file, category = sys.argv[1], sys.argv[2]
+          with open(sarif_file, 'rb') as f:
+              encoded = base64.b64encode(gzip.compress(f.read())).decode()
+          print(json.dumps({
+              "commit_sha": os.environ["GITHUB_SHA"],
+              "ref":        os.environ["GITHUB_REF"],
+              "sarif":      encoded,
+              "category":   category,
+          }))
+          PYEOF
+
+            local attempt
+            for attempt in 1 2; do
+              if gh api --method POST \
+                   "repos/$GITHUB_REPOSITORY/code-scanning/sarifs" \
+                   --input "$payload_file" > /dev/null; then
+                echo "Uploaded ${category} (attempt ${attempt})"
+                rm -f "$payload_file"
+                return 0
+              fi
+              if [ "$attempt" -lt 2 ]; then
+                echo "Attempt 1 failed for ${category} — retrying in 15 s..."
+                sleep 15
+              fi
+            done
+
+            rm -f "$payload_file"
+            echo "::error title=SARIF upload failed::${category} could not be uploaded after 2 attempts"
+            return 1
+          }
+
+          rc=0
+          failed_categories=()
+          upload_with_retry "sarif-reports/app-phone-detekt.sarif" "app-phone-detekt" \
+            || { rc=1; failed_categories+=("app-phone-detekt"); }
+          upload_with_retry "sarif-reports/app-phone-lint-results-debug.sarif" "app-phone-lint" \
+            || { rc=1; failed_categories+=("app-phone-lint"); }
+          upload_with_retry "sarif-reports/app-tv-detekt.sarif" "app-tv-detekt" \
+            || { rc=1; failed_categories+=("app-tv-detekt"); }
+          upload_with_retry "sarif-reports/app-tv-lint-results-debug.sarif" "app-tv-lint" \
+            || { rc=1; failed_categories+=("app-tv-lint"); }
+          upload_with_retry "sarif-reports/core-detekt.sarif" "core-detekt" \
+            || { rc=1; failed_categories+=("core-detekt"); }
+
+          if [ "$rc" -ne 0 ]; then
+            {
+              printf '## Warning: SARIF upload failures\n\n'
+              printf 'The following uploads failed after 2 attempts:\n\n'
+              for cat in "${failed_categories[@]}"; do
+                printf '- `%s`\n' "$cat"
+              done
+              printf '\nCode-scanning annotations may be incomplete.\n'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+          exit "$rc"
 
       - name: Archive analysis reports
         if: always()
