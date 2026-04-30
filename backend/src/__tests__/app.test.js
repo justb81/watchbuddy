@@ -1239,6 +1239,51 @@ describe('Debug logging — Trakt API call details (debug: true)', () => {
   });
 });
 
+// ── Production-mode safety ─────────────────────────────────────────────────
+
+describe('Production-mode safety — no internal details in responses', () => {
+  let errorSpy;
+
+  beforeEach(() => {
+    errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    errorSpy.mockRestore();
+  });
+
+  it('does not include a stack trace in the error response body', async () => {
+    const app = buildApp(mockFetch(200, {}));
+    const res = await request(app)
+      .post('/trakt/token')
+      .set('Content-Type', 'application/json')
+      .set('Content-Encoding', 'utterly-invalid-encoding')
+      .send('{"code":"abc"}');
+    expect(res.status).toBe(500);
+    const body = JSON.stringify(res.body);
+    expect(body).not.toMatch(/at\s+\w+\s+\(.*:\d+:\d+\)/); // stack frame pattern
+    expect(body).not.toMatch(/Error:/);
+  });
+
+  it('does not include Express internal error HTML in any response body', async () => {
+    const app = buildApp(mockFetch(200, {}));
+    const res = await request(app).get('/does-not-exist');
+    expect(res.headers['content-type']).toMatch(/application\/json/);
+    expect(res.text).not.toMatch(/<html/i);
+  });
+
+  it('global error handler returns JSON, not HTML, for unhandled errors', async () => {
+    const app = buildApp(mockFetch(200, {}));
+    const res = await request(app)
+      .post('/trakt/token')
+      .set('Content-Type', 'application/json')
+      .set('Content-Encoding', 'utterly-invalid-encoding')
+      .send('{"code":"abc"}');
+    expect(res.headers['content-type']).toMatch(/application\/json/);
+    expect(res.body).toEqual({ error: 'internal_error' });
+  });
+});
+
 // ── filterTokenResponse (shared helper) ────────────────────────────────────
 
 describe('filterTokenResponse — extra Trakt fields are stripped', () => {
