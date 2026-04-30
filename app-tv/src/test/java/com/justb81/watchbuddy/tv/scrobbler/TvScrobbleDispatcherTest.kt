@@ -5,6 +5,7 @@ import com.justb81.watchbuddy.core.model.AmbiguousCandidate
 import com.justb81.watchbuddy.core.model.AmbiguousScrobbleEvent
 import com.justb81.watchbuddy.core.model.LlmBackend
 import com.justb81.watchbuddy.core.model.PlaybackTick
+import com.justb81.watchbuddy.core.model.ScrobbleAction
 import com.justb81.watchbuddy.tv.TestFixtures
 import com.justb81.watchbuddy.tv.discovery.DiscoveryConstants
 import com.justb81.watchbuddy.tv.discovery.PhoneApiClientFactory
@@ -424,6 +425,36 @@ class TvScrobbleDispatcherTest {
             advanceUntilIdle()
 
             coVerify(exactly = 1) { phoneApiService.scrobbleStart(any()) }
+        }
+    }
+
+    // ── QueuedScrobble type contract ──────────────────────────────────────────
+
+    @Nested
+    @DisplayName("QueuedScrobble uses core ScrobbleAction (#611)")
+    inner class QueuedScrobbleTypeTest {
+
+        @Test
+        fun `QueuedScrobble action field holds core ScrobbleAction values`() {
+            val queued = TvScrobbleDispatcher.QueuedScrobble(
+                action = ScrobbleAction.START,
+                show = TestFixtures.traktShow(),
+                episode = TestFixtures.traktEpisode(),
+                progress = 10f,
+                capturedAtMs = fakeNow,
+            )
+            assertEquals(ScrobbleAction.START, queued.action)
+            assertInstanceOf(ScrobbleAction::class.java, queued.action)
+        }
+
+        @Test
+        fun `all three core ScrobbleAction values can be stored in QueuedScrobble`() {
+            val show = TestFixtures.traktShow()
+            val episode = TestFixtures.traktEpisode()
+            val actions = ScrobbleAction.entries.map { action ->
+                TvScrobbleDispatcher.QueuedScrobble(action, show, episode, 50f, fakeNow).action
+            }
+            assertEquals(listOf(ScrobbleAction.START, ScrobbleAction.PAUSE, ScrobbleAction.STOP), actions)
         }
     }
 
