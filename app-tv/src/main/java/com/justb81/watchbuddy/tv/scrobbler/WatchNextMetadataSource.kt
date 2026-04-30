@@ -2,7 +2,9 @@ package com.justb81.watchbuddy.tv.scrobbler
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.pm.PackageManager
 import android.database.Cursor
+import androidx.core.content.ContextCompat
 import androidx.tvprovider.media.tv.TvContractCompat
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.model.PlaybackTick
@@ -73,9 +75,11 @@ class WatchNextMetadataSource @Inject constructor(
 
     /**
      * Set to `true` once [SecurityException] has been thrown by the WatchNext provider so
-     * subsequent calls short-circuit without re-issuing the query. Reset by
-     * [resetPermissionState] when the diagnostics screen returns from the system permission
-     * settings so a freshly granted permission is picked up without an app restart.
+     * subsequent calls short-circuit without re-issuing the query. Cleared by
+     * [resetPermissionState] (explicit) or automatically by [isPermissionCurrentlyDenied] when
+     * a live [ContextCompat.checkSelfPermission] call detects an out-of-band grant — e.g. when
+     * the user grants `READ_TV_LISTINGS` via system Settings without returning through the in-app
+     * permission dialog or the diagnostics screen.
      */
     @Volatile
     private var permissionDenied: Boolean = false
@@ -90,6 +94,26 @@ class WatchNextMetadataSource @Inject constructor(
      */
     fun resetPermissionState() {
         permissionDenied = false
+    }
+
+    /**
+     * Returns `true` when the WatchNext query should be skipped due to a permission denial.
+     *
+     * If the cached [permissionDenied] flag is set, performs a live
+     * [ContextCompat.checkSelfPermission] check to detect out-of-band grants (e.g. the user
+     * toggled the permission in system Settings without coming back through the in-app dialog).
+     * When the live check confirms the permission is now granted the flag is cleared
+     * automatically so the next query proceeds without an app restart.
+     */
+    private fun isPermissionCurrentlyDenied(): Boolean {
+        if (!permissionDenied) return false
+        return if (ContextCompat.checkSelfPermission(context, READ_TV_LISTINGS) == PackageManager.PERMISSION_GRANTED) {
+            permissionDenied = false
+            DiagnosticLog.event(TAG, "WatchNext: READ_TV_LISTINGS granted out-of-band — re-enabling source")
+            false
+        } else {
+            true
+        }
     }
 
     override suspend fun enrich(
@@ -118,7 +142,7 @@ class WatchNextMetadataSource @Inject constructor(
     }
 
     private fun lookup(packageName: String): WatchNextSnippet? {
-        if (permissionDenied) return null
+        if (isPermissionCurrentlyDenied()) return null
         return try {
             val now = System.currentTimeMillis()
             context.contentResolver.query(
@@ -146,7 +170,7 @@ class WatchNextMetadataSource @Inject constructor(
      * Returns [CountResult.PermissionDenied] when the system denies `READ_TV_LISTINGS`.
      */
     fun countPublishingApps(): CountResult {
-        if (permissionDenied) return CountResult.PermissionDenied
+        if (isPermissionCurrentlyDenied()) return CountResult.PermissionDenied
         return try {
             val cutoffMs = System.currentTimeMillis() - ROW_FRESHNESS_MS
             context.contentResolver.query(
@@ -205,6 +229,12 @@ class WatchNextMetadataSource @Inject constructor(
         const val ROW_FRESHNESS_MS = 5L * 60_000L
 
         private const val TAG = "WatchNextMetadataSource"
+
+        /**
+         * String literal for `android.permission.READ_TV_LISTINGS` — the constant is
+         * `@SystemApi` / `@hide` in the public SDK stubs and not resolvable at compile time.
+         */
+        private const val READ_TV_LISTINGS = "android.permission.READ_TV_LISTINGS"
 
         private val PROJECTION = arrayOf(
             TvContractCompat.WatchNextPrograms.COLUMN_TITLE,

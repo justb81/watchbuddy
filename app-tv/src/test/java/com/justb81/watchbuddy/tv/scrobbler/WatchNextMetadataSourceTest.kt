@@ -2,14 +2,19 @@ package com.justb81.watchbuddy.tv.scrobbler
 
 import android.content.ContentResolver
 import android.content.Context
+import android.content.pm.PackageManager
 import android.database.Cursor
+import androidx.core.content.ContextCompat
 import androidx.tvprovider.media.tv.TvContractCompat
 import com.justb81.watchbuddy.core.model.PlaybackTick
 import com.justb81.watchbuddy.core.scrobbler.MediaSnapshotBuilder
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkStatic
+import io.mockk.unmockkStatic
 import io.mockk.verify
 import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -387,6 +392,21 @@ class WatchNextMetadataSourceTest {
             capturedAtMs = System.currentTimeMillis(),
         )
 
+        @BeforeEach
+        fun setUpPermissionStillDenied() {
+            // Default for all tests in this class: the live permission check confirms denial
+            // so the cached flag continues to short-circuit correctly.
+            mockkStatic(ContextCompat::class)
+            every {
+                ContextCompat.checkSelfPermission(any(), "android.permission.READ_TV_LISTINGS")
+            } returns PackageManager.PERMISSION_DENIED
+        }
+
+        @AfterEach
+        fun tearDownPermissionMock() {
+            unmockkStatic(ContextCompat::class)
+        }
+
         @Test
         fun `enrich short-circuits subsequent calls after first SecurityException`() = runTest {
             every {
@@ -438,6 +458,61 @@ class WatchNextMetadataSourceTest {
             val result = source.countPublishingApps()
 
             assertEquals(WatchNextMetadataSource.CountResult.Success(1), result)
+        }
+
+        @Test
+        fun `enrich auto-heals when READ_TV_LISTINGS was granted out-of-band`() = runTest {
+            // Seed the denial flag by having the first call throw SecurityException.
+            every {
+                contentResolver.query(any(), any(), any(), any(), any())
+            } throws SecurityException("READ_TV_LISTINGS denied")
+            source.enrich("com.netflix.ninja", tick, MediaSnapshotBuilder("com.netflix.ninja"))
+            assertTrue(source.isPermissionDenied())
+
+            // Simulate the user granting the permission via system Settings (out-of-band).
+            every {
+                ContextCompat.checkSelfPermission(any(), "android.permission.READ_TV_LISTINGS")
+            } returns PackageManager.PERMISSION_GRANTED
+            givenEpisodeQuery(
+                buildEpisodeCursor(
+                    title = "Stranger Things",
+                    season = "4",
+                    episode = "9",
+                    episodeTitle = null,
+                    shortDesc = null,
+                    contentId = null,
+                    lastEngagementMs = freshMs,
+                ),
+            )
+            val builder = MediaSnapshotBuilder("com.netflix.ninja")
+
+            source.enrich("com.netflix.ninja", tick, builder)
+
+            // Flag must have been cleared by the live permission check.
+            assertFalse(source.isPermissionDenied())
+            val snapshot = builder.build()
+            assertTrue(snapshot.text.contains("watchNext.title: Stranger Things"), "enrichment should resume after auto-heal")
+        }
+
+        @Test
+        fun `countPublishingApps auto-heals when READ_TV_LISTINGS was granted out-of-band`() {
+            // Seed the denial flag.
+            every {
+                contentResolver.query(any(), any(), any(), any(), any())
+            } throws SecurityException("READ_TV_LISTINGS denied")
+            source.countPublishingApps()
+            assertTrue(source.isPermissionDenied())
+
+            // Simulate an out-of-band grant.
+            every {
+                ContextCompat.checkSelfPermission(any(), "android.permission.READ_TV_LISTINGS")
+            } returns PackageManager.PERMISSION_GRANTED
+            givenCountQuery(buildPackageCursor("com.netflix.ninja", "com.disney.disneyplus"))
+
+            val result = source.countPublishingApps()
+
+            assertFalse(source.isPermissionDenied())
+            assertEquals(WatchNextMetadataSource.CountResult.Success(2), result)
         }
     }
 }
