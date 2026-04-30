@@ -98,8 +98,8 @@ class MediaSessionScrobblerIntentTest {
             assertEquals(strangersShow.title, candidate!!.matchedShow!!.title)
             assertEquals(4, candidate.matchedEpisode!!.season)
             assertEquals(1, candidate.matchedEpisode!!.number)
-            assert(candidate.confidence >= MediaSessionScrobbler.AUTO_SCROBBLE_THRESHOLD) {
-                "expected confidence >= ${MediaSessionScrobbler.AUTO_SCROBBLE_THRESHOLD}, was ${candidate.confidence}"
+            assert(candidate.confidence >= ScrobbleTuning.DEFAULT.autoScrobbleThreshold) {
+                "expected confidence >= ${ScrobbleTuning.DEFAULT.autoScrobbleThreshold}, was ${candidate.confidence}"
             }
         }
 
@@ -113,7 +113,7 @@ class MediaSessionScrobblerIntentTest {
             val candidate = scrobbler.matchSnapshot(snapshot, PlaybackTick.UNKNOWN, intent)
 
             // If Phase 0 fires (score >= 0.40), result must be >= AUTO_SCROBBLE_THRESHOLD
-            if (candidate != null && candidate.confidence >= MediaSessionScrobbler.AUTO_SCROBBLE_THRESHOLD) {
+            if (candidate != null && candidate.confidence >= ScrobbleTuning.DEFAULT.autoScrobbleThreshold) {
                 assert(candidate.matchedShow?.title == strangersShow.title)
             }
         }
@@ -141,7 +141,7 @@ class MediaSessionScrobblerIntentTest {
             val candidate = scrobbler.matchSnapshot(snapshot, PlaybackTick.UNKNOWN, intent)
 
             // Phase 0 may still fire if text score >= 0.40; show falls back to intent data
-            if (candidate != null && candidate.confidence >= MediaSessionScrobbler.AUTO_SCROBBLE_THRESHOLD) {
+            if (candidate != null && candidate.confidence >= ScrobbleTuning.DEFAULT.autoScrobbleThreshold) {
                 assertEquals(strangersShow.title, candidate.matchedShow!!.title)
                 assertEquals(strangersIds.trakt, candidate.matchedShow!!.ids.trakt)
             }
@@ -165,7 +165,7 @@ class MediaSessionScrobblerIntentTest {
 
             // Phase 0 should fall through; any match must come from Phase 1/2/3 cascade
             if (candidate != null) {
-                assert(candidate.confidence < MediaSessionScrobbler.AUTO_SCROBBLE_THRESHOLD) {
+                assert(candidate.confidence < ScrobbleTuning.DEFAULT.autoScrobbleThreshold) {
                     "Phase 0 should not have confirmed for an unrelated title"
                 }
             }
@@ -193,7 +193,7 @@ class MediaSessionScrobblerIntentTest {
 
             // Both should behave identically (Phase 0 not influencing the result)
             // The important thing is Phase 0 doesn't return a wrong high-confidence candidate
-            if (candidateWithIntent != null && candidateWithIntent.confidence >= MediaSessionScrobbler.AUTO_SCROBBLE_THRESHOLD) {
+            if (candidateWithIntent != null && candidateWithIntent.confidence >= ScrobbleTuning.DEFAULT.autoScrobbleThreshold) {
                 // If Phase 1 happened to return high confidence on its own, that's fine
                 // but Phase 0 should not have been the source (confidence would be from Phase 1)
                 assertEquals(candidateNoIntent?.confidence, candidateWithIntent.confidence)

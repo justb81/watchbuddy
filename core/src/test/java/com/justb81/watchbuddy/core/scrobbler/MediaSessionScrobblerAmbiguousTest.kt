@@ -60,9 +60,9 @@ class MediaSessionScrobblerAmbiguousTest {
             )
             // All returned candidates should be in the ambiguous band
             candidates.forEach { c ->
-                assertTrue(c.score >= MediaSessionScrobbler.AMBIGUOUS_THRESHOLD,
+                assertTrue(c.score >= ScrobbleTuning.DEFAULT.ambiguousThreshold,
                     "score ${c.score} should be >= AMBIGUOUS_THRESHOLD")
-                assertTrue(c.score < MediaSessionScrobbler.OVERLAY_THRESHOLD,
+                assertTrue(c.score < ScrobbleTuning.DEFAULT.overlayThreshold,
                     "score ${c.score} should be < OVERLAY_THRESHOLD")
             }
         }

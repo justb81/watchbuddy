@@ -10,6 +10,7 @@ import com.justb81.watchbuddy.core.scrobbler.MetadataEnricher
 import com.justb81.watchbuddy.core.scrobbler.NoOpPlaybackIntentProvider
 import com.justb81.watchbuddy.core.scrobbler.NoOpTitleExtractor
 import com.justb81.watchbuddy.core.scrobbler.PlaybackIntentProvider
+import com.justb81.watchbuddy.core.scrobbler.ScrobbleTuning
 import com.justb81.watchbuddy.core.scrobbler.TitleExtractor
 import com.justb81.watchbuddy.phone.network.WifiStateProvider
 import dagger.Module
@@ -98,6 +99,15 @@ object AppModule {
     @Provides
     @Singleton
     fun providePlaybackIntentProvider(): PlaybackIntentProvider = NoOpPlaybackIntentProvider()
+
+    /**
+     * Production scrobble-tuning constants. Inject [ScrobbleTuning] rather than
+     * reading [ScrobbleTuning.DEFAULT] directly so tests can substitute a custom
+     * instance without subclassing [MediaSessionScrobbler].
+     */
+    @Provides
+    @Singleton
+    fun provideScrobbleTuning(): ScrobbleTuning = ScrobbleTuning.DEFAULT
 
     /**
      * Singleton [WifiStateProvider] wired to the process lifecycle so its

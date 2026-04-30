@@ -59,9 +59,8 @@ class MediaSessionScrobblerRuntimeAffinityTest {
                 tickDurationMs = 45 * 60_000L,
                 candidateRuntimeMin = 45
             )
-            // 1.10f is allowed if it doesn't exceed 1/AUTO_SCROBBLE_THRESHOLD ≈ 1.053
-            // AUTO_SCROBBLE_THRESHOLD = 0.95, so cap = 1/0.95 ≈ 1.053 → 1.10 exceeds cap, clamped
-            val cap = 1.0f / MediaSessionScrobbler.AUTO_SCROBBLE_THRESHOLD
+            // 1.10f boost exceeds 1/autoScrobbleThreshold ≈ 1.053, so it gets clamped to the cap.
+            val cap = 1.0f / ScrobbleTuning.DEFAULT.autoScrobbleThreshold
             assertTrue(result <= cap, "result $result should not exceed cap $cap")
             assertTrue(result >= 1.00f, "result $result should be >= 1.00 for near match")
         }
@@ -155,8 +154,8 @@ class MediaSessionScrobblerRuntimeAffinityTest {
     }
 
     @Test
-    fun `result never exceeds 1 over AUTO_SCROBBLE_THRESHOLD`() {
-        val cap = 1.0f / MediaSessionScrobbler.AUTO_SCROBBLE_THRESHOLD
+    fun `result never exceeds 1 over autoScrobbleThreshold`() {
+        val cap = 1.0f / ScrobbleTuning.DEFAULT.autoScrobbleThreshold
         val result = scrobbler.runtimeAffinity(tickDurationMs = 60 * 60_000L, candidateRuntimeMin = 60)
         assertTrue(result <= cap, "result $result must not exceed cap $cap")
     }
