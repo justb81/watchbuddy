@@ -21,7 +21,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import retrofit2.HttpException
 import java.io.IOException
-import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -62,6 +61,9 @@ class TvScrobbleDispatcher(
         private const val TAG = "TvScrobbleDispatcher"
         internal const val QUEUE_MAX_SIZE = 16
         internal const val QUEUE_TTL_MS = 5 * 60 * 1_000L
+
+        /** At-most-once delivery window for ambiguous prompts. Keys older than this are evicted. */
+        internal const val AMBIGUOUS_KEY_TTL_MS = 30 * 60 * 1_000L
     }
 
     internal enum class ScrobbleAction { START, PAUSE, STOP }
@@ -77,17 +79,23 @@ class TvScrobbleDispatcher(
     private val queueMutex = Mutex()
     private val pendingQueue = ArrayDeque<QueuedScrobble>()
 
-    /** Session keys for which an ambiguous prompt has already been dispatched. Cleared on resolution. */
-    private val dispatchedAmbiguousKeys: MutableSet<String> =
-        Collections.newSetFromMap(ConcurrentHashMap())
+    /**
+     * Session keys for which an ambiguous prompt has already been dispatched, mapped to the
+     * timestamp (ms) at which the key was first registered.
+     *
+     * At-most-once semantics: the key is kept even when no phones are available so a transient
+     * phone outage never causes the same overlay to appear twice. Entries are evicted lazily
+     * after [AMBIGUOUS_KEY_TTL_MS] (30 min) so the map does not grow without bound.
+     * Explicit removal happens via [clearResolvedPrompt] once the phone confirms resolution.
+     */
+    private val dispatchedAmbiguousKeys: ConcurrentHashMap<String, Long> = ConcurrentHashMap()
 
     /**
      * TMDB IDs for which the user has already confirmed an add-to-library this session.
      * Prevents duplicate Trakt history writes when the overlay is confirmed more than once
      * for the same unknown show. Cleared on service restart.
      */
-    private val confirmedUnknownTmdbIds: MutableSet<Int> =
-        Collections.newSetFromMap(ConcurrentHashMap())
+    private val confirmedUnknownTmdbIds: MutableSet<Int> = ConcurrentHashMap.newKeySet()
 
     init {
         replayScope.launch {
@@ -245,13 +253,23 @@ class TvScrobbleDispatcher(
      * Fans [event] to every reachable phone in parallel. Idempotent on [AmbiguousScrobbleEvent.sessionKey]:
      * if the same session key has been dispatched already (and not yet resolved via
      * [clearResolvedPrompt]), this is a no-op so repeated poll cycles don't stack notifications.
+     *
+     * At-most-once delivery: the key is kept even when no phones are reachable at dispatch time.
+     * A transient outage must not cause the phone to display the same overlay again when it
+     * reconnects. Stale keys are evicted lazily after [AMBIGUOUS_KEY_TTL_MS].
      */
     suspend fun dispatchAmbiguous(event: AmbiguousScrobbleEvent) {
-        if (!dispatchedAmbiguousKeys.add(event.sessionKey)) return
+        val now = clock()
+        // Lazily evict keys whose TTL has elapsed so the map does not grow without bound.
+        dispatchedAmbiguousKeys.entries.removeIf { (_, registeredAtMs) ->
+            now - registeredAtMs > AMBIGUOUS_KEY_TTL_MS
+        }
+        // putIfAbsent returns null when the key is new (successfully inserted) and the
+        // existing timestamp when the key was already present.
+        if (dispatchedAmbiguousKeys.putIfAbsent(event.sessionKey, now) != null) return
         val phones = availablePhones()
         if (phones.isEmpty()) {
-            DiagnosticLog.warn(TAG, "ambiguous prompt dropped — no phones reachable for '${event.sessionKey}'")
-            dispatchedAmbiguousKeys.remove(event.sessionKey)
+            DiagnosticLog.warn(TAG, "ambiguous prompt held — no phones reachable for '${event.sessionKey}', will not retry")
             return
         }
         coroutineScope {
