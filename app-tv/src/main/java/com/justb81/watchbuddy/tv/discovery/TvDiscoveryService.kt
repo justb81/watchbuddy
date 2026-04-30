@@ -151,9 +151,9 @@ class TvDiscoveryService : Service() {
             )
             val label = when (reason) {
                 IdleTimeoutMonitor.Reason.NO_DISCOVERY ->
-                    "no phone discovered in ${DiscoveryConstants.NO_DISCOVERY_TIMEOUT_MS / 60_000} min"
+                    "no phone discovered in ${DiscoveryConstants.NO_DISCOVERY_TIMEOUT_MINUTES} min"
                 IdleTimeoutMonitor.Reason.ALL_UNREACHABLE ->
-                    "all phones unreachable for ${DiscoveryConstants.ALL_UNREACHABLE_TIMEOUT_MS / 60_000} min"
+                    "all phones unreachable for ${DiscoveryConstants.ALL_UNREACHABLE_TIMEOUT_MINUTES} min"
             }
             DiagnosticLog.event(TAG, "idle timeout ($label) — stopping self")
             stopSelf()

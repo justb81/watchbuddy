@@ -26,6 +26,7 @@ internal object DiscoveryConstants {
      * companion phone is in BLE range (addresses Android 14+ 24-hour FGS quota).
      */
     const val NO_DISCOVERY_TIMEOUT_MS = 60 * 60_000L // 1 h
+    const val NO_DISCOVERY_TIMEOUT_MINUTES = NO_DISCOVERY_TIMEOUT_MS / 60_000L
 
     /**
      * [TvDiscoveryService] self-stops if all previously-discovered phones have been absent
@@ -33,4 +34,5 @@ internal object DiscoveryConstants {
      * user leaves home or all companion phones lose power after an initial discovery.
      */
     const val ALL_UNREACHABLE_TIMEOUT_MS = 30 * 60_000L // 30 min
+    const val ALL_UNREACHABLE_TIMEOUT_MINUTES = ALL_UNREACHABLE_TIMEOUT_MS / 60_000L
 }

@@ -26,6 +26,7 @@ internal class IdleTimeoutMonitor(
     enum class Reason {
         /** Zero phones discovered within [noDiscoveryTimeoutMs]. */
         NO_DISCOVERY,
+
         /** All known phones absent for [allUnreachableTimeoutMs]. */
         ALL_UNREACHABLE,
     }
