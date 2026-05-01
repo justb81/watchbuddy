@@ -247,6 +247,12 @@
     <string name="diagnostics_llm_detail_empty_response">(sin respuesta)</string>
     <string name="diagnostics_llm_detail_not_found">Esta llamada al LLM ya no está disponible — llamadas más recientes la desplazaron del búfer.</string>
 
+    <!-- Country / Region override -->
+    <string name="settings_country_section">País / Región</string>
+    <string name="settings_country_label">País / Región</string>
+    <string name="settings_country_auto">Automático (usar configuración regional)</string>
+    <string name="settings_country_helper">Se usa para buscar proveedores de streaming en la TV. Déjalo en Automático salvo que la configuración regional de tu teléfono difiera de tu país de suscripción.</string>
+
     <!-- Version footer -->
     <string name="settings_version_footer">WatchBuddy v%1$s (build %2$d)</string>
 </resources>

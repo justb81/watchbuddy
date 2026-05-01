@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -564,6 +565,31 @@ private fun AdvancedAuthSettings(uiState: SettingsUiState, viewModel: SettingsVi
         )
 
         Spacer(Modifier.height(12.dp))
+        HorizontalDivider(
+            color     = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+            thickness = 0.5.dp
+        )
+        Spacer(Modifier.height(12.dp))
+
+        // ── Country / Region group ────────────────────────────────────────────
+        Text(
+            text  = stringResource(R.string.settings_country_section),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Spacer(Modifier.height(4.dp))
+        CountryOverrideDropdown(
+            selected  = uiState.countryOverride,
+            onSelect  = viewModel::setCountryOverride
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text  = stringResource(R.string.settings_country_helper),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+        )
+
+        Spacer(Modifier.height(12.dp))
         Button(
             onClick  = { viewModel.saveAdvancedSettings() },
             modifier = Modifier.fillMaxWidth()
@@ -571,6 +597,67 @@ private fun AdvancedAuthSettings(uiState: SettingsUiState, viewModel: SettingsVi
             Text(stringResource(R.string.settings_save))
         }
         Spacer(Modifier.height(12.dp))
+    }
+}
+
+// ── Country / Region dropdown ──────────────────────────────────────────────────
+
+private data class CountryOption(val code: String, val label: String)
+
+private val COUNTRY_OPTIONS = listOf(
+    CountryOption("", ""),  // placeholder; label resolved from string resource at call site
+    CountryOption("AT", "AT — Austria"),
+    CountryOption("AU", "AU — Australia"),
+    CountryOption("CA", "CA — Canada"),
+    CountryOption("CH", "CH — Switzerland"),
+    CountryOption("DE", "DE — Germany"),
+    CountryOption("ES", "ES — Spain"),
+    CountryOption("FR", "FR — France"),
+    CountryOption("GB", "GB — United Kingdom"),
+    CountryOption("IT", "IT — Italy"),
+    CountryOption("NL", "NL — Netherlands"),
+    CountryOption("US", "US — United States"),
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CountryOverrideDropdown(selected: String, onSelect: (String) -> Unit) {
+    var expanded by remember { mutableStateOf(false) }
+    val autoLabel = stringResource(R.string.settings_country_auto)
+    val displayLabel = if (selected.isBlank()) autoLabel
+    else COUNTRY_OPTIONS.firstOrNull { it.code == selected }?.label ?: selected
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = it }
+    ) {
+        OutlinedTextField(
+            value             = displayLabel,
+            onValueChange     = {},
+            readOnly          = true,
+            label             = { Text(stringResource(R.string.settings_country_label)) },
+            trailingIcon      = {
+                Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+            },
+            modifier          = Modifier
+                .fillMaxWidth()
+                .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+        )
+        ExposedDropdownMenu(
+            expanded         = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            COUNTRY_OPTIONS.forEach { option ->
+                val itemLabel = if (option.code.isBlank()) autoLabel else option.label
+                DropdownMenuItem(
+                    text    = { Text(itemLabel) },
+                    onClick = {
+                        onSelect(option.code)
+                        expanded = false
+                    }
+                )
+            }
+        }
     }
 }
 

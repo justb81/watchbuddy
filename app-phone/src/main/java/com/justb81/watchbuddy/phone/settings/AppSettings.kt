@@ -32,5 +32,11 @@ data class AppSettings(
      * can surface them. Off-by-default would hide the feature; on-by-default
      * mirrors how the rest of the Diagnostics data is always captured.
      */
-    val llmActivityLoggingEnabled: Boolean = true
+    val llmActivityLoggingEnabled: Boolean = true,
+    /**
+     * Two-letter ISO 3166-1 alpha-2 country code chosen by the user in Settings → Advanced.
+     * Blank string means "Auto" — fall back to [java.util.Locale.getDefault] country.
+     * Projected into `/capability` by [com.justb81.watchbuddy.phone.server.DeviceCapabilityProvider].
+     */
+    val countryOverride: String = ""
 )
