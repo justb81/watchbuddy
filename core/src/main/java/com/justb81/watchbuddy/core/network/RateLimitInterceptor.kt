@@ -8,6 +8,7 @@ private const val TAG = "RateLimit"
 private const val HTTP_TOO_MANY_REQUESTS = 429
 private const val MAX_RETRY_DELAY_SECONDS = 60L
 private const val DEFAULT_RETRY_DELAY_SECONDS = 5L
+private const val MILLIS_PER_SECOND = 1_000L
 
 /**
  * OkHttp interceptor that handles 429 Too Many Requests responses.
@@ -38,7 +39,7 @@ internal class RateLimitInterceptor(
         if (!isSafeMethod(method)) return response
 
         response.close()
-        sleepFn(delaySeconds * 1_000)
+        sleepFn(delaySeconds * MILLIS_PER_SECOND)
 
         return chain.proceed(request)
     }
