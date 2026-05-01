@@ -48,6 +48,7 @@ class CompanionService : Service() {
         private const val PRESENCE_CHECK_INTERVAL_MS = 60_000L
         /** Auto-deactivate if no TV has polled /capability for this long. */
         private const val PRESENCE_TIMEOUT_MS = 5 * 60_000L
+
         /**
          * A TV is "connected" when its last /capability poll was within this window.
          * 1.5× the TV's own check interval gives one missed poll of slack.
