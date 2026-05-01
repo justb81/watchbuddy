@@ -124,7 +124,9 @@ class JustWatchDeepLinkRepository @Inject constructor(
         outcome: JustWatchOutcomeEvent.Outcome,
         detail: String = "",
     ) = synchronized(outcomeLock) {
-        val event = JustWatchOutcomeEvent(System.currentTimeMillis(), tmdbShowId, providerId, countryCode, outcome, detail)
+        val event = JustWatchOutcomeEvent(
+            System.currentTimeMillis(), tmdbShowId, providerId, countryCode, outcome, detail,
+        )
         val current = _outcomeEvents.value
         _outcomeEvents.value = if (current.size >= MAX_OUTCOME_EVENTS) current.drop(1) + event else current + event
     }

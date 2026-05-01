@@ -1,6 +1,5 @@
 package com.justb81.watchbuddy.tv.data
 
-import com.justb81.watchbuddy.tv.data.JustWatchOutcomeEvent
 import com.justb81.watchbuddy.core.justwatch.JustWatchApiService
 import com.justb81.watchbuddy.core.justwatch.JustWatchContent
 import com.justb81.watchbuddy.core.justwatch.JustWatchData

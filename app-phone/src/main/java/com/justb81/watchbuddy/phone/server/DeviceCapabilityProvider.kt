@@ -3,7 +3,6 @@ package com.justb81.watchbuddy.phone.server
 import android.app.ActivityManager
 import android.content.Context
 import android.os.Build
-import java.util.Locale
 import com.justb81.watchbuddy.core.model.AvatarSource
 import com.justb81.watchbuddy.core.model.DeviceCapability
 import com.justb81.watchbuddy.core.trakt.TraktApiService
@@ -17,6 +16,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 

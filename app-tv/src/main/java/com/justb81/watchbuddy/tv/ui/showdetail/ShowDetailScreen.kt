@@ -409,9 +409,9 @@ private fun ProviderChip(
         else -> Color.Transparent
     }
     val borderWidth = if (provider.isLastUsed) 2.dp else 0.dp
-    val isEnabled = deepLinkState is DeepLinkState.Available
-        || deepLinkState == null
-        || (deepLinkState is DeepLinkState.Unavailable && provider.isInstalled)
+    val isEnabled = deepLinkState is DeepLinkState.Available ||
+        deepLinkState == null ||
+        (deepLinkState is DeepLinkState.Unavailable && provider.isInstalled)
     val focusedContainerColor = if (isEnabled) {
         MaterialTheme.colorScheme.surfaceVariant
     } else {

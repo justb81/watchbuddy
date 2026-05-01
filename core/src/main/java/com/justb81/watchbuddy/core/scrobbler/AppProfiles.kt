@@ -109,7 +109,9 @@ object AppProfiles {
         AppProfile(
             packageName = "com.google.android.youtube.tv",
             skipPhase1 = true,
-            llmHint = "App is YouTube. The 'series' may be a creator's playlist; the title is usually descriptive ('Episode 47: How to ...'). If no SxxExx pattern is detected, return null rather than guessing.",
+            llmHint = "App is YouTube. The 'series' may be a creator's playlist; the title is usually" +
+                " descriptive ('Episode 47: How to ...'). If no SxxExx pattern is detected, return null" +
+                " rather than guessing.",
         ),
     ).associateBy { it.packageName }
 
