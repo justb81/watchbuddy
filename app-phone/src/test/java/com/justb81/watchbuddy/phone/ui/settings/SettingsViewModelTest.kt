@@ -997,7 +997,6 @@ class SettingsViewModelTest {
             advanceUntilIdle()
             // No crash — UI remains usable.
         }
-
     }
 
     /**
