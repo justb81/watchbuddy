@@ -409,7 +409,9 @@ private fun ProviderChip(
         else -> Color.Transparent
     }
     val borderWidth = if (provider.isLastUsed) 2.dp else 0.dp
-    val isEnabled = deepLinkState is DeepLinkState.Available || deepLinkState == null
+    val isEnabled = deepLinkState is DeepLinkState.Available ||
+        deepLinkState == null ||
+        (deepLinkState is DeepLinkState.Unavailable && provider.isInstalled)
     val focusedContainerColor = if (isEnabled) {
         MaterialTheme.colorScheme.surfaceVariant
     } else {
@@ -435,8 +437,11 @@ private fun ProviderChip(
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 ProviderLogo(provider)
-                val labelText = when (deepLinkState) {
-                    is DeepLinkState.Unavailable -> stringResource(R.string.tv_provider_no_deep_link)
+                val labelText = when {
+                    deepLinkState is DeepLinkState.Unavailable && provider.isInstalled ->
+                        stringResource(R.string.tv_provider_open_app)
+                    deepLinkState is DeepLinkState.Unavailable ->
+                        stringResource(R.string.tv_provider_no_deep_link)
                     else -> provider.name
                 }
                 Text(

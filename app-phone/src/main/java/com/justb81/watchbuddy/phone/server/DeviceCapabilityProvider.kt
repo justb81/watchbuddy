@@ -16,6 +16,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -75,6 +76,7 @@ class DeviceCapabilityProvider @Inject constructor(
             avatarSource = settings.avatarSource,
             lastResolvedSessionKey = stateManager.lastResolvedSessionKey.value,
             lastResolvedTraktId = stateManager.lastResolvedTraktId.value,
+            countryCode = Locale.getDefault().country.takeIf { it.length == 2 },
         )
     }
 

@@ -95,6 +95,24 @@ object AppProfiles {
             packageName = "org.xbmc.kodi",
             preferredSourceTags = listOf("mediaSession.title"),
         ),
+        // Joyn (German free streaming, ProSiebenSat.1) — episode marker uses "Staffel Y, Folge X"
+        AppProfile(
+            packageName = "de.prosiebensat1digital.seventv",
+            preferredSourceTags = listOf("watchNext.contentId", "watchNext.episodeNumber", "mediaSession.subtitle"),
+            markerRegexes = listOf(
+                // "Staffel 2, Folge 3" or "Staffel 2 Folge 3"
+                Regex("""Staffel\s*(\d+)[,\s]+Folge\s*(\d+)""", RegexOption.IGNORE_CASE),
+            ),
+            llmHint = "App is Joyn (German free streaming, ProSiebenSat.1). Episode markers may use 'Folge'/'Staffel' German keywords.",
+        ),
+        // YouTube TV — titles are descriptive; skip Phase 1 to avoid noisy cache matches
+        AppProfile(
+            packageName = "com.google.android.youtube.tv",
+            skipPhase1 = true,
+            llmHint = "App is YouTube. The 'series' may be a creator's playlist; the title is usually" +
+                " descriptive ('Episode 47: How to ...'). If no SxxExx pattern is detected, return null" +
+                " rather than guessing.",
+        ),
     ).associateBy { it.packageName }
 
     fun forPackage(pkg: String): AppProfile? = ALL[pkg]

@@ -158,6 +158,14 @@ data class DeviceCapability(
      * [TvShowCache] so the same metadata shape short-circuits Phase 1 next time.
      */
     val lastResolvedTraktId: Int? = null,
+    /**
+     * ISO 3166-1 alpha-2 country code reported by the phone's default Locale, or null
+     * when the phone's locale has no country component. The TV uses this for watch-provider
+     * and JustWatch lookups so that region-specific services (e.g. Joyn in DE/AT) appear
+     * correctly even when the TV's own UI locale returns an empty country string.
+     * Nullable for backward compatibility with older phone builds that don't include this field.
+     */
+    val countryCode: String? = null,
 )
 
 enum class LlmBackend { AICORE, LITERT, NONE }

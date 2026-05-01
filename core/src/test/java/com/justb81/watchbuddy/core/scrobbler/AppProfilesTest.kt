@@ -11,7 +11,6 @@ import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -95,10 +94,13 @@ class AppProfilesTest {
         }
 
         @Test
-        fun `no profile has skipPhase1 = true in default registry`() {
-            AppProfiles.ALL.values.forEach { p ->
-                assertFalse(p.skipPhase1, "Unexpected skipPhase1=true for ${p.packageName}")
-            }
+        fun `only YouTube TV profile has skipPhase1 = true`() {
+            val skipPhase1Profiles = AppProfiles.ALL.values.filter { it.skipPhase1 }.map { it.packageName }
+            assertEquals(
+                listOf("com.google.android.youtube.tv"),
+                skipPhase1Profiles,
+                "Only the YouTube TV profile should have skipPhase1=true",
+            )
         }
     }
 
@@ -337,6 +339,84 @@ class AppProfilesTest {
             assertEquals("The Office", result!!.matchedShow?.title)
             assertEquals(2, result.matchedEpisode?.season)
             assertEquals(1, result.matchedEpisode?.number)
+        }
+    }
+
+    // ── Joyn fixture ─────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("Joyn (de.prosiebensat1digital.seventv)")
+    inner class JoynFixture {
+
+        @Test
+        fun `forPackage returns profile for joyn`() {
+            val profile = AppProfiles.forPackage("de.prosiebensat1digital.seventv")
+            assertNotNull(profile)
+            assertEquals("de.prosiebensat1digital.seventv", profile!!.packageName)
+        }
+
+        @Test
+        fun `Staffel Y Folge X marker regex extracts season and episode`() {
+            val profile = AppProfiles.forPackage("de.prosiebensat1digital.seventv")!!
+            val regex = profile.markerRegexes.first()
+
+            val match1 = regex.find("Staffel 2, Folge 3")
+            assertNotNull(match1)
+            assertEquals("2", match1!!.groupValues[1])
+            assertEquals("3", match1.groupValues[2])
+
+            val match2 = regex.find("Staffel 1 Folge 12")
+            assertNotNull(match2)
+            assertEquals("1", match2!!.groupValues[1])
+            assertEquals("12", match2.groupValues[2])
+        }
+
+        @Test
+        fun `Staffel Folge marker regex is case-insensitive`() {
+            val profile = AppProfiles.forPackage("de.prosiebensat1digital.seventv")!!
+            val regex = profile.markerRegexes.first()
+            val match = regex.find("staffel 3, folge 5")
+            assertNotNull(match)
+            assertEquals("3", match!!.groupValues[1])
+            assertEquals("5", match.groupValues[2])
+        }
+
+        @Test
+        fun `joyn profile has llmHint`() {
+            val profile = AppProfiles.forPackage("de.prosiebensat1digital.seventv")!!
+            assertNotNull(profile.llmHint)
+        }
+    }
+
+    // ── YouTube TV fixture ────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("YouTube TV (com.google.android.youtube.tv)")
+    inner class YouTubeTvFixture {
+
+        @Test
+        fun `forPackage returns profile for youtube tv`() {
+            val profile = AppProfiles.forPackage("com.google.android.youtube.tv")
+            assertNotNull(profile)
+            assertEquals("com.google.android.youtube.tv", profile!!.packageName)
+        }
+
+        @Test
+        fun `youtube tv profile has skipPhase1 = true`() {
+            val profile = AppProfiles.forPackage("com.google.android.youtube.tv")!!
+            assertTrue(profile.skipPhase1)
+        }
+
+        @Test
+        fun `youtube tv profile has llmHint`() {
+            val profile = AppProfiles.forPackage("com.google.android.youtube.tv")!!
+            assertNotNull(profile.llmHint)
+        }
+
+        @Test
+        fun `youtube tv profile has no markerRegexes`() {
+            val profile = AppProfiles.forPackage("com.google.android.youtube.tv")!!
+            assertTrue(profile.markerRegexes.isEmpty())
         }
     }
 

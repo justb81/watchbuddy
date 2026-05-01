@@ -63,10 +63,11 @@
     <string name="tv_provider_last_used_label">Zuletzt genutzt</string>
     <!-- JustWatch deep links (#476) -->
     <string name="tv_provider_no_deep_link">Kein Deep Link</string>
+    <string name="tv_provider_open_app">App öffnen</string>
     <string name="tv_watch_now_unavailable">Deep Link nicht verfügbar</string>
     <string name="tv_watch_now_no_provider">Kein Anbieter verfügbar</string>
     <string name="tv_justwatch_attribution">Streaming-Daten von JustWatch</string>
-    <!-- Diagnostics — streaming deep links (#476) -->
+    <!-- Diagnostics — streaming deep links (#476 / #620) -->
     <string name="tv_diagnostics_section_streaming_links">Streaming-Deep-Links</string>
     <string name="tv_diagnostics_row_cached_urls">Gespeicherte URLs</string>
     <string name="tv_diagnostics_row_negative_entries">Negative Einträge</string>
@@ -74,6 +75,7 @@
     <string name="tv_diagnostics_action_clear_streaming_cache">Streaming-Link-Cache löschen</string>
     <string name="tv_diagnostics_row_jw_search_misses">Suchtreffer fehler (24 Std.)</string>
     <string name="tv_diagnostics_row_jw_last_error">Letzter JustWatch-Fehler</string>
+    <string name="tv_diagnostics_row_jw_recent_outcomes">Letzte Ergebnisse</string>
 
     <!-- TV Settings hub (#344 / #367) -->
     <string name="tv_settings_title">Einstellungen</string>

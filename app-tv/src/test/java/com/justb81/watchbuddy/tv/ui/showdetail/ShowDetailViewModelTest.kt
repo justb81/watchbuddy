@@ -54,7 +54,7 @@ class ShowDetailViewModelTest {
     private val justWatchRepo: JustWatchDeepLinkRepository = mockk()
     private lateinit var viewModel: ShowDetailViewModel
 
-    private fun makeCapability(apiKey: String?) = DeviceCapability(
+    private fun makeCapability(apiKey: String?, countryCode: String? = null) = DeviceCapability(
         deviceId = "dev1",
         userName = "user",
         deviceName = "Pixel",
@@ -62,10 +62,11 @@ class ShowDetailViewModelTest {
         modelQuality = 0,
         freeRamMb = 0,
         tmdbApiKey = apiKey,
+        countryCode = countryCode,
     )
 
-    private fun makePhone(apiKey: String?) = mockk<PhoneDiscoveryManager.DiscoveredPhone> {
-        every { capability } returns makeCapability(apiKey)
+    private fun makePhone(apiKey: String?, countryCode: String? = null) = mockk<PhoneDiscoveryManager.DiscoveredPhone> {
+        every { capability } returns makeCapability(apiKey, countryCode)
     }
 
     private fun makeEntry(
@@ -185,6 +186,26 @@ class ShowDetailViewModelTest {
 
             val state = assertInstanceOf(ProviderListUiState.Empty::class.java, viewModel.providers.value)
             assertNull(state.tmdbPageUrl)
+        }
+
+        @Test
+        fun `usesPhoneCountryCodeWhenAvailable`() = runTest {
+            val providers = listOf(makeProvider())
+            every { phoneDiscovery.getBestPhone() } returns makePhone("api-key", countryCode = "DE")
+            coEvery { watchProviders.getResolvedProviders(100, "DE", "api-key", false) } returns (providers to null)
+
+            viewModel.loadProviders(makeEntry())
+
+            assertInstanceOf(ProviderListUiState.Success::class.java, viewModel.providers.value)
+        }
+
+        @Test
+        fun `fallsBackToLocaleWhenNoPhone`() = runTest {
+            every { phoneDiscovery.getBestPhone() } returns null
+
+            viewModel.loadProviders(makeEntry())
+
+            assertEquals(ProviderListUiState.Error, viewModel.providers.value)
         }
     }
 

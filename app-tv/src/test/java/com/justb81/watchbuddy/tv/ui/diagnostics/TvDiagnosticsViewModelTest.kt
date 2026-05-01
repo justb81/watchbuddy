@@ -6,6 +6,7 @@ import com.justb81.watchbuddy.core.scrobbler.MediaSessionScrobbler
 import com.justb81.watchbuddy.core.scrobbler.NoOpPlaybackIntentProvider
 import com.justb81.watchbuddy.tv.MainDispatcherRule
 import com.justb81.watchbuddy.tv.data.JustWatchDeepLinkRepository
+import com.justb81.watchbuddy.tv.data.JustWatchOutcomeEvent
 import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
 import com.justb81.watchbuddy.tv.scrobbler.NotificationMetadataSource
 import com.justb81.watchbuddy.tv.scrobbler.WatchNextMetadataSource
@@ -60,6 +61,7 @@ class TvDiagnosticsViewModelTest {
         coEvery { justWatchRepo.clearAll() } returns Unit
         every { justWatchRepo.lastFetchError() } returns null
         every { justWatchRepo.searchMissCount() } returns 0
+        every { justWatchRepo.outcomeEvents } returns MutableStateFlow(emptyList<JustWatchOutcomeEvent>())
         every { watchNextSource.countPublishingApps() } returns WatchNextMetadataSource.CountResult.Success(0)
     }
 
