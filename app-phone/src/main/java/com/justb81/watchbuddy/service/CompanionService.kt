@@ -12,6 +12,7 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
+import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import com.justb81.watchbuddy.R
@@ -96,11 +97,28 @@ class CompanionService : Service() {
         super.onCreate()
         DiagnosticLog.event(TAG, "onCreate")
         ensureNotificationChannel()
-        startForeground(
-            NOTIFICATION_ID,
-            buildNotification(),
-            ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE,
-        )
+        try {
+            startForeground(
+                NOTIFICATION_ID,
+                buildNotification(),
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE,
+            )
+        } catch (e: Exception) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                e::class.simpleName == "ForegroundServiceStartNotAllowedException"
+            ) {
+                DiagnosticLog.warn(
+                    TAG,
+                    "ForegroundServiceStartNotAllowedException during onCreate (background recreation on Android 16+) — stopping service"
+                )
+                serviceScope.launch {
+                    settingsRepository.setCompanionEnabled(false)
+                }
+                stopSelf()
+            } else {
+                throw e
+            }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -115,11 +133,10 @@ class CompanionService : Service() {
             stopSelf(startId)
             return START_NOT_STICKY
         }
-        // Idempotent: onStartCommand can fire multiple times (ViewModel re-starts,
-        // system re-delivery of START_STICKY).
+        // Idempotent: onStartCommand can fire multiple times (ViewModel re-starts).
         if (stateManager.isServiceRunning.value) {
             DiagnosticLog.debug(TAG, "onStartCommand skipped; service already running")
-            return START_STICKY
+            return START_NOT_STICKY
         }
         try {
             companionHttpServer.start()
@@ -145,7 +162,7 @@ class CompanionService : Service() {
             stopSelf(startId)
             return START_NOT_STICKY
         }
-        return START_STICKY
+        return START_NOT_STICKY
     }
 
     override fun onDestroy() {
