@@ -6,6 +6,7 @@ import android.content.res.AssetFileDescriptor
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import androidx.core.graphics.scale
 import io.mockk.answers
 import io.mockk.every
 import io.mockk.just
@@ -89,7 +90,6 @@ class AvatarImageStoreTest {
         val bmp = mockk<Bitmap>(relaxed = true)
         every { bmp.width } returns width
         every { bmp.height } returns height
-        every { bmp.scale(any(), any()) } returns bmp
         every { bmp.compress(any(), any(), any()) } answers {
             val out = arg<OutputStream>(2)
             out.write(ByteArray(outputBytes))
@@ -262,11 +262,11 @@ class AvatarImageStoreTest {
             val bmp = mockk<Bitmap>(relaxed = true)
             every { bmp.width } returns 256
             every { bmp.height } returns 256
-            every { bmp.scale(any(), any()) } returns bmp
             every { bmp.compress(any(), any(), any()) } answers {
                 val out = arg<OutputStream>(2)
                 compressCallCount++
-                // First compress returns 250 KB (too large), second returns 80 KB (ok)
+                // First compress returns 250 KB (too large), subsequent return 80 KB (ok).
+                // The second quality step (70) should succeed so scale is never reached.
                 if (compressCallCount == 1) out.write(ByteArray(250 * 1024))
                 else out.write(ByteArray(80 * 1024))
                 true
@@ -293,21 +293,39 @@ class AvatarImageStoreTest {
 
         @Test
         fun `returns Failed when all compress retries exceed 200 KB`() = runTest {
-            // Bitmap.compress always writes 300 KB regardless of quality or scale
-            val bmp = mockk<Bitmap>(relaxed = true)
-            every { bmp.width } returns 256
-            every { bmp.height } returns 256
-            every { bmp.scale(any(), any()) } returns bmp
-            every { bmp.compress(any(), any(), any()) } answers {
-                val out = arg<OutputStream>(2)
-                out.write(ByteArray(300 * 1024))
-                true
+            // Bitmap.scale is a Kotlin extension function (BitmapKt static) — must use
+            // mockkStatic to intercept it; instance mocking silently ignores it.
+            mockkStatic("androidx.core.graphics.BitmapKt")
+            try {
+                val bmp = mockk<Bitmap>(relaxed = true)
+                every { bmp.width } returns 256
+                every { bmp.height } returns 256
+                every { bmp.compress(any(), any(), any()) } answers {
+                    val out = arg<OutputStream>(2)
+                    out.write(ByteArray(300 * 1024)) // 300 KB — always over the 200 KB cap
+                    true
+                }
+
+                // Mock the scale extension function to return a smaller bitmap that also
+                // compresses to 300 KB, so even the half-dimension retry path fails.
+                val smaller = mockk<Bitmap>(relaxed = true)
+                every { smaller.width } returns 128
+                every { smaller.height } returns 128
+                every { smaller.compress(any(), any(), any()) } answers {
+                    val out = arg<OutputStream>(2)
+                    out.write(ByteArray(300 * 1024))
+                    true
+                }
+                every { bmp.scale(any<Int>(), any<Int>()) } returns smaller
+
+                stubBoundsAndDecode("image/jpeg", width = 256, height = 256, decodedBitmap = bmp)
+
+                val result = store.writeFromUri(uri)
+
+                assertEquals(AvatarImageStore.Result.Failed("write"), result)
+            } finally {
+                unmockkStatic("androidx.core.graphics.BitmapKt")
             }
-            stubBoundsAndDecode("image/jpeg", width = 256, height = 256, decodedBitmap = bmp)
-
-            val result = store.writeFromUri(uri)
-
-            assertEquals(AvatarImageStore.Result.Failed("write"), result)
         }
     }
 
