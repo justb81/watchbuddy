@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.34.0](https://github.com/justb81/watchbuddy/compare/v0.33.2...v0.34.0) (2026-05-01)
+
+
+### Features
+
+* **phone:** user-configurable country override in Advanced Settings ([#633](https://github.com/justb81/watchbuddy/issues/633)) ([058464f](https://github.com/justb81/watchbuddy/commit/058464fda909dd96105ee8dfcb0451a515f697c9))
+
+
+### Bug Fixes
+
+* **core:** add RateLimitInterceptor for 429 Retry-After handling ([#634](https://github.com/justb81/watchbuddy/issues/634)) ([c341342](https://github.com/justb81/watchbuddy/commit/c341342356e3876a4cf915bbfb765f29c1baaa75))
+* **core:** log DiagnosticLog warning for unmapped JustWatch technicalNames and add TMDB provider validation ([#637](https://github.com/justb81/watchbuddy/issues/637)) ([e2c6943](https://github.com/justb81/watchbuddy/commit/e2c6943a3f5bfa316b602d8c98921c1e9c15f5fd)), closes [#570](https://github.com/justb81/watchbuddy/issues/570)
+* **core:** make CrashReporter.install() idempotent and add chaining tests ([#635](https://github.com/justb81/watchbuddy/issues/635)) ([5cd8998](https://github.com/justb81/watchbuddy/commit/5cd8998dfa18413c9259b372c74e069480076f24)), closes [#575](https://github.com/justb81/watchbuddy/issues/575)
+* **phone:** handle ForegroundServiceStartNotAllowedException in CompanionService ([#631](https://github.com/justb81/watchbuddy/issues/631)) ([1a7e036](https://github.com/justb81/watchbuddy/commit/1a7e036c17edfcb4e5a7e20cc8ad7faa1be7fb0b)), closes [#630](https://github.com/justb81/watchbuddy/issues/630)
+* **tv:** replace fragile pipe-format encoding in LastUsedProviderRepository with JSON ([#636](https://github.com/justb81/watchbuddy/issues/636)) ([4fe2e31](https://github.com/justb81/watchbuddy/commit/4fe2e314c0fd7437010e5974be03906e07e17b56)), closes [#550](https://github.com/justb81/watchbuddy/issues/550)
+* **tv:** replace runBlocking in BootReceiver with goAsync + coroutine ([#638](https://github.com/justb81/watchbuddy/issues/638)) ([bfd9bf0](https://github.com/justb81/watchbuddy/commit/bfd9bf071bdea22d9551b9c795aad8d7bf043631))
+
 ## [0.33.2](https://github.com/justb81/watchbuddy/compare/v0.33.1...v0.33.2) (2026-05-01)
 
 
