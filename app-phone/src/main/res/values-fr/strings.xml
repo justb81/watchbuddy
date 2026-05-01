@@ -247,6 +247,12 @@
     <string name="diagnostics_llm_detail_empty_response">(pas de réponse)</string>
     <string name="diagnostics_llm_detail_not_found">Cet appel LLM n\'est plus disponible — des appels plus récents l\'ont évincé du tampon.</string>
 
+    <!-- Country / Region override -->
+    <string name="settings_country_section">Pays / Région</string>
+    <string name="settings_country_label">Pays / Région</string>
+    <string name="settings_country_auto">Automatique (locale de l\'appareil)</string>
+    <string name="settings_country_helper">Utilisé pour rechercher les fournisseurs de streaming sur la TV. Laissez sur Automatique sauf si la langue de votre téléphone diffère de votre pays d\'abonnement.</string>
+
     <!-- Version footer -->
     <string name="settings_version_footer">WatchBuddy v%1$s (build %2$d)</string>
 </resources>

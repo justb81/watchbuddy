@@ -76,7 +76,8 @@ class DeviceCapabilityProvider @Inject constructor(
             avatarSource = settings.avatarSource,
             lastResolvedSessionKey = stateManager.lastResolvedSessionKey.value,
             lastResolvedTraktId = stateManager.lastResolvedTraktId.value,
-            countryCode = Locale.getDefault().country.takeIf { it.length == 2 },
+            countryCode = settings.countryOverride.takeIf { it.length == 2 }
+                ?: Locale.getDefault().country.takeIf { it.length == 2 },
         )
     }
 

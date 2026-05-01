@@ -7,7 +7,6 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.datastore.preferences.preferencesDataStore
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.model.AvatarSource
 import com.justb81.watchbuddy.phone.auth.TokenRepository
@@ -29,11 +28,10 @@ import javax.inject.Inject
 import javax.inject.Named
 import javax.inject.Singleton
 
-private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
-
 @Singleton
 class SettingsRepository @Inject constructor(
     @param:ApplicationContext private val context: Context,
+    private val dataStore: DataStore<Preferences>,
     private val tokenRepository: TokenRepository,
     private val llmEventLog: LlmEventLog,
     @param:Named("defaultTmdbApiKey") private val defaultTmdbApiKey: String
@@ -50,6 +48,7 @@ class SettingsRepository @Inject constructor(
         val AVATAR_SOURCE = stringPreferencesKey("avatar_source")
         val CUSTOM_AVATAR_VERSION = longPreferencesKey("custom_avatar_version")
         val LLM_ACTIVITY_LOGGING_ENABLED = booleanPreferencesKey("llm_activity_logging_enabled")
+        val COUNTRY_OVERRIDE = stringPreferencesKey("country_override")
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -59,7 +58,7 @@ class SettingsRepository @Inject constructor(
 
     init {
         scope.launch {
-            context.dataStore.data
+            dataStore.data
                 .catch { e ->
                     DiagnosticLog.error(TAG, "modelReady flow errored at subscription", e)
                 }
@@ -70,7 +69,7 @@ class SettingsRepository @Inject constructor(
         }
     }
 
-    val settings: Flow<AppSettings> = context.dataStore.data.map { prefs ->
+    val settings: Flow<AppSettings> = dataStore.data.map { prefs ->
         AppSettings(
             authMode = prefs[Keys.AUTH_MODE]
                 ?.let { runCatching { AuthMode.valueOf(it) }.getOrNull() }
@@ -86,12 +85,13 @@ class SettingsRepository @Inject constructor(
                 ?.let { runCatching { AvatarSource.valueOf(it) }.getOrNull() }
                 ?: AvatarSource.TRAKT,
             customAvatarVersion = prefs[Keys.CUSTOM_AVATAR_VERSION] ?: 0L,
-            llmActivityLoggingEnabled = prefs[Keys.LLM_ACTIVITY_LOGGING_ENABLED] ?: true
+            llmActivityLoggingEnabled = prefs[Keys.LLM_ACTIVITY_LOGGING_ENABLED] ?: true,
+            countryOverride = prefs[Keys.COUNTRY_OVERRIDE] ?: ""
         )
     }
 
     suspend fun saveSettings(settings: AppSettings) {
-        context.dataStore.edit { prefs ->
+        dataStore.edit { prefs ->
             prefs[Keys.AUTH_MODE] = settings.authMode.name
             prefs[Keys.BACKEND_URL] = settings.backendUrl
             prefs[Keys.DIRECT_CLIENT_ID] = settings.directClientId
@@ -102,6 +102,7 @@ class SettingsRepository @Inject constructor(
             prefs[Keys.AVATAR_SOURCE] = settings.avatarSource.name
             prefs[Keys.CUSTOM_AVATAR_VERSION] = settings.customAvatarVersion
             prefs[Keys.LLM_ACTIVITY_LOGGING_ENABLED] = settings.llmActivityLoggingEnabled
+            prefs[Keys.COUNTRY_OVERRIDE] = settings.countryOverride
         }
     }
 
@@ -110,7 +111,7 @@ class SettingsRepository @Inject constructor(
         displayNameOverride: String,
         avatarSource: AvatarSource
     ) {
-        context.dataStore.edit { prefs ->
+        dataStore.edit { prefs ->
             prefs[Keys.DISPLAY_NAME_OVERRIDE] = displayNameOverride
             prefs[Keys.AVATAR_SOURCE] = avatarSource.name
         }
@@ -124,7 +125,7 @@ class SettingsRepository @Inject constructor(
      */
     suspend fun bumpCustomAvatarVersion(): Long {
         var next = 0L
-        context.dataStore.edit { prefs ->
+        dataStore.edit { prefs ->
             next = (prefs[Keys.CUSTOM_AVATAR_VERSION] ?: 0L) + 1L
             prefs[Keys.CUSTOM_AVATAR_VERSION] = next
         }
@@ -150,7 +151,7 @@ class SettingsRepository @Inject constructor(
      * Returns the effective TMDB API key: the user's custom key when set, otherwise the
      * default key baked in at build time.  Returns an empty string when neither is available.
      */
-    fun getTmdbApiKey(): Flow<String> = context.dataStore.data.map { prefs ->
+    fun getTmdbApiKey(): Flow<String> = dataStore.data.map { prefs ->
         val userKey = prefs[Keys.TMDB_API_KEY] ?: ""
         userKey.ifBlank { defaultTmdbApiKey }
     }
@@ -160,7 +161,7 @@ class SettingsRepository @Inject constructor(
 
     fun setModelReady(ready: Boolean) {
         scope.launch {
-            context.dataStore.edit { prefs ->
+            dataStore.edit { prefs ->
                 prefs[Keys.MODEL_READY] = ready
             }
         }
@@ -168,7 +169,7 @@ class SettingsRepository @Inject constructor(
 
     /** Updates only the companion-enabled flag without touching other settings. */
     suspend fun setCompanionEnabled(enabled: Boolean) {
-        context.dataStore.edit { prefs ->
+        dataStore.edit { prefs ->
             prefs[Keys.COMPANION_ENABLED] = enabled
         }
     }
@@ -179,10 +180,17 @@ class SettingsRepository @Inject constructor(
      * immediately — turning the switch off should mean no in-memory trace.
      */
     suspend fun setLlmActivityLoggingEnabled(enabled: Boolean) {
-        context.dataStore.edit { prefs ->
+        dataStore.edit { prefs ->
             prefs[Keys.LLM_ACTIVITY_LOGGING_ENABLED] = enabled
         }
         if (!enabled) llmEventLog.clear()
+    }
+
+    /** Persists the two-letter ISO 3166-1 country code override, or clears it when blank. */
+    suspend fun setCountryOverride(countryCode: String) {
+        dataStore.edit { prefs ->
+            prefs[Keys.COUNTRY_OVERRIDE] = countryCode.uppercase().take(2)
+        }
     }
 
     /** Absolute path where downloaded model files are stored. */

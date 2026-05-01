@@ -243,6 +243,12 @@
     <string name="diagnostics_llm_detail_empty_response">(keine Antwort)</string>
     <string name="diagnostics_llm_detail_not_found">Dieser LLM-Aufruf ist nicht mehr verfügbar — neuere Aufrufe haben ihn aus dem Puffer verdrängt.</string>
 
+    <!-- Country / Region override -->
+    <string name="settings_country_section">Land / Region</string>
+    <string name="settings_country_label">Land / Region</string>
+    <string name="settings_country_auto">Automatisch (Gerätesprache)</string>
+    <string name="settings_country_helper">Wird auf dem TV zur Suche nach Streaming-Anbietern verwendet. Nur ändern, wenn das Geräte-Gebietsschema nicht deinem Abonnementland entspricht.</string>
+
     <!-- Version footer -->
     <string name="settings_version_footer">WatchBuddy v%1$s (Build %2$d)</string>
 </resources>

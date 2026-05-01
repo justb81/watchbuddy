@@ -3,6 +3,9 @@ package com.justb81.watchbuddy.phone.di
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.preferencesDataStore
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.work.WorkManager
 import com.justb81.watchbuddy.BuildConfig
@@ -21,6 +24,8 @@ import dagger.hilt.components.SingletonComponent
 import javax.inject.Named
 import javax.inject.Singleton
 
+private val Context.settingsDataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
+
 /**
  * App-specific Hilt bindings.
  *
@@ -31,6 +36,17 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object AppModule {
+
+    /**
+     * Provides the app's singleton [DataStore] for settings persistence.
+     * Declared here so that [com.justb81.watchbuddy.phone.settings.SettingsRepository]
+     * receives the store as an injected dependency and can be tested with a
+     * substitute store in unit tests.
+     */
+    @Provides
+    @Singleton
+    fun provideSettingsDataStore(@ApplicationContext context: Context): DataStore<Preferences> =
+        context.settingsDataStore
 
     /** Trakt Client ID from BuildConfig (set via app-phone/build.gradle.kts). */
     @Provides

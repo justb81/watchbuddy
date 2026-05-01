@@ -132,4 +132,34 @@ class DeviceCapabilityProviderTest {
         // API should be called twice (once before and once after invalidation)
         coVerify(exactly = 2) { traktApi.getProfile(any()) }
     }
+
+    @Test
+    fun `overrideTakesPrecedenceOverLocale — countryOverride is used when set`() = runTest {
+        every { tokenRepository.getAccessToken() } returns null
+        every { settingsRepository.settings } returns flowOf(AppSettings(countryOverride = "DE"))
+
+        val cap = provider.getCapability()
+        assertEquals("DE", cap.countryCode)
+    }
+
+    @Test
+    fun `overrideTakesPrecedenceOverLocale — locale is used when override is blank`() = runTest {
+        every { tokenRepository.getAccessToken() } returns null
+        every { settingsRepository.settings } returns flowOf(AppSettings(countryOverride = ""))
+
+        val cap = provider.getCapability()
+        // On JVM the default locale country may vary; just verify it is not the override
+        // and is either null or a 2-letter code (locale-dependent).
+        assertTrue(cap.countryCode == null || cap.countryCode!!.length == 2)
+    }
+
+    @Test
+    fun `overrideTakesPrecedenceOverLocale — override wins over locale`() = runTest {
+        every { tokenRepository.getAccessToken() } returns null
+        // Locale.getDefault().country on JVM is typically "US" or similar, but we want "AT"
+        every { settingsRepository.settings } returns flowOf(AppSettings(countryOverride = "AT"))
+
+        val cap = provider.getCapability()
+        assertEquals("AT", cap.countryCode)
+    }
 }

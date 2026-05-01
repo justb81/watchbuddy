@@ -76,7 +76,12 @@ data class SettingsUiState(
      * True when advanced settings must always be visible (i.e. at least one bundled option
      * is not configured in this build so the user must configure it manually).
      */
-    val forceShowAdvanced: Boolean = false
+    val forceShowAdvanced: Boolean = false,
+    /**
+     * Two-letter ISO 3166-1 country code override. Empty string = "Auto (device locale)".
+     * Shown in Settings → Advanced as a dropdown.
+     */
+    val countryOverride: String = ""
 )
 
 @HiltViewModel
@@ -192,7 +197,8 @@ class SettingsViewModel @Inject constructor(
                     avatarSource = saved.avatarSource,
                     hasCustomAvatar = avatarImageStore.exists(),
                     customAvatarVersion = saved.customAvatarVersion,
-                    llmActivityLoggingEnabled = saved.llmActivityLoggingEnabled
+                    llmActivityLoggingEnabled = saved.llmActivityLoggingEnabled,
+                    countryOverride = saved.countryOverride
                 )
                 Log.d(TAG, "loadPersistedSettings: authMode=$resolvedAuthMode tmdbConnected=${saved.tmdbApiKey.isNotBlank()}")
             } catch (e: Exception) {
@@ -287,6 +293,10 @@ class SettingsViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(directClientSecret = secret)
     }
 
+    fun setCountryOverride(countryCode: String) {
+        _uiState.value = _uiState.value.copy(countryOverride = countryCode)
+    }
+
     fun setModelDownloadUrl(url: String) {
         _uiState.value = _uiState.value.copy(
             modelDownloadUrl = url,
@@ -348,7 +358,8 @@ class SettingsViewModel @Inject constructor(
                         backendUrl = state.customBackendUrl,
                         directClientId = state.directClientId,
                         modelDownloadUrl = state.modelDownloadUrl,
-                        tmdbApiKey = tmdbKeyToSave
+                        tmdbApiKey = tmdbKeyToSave,
+                        countryOverride = state.countryOverride
                     )
                 )
                 settingsRepository.saveClientSecret(state.directClientSecret)
