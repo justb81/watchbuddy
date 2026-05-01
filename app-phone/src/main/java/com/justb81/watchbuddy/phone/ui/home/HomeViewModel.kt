@@ -33,7 +33,6 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.time.Duration
 import java.time.Instant
@@ -253,7 +252,7 @@ class HomeViewModel @Inject constructor(
 
     private fun observeTvConnected() {
         val ticker = flow {
-            while (isActive) {
+            while (true) {
                 emit(Unit)
                 delay(TV_CONNECTED_TICK_MS)
             }
