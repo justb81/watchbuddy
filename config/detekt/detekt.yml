@@ -133,9 +133,7 @@ formatting:
   FinalNewline:
     active: true
   NoWildcardImports:
-    active: true
-    excludeImports:
-      - io.mockk.*
+    active: false          # Enforced by style.WildcardImport above (supports excludeImports).
   Indentation:
     active: false          # Too noisy on mixed-indent legacy files; trust IDE.
   ArgumentListWrapping:
