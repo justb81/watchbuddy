@@ -17,7 +17,6 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
@@ -30,6 +29,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -542,7 +542,7 @@ private fun TvConnectionChip(connected: Boolean) {
         label = { Text(label) },
         leadingIcon = {
             Icon(
-                imageVector = Icons.Filled.Tv,
+                painter = painterResource(R.drawable.ic_tv),
                 contentDescription = null,
                 modifier = Modifier.size(AssistChipDefaults.IconSize)
             )
