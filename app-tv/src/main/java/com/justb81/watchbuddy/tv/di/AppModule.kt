@@ -17,6 +17,9 @@ import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import javax.inject.Named
 import javax.inject.Singleton
 
@@ -74,5 +77,17 @@ abstract class AppModule {
         @Provides
         @Singleton
         fun provideScrobbleTuning(): ScrobbleTuning = ScrobbleTuning.DEFAULT
+
+        /**
+         * Application-level [CoroutineScope] backed by a [SupervisorJob] so that
+         * individual child failures do not cancel the whole scope. Used by
+         * [com.justb81.watchbuddy.tv.boot.BootReceiver] to outlive the broadcast
+         * dispatch window via [android.content.BroadcastReceiver.goAsync].
+         */
+        @Provides
+        @Singleton
+        @ApplicationScope
+        fun provideApplicationScope(): CoroutineScope =
+            CoroutineScope(SupervisorJob() + Dispatchers.Default)
     }
 }
