@@ -168,10 +168,7 @@ internal fun Application.configureCompanionRoutes(
             }
             call.response.header(HttpHeaders.CacheControl, "private, max-age=60")
             call.response.header(HttpHeaders.ETag, etag)
-            call.respondBytes(
-                bytes = file.readBytes(),
-                contentType = ContentType.Image.JPEG
-            )
+            call.respondFile(file)
         }
 
         get("/shows") {

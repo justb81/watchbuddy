@@ -23,6 +23,7 @@ import com.justb81.watchbuddy.phone.auth.TokenRefreshManager
 import com.justb81.watchbuddy.phone.auth.TokenRepository
 import com.justb81.watchbuddy.phone.llm.LlmTitleExtractor
 import com.justb81.watchbuddy.phone.llm.RecapGenerator
+import com.justb81.watchbuddy.phone.settings.AppSettings
 import com.justb81.watchbuddy.phone.settings.AvatarImageStore
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import com.justb81.watchbuddy.service.CompanionStateManager
@@ -37,9 +38,14 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
+import java.io.File
 
 @DisplayName("CompanionHttpServer routes")
 class CompanionHttpServerTest {
+
+    @TempDir
+    lateinit var tempDir: File
 
     // ── Mocked dependencies ───────────────────────────────────────────────────
 
@@ -120,6 +126,90 @@ class CompanionHttpServerTest {
             val body = response.bodyAsText()
             assertTrue(body.contains("\"userName\":\"alice\""))
             assertTrue(body.contains("\"modelQuality\":75"))
+        }
+    }
+
+    // ── GET /avatar ───────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("GET /avatar")
+    inner class AvatarEndpoint {
+
+        @Test
+        fun `returns 404 when no custom avatar stored`() = testApp {
+            every { avatarImageStore.exists() } returns false
+
+            val response = client.get("/avatar")
+
+            assertEquals(HttpStatusCode.NotFound, response.status)
+        }
+
+        @Test
+        fun `returns 304 when request ETag matches stored version`() = testApp {
+            every { avatarImageStore.exists() } returns true
+            every { settingsRepository.settings } returns flowOf(AppSettings(customAvatarVersion = 5L))
+
+            val response = client.get("/avatar") {
+                header(HttpHeaders.IfNoneMatch, "\"5\"")
+            }
+
+            assertEquals(HttpStatusCode.NotModified, response.status)
+        }
+
+        @Test
+        fun `returns 200 with file content when ETag does not match`() = testApp {
+            val avatarBytes = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xE0.toByte())
+            val avatarFile = File(tempDir, "avatar.jpg").apply { writeBytes(avatarBytes) }
+            every { avatarImageStore.exists() } returns true
+            every { avatarImageStore.file() } returns avatarFile
+            every { settingsRepository.settings } returns flowOf(AppSettings(customAvatarVersion = 1L))
+
+            val response = client.get("/avatar")
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertArrayEquals(avatarBytes, response.readBytes())
+        }
+
+        @Test
+        fun `sets ETag header matching current avatar version`() = testApp {
+            val avatarFile = File(tempDir, "avatar.jpg").apply { writeBytes(byteArrayOf(1, 2, 3)) }
+            every { avatarImageStore.exists() } returns true
+            every { avatarImageStore.file() } returns avatarFile
+            every { settingsRepository.settings } returns flowOf(AppSettings(customAvatarVersion = 42L))
+
+            val response = client.get("/avatar")
+
+            assertEquals("\"42\"", response.headers[HttpHeaders.ETag])
+        }
+
+        @Test
+        fun `sets Cache-Control private header`() = testApp {
+            val avatarFile = File(tempDir, "avatar.jpg").apply { writeBytes(byteArrayOf(1, 2, 3)) }
+            every { avatarImageStore.exists() } returns true
+            every { avatarImageStore.file() } returns avatarFile
+            every { settingsRepository.settings } returns flowOf(AppSettings(customAvatarVersion = 1L))
+
+            val response = client.get("/avatar")
+
+            val cacheControl = response.headers[HttpHeaders.CacheControl]
+            assertNotNull(cacheControl)
+            assertTrue(cacheControl!!.contains("private"))
+        }
+
+        @Test
+        fun `serves file content without loading it all into a byte array`() = testApp {
+            // Verify that a file with non-trivial content is served correctly —
+            // regression guard to ensure respondFile rather than readBytes() is used.
+            val content = ByteArray(512) { it.toByte() }
+            val avatarFile = File(tempDir, "avatar.jpg").apply { writeBytes(content) }
+            every { avatarImageStore.exists() } returns true
+            every { avatarImageStore.file() } returns avatarFile
+            every { settingsRepository.settings } returns flowOf(AppSettings(customAvatarVersion = 2L))
+
+            val response = client.get("/avatar")
+
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertArrayEquals(content, response.readBytes())
         }
     }
 
