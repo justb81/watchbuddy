@@ -367,6 +367,12 @@ data class WatchProviderResponse(
     val results: Map<String, WatchProviderResult> = emptyMap(),
 )
 
+/** Response from TMDB `/watch/providers/tv` — the global catalogue of all TV watch providers. */
+@Serializable
+data class AllTvWatchProvidersResponse(
+    val results: List<WatchProviderEntry> = emptyList(),
+)
+
 /**
  * A fully resolved streaming provider for a show, ready for the UI.
  * Combines TMDB provider data with the [ProviderCatalog] mapping and
