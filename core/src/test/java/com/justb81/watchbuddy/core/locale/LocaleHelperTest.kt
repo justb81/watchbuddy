@@ -46,9 +46,9 @@ class LocaleHelperTest {
             Arguments.of(Locale.ENGLISH, "en"),
             Arguments.of(Locale.GERMAN, "de"),
             Arguments.of(locale("fr"), "fr"),
-            Arguments.of(locale("eo"), "eo"),   // Esperanto — no country variant exists
-            Arguments.of(locale("la"), "la"),   // Latin — no country variant exists
-            Arguments.of(locale("en"), "en")    // regionless English
+            Arguments.of(locale("eo"), "eo"), // Esperanto — no country variant exists
+            Arguments.of(locale("la"), "la"), // Latin — no country variant exists
+            Arguments.of(locale("en"), "en") // regionless English
         )
     }
 
