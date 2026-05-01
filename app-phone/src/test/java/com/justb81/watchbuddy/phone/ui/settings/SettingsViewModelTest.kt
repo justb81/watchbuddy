@@ -998,39 +998,6 @@ class SettingsViewModelTest {
             // No crash — UI remains usable.
         }
 
-        @Test
-        fun `toggleCompanionService reverts optimistic state when settings flow throws`() = runTest {
-            val vm = createViewModel()
-            advanceUntilIdle()
-
-            // ViewModel was created with companionRunning = false (default).
-            val beforeToggle = vm.uiState.value.companionRunning
-            assertFalse(beforeToggle)
-
-            // Swap in a throwing flow so the save path fails.
-            every { settingsRepository.settings } returns flow { throw IOException("DataStore corrupted") }
-
-            vm.toggleCompanionService()
-            advanceUntilIdle()
-
-            // After failure, the optimistic flip must be reverted so the UI matches reality.
-            assertEquals(beforeToggle, vm.uiState.value.companionRunning)
-        }
-
-        @Test
-        fun `toggleCompanionService reverts optimistic state when saveSettings throws`() = runTest {
-            val vm = createViewModel()
-            advanceUntilIdle()
-
-            val beforeToggle = vm.uiState.value.companionRunning
-            coEvery { settingsRepository.saveSettings(any()) } throws
-                RuntimeException("DataStore write failed")
-
-            vm.toggleCompanionService()
-            advanceUntilIdle()
-
-            assertEquals(beforeToggle, vm.uiState.value.companionRunning)
-        }
     }
 
     /**

@@ -168,42 +168,6 @@ fun SettingsScreen(
                 )
             }
 
-            // ── Companion Service ─────────────────────────────────────────────
-            SettingsSectionHeader(stringResource(R.string.settings_companion))
-
-            SettingsCard {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column {
-                        Text(
-                            stringResource(R.string.settings_companion_toggle),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text  = if (uiState.companionRunning)
-                                        stringResource(R.string.settings_companion_running)
-                                    else
-                                        stringResource(R.string.settings_companion_stopped),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (uiState.companionRunning)
-                                        MaterialTheme.colorScheme.primary
-                                    else
-                                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                        )
-                    }
-                    Switch(
-                        checked         = uiState.companionRunning,
-                        onCheckedChange = { viewModel.toggleCompanionService() }
-                    )
-                }
-            }
-
             // ── LLM Section ───────────────────────────────────────────────────
             SettingsSectionHeader(stringResource(R.string.settings_llm))
 

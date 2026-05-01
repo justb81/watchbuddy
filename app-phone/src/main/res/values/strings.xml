@@ -97,10 +97,6 @@
     <string name="settings_tmdb_default_key_active">Built-in key active</string>
     <string name="settings_tmdb_attribution" translatable="false">This app uses the TMDB API but is not endorsed or certified by TMDB.</string>
     <string name="settings_disconnect">Disconnect</string>
-    <string name="settings_companion">Companion service</string>
-    <string name="settings_companion_running">Running (port 8765)</string>
-    <string name="settings_companion_stopped">Stopped</string>
-    <string name="settings_companion_toggle">Companion service</string>
     <string name="settings_llm">AI model</string>
     <string name="settings_llm_backend">Backend</string>
     <string name="settings_llm_model">Model</string>

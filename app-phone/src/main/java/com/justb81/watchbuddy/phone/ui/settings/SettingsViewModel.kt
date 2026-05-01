@@ -55,7 +55,6 @@ data class SettingsUiState(
     val buildHasBundledTmdbKey: Boolean = false,
     /** True when the user has selected the "bundled key" radio in advanced settings. */
     val useBundledTmdbKey: Boolean = true,
-    val companionRunning: Boolean  = false,
     val authMode: AuthMode         = AuthMode.MANAGED,
     val customBackendUrl: String   = "",
     val directClientId: String     = "",
@@ -182,7 +181,6 @@ class SettingsViewModel @Inject constructor(
                     customBackendUrl = saved.backendUrl,
                     directClientId = saved.directClientId,
                     directClientSecret = clientSecret,
-                    companionRunning = saved.companionEnabled,
                     modelDownloadUrl = saved.modelDownloadUrl,
                     tmdbApiKey = saved.tmdbApiKey,
                     tmdbConnected = saved.tmdbApiKey.isNotBlank(),
@@ -349,7 +347,6 @@ class SettingsViewModel @Inject constructor(
                         authMode = state.authMode,
                         backendUrl = state.customBackendUrl,
                         directClientId = state.directClientId,
-                        companionEnabled = state.companionRunning,
                         modelDownloadUrl = state.modelDownloadUrl,
                         tmdbApiKey = tmdbKeyToSave
                     )
@@ -389,29 +386,6 @@ class SettingsViewModel @Inject constructor(
             } catch (e: Exception) {
                 DiagnosticLog.error(TAG, "setLlmActivityLoggingEnabled:failed (reverting)", e)
                 _uiState.value = _uiState.value.copy(llmActivityLoggingEnabled = previous)
-            }
-        }
-    }
-
-    fun toggleCompanionService() {
-        val previousState = _uiState.value.companionRunning
-        val newState = !previousState
-        _uiState.value = _uiState.value.copy(companionRunning = newState)
-        launchSafe {
-            try {
-                val current = settingsRepository.settings.first()
-                settingsRepository.saveSettings(current.copy(companionEnabled = newState))
-                val context = getApplication<Application>()
-                if (newState) {
-                    CompanionService.start(context)
-                } else {
-                    CompanionService.stop(context)
-                }
-            } catch (e: Exception) {
-                // Persistence or service start failed — revert optimistic toggle so
-                // the UI reflects reality and the user can retry.
-                DiagnosticLog.error(TAG, "toggleCompanionService:failed (reverting)", e)
-                _uiState.value = _uiState.value.copy(companionRunning = previousState)
             }
         }
     }

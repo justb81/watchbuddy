@@ -89,10 +89,6 @@
     <string name="settings_tmdb_helper_link">Obtener clave API</string>
     <string name="settings_tmdb_default_key_active">Clave integrada activa</string>
     <string name="settings_disconnect">Desconectar</string>
-    <string name="settings_companion">Servicio compañero</string>
-    <string name="settings_companion_running">En ejecución (puerto 8765)</string>
-    <string name="settings_companion_stopped">Detenido</string>
-    <string name="settings_companion_toggle">Servicio compañero</string>
     <string name="settings_llm">Modelo IA</string>
     <string name="settings_llm_backend">Backend</string>
     <string name="settings_llm_model">Modelo</string>
