@@ -50,6 +50,12 @@ class CompanionService : Service() {
         private const val PRESENCE_TIMEOUT_MS = 5 * 60_000L
 
         /**
+         * A TV is "connected" when its last /capability poll was within this window.
+         * 1.5× the TV's own check interval gives one missed poll of slack.
+         */
+        internal const val TV_CONNECTED_WINDOW_MS = 90_000L
+
+        /**
          * Grace period after a Wi-Fi network is lost before the service
          * self-stops. Covers SSID handoffs where `onLost(oldNet)` fires a beat
          * before `onAvailable(newNet)`. If Wi-Fi is genuinely gone after this
@@ -171,6 +177,7 @@ class CompanionService : Service() {
     private fun startPresenceMonitor() {
         // Reset the timestamp so the first check doesn't immediately time out
         stateManager.onCapabilityChecked()
+        var lastNotifiedConnected = false
         presenceJob = serviceScope.launch {
             while (true) {
                 delay(PRESENCE_CHECK_INTERVAL_MS)
@@ -180,6 +187,12 @@ class CompanionService : Service() {
                     settingsRepository.setCompanionEnabled(false)
                     stopSelf()
                     break
+                }
+                val connected = elapsed < TV_CONNECTED_WINDOW_MS
+                if (connected != lastNotifiedConnected) {
+                    lastNotifiedConnected = connected
+                    val nm = getSystemService(NotificationManager::class.java)
+                    nm.notify(NOTIFICATION_ID, buildNotification(connected))
                 }
             }
         }
@@ -246,7 +259,7 @@ class CompanionService : Service() {
         }
     }
 
-    private fun buildNotification(): Notification {
+    private fun buildNotification(connected: Boolean = false): Notification {
         // Tapping the notification brings MainActivity back to the front so the
         // user can toggle the "I am watching TV" switch off without fishing the
         // app out of recents.
@@ -258,9 +271,14 @@ class CompanionService : Service() {
             },
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
+        val contentText = if (connected) {
+            getString(R.string.companion_notification_text_connected)
+        } else {
+            getString(R.string.companion_notification_text)
+        }
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(getString(R.string.companion_notification_title))
-            .setContentText(getString(R.string.companion_notification_text))
+            .setContentText(contentText)
             // Must be a white-on-transparent vector — adaptive mipmaps are
             // rejected or rendered blank by some OEM skins (#261).
             .setSmallIcon(R.drawable.ic_companion_notification)

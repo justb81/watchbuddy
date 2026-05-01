@@ -24,7 +24,9 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.jupiter.api.Assertions.*
@@ -731,6 +733,66 @@ class HomeViewModelTest {
 
             coVerify(exactly = 1) { settingsRepository.setCompanionEnabled(false) }
             assertFalse(vm.uiState.value.isOnWifi)
+        }
+    }
+
+    @Nested
+    @DisplayName("isTvConnected — TV presence indicator")
+    inner class TvConnectedTest {
+
+        @Test
+        fun `isTvConnected is false initially when lastCapabilityCheck is 0`() = runTest {
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            assertFalse(vm.uiState.value.isTvConnected)
+        }
+
+        @Test
+        fun `isTvConnected becomes true when a recent poll is recorded`() = runTest {
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            companionStateManager.onCapabilityChecked()
+            // runCurrent() processes the flatMapLatest emit(true) without advancing
+            // past the 90 s delay — so isTvConnected stays true.
+            runCurrent()
+
+            assertTrue(vm.uiState.value.isTvConnected)
+        }
+
+        @Test
+        fun `isTvConnected flips false after TV_CONNECTED_WINDOW_MS without a new poll`() = runTest {
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            companionStateManager.onCapabilityChecked()
+            runCurrent()
+            assertTrue(vm.uiState.value.isTvConnected)
+
+            // Advance past the 90 s window — the flatMapLatest delay completes and
+            // emit(false) fires, flipping isTvConnected back to false.
+            advanceTimeBy(HomeViewModel.TV_CONNECTED_WINDOW_MS + 1)
+            runCurrent()
+
+            assertFalse(vm.uiState.value.isTvConnected)
+        }
+
+        @Test
+        fun `isTvConnected stays true while polls keep arriving within the window`() = runTest {
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            // Each new poll must carry a unique timestamp so MutableStateFlow emits a
+            // new value and flatMapLatest cancels the old 90 s delay before advancing.
+            // Using onCapabilityChecked() risks the same millis across iterations,
+            // which would suppress the StateFlow emission.
+            repeat(3) { i ->
+                companionStateManager.onCapabilityCheckedAt(1_000L + i)
+                runCurrent()
+                assertTrue(vm.uiState.value.isTvConnected)
+                advanceTimeBy(60_000L)
+            }
         }
     }
 }

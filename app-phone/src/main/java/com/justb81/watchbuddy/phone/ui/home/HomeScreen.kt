@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -283,6 +284,9 @@ private fun HomeContent(
                 onToggle = onToggleWatchingTv
             )
         }
+        if (state.isWatchingTv) {
+            item { TvConnectionChip(connected = state.isTvConnected) }
+        }
         when {
             state.latestScrobbleEvent != null ->
                 item { NowWatchingCard(event = state.latestScrobbleEvent) }
@@ -528,6 +532,32 @@ private fun WatchingTvToggle(
             )
         }
     }
+}
+
+@Composable
+private fun TvConnectionChip(connected: Boolean) {
+    val label = stringResource(if (connected) R.string.home_tv_connected else R.string.home_tv_waiting)
+    AssistChip(
+        onClick = {},
+        label = { Text(label) },
+        leadingIcon = {
+            Icon(
+                painter = painterResource(R.drawable.ic_tv),
+                contentDescription = null,
+                modifier = Modifier.size(AssistChipDefaults.IconSize)
+            )
+        },
+        border = if (connected) null else AssistChipDefaults.assistChipBorder(enabled = true),
+        colors = if (connected) {
+            AssistChipDefaults.assistChipColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                labelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                leadingIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+        } else {
+            AssistChipDefaults.assistChipColors()
+        },
+    )
 }
 
 @Composable
