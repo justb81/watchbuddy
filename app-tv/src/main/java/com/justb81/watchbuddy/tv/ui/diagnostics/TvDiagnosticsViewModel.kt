@@ -10,6 +10,7 @@ import com.justb81.watchbuddy.core.scrobbler.MediaSessionScrobbler
 import com.justb81.watchbuddy.core.scrobbler.PlaybackIntentProvider
 import com.justb81.watchbuddy.core.scrobbler.PlaybackIntentStats
 import com.justb81.watchbuddy.tv.data.JustWatchDeepLinkRepository
+import com.justb81.watchbuddy.tv.data.JustWatchOutcomeEvent
 import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
 import com.justb81.watchbuddy.tv.scrobbler.NotificationMetadataSource
 import com.justb81.watchbuddy.tv.scrobbler.WatchNextMetadataSource
@@ -61,6 +62,11 @@ data class TvDiagnosticsUiState(
     val ambiguousPromptStats: MediaSessionScrobbler.AmbiguousPromptStats? = null,
     /** Counters for Watch-Now intent lifecycle (hits / fallthroughs / manual-mark overrides). Null before first refresh. */
     val intentStats: PlaybackIntentStats? = null,
+    /**
+     * The last 5 JustWatch resolution outcomes for display in the Streaming Links diagnostics section.
+     * Most recent event is last. Empty until the user navigates to a show-detail screen.
+     */
+    val recentJustWatchOutcomes: List<JustWatchOutcomeEvent> = emptyList(),
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -144,6 +150,12 @@ class TvDiagnosticsViewModel @Inject constructor(
             DiagnosticLog.updates.onStart { emit(Unit) }.collect {
                 val latest = DiagnosticLog.snapshot().asReversed().take(MAX_RECENT_EVENTS)
                 _uiState.update { it.copy(recentEvents = latest) }
+            }
+        }
+
+        viewModelScope.launch {
+            justWatchRepo.outcomeEvents.collect { events ->
+                _uiState.update { it.copy(recentJustWatchOutcomes = events.takeLast(MAX_DISPLAYED_OUTCOMES)) }
             }
         }
     }
@@ -240,5 +252,6 @@ class TvDiagnosticsViewModel @Inject constructor(
 
     companion object {
         private const val MAX_RECENT_EVENTS = 100
+        private const val MAX_DISPLAYED_OUTCOMES = 5
     }
 }

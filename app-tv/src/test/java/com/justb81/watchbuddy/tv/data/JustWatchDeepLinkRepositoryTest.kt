@@ -1,5 +1,6 @@
 package com.justb81.watchbuddy.tv.data
 
+import com.justb81.watchbuddy.tv.data.JustWatchOutcomeEvent
 import com.justb81.watchbuddy.core.justwatch.JustWatchApiService
 import com.justb81.watchbuddy.core.justwatch.JustWatchContent
 import com.justb81.watchbuddy.core.justwatch.JustWatchData
@@ -521,6 +522,80 @@ class JustWatchDeepLinkRepositoryTest {
         @Test
         fun `lastFetchError returns null initially`() {
             assertNull(repository.lastFetchError())
+        }
+    }
+
+    @Nested
+    @DisplayName("outcome events ring buffer")
+    inner class OutcomeEventTests {
+
+        @Test
+        fun `records EPISODE_CACHE_HIT outcome on cache hit`() = runTest {
+            coEvery { dao.get(100, 1, 2, 8, "US") } returns makeLink(url = "https://www.netflix.com/watch/99")
+
+            repository.resolveDeepLink(100, 1, 2, 8, "US", "Breaking Bad")
+
+            val outcomes = repository.outcomeEvents.value
+            assertTrue(outcomes.any { it.outcome == JustWatchOutcomeEvent.Outcome.EPISODE_CACHE_HIT })
+        }
+
+        @Test
+        fun `records SEARCH_MISS outcome when JustWatch returns no matching TMDB id`() = runTest {
+            coEvery { dao.get(any(), any(), any(), any(), any()) } returns null
+            coEvery { api.query(match { it.query == JustWatchApiService.SEARCH_QUERY }) } returns
+                makeSearchResponse(tmdbId = "999")
+
+            repository.resolveDeepLink(100, 1, 2, 8, "US", "Unknown Show")
+
+            val outcomes = repository.outcomeEvents.value
+            assertTrue(outcomes.any { it.outcome == JustWatchOutcomeEvent.Outcome.SEARCH_MISS })
+        }
+
+        @Test
+        fun `logsTechnicalNameUnmapped records TECHNICAL_NAME_UNMAPPED outcome for unknown aliases`() = runTest {
+            val unknownOffer = makeOffer(technicalName = "xyz_unknown")
+            coEvery { dao.get(100, 1, 2, 8, "US") } returns null andThen null
+            coEvery { dao.get(100, 0, 0, 8, "US") } returns null andThen null
+
+            coEvery { api.query(match { it.query == JustWatchApiService.SEARCH_QUERY }) } returns
+                makeSearchResponse(offers = listOf(unknownOffer))
+            coEvery { api.query(match { it.query == JustWatchApiService.SEASONS_QUERY }) } returns
+                makeSeasonsResponse()
+            coEvery { api.query(match { it.query == JustWatchApiService.EPISODES_QUERY }) } returns
+                makeEpisodesResponse(emptyList())
+
+            repository.resolveDeepLink(100, 1, 2, 8, "US", "Breaking Bad")
+
+            val outcomes = repository.outcomeEvents.value
+            val unmapped = outcomes.filter { it.outcome == JustWatchOutcomeEvent.Outcome.TECHNICAL_NAME_UNMAPPED }
+            assertTrue(unmapped.isNotEmpty(), "Expected at least one TECHNICAL_NAME_UNMAPPED outcome")
+            assertEquals("xyz_unknown", unmapped.first().detail)
+        }
+
+        @Test
+        fun `records HTTP_ERROR outcome on HTTP 422 from search`() = runTest {
+            coEvery { dao.get(any(), any(), any(), any(), any()) } returns null
+            coEvery { api.query(match { it.query == JustWatchApiService.SEARCH_QUERY }) } answers {
+                makeHttpErrorResponse(422)
+            }
+
+            repository.resolveDeepLink(100, 1, 2, 8, "US", "Breaking Bad")
+
+            val outcomes = repository.outcomeEvents.value
+            assertTrue(outcomes.any { it.outcome == JustWatchOutcomeEvent.Outcome.HTTP_ERROR })
+        }
+
+        @Test
+        fun `ring buffer caps at MAX_OUTCOME_EVENTS and does not grow indefinitely`() = runTest {
+            coEvery { dao.get(any(), any(), any(), any(), any()) } answers {
+                makeLink(url = "https://example.com/${System.nanoTime()}")
+            }
+
+            repeat(60) { i ->
+                repository.resolveDeepLink(i, 1, 1, 8, "US", "Show $i")
+            }
+
+            assertTrue(repository.outcomeEvents.value.size <= 50)
         }
     }
 

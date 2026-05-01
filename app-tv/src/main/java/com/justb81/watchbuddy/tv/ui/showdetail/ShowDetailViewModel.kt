@@ -162,6 +162,19 @@ class ShowDetailViewModel @Inject constructor(
     }
 
     /**
+     * Resolves the country code for watch-provider and JustWatch lookups.
+     *
+     * Cascade:
+     *   1. Country code reported by the best-connected phone's locale (via [DeviceCapability.countryCode]).
+     *   2. TV's own default locale country (may be empty on TVs with English-only firmware).
+     *   3. Hard-coded "US" fallback.
+     */
+    private fun resolveCountryCode(): String =
+        phoneDiscovery.getBestPhone()?.capability?.countryCode
+            ?: Locale.getDefault().country.takeIf { it.length == 2 }
+            ?: "US"
+
+    /**
      * Fetches TMDB watch providers for [enriched], applies installed-app filter and
      * last-used ordering, then updates [providers]. Safe to call multiple times (retry).
      */
@@ -178,7 +191,7 @@ class ShowDetailViewModel @Inject constructor(
                 return@launch
             }
             try {
-                val countryCode = Locale.getDefault().country.takeIf { it.length == 2 } ?: "US"
+                val countryCode = resolveCountryCode()
                 val showNonInstalled = streamingPrefs.getShowNonInstalledProviders()
                 val (resolved, pageUrl) = watchProviders.getResolvedProviders(
                     tmdbId, countryCode, apiKey, showNonInstalled
@@ -208,7 +221,7 @@ class ShowDetailViewModel @Inject constructor(
             ShowProgressCalculator.nextUnwatchedEpisodeNumbers(enriched.entry, enriched.tmdb) ?: return
         val providerState = _providers.value
         val providerList = (providerState as? ProviderListUiState.Success)?.providers ?: return
-        val countryCode = Locale.getDefault().country.takeIf { it.length == 2 } ?: "US"
+        val countryCode = resolveCountryCode()
         val showTitle = enriched.entry.show.title
 
         // Set all providers to Loading

@@ -8,6 +8,9 @@ import com.justb81.watchbuddy.core.justwatch.JustWatchPackageMap
 import com.justb81.watchbuddy.core.justwatch.JustWatchTitle
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.buildJsonObject
@@ -25,6 +28,35 @@ private val COUNTRY_CODE_REGEX = Regex("[A-Z]{2}")
 private const val DEFAULT_MISS_WINDOW_MS = 24L * 60 * 60 * 1_000
 private const val MAX_ERROR_SUMMARY_LENGTH = 200
 private const val MAX_HTTP_ERROR_BODY_LENGTH = 500
+private const val MAX_OUTCOME_EVENTS = 50
+
+/**
+ * A single deep-link resolution outcome recorded in [JustWatchDeepLinkRepository.outcomeEvents].
+ *
+ * [providerId] is -1 when the outcome is not specific to a single provider (e.g., HTTP errors
+ * and search misses affect all providers for a given show). [detail] carries extra context
+ * such as the unmapped technical name or HTTP status.
+ */
+data class JustWatchOutcomeEvent(
+    val timestampMs: Long,
+    val tmdbShowId: Int,
+    val providerId: Int,
+    val countryCode: String,
+    val outcome: Outcome,
+    val detail: String = "",
+) {
+    enum class Outcome {
+        EPISODE_CACHE_HIT,
+        EPISODE_API_HIT,
+        SHOW_CACHE_HIT,
+        SHOW_API_HIT,
+        SEARCH_MISS,
+        TECHNICAL_NAME_UNMAPPED,
+        HTTP_ERROR,
+        GRAPHQL_ERROR,
+        EPISODE_NOT_IN_RESULTS,
+    }
+}
 
 /**
  * Resolves JustWatch per-episode deep links with a persistent Room cache.
@@ -78,6 +110,25 @@ class JustWatchDeepLinkRepository @Inject constructor(
     private val missTimestamps = ArrayDeque<Long>()
     private val missLock = Any()
 
+    private val _outcomeEvents = MutableStateFlow<List<JustWatchOutcomeEvent>>(emptyList())
+
+    /** Bounded ring-buffer (max [MAX_OUTCOME_EVENTS]) of recent deep-link resolution outcomes. */
+    val outcomeEvents: StateFlow<List<JustWatchOutcomeEvent>> = _outcomeEvents.asStateFlow()
+
+    private val outcomeLock = Any()
+
+    private fun recordOutcome(
+        tmdbShowId: Int,
+        providerId: Int,
+        countryCode: String,
+        outcome: JustWatchOutcomeEvent.Outcome,
+        detail: String = "",
+    ) = synchronized(outcomeLock) {
+        val event = JustWatchOutcomeEvent(System.currentTimeMillis(), tmdbShowId, providerId, countryCode, outcome, detail)
+        val current = _outcomeEvents.value
+        _outcomeEvents.value = if (current.size >= MAX_OUTCOME_EVENTS) current.drop(1) + event else current + event
+    }
+
     private fun recordMiss() = synchronized(missLock) {
         missTimestamps.addLast(System.currentTimeMillis())
     }
@@ -116,20 +167,29 @@ class JustWatchDeepLinkRepository @Inject constructor(
 
         // 1. Episode-level cache
         val epCached = dao.get(tmdbShowId, season, episode, providerId, country)
-        if (epCached != null && epCached.isValidCache()) return epCached.standardWebUrl
+        if (epCached != null && epCached.isValidCache()) {
+            recordOutcome(tmdbShowId, providerId, country, JustWatchOutcomeEvent.Outcome.EPISODE_CACHE_HIT)
+            return epCached.standardWebUrl
+        }
 
         // 2. Episode-level live fetch (deduped per episode)
         val episodeKey = FetchKey(tmdbShowId, season, episode, country)
         getMutex(episodeKey).withLock {
             // Re-check cache after acquiring lock — another coroutine may have populated it
             val refreshed = dao.get(tmdbShowId, season, episode, providerId, country)
-            if (refreshed != null && refreshed.isValidCache()) return refreshed.standardWebUrl
+            if (refreshed != null && refreshed.isValidCache()) {
+                recordOutcome(tmdbShowId, providerId, country, JustWatchOutcomeEvent.Outcome.EPISODE_CACHE_HIT)
+                return refreshed.standardWebUrl
+            }
             fetchAndCacheEpisodeOffers(tmdbShowId, season, episode, country, showTitle)
         }
 
         // Re-read after episode fetch
         val epResult = dao.get(tmdbShowId, season, episode, providerId, country)
-        if (epResult != null && epResult.isValidCache()) return epResult.standardWebUrl
+        if (epResult != null && epResult.isValidCache()) {
+            recordOutcome(tmdbShowId, providerId, country, JustWatchOutcomeEvent.Outcome.EPISODE_API_HIT)
+            return epResult.standardWebUrl
+        }
 
         return resolveShowLevel(tmdbShowId, providerId, country, showTitle)
     }
@@ -152,17 +212,27 @@ class JustWatchDeepLinkRepository @Inject constructor(
     ): String? {
         // 3. Show-level cache
         val showCached = dao.get(tmdbShowId, 0, 0, providerId, countryCode)
-        if (showCached != null && showCached.isValidCache()) return showCached.standardWebUrl
+        if (showCached != null && showCached.isValidCache()) {
+            recordOutcome(tmdbShowId, providerId, countryCode, JustWatchOutcomeEvent.Outcome.SHOW_CACHE_HIT)
+            return showCached.standardWebUrl
+        }
 
         // 4. Show-level live fetch (deduped)
         val showKey = FetchKey(tmdbShowId, 0, 0, countryCode)
         getMutex(showKey).withLock {
             val refreshed = dao.get(tmdbShowId, 0, 0, providerId, countryCode)
-            if (refreshed != null && refreshed.isValidCache()) return refreshed.standardWebUrl
+            if (refreshed != null && refreshed.isValidCache()) {
+                recordOutcome(tmdbShowId, providerId, countryCode, JustWatchOutcomeEvent.Outcome.SHOW_CACHE_HIT)
+                return refreshed.standardWebUrl
+            }
             fetchAndCacheShowOffers(tmdbShowId, countryCode, showTitle)
         }
 
-        return dao.get(tmdbShowId, 0, 0, providerId, countryCode)?.standardWebUrl
+        val showResult = dao.get(tmdbShowId, 0, 0, providerId, countryCode)
+        if (showResult?.standardWebUrl != null) {
+            recordOutcome(tmdbShowId, providerId, countryCode, JustWatchOutcomeEvent.Outcome.SHOW_API_HIT)
+        }
+        return showResult?.standardWebUrl
     }
 
     private fun JustWatchDeepLink.isValidCache(): Boolean =
@@ -200,17 +270,20 @@ class JustWatchDeepLinkRepository @Inject constructor(
                     val msg = "HTTP ${result.code} searching '$showTitle' (tmdb=$tmdbShowId): ${result.bodySummary}"
                     DiagnosticLog.error(TAG, msg)
                     recordError(msg)
+                    recordOutcome(tmdbShowId, -1, countryCode, JustWatchOutcomeEvent.Outcome.HTTP_ERROR, "HTTP ${result.code}")
                     return
                 }
                 is SearchResult.GraphQlError -> {
                     val msg = "GraphQL error searching '$showTitle' (tmdb=$tmdbShowId): ${result.summary}"
                     DiagnosticLog.error(TAG, msg)
                     recordError(msg)
+                    recordOutcome(tmdbShowId, -1, countryCode, JustWatchOutcomeEvent.Outcome.GRAPHQL_ERROR, result.summary)
                     return
                 }
                 is SearchResult.SearchMiss -> {
                     DiagnosticLog.warn(TAG, "No JustWatch node matched tmdbId=$tmdbShowId title='$showTitle'")
                     recordMiss()
+                    recordOutcome(tmdbShowId, -1, countryCode, JustWatchOutcomeEvent.Outcome.SEARCH_MISS)
                     return
                 }
                 is SearchResult.Found ->
@@ -288,6 +361,7 @@ class JustWatchDeepLinkRepository @Inject constructor(
             cacheOffers(jwEp.offers, tmdbShowId, season, episode, countryCode)
         } else {
             DiagnosticLog.warn(TAG, "Episode S${season}E$episode not found in JustWatch for tmdbId=$tmdbShowId")
+            recordOutcome(tmdbShowId, -1, countryCode, JustWatchOutcomeEvent.Outcome.EPISODE_NOT_IN_RESULTS, "S${season}E$episode")
         }
     }
 
@@ -418,9 +492,14 @@ class JustWatchDeepLinkRepository @Inject constructor(
             .filter { it.monetizationType in ALLOWED_MONETIZATION }
             .forEach { offer ->
                 val technicalName = offer.`package`?.technicalName ?: return@forEach
-                val providerId = JustWatchPackageMap.resolveProviderId(technicalName) ?: return@forEach
+                val resolvedId = JustWatchPackageMap.resolveProviderId(technicalName)
+                if (resolvedId == null) {
+                    DiagnosticLog.warn(TAG, "technicalNameUnmapped: '$technicalName' (tmdbShowId=$tmdbShowId)")
+                    recordOutcome(tmdbShowId, -1, countryCode, JustWatchOutcomeEvent.Outcome.TECHNICAL_NAME_UNMAPPED, technicalName)
+                    return@forEach
+                }
                 val url = offer.standardWebURL ?: return@forEach
-                providerUrls.putIfAbsent(providerId, url)
+                providerUrls.putIfAbsent(resolvedId, url)
             }
         for ((providerId, url) in providerUrls) {
             dao.upsert(JustWatchDeepLink(tmdbShowId, season, episode, providerId, countryCode, url, now))

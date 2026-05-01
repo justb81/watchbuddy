@@ -3,6 +3,7 @@ package com.justb81.watchbuddy.phone.server
 import android.app.ActivityManager
 import android.content.Context
 import android.os.Build
+import java.util.Locale
 import com.justb81.watchbuddy.core.model.AvatarSource
 import com.justb81.watchbuddy.core.model.DeviceCapability
 import com.justb81.watchbuddy.core.trakt.TraktApiService
@@ -75,6 +76,7 @@ class DeviceCapabilityProvider @Inject constructor(
             avatarSource = settings.avatarSource,
             lastResolvedSessionKey = stateManager.lastResolvedSessionKey.value,
             lastResolvedTraktId = stateManager.lastResolvedTraktId.value,
+            countryCode = Locale.getDefault().country.takeIf { it.length == 2 },
         )
     }
 

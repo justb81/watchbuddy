@@ -20,6 +20,10 @@ object JustWatchPackageMap {
         "wpu" to 2187, // WaipuTV
         "ard" to 195, // ARD Mediathek
         "zdf" to 231, // ZDF Mediathek
+        // YouTube: JustWatch has shuffled aliases over time; map all known variants to TMDB 192
+        "yti" to 192, // YouTube (primary alias)
+        "yot" to 192, // YouTube (alternate alias)
+        "ytv" to 192, // YouTube (TV variant alias)
     )
 
     fun resolveProviderId(technicalName: String): Int? =

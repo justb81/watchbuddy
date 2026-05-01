@@ -23,9 +23,19 @@ class JustWatchPackageMapTest {
         "wpu, 2187",
         "ard, 195",
         "zdf, 231",
+        "yti, 192",
+        "yot, 192",
+        "ytv, 192",
     )
     fun `resolves known technical names to TMDB provider ids`(technicalName: String, expectedId: Int) {
         assertEquals(expectedId, JustWatchPackageMap.resolveProviderId(technicalName))
+    }
+
+    @Test
+    fun `youtubeAliasesResolveToProvider192`() {
+        assertEquals(192, JustWatchPackageMap.resolveProviderId("yti"))
+        assertEquals(192, JustWatchPackageMap.resolveProviderId("yot"))
+        assertEquals(192, JustWatchPackageMap.resolveProviderId("ytv"))
     }
 
     @Test

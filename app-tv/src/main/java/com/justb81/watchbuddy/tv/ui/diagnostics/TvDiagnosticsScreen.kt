@@ -30,6 +30,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.tv.material3.*
 import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
+import com.justb81.watchbuddy.tv.data.JustWatchOutcomeEvent
 import com.justb81.watchbuddy.core.model.PlaybackTick
 import com.justb81.watchbuddy.core.scrobbler.MediaSessionScrobbler
 import com.justb81.watchbuddy.core.scrobbler.PlaybackIntentStats
@@ -236,6 +237,7 @@ fun TvDiagnosticsScreen(
                     lastFetchMs = uiState.lastDeepLinkFetchMs,
                     lastError = uiState.lastJustWatchError,
                     searchMisses24h = uiState.justWatchSearchMisses24h,
+                    recentOutcomes = uiState.recentJustWatchOutcomes,
                     onClearCache = { viewModel.clearJustWatchCache() },
                 )
             }
@@ -589,6 +591,7 @@ private fun StreamingDeepLinksSection(
     lastFetchMs: Long,
     lastError: String?,
     searchMisses24h: Int,
+    recentOutcomes: List<JustWatchOutcomeEvent>,
     onClearCache: () -> Unit,
 ) {
     Text(
@@ -641,6 +644,57 @@ private fun StreamingDeepLinksSection(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f),
                     )
+                }
+            }
+            if (recentOutcomes.isNotEmpty()) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = stringResource(R.string.tv_diagnostics_row_jw_recent_outcomes),
+                    fontSize = 12.sp,
+                    color = Color.White.copy(alpha = 0.5f),
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+                recentOutcomes.asReversed().forEach { event ->
+                    val outcomeStatus = when (event.outcome) {
+                        JustWatchOutcomeEvent.Outcome.EPISODE_CACHE_HIT,
+                        JustWatchOutcomeEvent.Outcome.EPISODE_API_HIT,
+                        JustWatchOutcomeEvent.Outcome.SHOW_CACHE_HIT,
+                        JustWatchOutcomeEvent.Outcome.SHOW_API_HIT -> Status.OK
+                        JustWatchOutcomeEvent.Outcome.SEARCH_MISS,
+                        JustWatchOutcomeEvent.Outcome.TECHNICAL_NAME_UNMAPPED,
+                        JustWatchOutcomeEvent.Outcome.EPISODE_NOT_IN_RESULTS -> Status.WARN
+                        JustWatchOutcomeEvent.Outcome.HTTP_ERROR,
+                        JustWatchOutcomeEvent.Outcome.GRAPHQL_ERROR -> Status.FAIL
+                    }
+                    val label = event.outcome.name.lowercase().replace('_', ' ')
+                    val value = buildString {
+                        append("tmdb=${event.tmdbShowId}")
+                        if (event.providerId >= 0) append(" p=${event.providerId}")
+                        if (event.detail.isNotBlank()) append(" (${event.detail})")
+                        append(" · ${formatAge(event.timestampMs)}")
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Box(Modifier.size(8.dp).background(statusColor(outcomeStatus), RoundedCornerShape(2.dp)))
+                            Spacer(Modifier.width(8.dp))
+                            Text(label, fontSize = 12.sp, color = Color.White)
+                        }
+                        Text(
+                            value,
+                            fontSize = 11.sp,
+                            color = Color.White.copy(alpha = 0.6f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
                 }
             }
             Spacer(Modifier.height(8.dp))
