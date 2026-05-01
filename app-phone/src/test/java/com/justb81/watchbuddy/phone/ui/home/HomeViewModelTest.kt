@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.jupiter.api.Assertions.*
@@ -753,7 +754,9 @@ class HomeViewModelTest {
             advanceUntilIdle()
 
             companionStateManager.onCapabilityChecked()
-            advanceUntilIdle()
+            // runCurrent() processes the flatMapLatest emit(true) without advancing
+            // past the 90 s delay — so isTvConnected stays true.
+            runCurrent()
 
             assertTrue(vm.uiState.value.isTvConnected)
         }
@@ -763,13 +766,14 @@ class HomeViewModelTest {
             val vm = createViewModel()
             advanceUntilIdle()
 
-            companionStateManager.onCapabilityCheckedAt(System.currentTimeMillis())
-            advanceUntilIdle()
+            companionStateManager.onCapabilityChecked()
+            runCurrent()
             assertTrue(vm.uiState.value.isTvConnected)
 
-            // Advance past the connected window; the 15 s ticker should re-evaluate.
-            advanceTimeBy(HomeViewModel.TV_CONNECTED_WINDOW_MS + 15_000L)
-            advanceUntilIdle()
+            // Advance past the 90 s window — the flatMapLatest delay completes and
+            // emit(false) fires, flipping isTvConnected back to false.
+            advanceTimeBy(HomeViewModel.TV_CONNECTED_WINDOW_MS + 1)
+            runCurrent()
 
             assertFalse(vm.uiState.value.isTvConnected)
         }
@@ -779,11 +783,13 @@ class HomeViewModelTest {
             val vm = createViewModel()
             advanceUntilIdle()
 
+            // Each new poll cancels the previous flatMapLatest inner flow and resets
+            // the 90 s countdown, so isTvConnected remains true across multiple polls.
             repeat(3) {
                 companionStateManager.onCapabilityChecked()
-                advanceTimeBy(60_000L)
-                advanceUntilIdle()
+                runCurrent()
                 assertTrue(vm.uiState.value.isTvConnected)
+                advanceTimeBy(60_000L)
             }
         }
     }

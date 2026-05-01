@@ -26,10 +26,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
-import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.delay
@@ -90,9 +92,6 @@ class HomeViewModel @Inject constructor(
 
         /** A TV is "connected" when its last /capability poll was within this window. */
         internal const val TV_CONNECTED_WINDOW_MS = 90_000L
-
-        /** How often the ticker re-evaluates the TV-connected derived state. */
-        private const val TV_CONNECTED_TICK_MS = 15_000L
     }
 
     private val _uiState = MutableStateFlow(HomeUiState(isLoading = true))
@@ -251,18 +250,23 @@ class HomeViewModel @Inject constructor(
     }
 
     private fun observeTvConnected() {
-        val ticker = flow {
-            while (true) {
-                emit(Unit)
-                delay(TV_CONNECTED_TICK_MS)
-            }
-        }
         viewModelScope.launch {
-            combine(companionStateManager.lastCapabilityCheck, ticker) { lastCheck, _ ->
-                lastCheck > 0 && System.currentTimeMillis() - lastCheck < TV_CONNECTED_WINDOW_MS
-            }.collect { connected ->
-                _uiState.update { it.copy(isTvConnected = connected) }
-            }
+            companionStateManager.lastCapabilityCheck
+                .flatMapLatest { lastCheck ->
+                    if (lastCheck <= 0L) {
+                        flowOf(false)
+                    } else {
+                        flow {
+                            emit(true)
+                            delay(TV_CONNECTED_WINDOW_MS)
+                            emit(false)
+                        }
+                    }
+                }
+                .distinctUntilChanged()
+                .collect { connected ->
+                    _uiState.update { it.copy(isTvConnected = connected) }
+                }
         }
     }
 
