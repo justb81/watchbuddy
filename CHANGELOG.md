@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.33.2](https://github.com/justb81/watchbuddy/compare/v0.33.1...v0.33.2) (2026-05-01)
+
+
+### Bug Fixes
+
+* **phone:** cap avatar JPEG output at 200 KB and stream /avatar via respondFile ([#627](https://github.com/justb81/watchbuddy/issues/627)) ([4887109](https://github.com/justb81/watchbuddy/commit/488710908deb492d30935914d21eda7673292ba8))
+* **phone:** remove duplicate companion service toggle from settings ([#623](https://github.com/justb81/watchbuddy/issues/623)) ([fa86611](https://github.com/justb81/watchbuddy/commit/fa866115ba8bee8b709c29f53e2f9fad2f832858))
+* **phone:** show TV connection status in notification and home screen ([#629](https://github.com/justb81/watchbuddy/issues/629)) ([5a7c4c1](https://github.com/justb81/watchbuddy/commit/5a7c4c1937acfb407e165596ce694fcfb0182799)), closes [#519](https://github.com/justb81/watchbuddy/issues/519)
+* **tv:** resolve YouTube/Joyn deep links, country code, and provider chip ([#620](https://github.com/justb81/watchbuddy/issues/620)) ([#624](https://github.com/justb81/watchbuddy/issues/624)) ([bad1c2c](https://github.com/justb81/watchbuddy/commit/bad1c2c09a0a5a57377f1e2f69715fc77ef0d76c))
+
 ## [0.33.1](https://github.com/justb81/watchbuddy/compare/v0.33.0...v0.33.1) (2026-04-30)
 
 
