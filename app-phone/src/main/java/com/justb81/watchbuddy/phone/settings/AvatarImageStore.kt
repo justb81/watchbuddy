@@ -35,6 +35,9 @@ class AvatarImageStore @Inject constructor(
         private const val FILENAME = "avatar.jpg"
         private const val MAX_DIMENSION_PX = 256
         private const val JPEG_QUALITY = 85
+        private const val JPEG_QUALITY_MED = 70
+        private const val JPEG_QUALITY_LOW = 55
+        private const val JPEG_QUALITY_MIN = 40
         private const val MAX_INPUT_BYTES = 10L * 1024 * 1024 // 10 MB
         internal const val MAX_OUTPUT_BYTES = 200 * 1024 // 200 KB
     }
@@ -130,7 +133,7 @@ class AvatarImageStore @Inject constructor(
      * encoding or writing fails.
      */
     private fun compressWithSizeCap(bitmap: Bitmap, dest: File): Boolean {
-        val qualitySteps = intArrayOf(JPEG_QUALITY, 70, 55, 40)
+        val qualitySteps = intArrayOf(JPEG_QUALITY, JPEG_QUALITY_MED, JPEG_QUALITY_LOW, JPEG_QUALITY_MIN)
         for (quality in qualitySteps) {
             val bytes = tryCompressToBytes(bitmap, quality) ?: continue
             if (bytes.size <= MAX_OUTPUT_BYTES) {
@@ -143,7 +146,7 @@ class AvatarImageStore @Inject constructor(
         val halfW = (bitmap.width / 2).coerceAtLeast(1)
         val halfH = (bitmap.height / 2).coerceAtLeast(1)
         val smaller = bitmap.scale(halfW, halfH)
-        for (quality in intArrayOf(55, 40)) {
+        for (quality in intArrayOf(JPEG_QUALITY_LOW, JPEG_QUALITY_MIN)) {
             val bytes = tryCompressToBytes(smaller, quality)
             if (bytes != null && bytes.size <= MAX_OUTPUT_BYTES) {
                 smaller.recycle()

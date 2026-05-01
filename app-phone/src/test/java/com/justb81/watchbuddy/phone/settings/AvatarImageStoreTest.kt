@@ -260,8 +260,11 @@ class AvatarImageStoreTest {
                 compressCallCount++
                 // First compress returns 250 KB (too large), subsequent return 80 KB (ok).
                 // The second quality step (70) should succeed so scale is never reached.
-                if (compressCallCount == 1) out.write(ByteArray(250 * 1024))
-                else out.write(ByteArray(80 * 1024))
+                if (compressCallCount == 1) {
+                    out.write(ByteArray(250 * 1024))
+                } else {
+                    out.write(ByteArray(80 * 1024))
+                }
                 true
             }
             stubBoundsAndDecode("image/jpeg", width = 256, height = 256, decodedBitmap = bmp)

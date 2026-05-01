@@ -64,6 +64,7 @@ style:
     excludeImports:
       - java.util.*
       - kotlinx.android.synthetic.*
+      - io.mockk.*
   NewLineAtEndOfFile:
     active: true
 
@@ -133,6 +134,8 @@ formatting:
     active: true
   NoWildcardImports:
     active: true
+    excludeImports:
+      - io.mockk.*
   Indentation:
     active: false          # Too noisy on mixed-indent legacy files; trust IDE.
   ArgumentListWrapping:
