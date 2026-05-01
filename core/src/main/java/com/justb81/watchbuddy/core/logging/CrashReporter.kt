@@ -28,6 +28,16 @@ object CrashReporter {
 
     private val installed = AtomicBoolean(false)
 
+    /**
+     * Installs the uncaught-exception handler.
+     *
+     * Must be called exactly once from [android.app.Application.onCreate], before any
+     * other component (Crashlytics, test frameworks, etc.) installs its own handler.
+     * Subsequent calls are no-ops — the [AtomicBoolean] compare-and-set guard makes
+     * this function idempotent and thread-safe, so the handler chain is never broken
+     * or duplicated even if the call site is reachable more than once (e.g. Hilt
+     * re-injection in tests).
+     */
     fun install(context: Context) {
         if (!installed.compareAndSet(false, true)) return
         val appContext = context.applicationContext
@@ -37,6 +47,10 @@ object CrashReporter {
             previous?.uncaughtException(thread, throwable)
         }
         DiagnosticLog.event(TAG, "CrashReporter installed")
+    }
+
+    internal fun resetForTest() {
+        installed.set(false)
     }
 
     fun reportsDir(context: Context): File =
