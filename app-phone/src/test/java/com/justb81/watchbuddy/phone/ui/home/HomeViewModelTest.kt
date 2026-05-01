@@ -783,10 +783,12 @@ class HomeViewModelTest {
             val vm = createViewModel()
             advanceUntilIdle()
 
-            // Each new poll cancels the previous flatMapLatest inner flow and resets
-            // the 90 s countdown, so isTvConnected remains true across multiple polls.
-            repeat(3) {
-                companionStateManager.onCapabilityChecked()
+            // Each new poll must carry a unique timestamp so MutableStateFlow emits a
+            // new value and flatMapLatest cancels the old 90 s delay before advancing.
+            // Using onCapabilityChecked() risks the same millis across iterations,
+            // which would suppress the StateFlow emission.
+            repeat(3) { i ->
+                companionStateManager.onCapabilityCheckedAt(1_000L + i)
                 runCurrent()
                 assertTrue(vm.uiState.value.isTvConnected)
                 advanceTimeBy(60_000L)
