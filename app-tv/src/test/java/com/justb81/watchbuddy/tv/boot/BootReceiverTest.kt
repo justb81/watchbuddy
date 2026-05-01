@@ -11,6 +11,7 @@ import io.mockk.mockk
 import io.mockk.mockkStatic
 import io.mockk.unmockkStatic
 import io.mockk.verify
+import java.io.IOException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.flow
@@ -148,7 +149,7 @@ class BootReceiverTest {
 
         @Test
         fun `logs error when DataStore read throws`() = runTest {
-            every { repo.isAutostartEnabled } returns flow { throw RuntimeException("DataStore error") }
+            every { repo.isAutostartEnabled } returns flow { throw IOException("DataStore error") }
             val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
 
             receiver.handleBootCompleted(context, repo, scope, pendingResult)
@@ -162,7 +163,7 @@ class BootReceiverTest {
 
         @Test
         fun `calls pendingResult finish even when DataStore read throws`() = runTest {
-            every { repo.isAutostartEnabled } returns flow { throw RuntimeException("DataStore error") }
+            every { repo.isAutostartEnabled } returns flow { throw IOException("DataStore error") }
             val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
 
             receiver.handleBootCompleted(context, repo, scope, pendingResult)
@@ -172,7 +173,7 @@ class BootReceiverTest {
 
         @Test
         fun `does not start service when DataStore read throws`() = runTest {
-            every { repo.isAutostartEnabled } returns flow { throw RuntimeException("DataStore error") }
+            every { repo.isAutostartEnabled } returns flow { throw IOException("DataStore error") }
             val scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))
 
             receiver.handleBootCompleted(context, repo, scope, pendingResult)
