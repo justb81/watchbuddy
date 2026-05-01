@@ -624,8 +624,11 @@ private val COUNTRY_OPTIONS = listOf(
 private fun CountryOverrideDropdown(selected: String, onSelect: (String) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     val autoLabel = stringResource(R.string.settings_country_auto)
-    val displayLabel = if (selected.isBlank()) autoLabel
-    else COUNTRY_OPTIONS.firstOrNull { it.code == selected }?.label ?: selected
+    val displayLabel = if (selected.isBlank()) {
+        autoLabel
+    } else {
+        COUNTRY_OPTIONS.firstOrNull { it.code == selected }?.label ?: selected
+    }
 
     ExposedDropdownMenuBox(
         expanded = expanded,
