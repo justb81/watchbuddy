@@ -39,6 +39,7 @@ object NetworkModule {
         // Trakt scrobble endpoints (/scrobble/start|pause|stop) are not idempotent;
         // a silent retry would double-charge a watch event on Trakt's side.
         .retryOnConnectionFailure(false)
+        .addInterceptor(RateLimitInterceptor())
         .addInterceptor { chain ->
             val builder = chain.request().newBuilder()
                 .addHeader("Content-Type", "application/json")
