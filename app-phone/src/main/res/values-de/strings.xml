@@ -88,10 +88,6 @@
     <string name="settings_tmdb_helper_link">API-Schlüssel holen</string>
     <string name="settings_tmdb_default_key_active">Integrierter Schlüssel aktiv</string>
     <string name="settings_disconnect">Trennen</string>
-    <string name="settings_companion">Companion-Dienst</string>
-    <string name="settings_companion_running">Läuft (Port 8765)</string>
-    <string name="settings_companion_stopped">Gestoppt</string>
-    <string name="settings_companion_toggle">Companion-Dienst</string>
     <string name="settings_llm">KI-Modell</string>
     <string name="settings_llm_backend">Backend</string>
     <string name="settings_llm_model">Modell</string>
