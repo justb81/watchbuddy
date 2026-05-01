@@ -42,9 +42,13 @@ class LocaleHelperTest {
             Arguments.of(Locale.FRANCE, "fr-FR"),
             Arguments.of(locale("es", "ES"), "es-ES"),
             Arguments.of(locale("ja", "JP"), "ja-JP"),
+            // language-only locales must not produce a trailing hyphen
             Arguments.of(Locale.ENGLISH, "en"),
             Arguments.of(Locale.GERMAN, "de"),
-            Arguments.of(locale("fr"), "fr")
+            Arguments.of(locale("fr"), "fr"),
+            Arguments.of(locale("eo"), "eo"),   // Esperanto — no country variant exists
+            Arguments.of(locale("la"), "la"),   // Latin — no country variant exists
+            Arguments.of(locale("en"), "en")    // regionless English
         )
     }
 
@@ -95,6 +99,21 @@ class LocaleHelperTest {
         fun `language-only locale returns language without hyphen`() {
             val result = LocaleHelper.getTmdbLanguage(Locale.ENGLISH)
             assertFalse(result.contains("-"))
+        }
+
+        @Test
+        fun `Esperanto locale returns eo without trailing hyphen`() {
+            assertEquals("eo", LocaleHelper.getTmdbLanguage(locale("eo")))
+        }
+
+        @Test
+        fun `Latin locale returns la without trailing hyphen`() {
+            assertEquals("la", LocaleHelper.getTmdbLanguage(locale("la")))
+        }
+
+        @Test
+        fun `regionless English returns en without trailing hyphen`() {
+            assertEquals("en", LocaleHelper.getTmdbLanguage(locale("en")))
         }
     }
 }
