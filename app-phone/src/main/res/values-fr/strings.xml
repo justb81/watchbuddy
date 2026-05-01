@@ -62,6 +62,8 @@
     <string name="home_watching_tv_description">Se connecter au téléviseur pour le scrobbling</string>
     <string name="home_watching_tv_disabled_reason">Connectez-vous d\'abord à Trakt et configurez TMDB</string>
     <string name="home_watching_tv_disabled_reason_no_wifi">Connectez-vous à un réseau Wi-Fi pour regarder avec votre TV</string>
+    <string name="home_tv_connected">TV connectée</string>
+    <string name="home_tv_waiting">En attente du TV…</string>
 
     <!-- Settings -->
     <string name="settings_title">Paramètres</string>
@@ -134,6 +136,7 @@
     <string name="companion_channel_description">Indique quand le serveur compagnon est actif pour les connexions TV</string>
     <string name="companion_notification_title">WatchBuddy Companion</string>
     <string name="companion_notification_text">Prêt pour la connexion TV</string>
+    <string name="companion_notification_text_connected">TV connectée</string>
     <string name="companion_notification_permission_rationale_title">Autoriser les notifications</string>
     <string name="companion_notification_permission_rationale_body">WatchBuddy affiche une notification persistante pendant que le service compagnon fonctionne, afin qu\'Android ne l\'arrête pas en silence. Active les notifications dans les réglages de l\'application pour continuer.</string>
     <string name="companion_notification_permission_open_settings">Ouvrir les réglages</string>

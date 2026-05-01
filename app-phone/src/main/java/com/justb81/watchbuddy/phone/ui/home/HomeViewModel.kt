@@ -26,11 +26,14 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.time.Duration
 import java.time.Instant
@@ -58,6 +61,8 @@ data class HomeUiState(
     val latestScrobbleEvent: ScrobbleDisplayEvent? = null,
     /** Non-null while an ambiguous scrobble prompt is awaiting the user's selection. */
     val pendingAmbiguousPrompt: AmbiguousScrobbleEvent? = null,
+    /** True when a TV has polled /capability within the last TV_CONNECTED_WINDOW_MS. */
+    val isTvConnected: Boolean = false,
 ) {
     val canStartCompanion: Boolean get() = canWatch && isOnWifi
 }
@@ -83,6 +88,12 @@ class HomeViewModel @Inject constructor(
 
         /** Shows last watched within this window appear in "Continue Watching". */
         val CONTINUE_WATCHING_WINDOW: Duration = Duration.ofDays(30)
+
+        /** A TV is "connected" when its last /capability poll was within this window. */
+        internal const val TV_CONNECTED_WINDOW_MS = 90_000L
+
+        /** How often the ticker re-evaluates the TV-connected derived state. */
+        private const val TV_CONNECTED_TICK_MS = 15_000L
     }
 
     private val _uiState = MutableStateFlow(HomeUiState(isLoading = true))
@@ -97,6 +108,7 @@ class HomeViewModel @Inject constructor(
         observeScrobbleEvents()
         observeWifiState()
         observePendingPrompt()
+        observeTvConnected()
     }
 
     private fun assertTokenAccessible() {
@@ -235,6 +247,22 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             companionStateManager.pendingPrompt.collect { event ->
                 _uiState.update { it.copy(pendingAmbiguousPrompt = event) }
+            }
+        }
+    }
+
+    private fun observeTvConnected() {
+        val ticker = flow {
+            while (isActive) {
+                emit(Unit)
+                delay(TV_CONNECTED_TICK_MS)
+            }
+        }
+        viewModelScope.launch {
+            combine(companionStateManager.lastCapabilityCheck, ticker) { lastCheck, _ ->
+                lastCheck > 0 && System.currentTimeMillis() - lastCheck < TV_CONNECTED_WINDOW_MS
+            }.collect { connected ->
+                _uiState.update { it.copy(isTvConnected = connected) }
             }
         }
     }

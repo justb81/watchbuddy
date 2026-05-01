@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
@@ -283,6 +284,9 @@ private fun HomeContent(
                 onToggle = onToggleWatchingTv
             )
         }
+        if (state.isWatchingTv) {
+            item { TvConnectionChip(connected = state.isTvConnected) }
+        }
         when {
             state.latestScrobbleEvent != null ->
                 item { NowWatchingCard(event = state.latestScrobbleEvent) }
@@ -528,6 +532,32 @@ private fun WatchingTvToggle(
             )
         }
     }
+}
+
+@Composable
+private fun TvConnectionChip(connected: Boolean) {
+    val label = stringResource(if (connected) R.string.home_tv_connected else R.string.home_tv_waiting)
+    AssistChip(
+        onClick = {},
+        label = { Text(label) },
+        leadingIcon = {
+            Icon(
+                imageVector = Icons.Filled.Tv,
+                contentDescription = null,
+                modifier = Modifier.size(AssistChipDefaults.IconSize)
+            )
+        },
+        border = if (connected) null else AssistChipDefaults.assistChipBorder(enabled = true),
+        colors = if (connected) {
+            AssistChipDefaults.assistChipColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                labelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                leadingIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+        } else {
+            AssistChipDefaults.assistChipColors()
+        },
+    )
 }
 
 @Composable

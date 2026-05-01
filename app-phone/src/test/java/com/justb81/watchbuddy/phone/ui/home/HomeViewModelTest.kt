@@ -24,6 +24,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import okhttp3.ResponseBody.Companion.toResponseBody
@@ -731,6 +732,59 @@ class HomeViewModelTest {
 
             coVerify(exactly = 1) { settingsRepository.setCompanionEnabled(false) }
             assertFalse(vm.uiState.value.isOnWifi)
+        }
+    }
+
+    @Nested
+    @DisplayName("isTvConnected — TV presence indicator")
+    inner class TvConnectedTest {
+
+        @Test
+        fun `isTvConnected is false initially when lastCapabilityCheck is 0`() = runTest {
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            assertFalse(vm.uiState.value.isTvConnected)
+        }
+
+        @Test
+        fun `isTvConnected becomes true when a recent poll is recorded`() = runTest {
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            companionStateManager.onCapabilityChecked()
+            advanceUntilIdle()
+
+            assertTrue(vm.uiState.value.isTvConnected)
+        }
+
+        @Test
+        fun `isTvConnected flips false after TV_CONNECTED_WINDOW_MS without a new poll`() = runTest {
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            companionStateManager.onCapabilityCheckedAt(System.currentTimeMillis())
+            advanceUntilIdle()
+            assertTrue(vm.uiState.value.isTvConnected)
+
+            // Advance past the connected window; the 15 s ticker should re-evaluate.
+            advanceTimeBy(HomeViewModel.TV_CONNECTED_WINDOW_MS + 15_000L)
+            advanceUntilIdle()
+
+            assertFalse(vm.uiState.value.isTvConnected)
+        }
+
+        @Test
+        fun `isTvConnected stays true while polls keep arriving within the window`() = runTest {
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            repeat(3) {
+                companionStateManager.onCapabilityChecked()
+                advanceTimeBy(60_000L)
+                advanceUntilIdle()
+                assertTrue(vm.uiState.value.isTvConnected)
+            }
         }
     }
 }
