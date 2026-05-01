@@ -6,13 +6,15 @@ import android.content.Intent
 import androidx.core.content.ContextCompat
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.tv.data.StreamingPreferencesRepository
+import com.justb81.watchbuddy.tv.di.ApplicationScope
 import com.justb81.watchbuddy.tv.discovery.TvDiscoveryService
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.launch
 
 /**
  * Starts [TvDiscoveryService] on device boot when the user has opted in via
@@ -21,9 +23,11 @@ import kotlinx.coroutines.runBlocking
  *
  * Implemented as a plain [BroadcastReceiver] (not `@AndroidEntryPoint`) —
  * boot broadcasts arrive once per reboot, so the marginal Hilt wiring cost is
- * avoided in favour of an on-demand [EntryPointAccessors] lookup. The DataStore
- * read is a synchronous blocking call, which is fine inside `onReceive` (the
- * system allows up to 10 s and the read is a single disk fetch).
+ * avoided in favour of an on-demand [EntryPointAccessors] lookup.
+ *
+ * The DataStore read is performed asynchronously: [goAsync] extends the
+ * broadcast lifetime beyond `onReceive`'s return, and [PendingResult.finish]
+ * is called once the coroutine completes so the system can reclaim resources.
  */
 class BootReceiver : BroadcastReceiver() {
 
@@ -31,36 +35,55 @@ class BootReceiver : BroadcastReceiver() {
     @InstallIn(SingletonComponent::class)
     interface BootReceiverEntryPoint {
         fun streamingPreferencesRepository(): StreamingPreferencesRepository
+
+        @ApplicationScope
+        fun applicationScope(): CoroutineScope
     }
 
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != Intent.ACTION_BOOT_COMPLETED) return
 
-        val repo = EntryPointAccessors
+        val entryPoint = EntryPointAccessors
             .fromApplication(context.applicationContext, BootReceiverEntryPoint::class.java)
-            .streamingPreferencesRepository()
 
-        val autostartEnabled = runCatching {
-            runBlocking { repo.isAutostartEnabled.first() }
-        }.getOrElse { e ->
-            DiagnosticLog.error(TAG, "read autostart preference failed", e)
-            return
-        }
+        handleBootCompleted(
+            context = context,
+            repo = entryPoint.streamingPreferencesRepository(),
+            scope = entryPoint.applicationScope(),
+            pendingResult = goAsync(),
+        )
+    }
 
-        if (!autostartEnabled) {
-            DiagnosticLog.event(TAG, "autostart disabled — not starting service")
-            return
-        }
+    internal fun handleBootCompleted(
+        context: Context,
+        repo: StreamingPreferencesRepository,
+        scope: CoroutineScope,
+        pendingResult: PendingResult,
+    ) {
+        scope.launch {
+            try {
+                val autostartEnabled = repo.isAutostartEnabled.first()
 
-        runCatching {
-            ContextCompat.startForegroundService(
-                context,
-                Intent(context, TvDiscoveryService::class.java),
-            )
-        }.onSuccess {
-            DiagnosticLog.event(TAG, "TvDiscoveryService start requested")
-        }.onFailure { e ->
-            DiagnosticLog.error(TAG, "tv.boot.autostart.failed: ${e.message}", e)
+                if (!autostartEnabled) {
+                    DiagnosticLog.event(TAG, "autostart disabled — not starting service")
+                    return@launch
+                }
+
+                runCatching {
+                    ContextCompat.startForegroundService(
+                        context,
+                        Intent(context, TvDiscoveryService::class.java),
+                    )
+                }.onSuccess {
+                    DiagnosticLog.event(TAG, "TvDiscoveryService start requested")
+                }.onFailure { e ->
+                    DiagnosticLog.error(TAG, "tv.boot.autostart.failed: ${e.message}", e)
+                }
+            } catch (e: Exception) {
+                DiagnosticLog.error(TAG, "read autostart preference failed", e)
+            } finally {
+                pendingResult.finish()
+            }
         }
     }
 

@@ -34,7 +34,7 @@ watchbuddy/
 │   └── src/main/java/com/justb81/watchbuddy/tv/
 │       ├── boot/       BootReceiver (starts TvDiscoveryService on BOOT_COMPLETED when autostart is enabled)
 │       ├── data/       StreamingPreferencesRepository (phone-discovery / autostart / showNonInstalledProviders), TvShowCache, WatchProvidersRepository (TMDB watch providers, 24 h cache), LastUsedProviderRepository (TV-local per-show last-used provider), JustWatchDeepLinkRepository + JustWatchDeepLinkDao + JustWatchDeepLinkDatabase (Room-backed per-episode deep link cache)
-│       ├── di/         AppModule (Hilt dependency injection)
+│       ├── di/         AppModule (Hilt dependency injection), ApplicationScope qualifier (@ApplicationScope CoroutineScope for goAsync in BootReceiver)
 │       ├── discovery/  PhoneDiscoveryManager, PhoneApiService, PhoneApiClientFactory, PhoneTitleExtractionClient (TitleExtractor → best phone's /scrobble/extract), TvDiscoveryService (foreground service — keeps discovery alive post-boot), InstalledAppsProbe (PackageManager cache, invalidated on install/remove)
 │       ├── scrobbler/  TvScrobbleDispatcher, TvWatchedShowSource, WatchNextMetadataSource, NotificationMetadataSource, WatchBuddyNotificationListener
 │       ├── ui/         TvMainActivity, TvNavGraph
