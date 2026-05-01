@@ -1,5 +1,6 @@
 package com.justb81.watchbuddy.core.tmdb
 
+import com.justb81.watchbuddy.core.model.AllTvWatchProvidersResponse
 import com.justb81.watchbuddy.core.model.TmdbEpisode
 import com.justb81.watchbuddy.core.model.TmdbShow
 import com.justb81.watchbuddy.core.model.TmdbTvSearchResponse
@@ -42,6 +43,13 @@ interface TmdbApiService {
         @Path("series_id") id: Int,
         @Query("api_key") apiKey: String
     ): WatchProviderResponse
+
+    /** Returns the global catalogue of all TV watch providers known to TMDB. */
+    @GET("watch/providers/tv")
+    suspend fun getAllTvWatchProviders(
+        @Query("api_key") apiKey: String,
+        @Query("language") language: String = "en-US"
+    ): AllTvWatchProvidersResponse
 }
 
 // Image URL helper

@@ -1,5 +1,7 @@
 package com.justb81.watchbuddy.core.justwatch
 
+import com.justb81.watchbuddy.core.logging.DiagnosticLog
+
 /**
  * Maps JustWatch `technicalName` values to TMDB `provider_id` integers.
  *
@@ -7,6 +9,8 @@ package com.justb81.watchbuddy.core.justwatch
  * TMDB's watch-provider list still renders them with their logo and name.
  */
 object JustWatchPackageMap {
+
+    private const val TAG = "JustWatchPackageMap"
 
     val technicalNameToProviderId: Map<String, Int> = mapOf(
         "nfx" to 8, // Netflix
@@ -26,6 +30,12 @@ object JustWatchPackageMap {
         "ytv" to 192, // YouTube (TV variant alias)
     )
 
-    fun resolveProviderId(technicalName: String): Int? =
-        technicalNameToProviderId[technicalName.lowercase()]
+    fun resolveProviderId(technicalName: String): Int? {
+        val key = technicalName.lowercase()
+        val id = technicalNameToProviderId[key]
+        if (id == null) {
+            DiagnosticLog.warn(TAG, "unmapped technicalName: $key")
+        }
+        return id
+    }
 }
