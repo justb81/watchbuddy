@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.35.1](https://github.com/justb81/watchbuddy/compare/v0.35.0...v0.35.1) (2026-05-02)
+
+
+### Bug Fixes
+
+* **justwatch:** update technicalName keys to match current JustWatch API ([#645](https://github.com/justb81/watchbuddy/issues/645)) ([d71ab19](https://github.com/justb81/watchbuddy/commit/d71ab192b87f0a06c3fd6c02a336796f4d1395b7))
+
 ## [0.35.0](https://github.com/justb81/watchbuddy/compare/v0.34.0...v0.35.0) (2026-05-02)
 
 
