@@ -38,7 +38,7 @@ class RecapViewModelTest {
     @BeforeEach
     fun setUp() {
         every { phoneDiscovery.discoveredPhones } returns phonesFlow
-        every { phoneApiClientFactory.createClient(any()) } returns mockApiService
+        every { phoneApiClientFactory.createClient(any(), anyNullable()) } returns mockApiService
         viewModel = RecapViewModel(application, phoneDiscovery, phoneApiClientFactory)
     }
 
@@ -95,6 +95,7 @@ class RecapViewModelTest {
                 }
                 every { this@mockk.score } returns score
                 every { this@mockk.baseUrl } returns baseUrl
+                every { this@mockk.bearerToken } returns null
             }
 
         @Test
@@ -125,8 +126,8 @@ class RecapViewModelTest {
         @Test
         fun `failover to next phone when first phone fails`() = runTest {
             val workingApiService: PhoneApiService = mockk()
-            every { phoneApiClientFactory.createClient("http://192.168.1.1:8765/") } returns mockApiService
-            every { phoneApiClientFactory.createClient("http://192.168.1.2:8765/") } returns workingApiService
+            every { phoneApiClientFactory.createClient("http://192.168.1.1:8765/", anyNullable()) } returns mockApiService
+            every { phoneApiClientFactory.createClient("http://192.168.1.2:8765/", anyNullable()) } returns workingApiService
 
             // Both phones available; first has higher score so it's tried first
             phonesFlow.value = listOf(
@@ -153,7 +154,7 @@ class RecapViewModelTest {
             viewModel.requestRecap(42, "fallback")
             advanceUntilIdle()
 
-            verify { phoneApiClientFactory.createClient(baseUrl) }
+            verify { phoneApiClientFactory.createClient(baseUrl, anyNullable()) }
             coVerify { mockApiService.getRecap(42) }
         }
     }

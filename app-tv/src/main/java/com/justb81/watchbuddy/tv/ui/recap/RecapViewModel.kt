@@ -54,7 +54,7 @@ class RecapViewModel @Inject constructor(
                     ?: getApplication<Application>().getString(R.string.tv_default_device_name)
                 _state.value = RecapUiState.Generating(deviceName)
                 try {
-                    val recap = phoneApiClientFactory.createClient(phone.baseUrl).getRecap(traktShowId)
+                    val recap = phoneApiClientFactory.createClient(phone.baseUrl, phone.bearerToken).getRecap(traktShowId)
                     _state.value = RecapUiState.Ready(recap.html)
                     return@launch
                 } catch (_: Exception) {

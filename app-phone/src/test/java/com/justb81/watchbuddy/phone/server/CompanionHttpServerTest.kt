@@ -27,12 +27,13 @@ import com.justb81.watchbuddy.phone.settings.AppSettings
 import com.justb81.watchbuddy.phone.settings.AvatarImageStore
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import com.justb81.watchbuddy.service.CompanionStateManager
+import io.ktor.client.*
+import io.ktor.client.plugins.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.testing.*
 import io.mockk.*
-import kotlinx.coroutines.flow.flowOf
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -40,6 +41,7 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
+import kotlinx.coroutines.flow.flowOf
 
 @DisplayName("CompanionHttpServer routes")
 class CompanionHttpServerTest {
@@ -61,6 +63,8 @@ class CompanionHttpServerTest {
     private val avatarImageStore: AvatarImageStore = mockk(relaxed = true)
     private val stateManager = CompanionStateManager()
     private val titleExtractor: LlmTitleExtractor = mockk(relaxed = true)
+    private val testToken = "test-bearer-token"
+    private val bearerTokenRepository: BearerTokenRepository = mockk()
 
     // ── Shared test fixtures ──────────────────────────────────────────────────
 
@@ -95,19 +99,31 @@ class CompanionHttpServerTest {
     fun setUp() {
         clearAllMocks()
         tmdbCache.clear()
+        every { bearerTokenRepository.token } returns testToken
     }
 
     // ── Helper: configure test application with all mocked dependencies ───────
 
-    private fun testApp(block: suspend ApplicationTestBuilder.() -> Unit) = testApplication {
+    inner class TestScope(builder: ApplicationTestBuilder) {
+        val unauthClient: HttpClient = builder.client
+        val client: HttpClient = builder.createClient {}.also { httpClient ->
+            httpClient.plugin(HttpSend).intercept { request ->
+                request.headers.append(HttpHeaders.Authorization, "Bearer $testToken")
+                execute(request)
+            }
+        }
+    }
+
+    private fun testApp(block: suspend TestScope.() -> Unit) = testApplication {
         application {
             configureCompanionRoutes(
                 recapGenerator, capabilityProvider, showRepository,
-                tokenRepository, tokenRefreshManager, traktApiService, tmdbApiService, tmdbCache, settingsRepository,
-                avatarImageStore, stateManager, titleExtractor,
+                tokenRepository, tokenRefreshManager, traktApiService, tmdbApiService, tmdbCache,
+                settingsRepository, avatarImageStore, stateManager, titleExtractor,
+                bearerTokenRepository,
             )
         }
-        block()
+        TestScope(this).block()
     }
 
     // ── GET /capability ───────────────────────────────────────────────────────
@@ -1098,6 +1114,51 @@ class CompanionHttpServerTest {
             assertEquals(1, showItem.seasons.first().number)
             assertEquals(1, showItem.seasons.first().episodes.size)
             assertEquals(1, showItem.seasons.first().episodes.first().number)
+        }
+    }
+
+    // ── Bearer auth ───────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("Bearer auth")
+    inner class AuthEndpoints {
+
+        @Test
+        fun `GET capability returns 200 without bearer token`() = testApp {
+            coEvery { capabilityProvider.getCapability() } returns capability
+            val response = unauthClient.get("/capability")
+            assertEquals(HttpStatusCode.OK, response.status)
+        }
+
+        @Test
+        fun `GET protected endpoint returns 401 without bearer token`() = testApp {
+            val response = unauthClient.get("/shows")
+            assertEquals(HttpStatusCode.Unauthorized, response.status)
+        }
+
+        @Test
+        fun `GET protected endpoint returns 401 with wrong bearer token`() = testApp {
+            val response = unauthClient.get("/shows") {
+                header("Authorization", "Bearer wrong-token")
+            }
+            assertEquals(HttpStatusCode.Unauthorized, response.status)
+        }
+
+        @Test
+        fun `POST protected endpoint returns 401 without bearer token`() = testApp {
+            val response = unauthClient.post("/scrobble/start") {
+                contentType(ContentType.Application.Json)
+                setBody("""{"show":{"title":"Test","year":2020,"ids":{}},"episode":{"season":1,"number":1,"ids":{}},"progress":50.0}""")
+            }
+            assertEquals(HttpStatusCode.Unauthorized, response.status)
+        }
+
+        @Test
+        fun `GET shows returns 200 with correct bearer token`() = testApp {
+            every { tokenRepository.getAccessToken() } returns "trakt-token"
+            coEvery { showRepository.getShows() } returns emptyList()
+            val response = client.get("/shows")
+            assertEquals(HttpStatusCode.OK, response.status)
         }
     }
 }

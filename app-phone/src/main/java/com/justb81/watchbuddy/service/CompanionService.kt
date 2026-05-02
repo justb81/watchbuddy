@@ -89,6 +89,8 @@ class CompanionService : Service() {
     @Inject lateinit var settingsRepository: SettingsRepository
     @Inject lateinit var bleAdvertiser: CompanionBleAdvertiser
 
+    @Inject lateinit var bearerTokenRepository: com.justb81.watchbuddy.phone.server.BearerTokenRepository
+
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var presenceJob: Job? = null
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
@@ -399,6 +401,7 @@ class CompanionService : Service() {
             port = CompanionHttpServer.PORT,
             modelQuality = llmConfig.qualityScore,
             llmBackendOrdinal = llmConfig.backend.ordinal,
+            tokenBytes = bearerTokenRepository.tokenBytes,
         )
     }
 

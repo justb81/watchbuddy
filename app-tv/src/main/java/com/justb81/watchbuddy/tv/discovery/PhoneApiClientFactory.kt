@@ -21,13 +21,26 @@ class PhoneApiClientFactory @Inject constructor(
         .callTimeout(95, TimeUnit.SECONDS)
         .build()
 
-    private val cache = mutableMapOf<String, PhoneApiService>()
+    private val cache = mutableMapOf<Pair<String, String?>, PhoneApiService>()
 
-    fun createClient(baseUrl: String): PhoneApiService =
-        cache.getOrPut(baseUrl) {
+    fun createClient(baseUrl: String, bearerToken: String? = null): PhoneApiService =
+        cache.getOrPut(baseUrl to bearerToken) {
+            val client = if (bearerToken != null) {
+                timeoutClient.newBuilder()
+                    .addInterceptor { chain ->
+                        chain.proceed(
+                            chain.request().newBuilder()
+                                .header("Authorization", "Bearer $bearerToken")
+                                .build()
+                        )
+                    }
+                    .build()
+            } else {
+                timeoutClient
+            }
             Retrofit.Builder()
                 .baseUrl(baseUrl)
-                .client(timeoutClient)
+                .client(client)
                 .addConverterFactory(WatchBuddyJson.asConverterFactory("application/json".toMediaType()))
                 .build()
                 .create(PhoneApiService::class.java)

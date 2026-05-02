@@ -47,6 +47,12 @@ class CompanionBleAdvertiser @Inject constructor(
      * with the same arguments are a no-op; calls with different arguments
      * replace the active advertisement.
      *
+     * When [tokenBytes] is non-null a scan-response packet carrying the bearer
+     * token is emitted alongside the primary advertisement, switching the
+     * advertising type from ADV_NONCONN_IND to ADV_SCAN_IND (non-connectable,
+     * scannable). The scan response uses [BleDiscoveryContract.TOKEN_SERVICE_UUID]
+     * so the TV can read the token without conflicting with the primary UUID.
+     *
      * @return true if the advertisement was handed off to the system BLE stack
      *   (the system may still reject it asynchronously via `onStartFailure`).
      */
@@ -56,6 +62,7 @@ class CompanionBleAdvertiser @Inject constructor(
         port: Int,
         modelQuality: Int,
         llmBackendOrdinal: Int,
+        tokenBytes: ByteArray? = null,
     ): Boolean {
         if (!hasAdvertisePermission()) {
             DiagnosticLog.event(TAG, "start skipped: BLUETOOTH_ADVERTISE permission not granted")
@@ -115,12 +122,38 @@ class CompanionBleAdvertiser @Inject constructor(
             .addServiceData(ParcelUuid(BleDiscoveryContract.SERVICE_UUID), payloadBytes)
             .build()
 
+        // Schema v2: emit bearer token in a scan response so the TV can
+        // authenticate HTTP requests. Uses a separate TOKEN_SERVICE_UUID to
+        // avoid conflicting with the primary service data in Android's merged
+        // ScanRecord map. Scan responses require ADV_SCAN_IND type; Android
+        // sets this automatically when a scan response is passed to the
+        // 4-argument startAdvertising overload with setConnectable(false).
+        val scanResponse = if (tokenBytes != null) {
+            val tokenPayload = runCatching {
+                BleDiscoveryContract.encodeTokenPayload(tokenBytes)
+            }.getOrNull()
+            if (tokenPayload != null) {
+                AdvertiseData.Builder()
+                    .setIncludeDeviceName(false)
+                    .setIncludeTxPowerLevel(false)
+                    .addServiceData(ParcelUuid(BleDiscoveryContract.TOKEN_SERVICE_UUID), tokenPayload)
+                    .build()
+            } else {
+                DiagnosticLog.warn(TAG, "token payload invalid; advertising without scan response")
+                null
+            }
+        } else {
+            null
+        }
+
         val callback = object : AdvertiseCallback() {
             override fun onStartSuccess(settingsInEffect: AdvertiseSettings) {
                 DiagnosticLog.event(
                     TAG,
                     "advertising started ip=${ipv4.hostAddress} port=$port " +
-                        "quality=$modelQuality backend=$llmBackendOrdinal"
+                        "quality=$modelQuality backend=$llmBackendOrdinal " +
+                        "schema=v${BleDiscoveryContract.PAYLOAD_SCHEMA_VERSION} " +
+                        "auth=${tokenBytes != null}"
                 )
                 stateManager.setBleAdvertiseState(CompanionStateManager.BleAdvertiseState.ADVERTISING)
             }
@@ -143,7 +176,11 @@ class CompanionBleAdvertiser @Inject constructor(
         }
 
         return runCatching {
-            leAdvertiser.startAdvertising(settings, data, callback)
+            if (scanResponse != null) {
+                leAdvertiser.startAdvertising(settings, data, scanResponse, callback)
+            } else {
+                leAdvertiser.startAdvertising(settings, data, callback)
+            }
             synchronized(this) {
                 advertiser = leAdvertiser
                 activeCallback = callback

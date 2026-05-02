@@ -6,6 +6,7 @@ import com.justb81.watchbuddy.BuildConfig
 import com.justb81.watchbuddy.core.model.ScrobbleDisplayEvent
 import com.justb81.watchbuddy.phone.llm.LlmEventLog
 import com.justb81.watchbuddy.phone.network.WifiStateProvider
+import com.justb81.watchbuddy.phone.server.BearerTokenRepository
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import com.justb81.watchbuddy.service.CompanionStateManager
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -41,6 +42,8 @@ data class DiagnosticsUiState(
     val llmEvents: List<LlmEventSummary> = emptyList(),
     val versionName: String = BuildConfig.VERSION_NAME,
     val versionCode: Int = BuildConfig.VERSION_CODE,
+    /** True when the bearer token has been generated and is ready to be distributed via BLE. */
+    val bearerTokenProvisioned: Boolean = false,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -50,7 +53,10 @@ class DiagnosticsViewModel @Inject constructor(
     stateManager: CompanionStateManager,
     private val llmEventLog: LlmEventLog,
     settingsRepository: SettingsRepository,
+    bearerTokenRepository: BearerTokenRepository,
 ) : ViewModel() {
+
+    private val bearerTokenProvisioned: Boolean = runCatching { bearerTokenRepository.token.isNotBlank() }.getOrDefault(false)
 
     private val _uiState = MutableStateFlow(DiagnosticsUiState())
     val uiState: StateFlow<DiagnosticsUiState> = _uiState.asStateFlow()
@@ -95,6 +101,7 @@ class DiagnosticsViewModel @Inject constructor(
                     lastScrobble = b.scrobble,
                     llmActivityLoggingEnabled = enabled,
                     llmEvents = events,
+                    bearerTokenProvisioned = bearerTokenProvisioned,
                 )
             }.collect { _uiState.value = it }
         }

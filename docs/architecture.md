@@ -22,29 +22,68 @@ graph TB
 
 ### BLE Advertisement (Phone side)
 
-The phone broadcasts a single BLE service-data beacon carrying its LAN endpoint
-so the TV can connect over HTTP without relying on mDNS/multicast (which is
-blocked by many home APs with client isolation, VLAN segmentation, or
-aggressive multicast filtering).
+The phone broadcasts a BLE service-data beacon carrying its LAN endpoint so
+the TV can connect over HTTP without relying on mDNS/multicast (which is blocked
+by many home APs with client isolation, VLAN segmentation, or aggressive
+multicast filtering). Schema v2 phones additionally emit a **scan response**
+with the bearer token used to authenticate TV→phone HTTP requests.
+
+#### Primary advertisement (schema v2, 9 bytes under `SERVICE_UUID`)
 
 ```
 Service UUID:    5e4b4d3a-9f7c-4b7e-8e6b-6c0e5f27e4a0
 Service data:    [schemaVersion (1B) | ipv4 (4B) | port (2B) | modelQuality (1B) | llmBackend ordinal (1B)]
 Advertise mode:  ADVERTISE_MODE_BALANCED (~250 ms interval)
 TX power:        ADVERTISE_TX_POWER_MEDIUM (~10 m, couch-to-TV)
-Connectable:     false (pure beacon, never accepts GATT connections)
+Connectable:     false → ADV_SCAN_IND when scan response is present
 ```
 
-The 9-byte payload is the authoritative wire contract — see
+Schema byte: `1` = legacy (v1, no auth), `2` = current (auth-capable, emits scan response).
+The TV's `PhoneBleScanner` accepts both schema versions via two BLE scan filters.
+
+#### Scan response (schema v2 only, 13 bytes under `TOKEN_SERVICE_UUID`)
+
+```
+Token UUID:      7a2c1f8b-3e5d-4c9a-b0e7-8d4f2a6c0b3e
+Scan response:   [bearer token bytes (13B)]
+```
+
+When `tokenBytes` is provided, the advertiser emits a scan response (ADV_SCAN_IND)
+under a separate `TOKEN_SERVICE_UUID` to avoid collision in Android's merged
+`ScanRecord` service-data map. The 13 bytes are raw random material (104-bit
+security); the TV Base64url-encodes them (18 chars, no padding) for use as
+`Authorization: Bearer <token>` on every subsequent HTTP call.
+
+Budget: scan response has no FLAGS AD, so all 31 bytes are available. Service
+data header = 1 (len) + 1 (type 0x21) + 16 (UUID) = 18 bytes; 31 − 18 = **13
+bytes** for the token. See `core/discovery/BleDiscoveryContract.kt`.
+
+#### HTTP bearer authentication
+
+All HTTP endpoints except `GET /capability` require:
+```
+Authorization: Bearer <Base64url(token)>
+```
+The token is generated once per phone install (13 random bytes → `SecureRandom`),
+stored in Tink-AEAD-encrypted `SharedPreferences` (`watchbuddy_bearer_token`), and
+distributed to the TV exclusively via the BLE scan response. `GET /capability` is
+intentionally unauthenticated so the TV can call it before it has received the
+token from BLE. `BearerTokenRepository` generates and persists the token; it is
+stable until the user resets pairing.
+
+The 9-byte primary advertisement payload is the authoritative wire contract — see
 `core/discovery/BleDiscoveryContract.kt`. The rest of the phone's metadata
 (avatar URL, username, TMDB API key, free RAM) is fetched over HTTP from
 `GET /capability` once the TV has the IPv4 + port.
 
 ### HTTP API (Phone exposes, TV calls)
 
+All endpoints except `GET /capability` require `Authorization: Bearer <token>` (token
+distributed via BLE scan response; see above). Missing or wrong bearer returns HTTP 401.
+
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/capability` | Device info + LLM score + TMDB API key + `avatarSource` + `lastResolvedSessionKey` + `lastResolvedTraktId` (#342, #474) |
+| GET | `/capability` | Device info + LLM score + TMDB API key + `avatarSource` + `lastResolvedSessionKey` + `lastResolvedTraktId` (#342, #474) — **unauthenticated** |
 | GET | `/avatar` | Custom avatar JPEG (200 bytes, ETag-revalidated; 404 when `avatarSource != CUSTOM`) |
 | GET | `/shows` | User's Trakt watched shows (cached), paginated via `offset` + `limit` query params |
 | POST | `/recap/{traktShowId}` | Generate HTML recap for a show |
@@ -185,14 +224,17 @@ BLE payload.
 
 **BLE discovery (sole channel):** Discovery is BLE-only — no mDNS/NSD fallback. The
 phone's `CompanionBleAdvertiser` (see `service/CompanionBleAdvertiser.kt`) broadcasts a
-9-byte service-data payload under the custom UUID `5e4b4d3a-9f7c-4b7e-8e6b-6c0e5f27e4a0`
-containing the phone's IPv4 address, port, `modelQuality`, and `llmBackend` ordinal
-(schema defined in `core/discovery/BleDiscoveryContract.kt`). The advertisement is pinned
-to `ADVERTISE_MODE_BALANCED` + `ADVERTISE_TX_POWER_MEDIUM` (~10 m range, the couch-to-TV
-use case) and is not connectable — the TV never opens a GATT connection, it just reads
-the advert. The TV's `PhoneBleScanner` listens for the same UUID in
-`SCAN_MODE_BALANCED` whenever discovery is enabled; each match feeds the existing
-`/capability` fetch + heartbeat pipeline, deduped by `baseUrl`. BLE range can exceed the
+9-byte service-data payload (schema v2) under `SERVICE_UUID` containing the phone's IPv4
+address, port, `modelQuality`, and `llmBackend` ordinal. A separate scan response under
+`TOKEN_SERVICE_UUID` carries the 13-byte bearer token for HTTP auth (see above). The
+advertisement is pinned to `ADVERTISE_MODE_BALANCED` + `ADVERTISE_TX_POWER_MEDIUM` (~10 m
+range) and is not connectable (advertising type upgrades to ADV_SCAN_IND automatically
+when a scan response is present). The TV's `PhoneBleScanner` listens with two filters
+(v1 and v2) in `SCAN_MODE_BALANCED` whenever discovery is enabled; each match feeds the
+existing `/capability` fetch + heartbeat pipeline, deduped by `baseUrl`. The bearer token
+is extracted from the scan response and stored in `DiscoveredPhone.bearerToken`; it is
+forwarded to `PhoneApiClientFactory.createClient(baseUrl, bearerToken)` for all
+authenticated HTTP calls. BLE range can exceed the
 LAN's reach — a phone that's out of Wi-Fi range but still within BLE range will fail
 `/capability` and be evicted after `MAX_CONSECUTIVE_FAILURES = 5` heartbeat misses
 with exponential backoff (~5 min total). Graceful degradation is the default: on Bluetooth-off, permission-denied, or

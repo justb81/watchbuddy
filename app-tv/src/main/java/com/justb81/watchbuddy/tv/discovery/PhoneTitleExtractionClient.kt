@@ -58,7 +58,7 @@ class PhoneTitleExtractionClient @Inject constructor(
         private const val MILLIS_PER_SECOND = 1_000L
     }
 
-    private val cache = ConcurrentHashMap<String, PhoneApiService>()
+    private val cache = ConcurrentHashMap<Pair<String, String?>, PhoneApiService>()
     private val inFlight = ConcurrentHashMap<String, CompletableDeferred<TitleExtractionResponse?>>()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -96,7 +96,7 @@ class PhoneTitleExtractionClient @Inject constructor(
         key: String,
     ) {
         try {
-            val service = clientFor(phone.baseUrl)
+            val service = clientFor(phone.baseUrl, phone.bearerToken)
             val hints = buildLibraryHints()
             val request = TitleExtractionRequest(snapshot = snapshot, libraryHints = hints)
             val response = withTimeoutOrNull(CLIENT_TIMEOUT_SECONDS * MILLIS_PER_SECOND) {
@@ -136,14 +136,28 @@ class PhoneTitleExtractionClient @Inject constructor(
                 )
             }
 
-    private fun clientFor(baseUrl: String): PhoneApiService = cache.getOrPut(baseUrl) {
-        Retrofit.Builder()
-            .baseUrl(baseUrl)
-            .client(longTimeoutHttpClient)
-            .addConverterFactory(WatchBuddyJson.asConverterFactory("application/json".toMediaType()))
-            .build()
-            .create(PhoneApiService::class.java)
-    }
+    private fun clientFor(baseUrl: String, bearerToken: String? = null): PhoneApiService =
+        cache.getOrPut(baseUrl to bearerToken) {
+            val client = if (bearerToken != null) {
+                longTimeoutHttpClient.newBuilder()
+                    .addInterceptor { chain ->
+                        chain.proceed(
+                            chain.request().newBuilder()
+                                .header("Authorization", "Bearer $bearerToken")
+                                .build()
+                        )
+                    }
+                    .build()
+            } else {
+                longTimeoutHttpClient
+            }
+            Retrofit.Builder()
+                .baseUrl(baseUrl)
+                .client(client)
+                .addConverterFactory(WatchBuddyJson.asConverterFactory("application/json".toMediaType()))
+                .build()
+                .create(PhoneApiService::class.java)
+        }
 
     /**
      * Dedup key — same evidence text should hit one inference even if minor

@@ -45,6 +45,8 @@ class PhoneBleScanner @Inject constructor(
             modelQuality: Int,
             llmBackendOrdinal: Int,
             rssi: Int,
+            authCapable: Boolean,
+            bearerTokenBytes: ByteArray?,
         )
     }
 
@@ -79,14 +81,19 @@ class PhoneBleScanner @Inject constructor(
         // Stop any prior scan — e.g. after permission grant or Wi-Fi reconnect.
         stopInternal(leScanner)
 
-        // Filter on the service-data AD field rather than the service-UUID
-        // AD field. The phone advertiser dropped the redundant UUID-list AD
-        // to stay under the 31-byte legacy envelope (#345), so only a
-        // setServiceData filter matches. The prefix byte pins the wire
-        // schema version, preventing a future incompatible schema from
-        // being handed to the current decoder. The 0xFF mask byte means
-        // "match this exact byte"; remaining bytes are unfiltered.
-        val filter = ScanFilter.Builder()
+        // Two filters: one for schema v1 (legacy phones without bearer auth)
+        // and one for schema v2 (current phones with BLE-distributed bearer token).
+        // Separate filters allow the OS to match either advertisement — a single
+        // filter with mask 0x00 on the version byte would accept any schema version
+        // including unknown future ones and garbled adverts from other apps.
+        val filterV1 = ScanFilter.Builder()
+            .setServiceData(
+                ParcelUuid(BleDiscoveryContract.SERVICE_UUID),
+                byteArrayOf(BleDiscoveryContract.PAYLOAD_SCHEMA_VERSION_LEGACY),
+                byteArrayOf(0xFF.toByte()),
+            )
+            .build()
+        val filterV2 = ScanFilter.Builder()
             .setServiceData(
                 ParcelUuid(BleDiscoveryContract.SERVICE_UUID),
                 byteArrayOf(BleDiscoveryContract.PAYLOAD_SCHEMA_VERSION),
@@ -126,7 +133,7 @@ class PhoneBleScanner @Inject constructor(
         }
 
         return runCatching {
-            leScanner.startScan(listOf(filter), settings, callback)
+            leScanner.startScan(listOf(filterV1, filterV2), settings, callback)
             synchronized(this) {
                 scanner = leScanner
                 activeCallback = callback
@@ -165,17 +172,23 @@ class PhoneBleScanner @Inject constructor(
     }
 
     private fun handleResult(result: ScanResult, listener: Listener) {
-        val data = result.scanRecord
-            ?.serviceData
-            ?.get(ParcelUuid(BleDiscoveryContract.SERVICE_UUID))
+        val scanRecord = result.scanRecord
+        val data = scanRecord?.serviceData?.get(ParcelUuid(BleDiscoveryContract.SERVICE_UUID))
         when (val decoded = BleDiscoveryContract.decode(data)) {
             is BleDiscoveryContract.DecodeResult.Ok -> {
                 val payload = decoded.payload
+                val bearerTokenBytes = if (decoded.authCapable) {
+                    BleDiscoveryContract.decodeTokenPayload(
+                        scanRecord?.serviceData?.get(ParcelUuid(BleDiscoveryContract.TOKEN_SERVICE_UUID))
+                    )
+                } else {
+                    null
+                }
                 Log.d(
                     TAG,
                     "advertisement: ip=${payload.ipv4.hostAddress} port=${payload.port} " +
                         "quality=${payload.modelQuality} backend=${payload.llmBackendOrdinal} " +
-                        "rssi=${result.rssi}"
+                        "rssi=${result.rssi} auth=${decoded.authCapable}"
                 )
                 listener.onAdvertisement(
                     ipv4 = payload.ipv4,
@@ -183,6 +196,8 @@ class PhoneBleScanner @Inject constructor(
                     modelQuality = payload.modelQuality,
                     llmBackendOrdinal = payload.llmBackendOrdinal,
                     rssi = result.rssi,
+                    authCapable = decoded.authCapable,
+                    bearerTokenBytes = bearerTokenBytes,
                 )
             }
             is BleDiscoveryContract.DecodeResult.WrongVersion -> DiagnosticLog.debug(
