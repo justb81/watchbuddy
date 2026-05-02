@@ -184,7 +184,7 @@ flowchart TD
 ```
 
 `ProviderCatalog` maps TMDB `provider_id` integers to Android package names so deep links can be
-attributed to the correct app. JustWatch `technicalName` strings (e.g. `nfx`, `prv`, `dnp`) are
+attributed to the correct app. JustWatch `technicalName` strings (e.g. `netflix`, `amazonprime`, `disneyplus`) are
 translated to TMDB `provider_id` integers by `JustWatchPackageMap`.
 
 Note: This journey calls the JustWatch GraphQL API, not the TMDB API. TMDB data (the TMDB show ID
