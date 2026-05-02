@@ -40,8 +40,8 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
-import kotlinx.coroutines.flow.flowOf
 import java.io.File
+import kotlinx.coroutines.flow.flowOf
 
 @DisplayName("CompanionHttpServer routes")
 class CompanionHttpServerTest {
