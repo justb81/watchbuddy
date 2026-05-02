@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.35.0](https://github.com/justb81/watchbuddy/compare/v0.34.0...v0.35.0) (2026-05-02)
+
+
+### Features
+
+* **security:** authenticate TV→phone HTTP with BLE-distributed bearer token ([#644](https://github.com/justb81/watchbuddy/issues/644)) ([87e6d46](https://github.com/justb81/watchbuddy/commit/87e6d46a4e69fd0b12f0c5ac5155f6771cbcd630))
+
+
+### Bug Fixes
+
+* **core:** add PII redactor to DiagnosticLog ring buffer ([#641](https://github.com/justb81/watchbuddy/issues/641)) ([183acd8](https://github.com/justb81/watchbuddy/commit/183acd82a1fe9d2ae9b65cab73adebd2306571ab))
+* **core:** BleDiscoveryContract.decode returns sealed DecodeResult ([#639](https://github.com/justb81/watchbuddy/issues/639)) ([abc1b90](https://github.com/justb81/watchbuddy/commit/abc1b902471965acb659187969123c98bcb5166c)), closes [#534](https://github.com/justb81/watchbuddy/issues/534)
+* **tv:** unregister InstalledAppsProbe receiver on process destroy + race-free cache ([#642](https://github.com/justb81/watchbuddy/issues/642)) ([f7aeb17](https://github.com/justb81/watchbuddy/commit/f7aeb17b0f7a84bfdc73092b3250643183b04507))
+
 ## [0.34.0](https://github.com/justb81/watchbuddy/compare/v0.33.2...v0.34.0) (2026-05-01)
 
 
