@@ -13,19 +13,19 @@ object JustWatchPackageMap {
     private const val TAG = "JustWatchPackageMap"
 
     val technicalNameToProviderId: Map<String, Int> = mapOf(
-        "netflix"                 to 8,    // Netflix
-        "netflixbasicwithads"     to 8,    // Netflix with Ads (same app)
-        "amazonprime"             to 119,  // Prime Video
-        "amazonprimevideowithads" to 119,  // Prime Video with Ads (same app)
-        "disneyplus"              to 337,  // Disney+
-        "appletvplus"             to 350,  // Apple TV+
-        "paramountplus"           to 531,  // Paramount+
-        "max"                     to 1899, // Max (HBO Max)
-        "joynde"                  to 2184, // Joyn
-        "daserstemediathek"       to 195,  // ARD Mediathek (free)
-        "ardplus"                 to 195,  // ARD+ (paid tier, same Android app)
-        "zdf"                     to 231,  // ZDF Mediathek
-        "youtubered"              to 192,  // YouTube Premium
+        "netflix" to 8, // Netflix
+        "netflixbasicwithads" to 8, // Netflix with Ads (same app)
+        "amazonprime" to 119, // Prime Video
+        "amazonprimevideowithads" to 119, // Prime Video with Ads (same app)
+        "disneyplus" to 337, // Disney+
+        "appletvplus" to 350, // Apple TV+
+        "paramountplus" to 531, // Paramount+
+        "max" to 1899, // Max (HBO Max)
+        "joynde" to 2184, // Joyn
+        "daserstemediathek" to 195, // ARD Mediathek (free)
+        "ardplus" to 195, // ARD+ (paid tier, same Android app)
+        "zdf" to 231, // ZDF Mediathek
+        "youtubered" to 192, // YouTube Premium
     )
 
     fun resolveProviderId(technicalName: String): Int? {
