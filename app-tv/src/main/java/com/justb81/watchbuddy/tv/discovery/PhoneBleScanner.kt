@@ -14,6 +14,7 @@ import android.os.ParcelUuid
 import android.util.Log
 import androidx.core.content.ContextCompat
 import com.justb81.watchbuddy.core.discovery.BleDiscoveryContract
+import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.net.Inet4Address
 import javax.inject.Inject
@@ -167,23 +168,37 @@ class PhoneBleScanner @Inject constructor(
         val data = result.scanRecord
             ?.serviceData
             ?.get(ParcelUuid(BleDiscoveryContract.SERVICE_UUID))
-        val payload = BleDiscoveryContract.decode(data) ?: run {
-            Log.v(TAG, "scan result without decodable WatchBuddy payload: ${result.device.address}")
-            return
+        when (val decoded = BleDiscoveryContract.decode(data)) {
+            is BleDiscoveryContract.DecodeResult.Ok -> {
+                val payload = decoded.payload
+                Log.d(
+                    TAG,
+                    "advertisement: ip=${payload.ipv4.hostAddress} port=${payload.port} " +
+                        "quality=${payload.modelQuality} backend=${payload.llmBackendOrdinal} " +
+                        "rssi=${result.rssi}"
+                )
+                listener.onAdvertisement(
+                    ipv4 = payload.ipv4,
+                    port = payload.port,
+                    modelQuality = payload.modelQuality,
+                    llmBackendOrdinal = payload.llmBackendOrdinal,
+                    rssi = result.rssi,
+                )
+            }
+            is BleDiscoveryContract.DecodeResult.WrongVersion -> DiagnosticLog.debug(
+                TAG,
+                "BLE schema mismatch from ${result.device.address}: " +
+                    "v${decoded.found} (expected v${decoded.expected})",
+            )
+            BleDiscoveryContract.DecodeResult.Truncated -> DiagnosticLog.warn(
+                TAG,
+                "Truncated BLE payload from ${result.device.address}",
+            )
+            BleDiscoveryContract.DecodeResult.MalformedIpv4 -> DiagnosticLog.warn(
+                TAG,
+                "Malformed IPv4 in BLE payload from ${result.device.address}",
+            )
         }
-        Log.d(
-            TAG,
-            "advertisement: ip=${payload.ipv4.hostAddress} port=${payload.port} " +
-                "quality=${payload.modelQuality} backend=${payload.llmBackendOrdinal} " +
-                "rssi=${result.rssi}"
-        )
-        listener.onAdvertisement(
-            ipv4 = payload.ipv4,
-            port = payload.port,
-            modelQuality = payload.modelQuality,
-            llmBackendOrdinal = payload.llmBackendOrdinal,
-            rssi = result.rssi,
-        )
     }
 
     private fun hasScanPermission(): Boolean =

@@ -58,6 +58,20 @@ object BleDiscoveryContract {
         val llmBackendOrdinal: Int,
     )
 
+    /** Typed result returned by [decode] so callers can distinguish failure modes. */
+    sealed class DecodeResult {
+        data class Ok(val payload: Payload) : DecodeResult()
+
+        /** Schema version in the advert differs from [PAYLOAD_SCHEMA_VERSION]; expected on old clients. */
+        data class WrongVersion(val found: Byte, val expected: Byte) : DecodeResult()
+
+        /** Payload is null or shorter than [PAYLOAD_SIZE_BYTES]. */
+        data object Truncated : DecodeResult()
+
+        /** IPv4 field could not be parsed into an [Inet4Address]. */
+        data object MalformedIpv4 : DecodeResult()
+    }
+
     /**
      * Packs [payload] into its 9-byte wire form.
      *
@@ -86,26 +100,32 @@ object BleDiscoveryContract {
     }
 
     /**
-     * Reads a payload emitted by [encode]. Returns `null` for any malformed or
-     * unknown-version input — never throws, since this runs on every scan
-     * callback and bad data is a normal network condition (other apps using
-     * adjacent UUID space, radio corruption, schema drift from a newer phone
-     * build).
+     * Reads a payload emitted by [encode]. Returns a [DecodeResult] that distinguishes
+     * the failure mode so callers can log unexpected cases separately from expected
+     * schema-version mismatches (old client on the same network).
+     *
+     * Never throws — this runs on every scan callback and bad data is a normal
+     * network condition (other apps using adjacent UUID space, radio corruption,
+     * schema drift from a newer phone build).
      */
-    fun decode(bytes: ByteArray?): Payload? {
-        if (bytes == null || bytes.size < PAYLOAD_SIZE_BYTES) return null
-        if (bytes[0] != PAYLOAD_SCHEMA_VERSION) return null
+    fun decode(bytes: ByteArray?): DecodeResult {
+        if (bytes == null || bytes.size < PAYLOAD_SIZE_BYTES) return DecodeResult.Truncated
+        if (bytes[0] != PAYLOAD_SCHEMA_VERSION) {
+            return DecodeResult.WrongVersion(found = bytes[0], expected = PAYLOAD_SCHEMA_VERSION)
+        }
         val ipv4 = runCatching {
             InetAddress.getByAddress(bytes.copyOfRange(1, 5)) as? Inet4Address
-        }.getOrNull() ?: return null
+        }.getOrNull() ?: return DecodeResult.MalformedIpv4
         val port = ((bytes[5].toInt() and 0xFF) shl 8) or (bytes[6].toInt() and 0xFF)
         val modelQuality = bytes[7].toInt() and 0xFF
         val llmBackendOrdinal = bytes[8].toInt() and 0xFF
-        return Payload(
-            ipv4 = ipv4,
-            port = port,
-            modelQuality = modelQuality,
-            llmBackendOrdinal = llmBackendOrdinal,
+        return DecodeResult.Ok(
+            Payload(
+                ipv4 = ipv4,
+                port = port,
+                modelQuality = modelQuality,
+                llmBackendOrdinal = llmBackendOrdinal,
+            )
         )
     }
 }

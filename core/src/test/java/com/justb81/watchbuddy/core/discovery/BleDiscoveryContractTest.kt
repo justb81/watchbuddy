@@ -2,9 +2,8 @@ package com.justb81.watchbuddy.core.discovery
 
 import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNotNull
-import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertThrows
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import java.net.Inet4Address
@@ -16,6 +15,12 @@ class BleDiscoveryContractTest {
     private fun ipv4(address: String) =
         InetAddress.getByName(address) as Inet4Address
 
+    private fun decodeOk(bytes: ByteArray): BleDiscoveryContract.Payload {
+        val result = BleDiscoveryContract.decode(bytes)
+        assertTrue(result is BleDiscoveryContract.DecodeResult.Ok, "Expected Ok but got $result")
+        return (result as BleDiscoveryContract.DecodeResult.Ok).payload
+    }
+
     @Test
     fun `round trip preserves all fields`() {
         val payload = BleDiscoveryContract.Payload(
@@ -25,7 +30,7 @@ class BleDiscoveryContractTest {
             llmBackendOrdinal = 2,
         )
 
-        val decoded = BleDiscoveryContract.decode(BleDiscoveryContract.encode(payload))
+        val decoded = decodeOk(BleDiscoveryContract.encode(payload))
 
         assertEquals(payload, decoded)
     }
@@ -53,7 +58,7 @@ class BleDiscoveryContractTest {
             BleDiscoveryContract.Payload(ipv4("255.255.255.255"), 0xFFFF, 255, 255),
             BleDiscoveryContract.Payload(ipv4("127.0.0.1"), 65535, 150, 1),
         ).forEach { payload ->
-            val decoded = BleDiscoveryContract.decode(BleDiscoveryContract.encode(payload))
+            val decoded = decodeOk(BleDiscoveryContract.encode(payload))
             assertEquals(payload, decoded, "round trip failed for $payload")
         }
     }
@@ -79,24 +84,40 @@ class BleDiscoveryContractTest {
     }
 
     @Test
-    fun `decode rejects null`() {
-        assertNull(BleDiscoveryContract.decode(null))
+    fun `decode null returns Truncated`() {
+        assertEquals(BleDiscoveryContract.DecodeResult.Truncated, BleDiscoveryContract.decode(null))
     }
 
     @Test
-    fun `decode rejects short buffer`() {
-        assertNull(
+    fun `decode short buffer returns Truncated`() {
+        assertEquals(
+            BleDiscoveryContract.DecodeResult.Truncated,
             BleDiscoveryContract.decode(ByteArray(BleDiscoveryContract.PAYLOAD_SIZE_BYTES - 1))
         )
     }
 
     @Test
-    fun `decode rejects unknown schema version`() {
+    fun `decode empty buffer returns Truncated`() {
+        assertEquals(
+            BleDiscoveryContract.DecodeResult.Truncated,
+            BleDiscoveryContract.decode(ByteArray(0))
+        )
+    }
+
+    @Test
+    fun `decode unknown schema version returns WrongVersion with correct fields`() {
         val valid = BleDiscoveryContract.encode(
             BleDiscoveryContract.Payload(ipv4("192.168.1.1"), 8765, 70, 1)
         )
         valid[0] = 99
-        assertNull(BleDiscoveryContract.decode(valid))
+        val result = BleDiscoveryContract.decode(valid)
+        assertEquals(
+            BleDiscoveryContract.DecodeResult.WrongVersion(
+                found = 99,
+                expected = BleDiscoveryContract.PAYLOAD_SCHEMA_VERSION,
+            ),
+            result,
+        )
     }
 
     @Test
@@ -105,9 +126,7 @@ class BleDiscoveryContractTest {
             BleDiscoveryContract.Payload(ipv4("192.168.1.1"), 8765, 70, 1)
         )
         val padded = valid + byteArrayOf(0xAA.toByte(), 0xBB.toByte())
-        val decoded = BleDiscoveryContract.decode(padded)
-        assertNotNull(decoded)
-        assertEquals(8765, decoded!!.port)
+        assertEquals(8765, decodeOk(padded).port)
     }
 
     @Test
@@ -136,6 +155,19 @@ class BleDiscoveryContractTest {
                 BleDiscoveryContract.Payload(ipv4("10.0.0.1"), 8765, 256, 0)
             )
         }
+    }
+
+    @Test
+    fun `WrongVersion carries found and expected version bytes`() {
+        val valid = BleDiscoveryContract.encode(
+            BleDiscoveryContract.Payload(ipv4("10.0.0.1"), 8765, 50, 0)
+        )
+        valid[0] = 42
+        val result = BleDiscoveryContract.decode(valid)
+        assertTrue(result is BleDiscoveryContract.DecodeResult.WrongVersion)
+        result as BleDiscoveryContract.DecodeResult.WrongVersion
+        assertEquals(42.toByte(), result.found)
+        assertEquals(BleDiscoveryContract.PAYLOAD_SCHEMA_VERSION, result.expected)
     }
 
     @Test
