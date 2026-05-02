@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.35.2](https://github.com/justb81/watchbuddy/compare/v0.35.1...v0.35.2) (2026-05-02)
+
+
+### Bug Fixes
+
+* **ci:** rebase before push in stats workflow to avoid non-fast-forward failures ([#648](https://github.com/justb81/watchbuddy/issues/648)) ([34764ef](https://github.com/justb81/watchbuddy/commit/34764efb88c9be051f112aa119edcc5c5e4152db))
+
 ## [0.35.1](https://github.com/justb81/watchbuddy/compare/v0.35.0...v0.35.1) (2026-05-02)
 
 
