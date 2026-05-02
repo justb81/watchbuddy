@@ -3,6 +3,7 @@ import com.github.triplet.gradle.androidpublisher.ResolutionStrategy
 
 plugins {
     id("watchbuddy.android.application")
+    id("watchbuddy.detekt")
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.gradle.play.publisher)
@@ -123,11 +124,9 @@ dependencies {
 // applicationId requires a single release on the track.
 play {
     serviceAccountCredentials.set(
-        layout.file(
-            providers.environmentVariable("GOOGLE_PLAY_SERVICE_ACCOUNT_FILE")
-                .orElse("/dev/null")
-                .map { file(it) }
-        )
+        providers.environmentVariable("GOOGLE_PLAY_SERVICE_ACCOUNT_FILE")
+            .orElse("/dev/null")
+            .map { path -> layout.projectDirectory.file(path) }
     )
 
     track.set(providers.gradleProperty("playTrack").orElse("internal"))
