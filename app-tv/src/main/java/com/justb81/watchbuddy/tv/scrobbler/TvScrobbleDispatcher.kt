@@ -140,7 +140,7 @@ class TvScrobbleDispatcher(
             phones.forEach { phone ->
                 launch {
                     try {
-                        val client = phoneApiClientFactory.createClient(phone.baseUrl)
+                        val client = phoneApiClientFactory.createClient(phone.baseUrl, phone.bearerToken)
                         when (action) {
                             ScrobbleAction.START -> {
                                 client.scrobbleStart(request)
@@ -230,7 +230,7 @@ class TvScrobbleDispatcher(
             phones.forEach { phone ->
                 launch {
                     try {
-                        val client = phoneApiClientFactory.createClient(phone.baseUrl)
+                        val client = phoneApiClientFactory.createClient(phone.baseUrl, phone.bearerToken)
                         client.addShowToLibrary(PhoneAddToLibraryRequest(show = show, episode = episode))
                         Log.i(TAG, "add-to-library-ok ${phone.baseUrl}: ${show.title} S${episode.season}E${episode.number}")
                         DiagnosticLog.event(TAG, "add-to-library-ok phone=${phone.baseUrl} '${show.title}'")
@@ -275,7 +275,7 @@ class TvScrobbleDispatcher(
             phones.forEach { phone ->
                 launch {
                     try {
-                        val client = phoneApiClientFactory.createClient(phone.baseUrl)
+                        val client = phoneApiClientFactory.createClient(phone.baseUrl, phone.bearerToken)
                         client.scrobblePrompt(event)
                         Log.i(TAG, "Ambiguous prompt sent to ${phone.baseUrl}: ${event.sessionKey}")
                     } catch (e: CancellationException) {

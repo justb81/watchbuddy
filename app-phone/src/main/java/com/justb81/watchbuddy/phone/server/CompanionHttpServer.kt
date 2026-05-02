@@ -29,6 +29,7 @@ import com.justb81.watchbuddy.service.CompanionStateManager
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
+import io.ktor.server.auth.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
 import io.ktor.server.plugins.contentnegotiation.*
@@ -51,8 +52,14 @@ private const val MAX_PAGE_SIZE = 200
  * Local HTTP server running on the phone (port 8765).
  * The TV discovers this via BLE advertisement and calls its endpoints over plain HTTP.
  *
+ * Authentication:
+ *   All endpoints except `/capability` require `Authorization: Bearer <token>`.
+ *   The bearer token is distributed to the TV via the BLE scan-response payload
+ *   (see [BearerTokenRepository]). `/capability` is intentionally unauthenticated
+ *   so the TV can call it before it has loaded the token from BLE.
+ *
  * Endpoints:
- *   GET  /capability           → DeviceCapability (device score, RAM, LLM backend)
+ *   GET  /capability           → DeviceCapability (unauthenticated)
  *   GET  /shows                → List of watched shows for this user (from Trakt cache)
  *   POST /recap/{traktShowId}  → Generate + return HTML recap for a show
  *   GET  /auth/token           → Current access token for TV app usage (show search)
@@ -63,6 +70,7 @@ private const val MAX_PAGE_SIZE = 200
  *                                metadata into (showTitle, season?, episode?)
  *   POST /scrobble/prompt      → Deliver ambiguous-scrobble prompt; consumed via state stream
  *   POST /shows/add-to-library → Add an episode to Trakt history (unknown-show overlay confirm)
+ *   GET  /avatar               → Custom user avatar JPEG
  */
 @Singleton
 class CompanionHttpServer @Inject constructor(
@@ -78,6 +86,7 @@ class CompanionHttpServer @Inject constructor(
     private val avatarImageStore: AvatarImageStore,
     private val stateManager: CompanionStateManager,
     private val titleExtractor: LlmTitleExtractor,
+    private val bearerTokenRepository: BearerTokenRepository,
 ) {
     companion object {
         const val PORT = 8765
@@ -97,6 +106,7 @@ class CompanionHttpServer @Inject constructor(
                     recapGenerator, capabilityProvider, showRepository,
                     tokenRepository, tokenRefreshManager, traktApiService, tmdbApiService, tmdbCache,
                     settingsRepository, avatarImageStore, stateManager, titleExtractor,
+                    bearerTokenRepository,
                 )
             }.start(wait = false)
         }.onFailure {
@@ -128,7 +138,17 @@ internal fun Application.configureCompanionRoutes(
     avatarImageStore: AvatarImageStore,
     stateManager: CompanionStateManager,
     titleExtractor: LlmTitleExtractor,
+    bearerTokenRepository: BearerTokenRepository,
 ) {
+    val expectedToken = bearerTokenRepository.token
+
+    install(Authentication) {
+        bearer("phone-tv") {
+            authenticate { credential ->
+                if (credential.token == expectedToken) UserIdPrincipal("tv") else null
+            }
+        }
+    }
     install(ContentNegotiation) {
         json(WatchBuddyJson)
     }
@@ -151,10 +171,14 @@ internal fun Application.configureCompanionRoutes(
         }
     }
     routing {
+        // /capability is intentionally unauthenticated — the TV must be able
+        // to reach it before it has received the bearer token from BLE.
         get("/capability") {
             stateManager.onCapabilityChecked()
             call.respond(capabilityProvider.getCapability())
         }
+
+        authenticate("phone-tv") {
 
         get("/avatar") {
             val file = avatarImageStore.file()
@@ -354,6 +378,8 @@ internal fun Application.configureCompanionRoutes(
                 call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("Add to library failed"))
             }
         }
+
+        } // authenticate("phone-tv")
     }
 }
 

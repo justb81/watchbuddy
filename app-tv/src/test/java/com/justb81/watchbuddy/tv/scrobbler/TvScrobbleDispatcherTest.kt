@@ -75,7 +75,7 @@ class TvScrobbleDispatcherTest {
             dispatcher = TvScrobbleDispatcher(phoneDiscovery, phoneApiClientFactory, backgroundScope) { fakeNow }
             val phone = makePhone()
             phonesFlow.value = listOf(phone)
-            coEvery { phoneApiClientFactory.createClient(any()) } returns phoneApiService
+            coEvery { phoneApiClientFactory.createClient(any(), anyNullable()) } returns phoneApiService
             coEvery { phoneApiService.scrobbleStart(any()) } returns mockk()
 
             dispatcher.dispatchStart(
@@ -100,7 +100,7 @@ class TvScrobbleDispatcherTest {
                 50f
             )
 
-            coVerify(exactly = 0) { phoneApiClientFactory.createClient(any()) }
+            coVerify(exactly = 0) { phoneApiClientFactory.createClient(any(), anyNullable()) }
         }
 
         @Test
@@ -110,7 +110,7 @@ class TvScrobbleDispatcherTest {
             val boundaryTime = fakeNow - DiscoveryConstants.PRESENCE_STALENESS_MS + 100L
             val phone = makePhone(lastSuccessfulCheck = boundaryTime)
             phonesFlow.value = listOf(phone)
-            coEvery { phoneApiClientFactory.createClient(any()) } returns phoneApiService
+            coEvery { phoneApiClientFactory.createClient(any(), anyNullable()) } returns phoneApiService
             coEvery { phoneApiService.scrobbleStart(any()) } returns mockk()
 
             dispatcher.dispatchStart(
@@ -134,7 +134,7 @@ class TvScrobbleDispatcherTest {
                 50f
             )
 
-            coVerify(exactly = 0) { phoneApiClientFactory.createClient(any()) }
+            coVerify(exactly = 0) { phoneApiClientFactory.createClient(any(), anyNullable()) }
         }
 
         @Test
@@ -148,7 +148,7 @@ class TvScrobbleDispatcherTest {
                 50f
             )
 
-            coVerify(exactly = 0) { phoneApiClientFactory.createClient(any()) }
+            coVerify(exactly = 0) { phoneApiClientFactory.createClient(any(), anyNullable()) }
         }
 
         @Test
@@ -159,8 +159,8 @@ class TvScrobbleDispatcherTest {
             val phone1 = makePhone(baseUrl = "http://phone1:8765/", name = "phone1")
             val phone2 = makePhone(baseUrl = "http://phone2:8765/", name = "phone2")
             phonesFlow.value = listOf(phone1, phone2)
-            coEvery { phoneApiClientFactory.createClient("http://phone1:8765/") } returns apiService1
-            coEvery { phoneApiClientFactory.createClient("http://phone2:8765/") } returns apiService2
+            coEvery { phoneApiClientFactory.createClient("http://phone1:8765/", anyNullable()) } returns apiService1
+            coEvery { phoneApiClientFactory.createClient("http://phone2:8765/", anyNullable()) } returns apiService2
             coEvery { apiService1.scrobbleStart(any()) } returns mockk()
             coEvery { apiService2.scrobbleStart(any()) } returns mockk()
 
@@ -182,8 +182,8 @@ class TvScrobbleDispatcherTest {
             val phone1 = makePhone(baseUrl = "http://phone1:8765/", name = "phone1")
             val phone2 = makePhone(baseUrl = "http://phone2:8765/", name = "phone2")
             phonesFlow.value = listOf(phone1, phone2)
-            coEvery { phoneApiClientFactory.createClient("http://phone1:8765/") } returns apiService1
-            coEvery { phoneApiClientFactory.createClient("http://phone2:8765/") } returns apiService2
+            coEvery { phoneApiClientFactory.createClient("http://phone1:8765/", anyNullable()) } returns apiService1
+            coEvery { phoneApiClientFactory.createClient("http://phone2:8765/", anyNullable()) } returns apiService2
             coEvery { apiService1.scrobbleStart(any()) } throws IOException("connection refused")
             coEvery { apiService2.scrobbleStart(any()) } returns mockk()
 
@@ -209,7 +209,7 @@ class TvScrobbleDispatcherTest {
             dispatcher = TvScrobbleDispatcher(phoneDiscovery, phoneApiClientFactory, backgroundScope) { fakeNow }
             val phone = makePhone()
             phonesFlow.value = listOf(phone)
-            coEvery { phoneApiClientFactory.createClient(any()) } returns phoneApiService
+            coEvery { phoneApiClientFactory.createClient(any(), anyNullable()) } returns phoneApiService
             coEvery { phoneApiService.scrobblePause(any()) } returns mockk()
 
             dispatcher.dispatchPause(
@@ -228,7 +228,7 @@ class TvScrobbleDispatcherTest {
             dispatcher = TvScrobbleDispatcher(phoneDiscovery, phoneApiClientFactory, backgroundScope) { fakeNow }
             val phone = makePhone()
             phonesFlow.value = listOf(phone)
-            coEvery { phoneApiClientFactory.createClient(any()) } returns phoneApiService
+            coEvery { phoneApiClientFactory.createClient(any(), anyNullable()) } returns phoneApiService
             coEvery { phoneApiService.scrobbleStop(any()) } returns mockk()
 
             dispatcher.dispatchStop(
@@ -253,7 +253,7 @@ class TvScrobbleDispatcherTest {
                 50f
             )
 
-            coVerify(exactly = 0) { phoneApiClientFactory.createClient(any()) }
+            coVerify(exactly = 0) { phoneApiClientFactory.createClient(any(), anyNullable()) }
         }
 
         @Test
@@ -267,7 +267,7 @@ class TvScrobbleDispatcherTest {
                 90f
             )
 
-            coVerify(exactly = 0) { phoneApiClientFactory.createClient(any()) }
+            coVerify(exactly = 0) { phoneApiClientFactory.createClient(any(), anyNullable()) }
         }
 
         @Test
@@ -275,7 +275,7 @@ class TvScrobbleDispatcherTest {
             dispatcher = TvScrobbleDispatcher(phoneDiscovery, phoneApiClientFactory, backgroundScope) { fakeNow }
             val phone = makePhone()
             phonesFlow.value = listOf(phone)
-            coEvery { phoneApiClientFactory.createClient(any()) } returns phoneApiService
+            coEvery { phoneApiClientFactory.createClient(any(), anyNullable()) } returns phoneApiService
             coEvery { phoneApiService.scrobbleStart(any()) } returns mockk()
 
             dispatcher.dispatchStart(
@@ -299,7 +299,7 @@ class TvScrobbleDispatcherTest {
         @Test
         fun `dropped START is dispatched when a phone later appears on discoveredPhones`() = runTest(UnconfinedTestDispatcher()) {
             dispatcher = TvScrobbleDispatcher(phoneDiscovery, phoneApiClientFactory, backgroundScope) { fakeNow }
-            coEvery { phoneApiClientFactory.createClient(any()) } returns phoneApiService
+            coEvery { phoneApiClientFactory.createClient(any(), anyNullable()) } returns phoneApiService
             coEvery { phoneApiService.scrobbleStart(any()) } returns mockk()
 
             // No phones → event is queued, not dispatched.
@@ -316,7 +316,7 @@ class TvScrobbleDispatcherTest {
         @Test
         fun `dropped PAUSE is replayed on the next phone emission`() = runTest(UnconfinedTestDispatcher()) {
             dispatcher = TvScrobbleDispatcher(phoneDiscovery, phoneApiClientFactory, backgroundScope) { fakeNow }
-            coEvery { phoneApiClientFactory.createClient(any()) } returns phoneApiService
+            coEvery { phoneApiClientFactory.createClient(any(), anyNullable()) } returns phoneApiService
             coEvery { phoneApiService.scrobblePause(any()) } returns mockk()
 
             dispatcher.dispatchPause(TestFixtures.traktShow(), TestFixtures.traktEpisode(), 50f)
@@ -331,7 +331,7 @@ class TvScrobbleDispatcherTest {
         @Test
         fun `dropped STOP is replayed on the next phone emission`() = runTest(UnconfinedTestDispatcher()) {
             dispatcher = TvScrobbleDispatcher(phoneDiscovery, phoneApiClientFactory, backgroundScope) { fakeNow }
-            coEvery { phoneApiClientFactory.createClient(any()) } returns phoneApiService
+            coEvery { phoneApiClientFactory.createClient(any(), anyNullable()) } returns phoneApiService
             coEvery { phoneApiService.scrobbleStop(any()) } returns mockk()
 
             dispatcher.dispatchStop(TestFixtures.traktShow(), TestFixtures.traktEpisode(), 90f)
@@ -346,7 +346,7 @@ class TvScrobbleDispatcherTest {
         @Test
         fun `queue is drained in FIFO order`() = runTest(UnconfinedTestDispatcher()) {
             dispatcher = TvScrobbleDispatcher(phoneDiscovery, phoneApiClientFactory, backgroundScope) { fakeNow }
-            coEvery { phoneApiClientFactory.createClient(any()) } returns phoneApiService
+            coEvery { phoneApiClientFactory.createClient(any(), anyNullable()) } returns phoneApiService
             val callOrder = mutableListOf<String>()
             coEvery { phoneApiService.scrobbleStart(any()) } answers { callOrder += "start"; mockk() }
             coEvery { phoneApiService.scrobblePause(any()) } answers { callOrder += "pause"; mockk() }
@@ -365,7 +365,7 @@ class TvScrobbleDispatcherTest {
         @Test
         fun `stale queued events older than QUEUE_TTL_MS are discarded on drain`() = runTest(UnconfinedTestDispatcher()) {
             dispatcher = TvScrobbleDispatcher(phoneDiscovery, phoneApiClientFactory, backgroundScope) { fakeNow }
-            coEvery { phoneApiClientFactory.createClient(any()) } returns phoneApiService
+            coEvery { phoneApiClientFactory.createClient(any(), anyNullable()) } returns phoneApiService
             coEvery { phoneApiService.scrobbleStart(any()) } returns mockk()
 
             // Enqueue a START at the current fake time.
@@ -383,7 +383,7 @@ class TvScrobbleDispatcherTest {
         @Test
         fun `queue caps at QUEUE_MAX_SIZE and drops the oldest entry`() = runTest(UnconfinedTestDispatcher()) {
             dispatcher = TvScrobbleDispatcher(phoneDiscovery, phoneApiClientFactory, backgroundScope) { fakeNow }
-            coEvery { phoneApiClientFactory.createClient(any()) } returns phoneApiService
+            coEvery { phoneApiClientFactory.createClient(any(), anyNullable()) } returns phoneApiService
             val dispatchedProgress = mutableListOf<Float>()
             coEvery { phoneApiService.scrobbleStart(any()) } answers {
                 dispatchedProgress += firstArg<PhoneScrobbleRequest>().progress
@@ -406,7 +406,7 @@ class TvScrobbleDispatcherTest {
         @Test
         fun `queue is empty after successful drain so second phone emission dispatches nothing`() = runTest(UnconfinedTestDispatcher()) {
             dispatcher = TvScrobbleDispatcher(phoneDiscovery, phoneApiClientFactory, backgroundScope) { fakeNow }
-            coEvery { phoneApiClientFactory.createClient(any()) } returns phoneApiService
+            coEvery { phoneApiClientFactory.createClient(any(), anyNullable()) } returns phoneApiService
             coEvery { phoneApiService.scrobbleStart(any()) } returns mockk()
 
             dispatcher.dispatchStart(TestFixtures.traktShow(), TestFixtures.traktEpisode(), 10f)
@@ -469,8 +469,8 @@ class TvScrobbleDispatcherTest {
             val phone1 = makePhone(baseUrl = "http://phone1:8765/", name = "phone1")
             val phone2 = makePhone(baseUrl = "http://phone2:8765/", name = "phone2")
             phonesFlow.value = listOf(phone1, phone2)
-            coEvery { phoneApiClientFactory.createClient("http://phone1:8765/") } returns apiService1
-            coEvery { phoneApiClientFactory.createClient("http://phone2:8765/") } returns apiService2
+            coEvery { phoneApiClientFactory.createClient("http://phone1:8765/", anyNullable()) } returns apiService1
+            coEvery { phoneApiClientFactory.createClient("http://phone2:8765/", anyNullable()) } returns apiService2
             coEvery { apiService1.addShowToLibrary(any()) } returns mockk()
             coEvery { apiService2.addShowToLibrary(any()) } returns mockk()
 
@@ -489,8 +489,8 @@ class TvScrobbleDispatcherTest {
             val phone1 = makePhone(baseUrl = "http://phone1:8765/", name = "phone1")
             val phone2 = makePhone(baseUrl = "http://phone2:8765/", name = "phone2")
             phonesFlow.value = listOf(phone1, phone2)
-            coEvery { phoneApiClientFactory.createClient("http://phone1:8765/") } returns apiService1
-            coEvery { phoneApiClientFactory.createClient("http://phone2:8765/") } returns apiService2
+            coEvery { phoneApiClientFactory.createClient("http://phone1:8765/", anyNullable()) } returns apiService1
+            coEvery { phoneApiClientFactory.createClient("http://phone2:8765/", anyNullable()) } returns apiService2
             coEvery { apiService1.addShowToLibrary(any()) } throws java.io.IOException("connection refused")
             coEvery { apiService2.addShowToLibrary(any()) } returns mockk()
 
@@ -506,7 +506,7 @@ class TvScrobbleDispatcherTest {
             dispatcher = TvScrobbleDispatcher(phoneDiscovery, phoneApiClientFactory, backgroundScope) { fakeNow }
             val phone = makePhone()
             phonesFlow.value = listOf(phone)
-            coEvery { phoneApiClientFactory.createClient(any()) } returns phoneApiService
+            coEvery { phoneApiClientFactory.createClient(any(), anyNullable()) } returns phoneApiService
             coEvery { phoneApiService.addShowToLibrary(any()) } returns mockk()
 
             val show = TestFixtures.traktShow(ids = TestFixtures.traktIds(trakt = null, tmdb = 66732))
@@ -522,7 +522,7 @@ class TvScrobbleDispatcherTest {
             dispatcher = TvScrobbleDispatcher(phoneDiscovery, phoneApiClientFactory, backgroundScope) { fakeNow }
             val phone = makePhone()
             phonesFlow.value = listOf(phone)
-            coEvery { phoneApiClientFactory.createClient(any()) } returns phoneApiService
+            coEvery { phoneApiClientFactory.createClient(any(), anyNullable()) } returns phoneApiService
             coEvery { phoneApiService.addShowToLibrary(any()) } returns mockk()
 
             val show1 = TestFixtures.traktShow(ids = TestFixtures.traktIds(trakt = null, tmdb = 111))
@@ -538,14 +538,14 @@ class TvScrobbleDispatcherTest {
             dispatcher = TvScrobbleDispatcher(phoneDiscovery, phoneApiClientFactory, backgroundScope) { fakeNow }
             val phone = makePhone()
             phonesFlow.value = listOf(phone)
-            coEvery { phoneApiClientFactory.createClient(any()) } returns phoneApiService
+            coEvery { phoneApiClientFactory.createClient(any(), anyNullable()) } returns phoneApiService
 
             val showWithoutTmdbId = TestFixtures.traktShow(
                 ids = TestFixtures.traktIds(trakt = null, tmdb = null)
             )
             dispatcher.dispatchAddToLibrary(showWithoutTmdbId, TestFixtures.traktEpisode())
 
-            coVerify(exactly = 0) { phoneApiClientFactory.createClient(any()) }
+            coVerify(exactly = 0) { phoneApiClientFactory.createClient(any(), anyNullable()) }
         }
 
         @Test
@@ -557,7 +557,7 @@ class TvScrobbleDispatcherTest {
             // Should not throw.
             dispatcher.dispatchAddToLibrary(show, TestFixtures.traktEpisode())
 
-            coVerify(exactly = 0) { phoneApiClientFactory.createClient(any()) }
+            coVerify(exactly = 0) { phoneApiClientFactory.createClient(any(), anyNullable()) }
         }
     }
 
@@ -595,8 +595,8 @@ class TvScrobbleDispatcherTest {
             val phone1 = makePhone(baseUrl = "http://phone1:8765/", name = "phone1")
             val phone2 = makePhone(baseUrl = "http://phone2:8765/", name = "phone2")
             phonesFlow.value = listOf(phone1, phone2)
-            coEvery { phoneApiClientFactory.createClient("http://phone1:8765/") } returns apiService1
-            coEvery { phoneApiClientFactory.createClient("http://phone2:8765/") } returns apiService2
+            coEvery { phoneApiClientFactory.createClient("http://phone1:8765/", anyNullable()) } returns apiService1
+            coEvery { phoneApiClientFactory.createClient("http://phone2:8765/", anyNullable()) } returns apiService2
             coEvery { apiService1.scrobblePrompt(any()) } returns mockk()
             coEvery { apiService2.scrobblePrompt(any()) } returns mockk()
 
@@ -611,7 +611,7 @@ class TvScrobbleDispatcherTest {
             dispatcher = TvScrobbleDispatcher(phoneDiscovery, phoneApiClientFactory, backgroundScope) { fakeNow }
             val phone = makePhone()
             phonesFlow.value = listOf(phone)
-            coEvery { phoneApiClientFactory.createClient(any()) } returns phoneApiService
+            coEvery { phoneApiClientFactory.createClient(any(), anyNullable()) } returns phoneApiService
             coEvery { phoneApiService.scrobblePrompt(any()) } returns mockk()
 
             val event = makeEvent()
@@ -632,7 +632,7 @@ class TvScrobbleDispatcherTest {
 
                 // Phone becomes available — but the key is still registered so re-dispatch is blocked.
                 phonesFlow.value = listOf(makePhone())
-                coEvery { phoneApiClientFactory.createClient(any()) } returns phoneApiService
+                coEvery { phoneApiClientFactory.createClient(any(), anyNullable()) } returns phoneApiService
                 coEvery { phoneApiService.scrobblePrompt(any()) } returns mockk()
                 dispatcher.dispatchAmbiguous(event)
 
@@ -644,7 +644,7 @@ class TvScrobbleDispatcherTest {
             dispatcher = TvScrobbleDispatcher(phoneDiscovery, phoneApiClientFactory, backgroundScope) { fakeNow }
             val phone = makePhone()
             phonesFlow.value = listOf(phone)
-            coEvery { phoneApiClientFactory.createClient(any()) } returns phoneApiService
+            coEvery { phoneApiClientFactory.createClient(any(), anyNullable()) } returns phoneApiService
             coEvery { phoneApiService.scrobblePrompt(any()) } returns mockk()
 
             val event = makeEvent()
@@ -663,7 +663,7 @@ class TvScrobbleDispatcherTest {
                 dispatcher = TvScrobbleDispatcher(phoneDiscovery, phoneApiClientFactory, backgroundScope) { fakeNow }
                 val phone = makePhone()
                 phonesFlow.value = listOf(phone)
-                coEvery { phoneApiClientFactory.createClient(any()) } returns phoneApiService
+                coEvery { phoneApiClientFactory.createClient(any(), anyNullable()) } returns phoneApiService
                 coEvery { phoneApiService.scrobblePrompt(any()) } returns mockk()
 
                 val event = makeEvent()
@@ -685,7 +685,7 @@ class TvScrobbleDispatcherTest {
             dispatcher = TvScrobbleDispatcher(phoneDiscovery, phoneApiClientFactory, backgroundScope) { fakeNow }
             val phone = makePhone()
             phonesFlow.value = listOf(phone)
-            coEvery { phoneApiClientFactory.createClient(any()) } returns phoneApiService
+            coEvery { phoneApiClientFactory.createClient(any(), anyNullable()) } returns phoneApiService
             coEvery { phoneApiService.scrobblePrompt(any()) } returns mockk()
 
             dispatcher.dispatchAmbiguous(makeEvent(sessionKey = "session-1"))
@@ -703,8 +703,8 @@ class TvScrobbleDispatcherTest {
                 val phone1 = makePhone(baseUrl = "http://phone1:8765/", name = "phone1")
                 val phone2 = makePhone(baseUrl = "http://phone2:8765/", name = "phone2")
                 phonesFlow.value = listOf(phone1, phone2)
-                coEvery { phoneApiClientFactory.createClient("http://phone1:8765/") } returns apiService1
-                coEvery { phoneApiClientFactory.createClient("http://phone2:8765/") } returns apiService2
+                coEvery { phoneApiClientFactory.createClient("http://phone1:8765/", anyNullable()) } returns apiService1
+                coEvery { phoneApiClientFactory.createClient("http://phone2:8765/", anyNullable()) } returns apiService2
                 coEvery { apiService1.scrobblePrompt(any()) } throws IOException("connection refused")
                 coEvery { apiService2.scrobblePrompt(any()) } returns mockk()
 

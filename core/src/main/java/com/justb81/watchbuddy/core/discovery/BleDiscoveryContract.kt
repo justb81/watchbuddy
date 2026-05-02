@@ -13,15 +13,29 @@ import java.util.UUID
  * (hotel and guest Wi-Fi, mesh routers with VLAN segmentation, aggressive
  * IGMP snooping).
  *
- * Wire format (service data attached to [SERVICE_UUID]): 9 bytes, packed big-endian.
+ * ## Primary advertisement (service data attached to [SERVICE_UUID]): 9 bytes, big-endian.
  *
  *   | offset | bytes | field                                              |
  *   |--------|-------|----------------------------------------------------|
- *   | 0      | 1     | schema version (current: [PAYLOAD_SCHEMA_VERSION]) |
+ *   | 0      | 1     | schema version (1 = legacy, 2 = auth-capable)      |
  *   | 1..4   | 4     | IPv4 address (network byte order)                  |
  *   | 5..6   | 2     | TCP port (big-endian, unsigned)                    |
  *   | 7      | 1     | modelQuality (0..255 clamped; semantic range 0..150) |
  *   | 8      | 1     | llmBackend ordinal (0..255)                        |
+ *
+ * ## Scan response (service data attached to [TOKEN_SERVICE_UUID]): 13 bytes.
+ *
+ * Schema-v2 phones also emit a BLE scan response carrying a 13-byte bearer
+ * token for HTTP authentication. Token bytes are raw random material;
+ * callers encode to Base64url for use in `Authorization: Bearer` headers.
+ *
+ *   | offset | bytes | field               |
+ *   |--------|-------|---------------------|
+ *   | 0..12  | 13    | bearer token bytes  |
+ *
+ * Budget: scan response has no mandatory FLAGS AD structure, so the full
+ * 31 bytes are available. Service data header is 1 (len) + 1 (type 0x21) +
+ * 16 (UUID) = 18 bytes. Remaining: 31 − 18 = **13 bytes** of token data.
  *
  * On the wire we emit **only** the Service Data 128-bit AD field — no
  * separate Complete-List-of-128-bit-UUIDs AD. Carrying the UUID in both
@@ -38,7 +52,7 @@ import java.util.UUID
  * `(ip, port)` pair.
  *
  * Schema evolution: additive changes must bump [PAYLOAD_SCHEMA_VERSION];
- * decoders reject unknown versions to avoid misinterpreting future fields.
+ * unknown versions beyond the recognised set are rejected.
  */
 object BleDiscoveryContract {
 
@@ -48,8 +62,23 @@ object BleDiscoveryContract {
      */
     val SERVICE_UUID: UUID = UUID.fromString("5e4b4d3a-9f7c-4b7e-8e6b-6c0e5f27e4a0")
 
-    const val PAYLOAD_SCHEMA_VERSION: Byte = 1
+    /**
+     * UUID for the scan-response service data carrying the 13-byte bearer token.
+     * Separate from [SERVICE_UUID] to avoid collision in Android's merged ScanRecord map.
+     */
+    val TOKEN_SERVICE_UUID: UUID = UUID.fromString("7a2c1f8b-3e5d-4c9a-b0e7-8d4f2a6c0b3e")
+
+    /** Legacy schema emitted by phone builds before bearer-token auth was introduced. */
+    const val PAYLOAD_SCHEMA_VERSION_LEGACY: Byte = 1
+
+    /** Current schema — phone emits scan response with [TOKEN_SERVICE_UUID] bearer token. */
+    const val PAYLOAD_SCHEMA_VERSION: Byte = 2
+
+    /** Size of the primary advertisement service data payload (both v1 and v2). */
     const val PAYLOAD_SIZE_BYTES: Int = 9
+
+    /** Size of the bearer-token scan-response payload (schema v2 only). */
+    const val TOKEN_PAYLOAD_SIZE_BYTES: Int = 13
 
     data class Payload(
         val ipv4: Inet4Address,
@@ -60,9 +89,15 @@ object BleDiscoveryContract {
 
     /** Typed result returned by [decode] so callers can distinguish failure modes. */
     sealed class DecodeResult {
-        data class Ok(val payload: Payload) : DecodeResult()
+        /**
+         * Successfully decoded payload.
+         *
+         * [authCapable] is true for schema v2 phones that also emit a bearer-token
+         * scan response; false for legacy v1 phones with no token.
+         */
+        data class Ok(val payload: Payload, val authCapable: Boolean) : DecodeResult()
 
-        /** Schema version in the advert differs from [PAYLOAD_SCHEMA_VERSION]; expected on old clients. */
+        /** Schema version is not 1 or 2 — unknown future schema or garbled advert. */
         data class WrongVersion(val found: Byte, val expected: Byte) : DecodeResult()
 
         /** Payload is null or shorter than [PAYLOAD_SIZE_BYTES]. */
@@ -104,14 +139,18 @@ object BleDiscoveryContract {
      * the failure mode so callers can log unexpected cases separately from expected
      * schema-version mismatches (old client on the same network).
      *
+     * Accepts both schema v1 (legacy, [authCapable]=false) and v2 ([authCapable]=true).
      * Never throws — this runs on every scan callback and bad data is a normal
      * network condition (other apps using adjacent UUID space, radio corruption,
      * schema drift from a newer phone build).
      */
     fun decode(bytes: ByteArray?): DecodeResult {
         if (bytes == null || bytes.size < PAYLOAD_SIZE_BYTES) return DecodeResult.Truncated
-        if (bytes[0] != PAYLOAD_SCHEMA_VERSION) {
-            return DecodeResult.WrongVersion(found = bytes[0], expected = PAYLOAD_SCHEMA_VERSION)
+        val version = bytes[0]
+        val authCapable = when (version) {
+            PAYLOAD_SCHEMA_VERSION_LEGACY -> false
+            PAYLOAD_SCHEMA_VERSION -> true
+            else -> return DecodeResult.WrongVersion(found = version, expected = PAYLOAD_SCHEMA_VERSION)
         }
         val ipv4 = runCatching {
             InetAddress.getByAddress(bytes.copyOfRange(1, 5)) as? Inet4Address
@@ -120,12 +159,35 @@ object BleDiscoveryContract {
         val modelQuality = bytes[7].toInt() and 0xFF
         val llmBackendOrdinal = bytes[8].toInt() and 0xFF
         return DecodeResult.Ok(
-            Payload(
+            payload = Payload(
                 ipv4 = ipv4,
                 port = port,
                 modelQuality = modelQuality,
                 llmBackendOrdinal = llmBackendOrdinal,
-            )
+            ),
+            authCapable = authCapable,
         )
+    }
+
+    /**
+     * Returns [tokenBytes] unchanged after validating length equals [TOKEN_PAYLOAD_SIZE_BYTES].
+     *
+     * @throws IllegalArgumentException if length != [TOKEN_PAYLOAD_SIZE_BYTES].
+     */
+    fun encodeTokenPayload(tokenBytes: ByteArray): ByteArray {
+        require(tokenBytes.size == TOKEN_PAYLOAD_SIZE_BYTES) {
+            "token must be exactly $TOKEN_PAYLOAD_SIZE_BYTES bytes; got ${tokenBytes.size}"
+        }
+        return tokenBytes.copyOf()
+    }
+
+    /**
+     * Validates and returns the bearer-token bytes from a [TOKEN_SERVICE_UUID] scan-response
+     * payload, or null if [bytes] is null or has the wrong length.
+     * Never throws.
+     */
+    fun decodeTokenPayload(bytes: ByteArray?): ByteArray? {
+        if (bytes == null || bytes.size < TOKEN_PAYLOAD_SIZE_BYTES) return null
+        return bytes.copyOf(TOKEN_PAYLOAD_SIZE_BYTES)
     }
 }

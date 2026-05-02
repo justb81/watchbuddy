@@ -2,6 +2,8 @@ package com.justb81.watchbuddy.core.discovery
 
 import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.DisplayName
@@ -33,6 +35,84 @@ class BleDiscoveryContractTest {
         val decoded = decodeOk(BleDiscoveryContract.encode(payload))
 
         assertEquals(payload, decoded)
+    }
+
+    @Test
+    fun `decode v2 sets authCapable true`() {
+        val bytes = BleDiscoveryContract.encode(
+            BleDiscoveryContract.Payload(ipv4("10.0.0.1"), 8765, 0, 0)
+        )
+        assertEquals(BleDiscoveryContract.PAYLOAD_SCHEMA_VERSION, bytes[0])
+        val result = BleDiscoveryContract.decode(bytes)
+        assertTrue(result is BleDiscoveryContract.DecodeResult.Ok)
+        assertTrue((result as BleDiscoveryContract.DecodeResult.Ok).authCapable)
+    }
+
+    @Test
+    fun `decode v1 legacy sets authCapable false`() {
+        val bytes = BleDiscoveryContract.encode(
+            BleDiscoveryContract.Payload(ipv4("10.0.0.1"), 8765, 0, 0)
+        ).copyOf()
+        bytes[0] = BleDiscoveryContract.PAYLOAD_SCHEMA_VERSION_LEGACY
+        val result = BleDiscoveryContract.decode(bytes)
+        assertTrue(result is BleDiscoveryContract.DecodeResult.Ok)
+        assertFalse((result as BleDiscoveryContract.DecodeResult.Ok).authCapable)
+    }
+
+    @Test
+    fun `encodeTokenPayload returns exact 13 bytes`() {
+        val token = ByteArray(BleDiscoveryContract.TOKEN_PAYLOAD_SIZE_BYTES) { it.toByte() }
+        val encoded = BleDiscoveryContract.encodeTokenPayload(token)
+        assertEquals(BleDiscoveryContract.TOKEN_PAYLOAD_SIZE_BYTES, encoded.size)
+        assertArrayEquals(token, encoded)
+    }
+
+    @Test
+    fun `encodeTokenPayload rejects wrong length`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            BleDiscoveryContract.encodeTokenPayload(ByteArray(10))
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            BleDiscoveryContract.encodeTokenPayload(ByteArray(14))
+        }
+    }
+
+    @Test
+    fun `decodeTokenPayload returns null for null input`() {
+        assertEquals(null, BleDiscoveryContract.decodeTokenPayload(null))
+    }
+
+    @Test
+    fun `decodeTokenPayload returns null for short buffer`() {
+        assertEquals(null, BleDiscoveryContract.decodeTokenPayload(ByteArray(12)))
+    }
+
+    @Test
+    fun `decodeTokenPayload returns first 13 bytes for longer buffer`() {
+        val input = ByteArray(20) { it.toByte() }
+        val result = BleDiscoveryContract.decodeTokenPayload(input)
+        assertArrayEquals(input.copyOf(13), result)
+    }
+
+    @Test
+    fun `decodeTokenPayload round trips with encodeTokenPayload`() {
+        val token = ByteArray(BleDiscoveryContract.TOKEN_PAYLOAD_SIZE_BYTES) { (it * 17).toByte() }
+        val decoded = BleDiscoveryContract.decodeTokenPayload(
+            BleDiscoveryContract.encodeTokenPayload(token)
+        )
+        assertArrayEquals(token, decoded)
+    }
+
+    @Test
+    fun `scan response fits within legacy 31-byte envelope`() {
+        // Scan response budget analysis (no FLAGS AD in scan response):
+        //   Service Data 128-bit (0x21): 1 len + 1 type + 16 UUID + N = 18 + N
+        // Max N = 31 - 18 = 13 bytes for token data.
+        val envelopeBudget = 31
+        val serviceDataAdOverhead = 1 + 1 + 16
+        val total = serviceDataAdOverhead + BleDiscoveryContract.TOKEN_PAYLOAD_SIZE_BYTES
+        assertEquals(31, total, "scan response must exactly fill the 31-byte envelope")
+        assertTrue(total <= envelopeBudget)
     }
 
     @Test

@@ -162,7 +162,7 @@ class TvHomeViewModel @Inject constructor(
 
         try {
             if (bestPhone != null) {
-                val api = phoneApiClientFactory.createClient(bestPhone.baseUrl)
+                val api = phoneApiClientFactory.createClient(bestPhone.baseUrl, bestPhone.bearerToken)
                 val newShows = api.getShows(offset = currentOffset, limit = PAGE_SIZE)
 
                 val hasMore = newShows.size >= PAGE_SIZE

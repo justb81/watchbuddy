@@ -90,7 +90,7 @@ class TvHomeViewModelTest {
         val phone = mockk<PhoneDiscoveryManager.DiscoveredPhone>()
         every { phone.baseUrl } returns "http://192.168.1.1:8765/"
         every { phoneDiscovery.getBestPhone() } returns phone
-        every { phoneApiClientFactory.createClient(any()) } returns phoneApiService
+        every { phoneApiClientFactory.createClient(any(), anyNullable()) } returns phoneApiService
         coEvery { phoneApiService.getShows(any(), any()) } throws RuntimeException("Connection refused")
 
         val viewModel = createViewModel()
@@ -106,7 +106,7 @@ class TvHomeViewModelTest {
     fun `loadShows shows cached data with phoneApiError when phone found but API fails`() = runTest {
         val phone = mockk<PhoneDiscoveryManager.DiscoveredPhone>()
         every { phone.baseUrl } returns "http://192.168.1.1:8765/"
-        every { phoneApiClientFactory.createClient(any()) } returns phoneApiService
+        every { phoneApiClientFactory.createClient(any(), anyNullable()) } returns phoneApiService
 
         // First call succeeds and populates cache
         every { phoneDiscovery.getBestPhone() } returns phone
@@ -132,7 +132,7 @@ class TvHomeViewModelTest {
         val phone = mockk<PhoneDiscoveryManager.DiscoveredPhone>()
         every { phone.baseUrl } returns "http://192.168.1.1:8765/"
         every { phoneDiscovery.getBestPhone() } returns phone
-        every { phoneApiClientFactory.createClient("http://192.168.1.1:8765/") } returns phoneApiService
+        every { phoneApiClientFactory.createClient("http://192.168.1.1:8765/", anyNullable()) } returns phoneApiService
         coEvery { phoneApiService.getShows(any(), any()) } returns testShows
 
         val viewModel = createViewModel()
@@ -151,7 +151,7 @@ class TvHomeViewModelTest {
         val phone = mockk<PhoneDiscoveryManager.DiscoveredPhone>()
         every { phone.baseUrl } returns "http://test:8765/"
         every { phoneDiscovery.getBestPhone() } returns phone
-        every { phoneApiClientFactory.createClient(any()) } returns phoneApiService
+        every { phoneApiClientFactory.createClient(any(), anyNullable()) } returns phoneApiService
         coEvery { phoneApiService.getShows(any(), any()) } returns testShows
 
         createViewModel()
@@ -198,7 +198,7 @@ class TvHomeViewModelTest {
         val phone = mockk<PhoneDiscoveryManager.DiscoveredPhone>()
         every { phone.baseUrl } returns "http://192.168.1.1:8765/"
         every { phoneDiscovery.getBestPhone() } returns phone
-        every { phoneApiClientFactory.createClient(any()) } returns phoneApiService
+        every { phoneApiClientFactory.createClient(any(), anyNullable()) } returns phoneApiService
         coEvery { phoneApiService.getShows(any(), any()) } throws CancellationException("cancelled")
 
         val viewModel = createViewModel()
@@ -226,7 +226,7 @@ class TvHomeViewModelTest {
             val phone = mockk<PhoneDiscoveryManager.DiscoveredPhone>()
             every { phone.baseUrl } returns "http://192.168.1.1:8765/"
             every { phoneDiscovery.getBestPhone() } returns phone
-            every { phoneApiClientFactory.createClient(any()) } returns phoneApiService
+            every { phoneApiClientFactory.createClient(any(), anyNullable()) } returns phoneApiService
             return phone
         }
 
@@ -456,7 +456,7 @@ class TvHomeViewModelTest {
             val phone = mockk<PhoneDiscoveryManager.DiscoveredPhone>()
             every { phone.baseUrl } returns "http://192.168.1.1:8765/"
             every { phoneDiscovery.getBestPhone() } returns phone
-            every { phoneApiClientFactory.createClient(any()) } returns phoneApiService
+            every { phoneApiClientFactory.createClient(any(), anyNullable()) } returns phoneApiService
 
             val recent = enrichedWatched("Recent", Instant.now().minus(5, ChronoUnit.DAYS).toString(), id = 1)
             val old = enrichedWatched("Old Show", Instant.now().minus(40, ChronoUnit.DAYS).toString(), id = 2)
@@ -598,7 +598,7 @@ class TvHomeViewModelTest {
             val phone = mockk<PhoneDiscoveryManager.DiscoveredPhone>()
             every { phone.baseUrl } returns "http://192.168.1.1:8765/"
             every { phoneDiscovery.getBestPhone() } returns phone
-            every { phoneApiClientFactory.createClient(any()) } returns phoneApiService
+            every { phoneApiClientFactory.createClient(any(), anyNullable()) } returns phoneApiService
 
             val completed =
                 completedShow("Done", id = 1, lastWatchedAt = Instant.now().minus(5, ChronoUnit.DAYS).toString())
