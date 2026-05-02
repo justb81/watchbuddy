@@ -25,13 +25,13 @@ fun interface Redactor {
 object DefaultRedactor : Redactor {
 
     private val BEARER_TOKEN = Regex("""Bearer\s+\S+""", RegexOption.IGNORE_CASE)
-    private val ACCESS_TOKEN = Regex("""access_token=[^&\s"']+""", RegexOption.IGNORE_CASE)
+    private val ACCESS_TOKEN = Regex("""(access_token=)[^&\s"']+""", RegexOption.IGNORE_CASE)
     private val MAC_ADDRESS = Regex("""[0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}""")
     private val IP_IN_URL = Regex("""(https?://)\d{1,3}(?:\.\d{1,3}){3}""", RegexOption.IGNORE_CASE)
 
     override fun redact(input: String): String = input
         .replace(BEARER_TOKEN, "Bearer [REDACTED]")
-        .replace(ACCESS_TOKEN, "access_token=[REDACTED]")
+        .replace(ACCESS_TOKEN) { match -> "${match.groupValues[1]}[REDACTED]" }
         .replace(MAC_ADDRESS, "[MAC_REDACTED]")
         .replace(IP_IN_URL) { match -> "${match.groupValues[1]}[IP_REDACTED]" }
 }
