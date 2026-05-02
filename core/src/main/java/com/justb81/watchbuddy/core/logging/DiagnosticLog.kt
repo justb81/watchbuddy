@@ -43,6 +43,7 @@ object DiagnosticLog {
     )
 
     private const val MAX_ENTRIES = 500
+    private const val MAX_THROWABLE_MESSAGE_CHARS = 200
 
     @Volatile private var redactor: Redactor = DefaultRedactor
 
@@ -135,7 +136,7 @@ object DiagnosticLog {
 
     private fun summarizeThrowable(t: Throwable): String {
         val typeName = t::class.qualifiedName ?: t.javaClass.name
-        val message = t.message?.take(200)?.let { redactor.redact(it) } ?: ""
+        val message = t.message?.take(MAX_THROWABLE_MESSAGE_CHARS)?.let { redactor.redact(it) } ?: ""
         return if (message.isEmpty()) typeName else "$typeName: $message"
     }
 
