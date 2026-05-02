@@ -669,32 +669,6 @@ class CompanionHttpServerTest {
         }
     }
 
-    // ── GET /auth/token ───────────────────────────────────────────────────────
-
-    @Nested
-    @DisplayName("GET /auth/token")
-    inner class AuthTokenEndpoint {
-
-        @Test
-        fun `returns 401 when token refresh returns null`() = testApp {
-            coEvery { tokenRefreshManager.getValidAccessToken() } returns null
-
-            val response = client.get("/auth/token")
-
-            assertEquals(HttpStatusCode.Unauthorized, response.status)
-        }
-
-        @Test
-        fun `returns 200 with valid access token after refresh`() = testApp {
-            coEvery { tokenRefreshManager.getValidAccessToken() } returns "my-secret-token"
-
-            val response = client.get("/auth/token")
-
-            assertEquals(HttpStatusCode.OK, response.status)
-            assertTrue(response.bodyAsText().contains("my-secret-token"))
-        }
-    }
-
     // ── POST /scrobble/start, /scrobble/pause, /scrobble/stop ────────────────
 
     @Nested

@@ -108,7 +108,6 @@ flowchart TD
 | `GET` | `/capability` | Device info, LLM backend, RAM, model quality score, TMDB API key | No |
 | `GET` | `/shows` | User's Trakt watched shows (5-min cache) | Token required |
 | `POST` | `/recap/{traktShowId}` | Generate HTML recap via LLM | Token required |
-| `GET` | `/auth/token` | Return current Trakt access token | Token required |
 | `POST` | `/scrobble/start` | Forward scrobble start to Trakt | Token required |
 | `POST` | `/scrobble/pause` | Forward scrobble pause to Trakt | Token required |
 | `POST` | `/scrobble/stop` | Forward scrobble stop to Trakt | Token required |

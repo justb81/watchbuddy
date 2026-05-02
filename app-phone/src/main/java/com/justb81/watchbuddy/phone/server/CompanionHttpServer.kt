@@ -62,7 +62,6 @@ private const val MAX_PAGE_SIZE = 200
  *   GET  /capability           → DeviceCapability (unauthenticated)
  *   GET  /shows                → List of watched shows for this user (from Trakt cache)
  *   POST /recap/{traktShowId}  → Generate + return HTML recap for a show
- *   GET  /auth/token           → Current access token for TV app usage (show search)
  *   POST /scrobble/start       → Forward scrobble start to this user's Trakt account
  *   POST /scrobble/pause       → Forward scrobble pause to this user's Trakt account
  *   POST /scrobble/stop        → Forward scrobble stop to this user's Trakt account
@@ -293,12 +292,6 @@ internal fun Application.configureCompanionRoutes(
             }
         }
 
-        get("/auth/token") {
-            val token = tokenRefreshManager.getValidAccessToken()
-                ?: return@get call.respond(HttpStatusCode.Unauthorized, ErrorResponse("No access token"))
-            call.respond(TokenResponse(accessToken = token))
-        }
-
         ScrobbleAction.entries.forEach { action ->
             post("/scrobble/${action.name.lowercase()}") {
                 call.handleScrobble(action, tokenRefreshManager, traktApiService, stateManager)
@@ -417,11 +410,6 @@ private suspend fun ApplicationCall.handleScrobble(
 @Serializable
 private data class RecapRequest(
     val tmdbApiKey: String = ""
-)
-
-@Serializable
-private data class TokenResponse(
-    val accessToken: String
 )
 
 @Serializable

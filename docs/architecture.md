@@ -87,7 +87,6 @@ distributed via BLE scan response; see above). Missing or wrong bearer returns H
 | GET | `/avatar` | Custom avatar JPEG (200 bytes, ETag-revalidated; 404 when `avatarSource != CUSTOM`) |
 | GET | `/shows` | User's Trakt watched shows (cached), paginated via `offset` + `limit` query params |
 | POST | `/recap/{traktShowId}` | Generate HTML recap for a show |
-| GET | `/auth/token` | Current Trakt access token (used by TV to obtain a token for authenticated calls) |
 | POST | `/scrobble/start` | Forward scrobble start to this user's Trakt account |
 | POST | `/scrobble/pause` | Forward scrobble pause to this user's Trakt account |
 | POST | `/scrobble/stop` | Forward scrobble stop to this user's Trakt account |
