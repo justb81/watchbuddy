@@ -123,11 +123,9 @@ dependencies {
 // applicationId requires a single release on the track.
 play {
     serviceAccountCredentials.set(
-        layout.file(
-            providers.environmentVariable("GOOGLE_PLAY_SERVICE_ACCOUNT_FILE")
-                .orElse("/dev/null")
-                .map { file(it) }
-        )
+        providers.environmentVariable("GOOGLE_PLAY_SERVICE_ACCOUNT_FILE")
+            .orElse("/dev/null")
+            .map { path -> layout.projectDirectory.file(path) }
     )
 
     track.set(providers.gradleProperty("playTrack").orElse("internal"))
