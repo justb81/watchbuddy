@@ -24,6 +24,11 @@ import java.util.TimeZone
  * Each entry is lightweight (timestamp + level + tag + message + optional throwable
  * summary) and all calls mirror to [android.util.Log] so logcat continues to work
  * unchanged during development.
+ *
+ * Every message and throwable summary is passed through the active [Redactor]
+ * before storage to prevent PII leakage via the share sheet (see issue #563).
+ * The default implementation is [DefaultRedactor]; tests may swap it via
+ * [setRedactorForTest].
  */
 object DiagnosticLog {
 
@@ -38,6 +43,8 @@ object DiagnosticLog {
     )
 
     private const val MAX_ENTRIES = 500
+
+    @Volatile private var redactor: Redactor = DefaultRedactor
 
     private val buffer = ArrayDeque<Entry>(MAX_ENTRIES)
     private val lock = Any()
@@ -77,6 +84,16 @@ object DiagnosticLog {
 
     fun clear() = synchronized(lock) { buffer.clear() }
 
+    /** Replaces the active [Redactor]; intended for tests only. */
+    internal fun setRedactorForTest(r: Redactor) {
+        redactor = r
+    }
+
+    /** Restores the default [Redactor]; intended for tests only. */
+    internal fun resetRedactorForTest() {
+        redactor = DefaultRedactor
+    }
+
     /** Renders the current buffer as a human-readable block for sharing. */
     fun formatForShare(): String {
         val entries = snapshot()
@@ -105,7 +122,7 @@ object DiagnosticLog {
             timestampMs = System.currentTimeMillis(),
             level = level,
             tag = tag,
-            message = message,
+            message = redactor.redact(message),
             throwableSummary = throwable?.let(::summarizeThrowable)
         )
         synchronized(lock) {
@@ -117,10 +134,9 @@ object DiagnosticLog {
     }
 
     private fun summarizeThrowable(t: Throwable): String {
-        val first = "${t.javaClass.name}: ${t.message ?: ""}".trim()
-        val topFrame = t.stackTrace.firstOrNull()?.let { "at $it" }
-        val cause = t.cause?.let { "caused by ${it.javaClass.simpleName}: ${it.message ?: ""}".trim() }
-        return listOfNotNull(first, topFrame, cause).joinToString("\n")
+        val typeName = t::class.qualifiedName ?: t.javaClass.name
+        val message = t.message?.take(200)?.let { redactor.redact(it) } ?: ""
+        return if (message.isEmpty()) typeName else "$typeName: $message"
     }
 
     private fun mirrorToLogcat(entry: Entry, throwable: Throwable?) {
