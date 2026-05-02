@@ -159,10 +159,8 @@ class BearerTokenRepositoryTest {
             val repo = makeRepo()
 
             // Encode the tokenBytes manually and compare to token
-            val manualEncoded = android.util.Base64.encodeToString(
-                repo.tokenBytes,
-                android.util.Base64.URL_SAFE or android.util.Base64.NO_PADDING or android.util.Base64.NO_WRAP
-            )
+            val manualEncoded = java.util.Base64.getUrlEncoder().withoutPadding()
+                .encodeToString(repo.tokenBytes)
             assertEquals(manualEncoded, repo.token)
         }
     }

@@ -89,6 +89,7 @@ class TvHomeViewModelTest {
     fun `loadShows sets phoneApiError (not noPhoneConnected) when phone found but API fails`() = runTest {
         val phone = mockk<PhoneDiscoveryManager.DiscoveredPhone>()
         every { phone.baseUrl } returns "http://192.168.1.1:8765/"
+        every { phone.bearerToken } returns null
         every { phoneDiscovery.getBestPhone() } returns phone
         every { phoneApiClientFactory.createClient(any(), anyNullable()) } returns phoneApiService
         coEvery { phoneApiService.getShows(any(), any()) } throws RuntimeException("Connection refused")
@@ -106,6 +107,7 @@ class TvHomeViewModelTest {
     fun `loadShows shows cached data with phoneApiError when phone found but API fails`() = runTest {
         val phone = mockk<PhoneDiscoveryManager.DiscoveredPhone>()
         every { phone.baseUrl } returns "http://192.168.1.1:8765/"
+        every { phone.bearerToken } returns null
         every { phoneApiClientFactory.createClient(any(), anyNullable()) } returns phoneApiService
 
         // First call succeeds and populates cache
@@ -131,6 +133,7 @@ class TvHomeViewModelTest {
     fun `loadShows fetches from best phone`() = runTest {
         val phone = mockk<PhoneDiscoveryManager.DiscoveredPhone>()
         every { phone.baseUrl } returns "http://192.168.1.1:8765/"
+        every { phone.bearerToken } returns null
         every { phoneDiscovery.getBestPhone() } returns phone
         every { phoneApiClientFactory.createClient("http://192.168.1.1:8765/", anyNullable()) } returns phoneApiService
         coEvery { phoneApiService.getShows(any(), any()) } returns testShows
@@ -150,6 +153,7 @@ class TvHomeViewModelTest {
     fun `loadShows updates TvShowCache`() = runTest {
         val phone = mockk<PhoneDiscoveryManager.DiscoveredPhone>()
         every { phone.baseUrl } returns "http://test:8765/"
+        every { phone.bearerToken } returns null
         every { phoneDiscovery.getBestPhone() } returns phone
         every { phoneApiClientFactory.createClient(any(), anyNullable()) } returns phoneApiService
         coEvery { phoneApiService.getShows(any(), any()) } returns testShows
@@ -197,6 +201,7 @@ class TvHomeViewModelTest {
     fun `CancellationException propagates and is not treated as a load failure`() = runTest {
         val phone = mockk<PhoneDiscoveryManager.DiscoveredPhone>()
         every { phone.baseUrl } returns "http://192.168.1.1:8765/"
+        every { phone.bearerToken } returns null
         every { phoneDiscovery.getBestPhone() } returns phone
         every { phoneApiClientFactory.createClient(any(), anyNullable()) } returns phoneApiService
         coEvery { phoneApiService.getShows(any(), any()) } throws CancellationException("cancelled")
@@ -225,6 +230,7 @@ class TvHomeViewModelTest {
         private fun setupPhone(): PhoneDiscoveryManager.DiscoveredPhone {
             val phone = mockk<PhoneDiscoveryManager.DiscoveredPhone>()
             every { phone.baseUrl } returns "http://192.168.1.1:8765/"
+            every { phone.bearerToken } returns null
             every { phoneDiscovery.getBestPhone() } returns phone
             every { phoneApiClientFactory.createClient(any(), anyNullable()) } returns phoneApiService
             return phone
@@ -455,6 +461,7 @@ class TvHomeViewModelTest {
         fun `uiState sections are computed after loading shows`() = runTest {
             val phone = mockk<PhoneDiscoveryManager.DiscoveredPhone>()
             every { phone.baseUrl } returns "http://192.168.1.1:8765/"
+            every { phone.bearerToken } returns null
             every { phoneDiscovery.getBestPhone() } returns phone
             every { phoneApiClientFactory.createClient(any(), anyNullable()) } returns phoneApiService
 
@@ -597,6 +604,7 @@ class TvHomeViewModelTest {
         fun `completed show is excluded from uiState sections after API load`() = runTest {
             val phone = mockk<PhoneDiscoveryManager.DiscoveredPhone>()
             every { phone.baseUrl } returns "http://192.168.1.1:8765/"
+            every { phone.bearerToken } returns null
             every { phoneDiscovery.getBestPhone() } returns phone
             every { phoneApiClientFactory.createClient(any(), anyNullable()) } returns phoneApiService
 

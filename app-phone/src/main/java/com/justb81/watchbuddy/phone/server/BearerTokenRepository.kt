@@ -2,7 +2,6 @@ package com.justb81.watchbuddy.phone.server
 
 import android.content.Context
 import android.content.SharedPreferences
-import android.util.Base64
 import androidx.core.content.edit
 import com.google.crypto.tink.Aead
 import com.justb81.watchbuddy.core.discovery.BleDiscoveryContract
@@ -75,7 +74,7 @@ class BearerTokenRepository @Inject constructor(
                 encoded.toByteArray(StandardCharsets.UTF_8),
                 AEAD_AAD.toByteArray(StandardCharsets.UTF_8),
             )
-            val stored = Base64.encodeToString(ciphertext, Base64.DEFAULT)
+            val stored = java.util.Base64.getEncoder().encodeToString(ciphertext)
             prefs.edit { putString(KEY_TOKEN, stored) }
         }.onFailure { DiagnosticLog.warn(TAG, "failed to persist bearer token", it) }
         DiagnosticLog.event(TAG, "bearer token generated and stored")
@@ -83,7 +82,7 @@ class BearerTokenRepository @Inject constructor(
     }
 
     private fun decryptAndDecode(stored: String): ByteArray {
-        val ciphertext = Base64.decode(stored, Base64.DEFAULT)
+        val ciphertext = java.util.Base64.getDecoder().decode(stored)
         val plaintext = aead.decrypt(
             ciphertext,
             AEAD_AAD.toByteArray(StandardCharsets.UTF_8),
@@ -92,8 +91,8 @@ class BearerTokenRepository @Inject constructor(
     }
 
     private fun encodeBase64url(bytes: ByteArray): String =
-        Base64.encodeToString(bytes, Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP)
+        java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
 
     private fun decodeBase64url(encoded: String): ByteArray =
-        Base64.decode(encoded, Base64.URL_SAFE or Base64.NO_PADDING)
+        java.util.Base64.getUrlDecoder().decode(encoded)
 }
