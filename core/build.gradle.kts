@@ -1,5 +1,6 @@
 plugins {
     id("watchbuddy.android.library")
+    id("watchbuddy.detekt")
     alias(libs.plugins.kotlin.serialization)
 }
 

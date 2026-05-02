@@ -1,5 +1,6 @@
 plugins {
     id("watchbuddy.android.application")
+    id("watchbuddy.detekt")
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.kotlin.serialization)
 }
@@ -78,6 +79,6 @@ dependencies {
 // issue #232 and the 0.12.0 trace on #244). Dropping the group removes both
 // the DEX classes and the merged-manifest contribution, so WorkManager cannot
 // be registered as an androidx.startup initializer in the first place.
-configurations.configureEach {
+configurations.all {
     exclude(group = "androidx.work")
 }
