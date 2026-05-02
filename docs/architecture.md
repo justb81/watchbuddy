@@ -385,7 +385,7 @@ The available-provider list for each show is fetched from TMDB `/tv/{id}/watch/p
 
 **Batch dedup:** A `Mutex`-protected `Map<FetchKey, Mutex>` prevents duplicate in-flight JustWatch API calls when multiple coroutines request the same `(showId, season, episode, countryCode)` simultaneously. After acquiring the per-key lock, the cache is re-checked before calling the API.
 
-**Provider mapping:** `JustWatchPackageMap` (`core/justwatch/`) maps JustWatch `technicalName` strings (e.g. `nfx`, `prv`, `dnp`) to TMDB `provider_id` integers. The same map drives negative-cache writes for known-but-absent providers.
+**Provider mapping:** `JustWatchPackageMap` (`core/justwatch/`) maps JustWatch `technicalName` strings (e.g. `netflix`, `amazonprime`, `disneyplus`) to TMDB `provider_id` integers. The same map drives negative-cache writes for known-but-absent providers.
 
 **ViewModel integration:** `ShowDetailViewModel.loadDeepLinks()` is triggered once `ProviderListUiState.Success` arrives. Each provider gets a `viewModelScope.async` backed by `JustWatchDeepLinkRepository`; in-flight dedup at the ViewModel level prevents duplicate `Deferred` jobs per key. State is `deepLinks: StateFlow<Map<Int, DeepLinkState>>` with `DeepLinkState = Loading | Available(url) | Unavailable`. The UI shows a spinner overlay on loading chips, disables unavailable chips, and displays a JustWatch attribution badge when any link is `Available`.
 

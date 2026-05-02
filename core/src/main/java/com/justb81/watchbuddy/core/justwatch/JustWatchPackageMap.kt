@@ -13,21 +13,19 @@ object JustWatchPackageMap {
     private const val TAG = "JustWatchPackageMap"
 
     val technicalNameToProviderId: Map<String, Int> = mapOf(
-        "nfx" to 8, // Netflix
-        "prv" to 119, // Prime Video
-        "dnp" to 337, // Disney+
-        "atp" to 350, // Apple TV+
-        "pmp" to 531, // Paramount+
-        "hbm" to 1899, // Max (legacy HBO Max id)
-        "max" to 1899, // Max
-        "jyn" to 2184, // Joyn
-        "wpu" to 2187, // WaipuTV
-        "ard" to 195, // ARD Mediathek
+        "netflix" to 8, // Netflix
+        "netflixbasicwithads" to 8, // Netflix with Ads (same app)
+        "amazonprime" to 119, // Prime Video
+        "amazonprimevideowithads" to 119, // Prime Video with Ads (same app)
+        "disneyplus" to 337, // Disney+
+        "appletvplus" to 350, // Apple TV+
+        "paramountplus" to 531, // Paramount+
+        "max" to 1899, // Max (HBO Max)
+        "joynde" to 2184, // Joyn
+        "daserstemediathek" to 195, // ARD Mediathek (free)
+        "ardplus" to 195, // ARD+ (paid tier, same Android app)
         "zdf" to 231, // ZDF Mediathek
-        // YouTube: JustWatch has shuffled aliases over time; map all known variants to TMDB 192
-        "yti" to 192, // YouTube (primary alias)
-        "yot" to 192, // YouTube (alternate alias)
-        "ytv" to 192, // YouTube (TV variant alias)
+        "youtubered" to 192, // YouTube Premium
     )
 
     fun resolveProviderId(technicalName: String): Int? {

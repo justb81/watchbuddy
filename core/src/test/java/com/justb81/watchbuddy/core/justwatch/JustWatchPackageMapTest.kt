@@ -26,36 +26,33 @@ class JustWatchPackageMapTest {
 
     @ParameterizedTest(name = "{0} → TMDB {1}")
     @CsvSource(
-        "nfx, 8",
-        "prv, 119",
-        "dnp, 337",
-        "atp, 350",
-        "pmp, 531",
-        "hbm, 1899",
+        "netflix, 8",
+        "netflixbasicwithads, 8",
+        "amazonprime, 119",
+        "amazonprimevideowithads, 119",
+        "disneyplus, 337",
+        "appletvplus, 350",
+        "paramountplus, 531",
         "max, 1899",
-        "jyn, 2184",
-        "wpu, 2187",
-        "ard, 195",
+        "joynde, 2184",
+        "daserstemediathek, 195",
+        "ardplus, 195",
         "zdf, 231",
-        "yti, 192",
-        "yot, 192",
-        "ytv, 192",
+        "youtubered, 192",
     )
     fun `resolves known technical names to TMDB provider ids`(technicalName: String, expectedId: Int) {
         assertEquals(expectedId, JustWatchPackageMap.resolveProviderId(technicalName))
     }
 
     @Test
-    fun `youtubeAliasesResolveToProvider192`() {
-        assertEquals(192, JustWatchPackageMap.resolveProviderId("yti"))
-        assertEquals(192, JustWatchPackageMap.resolveProviderId("yot"))
-        assertEquals(192, JustWatchPackageMap.resolveProviderId("ytv"))
+    fun `youtubeRedResolvesToProvider192`() {
+        assertEquals(192, JustWatchPackageMap.resolveProviderId("youtubered"))
     }
 
     @Test
     fun `resolveProviderId is case-insensitive`() {
-        assertEquals(8, JustWatchPackageMap.resolveProviderId("NFX"))
-        assertEquals(8, JustWatchPackageMap.resolveProviderId("Nfx"))
+        assertEquals(8, JustWatchPackageMap.resolveProviderId("NETFLIX"))
+        assertEquals(8, JustWatchPackageMap.resolveProviderId("Netflix"))
     }
 
     @Test
@@ -77,7 +74,7 @@ class JustWatchPackageMapTest {
 
     @Test
     fun `resolveProviderId does not log a warning for known technical names`() {
-        JustWatchPackageMap.resolveProviderId("nfx")
+        JustWatchPackageMap.resolveProviderId("netflix")
 
         val warnings = DiagnosticLog.snapshot().filter {
             it.level == DiagnosticLog.Level.WARN
@@ -100,7 +97,7 @@ class JustWatchPackageMapTest {
 
     @Test
     fun `map does not contain duplicates for known entries`() {
-        // hbm and max both map to 1899 — that is intentional, not a bug
+        // Multiple keys sharing a TMDB id (e.g. netflix/netflixbasicwithads → 8) is intentional
         val uniqueEntries = JustWatchPackageMap.technicalNameToProviderId.keys
         assertEquals(uniqueEntries.size, uniqueEntries.toSet().size)
     }
