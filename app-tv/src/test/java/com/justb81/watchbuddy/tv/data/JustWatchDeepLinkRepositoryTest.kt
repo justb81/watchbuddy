@@ -122,7 +122,7 @@ class JustWatchDeepLinkRepositoryTest {
 
     private fun makeOffer(
         url: String = "https://www.netflix.com/watch/99",
-        technicalName: String = "nfx",
+        technicalName: String = "netflix",
         monetizationType: String = "FLATRATE",
     ) = JustWatchOffer(
         standardWebURL = url,
@@ -380,7 +380,7 @@ class JustWatchDeepLinkRepositoryTest {
         fun `filters out non-FLATRATE-ADS-FREE offers`() = runTest {
             val rentalOffer = makeOffer(
                 url = "https://www.amazon.com/rent/99",
-                technicalName = "atp",
+                technicalName = "appletvplus",
                 monetizationType = "RENT",
             )
             coEvery { dao.get(100, 1, 2, 350, "US") } returns null andThen null
