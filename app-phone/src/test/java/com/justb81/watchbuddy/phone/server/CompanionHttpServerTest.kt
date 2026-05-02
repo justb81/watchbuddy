@@ -29,7 +29,7 @@ import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import com.justb81.watchbuddy.phone.server.BearerTokenRepository
 import com.justb81.watchbuddy.service.CompanionStateManager
 import io.ktor.client.*
-import io.ktor.client.plugins.defaultrequest.*
+import io.ktor.client.plugins.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -106,12 +106,13 @@ class CompanionHttpServerTest {
     // ── Helper: configure test application with all mocked dependencies ───────
 
     inner class TestScope(builder: ApplicationTestBuilder) {
-        val client: HttpClient = builder.createClient {
-            defaultRequest {
-                header("Authorization", "Bearer $TEST_TOKEN")
+        val unauthClient: HttpClient = builder.client
+        val client: HttpClient = builder.createClient {}.also { httpClient ->
+            httpClient.plugin(HttpSend).intercept { request ->
+                request.headers.append(HttpHeaders.Authorization, "Bearer $TEST_TOKEN")
+                execute(request)
             }
         }
-        val unauthClient: HttpClient = builder.client
     }
 
     private fun testApp(block: suspend TestScope.() -> Unit) = testApplication {
