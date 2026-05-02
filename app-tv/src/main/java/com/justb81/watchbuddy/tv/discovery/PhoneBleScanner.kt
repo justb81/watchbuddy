@@ -45,8 +45,8 @@ class PhoneBleScanner @Inject constructor(
             modelQuality: Int,
             llmBackendOrdinal: Int,
             rssi: Int,
-            authCapable: Boolean = false,
-            bearerTokenBytes: ByteArray? = null,
+            authCapable: Boolean,
+            bearerTokenBytes: ByteArray?,
         )
     }
 
