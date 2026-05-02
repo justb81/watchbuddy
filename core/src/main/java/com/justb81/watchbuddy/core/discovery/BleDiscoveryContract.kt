@@ -61,10 +61,13 @@ object BleDiscoveryContract {
     /** Typed result returned by [decode] so callers can distinguish failure modes. */
     sealed class DecodeResult {
         data class Ok(val payload: Payload) : DecodeResult()
+
         /** Schema version in the advert differs from [PAYLOAD_SCHEMA_VERSION]; expected on old clients. */
         data class WrongVersion(val found: Byte, val expected: Byte) : DecodeResult()
+
         /** Payload is null or shorter than [PAYLOAD_SIZE_BYTES]. */
         data object Truncated : DecodeResult()
+
         /** IPv4 field could not be parsed into an [Inet4Address]. */
         data object MalformedIpv4 : DecodeResult()
     }
