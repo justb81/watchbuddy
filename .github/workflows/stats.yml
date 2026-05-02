@@ -67,4 +67,20 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add README.md
           git commit -m "chore(readme): refresh code statistics [skip ci]"
-          git push origin main
+
+          # Rebase onto the current remote HEAD before pushing to handle any
+          # commits that landed on main while tests were running (non-fast-forward guard).
+          for attempt in 1 2 3; do
+            git fetch origin main
+            git rebase origin/main
+            if git push origin main; then
+              echo "Pushed on attempt ${attempt}."
+              break
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "Push attempt ${attempt} failed — retrying after rebase..."
+            else
+              echo "Push failed after 3 attempts."
+              exit 1
+            fi
+          done
