@@ -142,7 +142,9 @@ class CompanionBleAdvertiser @Inject constructor(
                 DiagnosticLog.warn(TAG, "token payload invalid; advertising without scan response")
                 null
             }
-        } else null
+        } else {
+            null
+        }
 
         val callback = object : AdvertiseCallback() {
             override fun onStartSuccess(settingsInEffect: AdvertiseSettings) {

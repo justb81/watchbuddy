@@ -181,7 +181,9 @@ class PhoneBleScanner @Inject constructor(
                     BleDiscoveryContract.decodeTokenPayload(
                         scanRecord?.serviceData?.get(ParcelUuid(BleDiscoveryContract.TOKEN_SERVICE_UUID))
                     )
-                } else null
+                } else {
+                    null
+                }
                 Log.d(
                     TAG,
                     "advertisement: ip=${payload.ipv4.hostAddress} port=${payload.port} " +

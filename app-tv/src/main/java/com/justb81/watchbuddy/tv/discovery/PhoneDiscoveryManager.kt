@@ -562,11 +562,15 @@ class PhoneDiscoveryManager(
             // Refresh the cached RSSI and bearer token without re-ranking —
             // score is driven by heartbeat results, not BLE signal strength.
             _discoveredPhones.value = _discoveredPhones.value.map {
-                if (it.baseUrl == baseUrl) it.copy(
-                    rssi = rssi,
-                    bearerToken = bearerToken ?: it.bearerToken,
-                    authCapable = authCapable || it.authCapable,
-                ) else it
+                if (it.baseUrl == baseUrl) {
+                    it.copy(
+                        rssi = rssi,
+                        bearerToken = bearerToken ?: it.bearerToken,
+                        authCapable = authCapable || it.authCapable,
+                    )
+                } else {
+                    it
+                }
             }
             return
         }

@@ -179,7 +179,6 @@ internal fun Application.configureCompanionRoutes(
         }
 
         authenticate("phone-tv") {
-
         get("/avatar") {
             val file = avatarImageStore.file()
             if (!avatarImageStore.exists()) {
@@ -378,7 +377,6 @@ internal fun Application.configureCompanionRoutes(
                 call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("Add to library failed"))
             }
         }
-
         } // authenticate("phone-tv")
     }
 }

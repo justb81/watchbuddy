@@ -26,7 +26,6 @@ import com.justb81.watchbuddy.phone.llm.RecapGenerator
 import com.justb81.watchbuddy.phone.settings.AppSettings
 import com.justb81.watchbuddy.phone.settings.AvatarImageStore
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
-import com.justb81.watchbuddy.phone.server.BearerTokenRepository
 import com.justb81.watchbuddy.service.CompanionStateManager
 import io.ktor.client.*
 import io.ktor.client.plugins.*
@@ -35,13 +34,13 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.testing.*
 import io.mockk.*
-import kotlinx.coroutines.flow.flowOf
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
+import kotlinx.coroutines.flow.flowOf
 import java.io.File
 
 @DisplayName("CompanionHttpServer routes")
@@ -64,7 +63,7 @@ class CompanionHttpServerTest {
     private val avatarImageStore: AvatarImageStore = mockk(relaxed = true)
     private val stateManager = CompanionStateManager()
     private val titleExtractor: LlmTitleExtractor = mockk(relaxed = true)
-    private val TEST_TOKEN = "test-bearer-token"
+    private val testToken = "test-bearer-token"
     private val bearerTokenRepository: BearerTokenRepository = mockk()
 
     // ── Shared test fixtures ──────────────────────────────────────────────────
@@ -100,7 +99,7 @@ class CompanionHttpServerTest {
     fun setUp() {
         clearAllMocks()
         tmdbCache.clear()
-        every { bearerTokenRepository.token } returns TEST_TOKEN
+        every { bearerTokenRepository.token } returns testToken
     }
 
     // ── Helper: configure test application with all mocked dependencies ───────
@@ -109,7 +108,7 @@ class CompanionHttpServerTest {
         val unauthClient: HttpClient = builder.client
         val client: HttpClient = builder.createClient {}.also { httpClient ->
             httpClient.plugin(HttpSend).intercept { request ->
-                request.headers.append(HttpHeaders.Authorization, "Bearer $TEST_TOKEN")
+                request.headers.append(HttpHeaders.Authorization, "Bearer $testToken")
                 execute(request)
             }
         }
