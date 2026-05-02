@@ -1,5 +1,7 @@
 package com.justb81.watchbuddy.tv.di
 
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.ProcessLifecycleOwner
 import com.justb81.watchbuddy.core.scrobbler.MetadataEnricher
 import com.justb81.watchbuddy.core.scrobbler.PlaybackIntentProvider
 import com.justb81.watchbuddy.core.scrobbler.ScrobbleDispatcher
@@ -89,5 +91,9 @@ abstract class AppModule {
         @ApplicationScope
         fun provideApplicationScope(): CoroutineScope =
             CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+        @Provides
+        @Singleton
+        fun provideProcessLifecycleOwner(): LifecycleOwner = ProcessLifecycleOwner.get()
     }
 }

@@ -5,8 +5,11 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 import com.justb81.watchbuddy.core.deeplink.ProviderCatalog
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -22,12 +25,14 @@ import javax.inject.Singleton
 @Singleton
 class InstalledAppsProbe @Inject constructor(
     @param:ApplicationContext private val context: Context,
-) {
-    @Volatile private var cachedPackages: Set<String>? = null
+    lifecycleOwner: LifecycleOwner,
+) : DefaultLifecycleObserver {
+
+    private val cachedPackages = AtomicReference<Set<String>?>()
 
     private val packageChangeReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            cachedPackages = null
+            cachedPackages.set(null)
         }
     }
 
@@ -38,11 +43,17 @@ class InstalledAppsProbe @Inject constructor(
             addDataScheme("package")
         }
         context.registerReceiver(packageChangeReceiver, filter)
+        lifecycleOwner.lifecycle.addObserver(this)
+    }
+
+    override fun onDestroy(owner: LifecycleOwner) {
+        context.unregisterReceiver(packageChangeReceiver)
+        owner.lifecycle.removeObserver(this)
     }
 
     fun isInstalled(packageName: String): Boolean = getInstalledPackages().contains(packageName)
 
-    fun getInstalledPackages(): Set<String> = cachedPackages ?: loadAndCache()
+    fun getInstalledPackages(): Set<String> = cachedPackages.get() ?: loadAndCache()
 
     private fun loadAndCache(): Set<String> {
         val pm = context.packageManager
@@ -54,7 +65,7 @@ class InstalledAppsProbe @Inject constructor(
                 false
             }
         }
-        cachedPackages = packages
-        return packages
+        cachedPackages.compareAndSet(null, packages)
+        return cachedPackages.get() ?: packages
     }
 }

@@ -1,0 +1,160 @@
+package com.justb81.watchbuddy.tv.discovery
+
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleObserver
+import androidx.lifecycle.LifecycleOwner
+import io.mockk.every
+import io.mockk.justRun
+import io.mockk.mockk
+import io.mockk.slot
+import io.mockk.verify
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNotSame
+import org.junit.jupiter.api.Assertions.assertSame
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.DisplayName
+import org.junit.jupiter.api.Nested
+import org.junit.jupiter.api.Test
+
+@DisplayName("InstalledAppsProbe")
+class InstalledAppsProbeTest {
+
+    private val context: Context = mockk(relaxed = true)
+    private val packageManager: PackageManager = mockk(relaxed = true)
+    private val lifecycle: Lifecycle = mockk(relaxed = true)
+    private val lifecycleOwner: LifecycleOwner = mockk(relaxed = true)
+
+    private val receiverSlot = slot<BroadcastReceiver>()
+    private val observerSlot = slot<LifecycleObserver>()
+
+    private lateinit var probe: InstalledAppsProbe
+
+    @BeforeEach
+    fun setUp() {
+        every { context.packageManager } returns packageManager
+        every { lifecycleOwner.lifecycle } returns lifecycle
+        every { context.registerReceiver(capture(receiverSlot), any()) } returns null
+        justRun { lifecycle.addObserver(capture(observerSlot)) }
+        justRun { lifecycle.removeObserver(any()) }
+        justRun { context.unregisterReceiver(any()) }
+
+        every { packageManager.getPackageInfo(any<String>(), 0) } throws PackageManager.NameNotFoundException()
+
+        probe = InstalledAppsProbe(context, lifecycleOwner)
+    }
+
+    @Nested
+    @DisplayName("initialisation")
+    inner class InitialisationTests {
+
+        @Test
+        fun `registers BroadcastReceiver on construction`() {
+            verify(exactly = 1) { context.registerReceiver(any(), any()) }
+        }
+
+        @Test
+        fun `adds lifecycle observer on construction`() {
+            verify(exactly = 1) { lifecycle.addObserver(any()) }
+        }
+    }
+
+    @Nested
+    @DisplayName("isInstalled")
+    inner class IsInstalledTests {
+
+        @Test
+        fun `returns true for an installed package`() {
+            every { packageManager.getPackageInfo(eq("com.netflix.ninja"), 0) } returns mockk()
+
+            assertTrue(probe.isInstalled("com.netflix.ninja"))
+        }
+
+        @Test
+        fun `returns false for a package not installed`() {
+            assertFalse(probe.isInstalled("com.netflix.ninja"))
+        }
+
+        @Test
+        fun `returns false for a package not in ProviderCatalog`() {
+            assertFalse(probe.isInstalled("com.unknown.app"))
+        }
+    }
+
+    @Nested
+    @DisplayName("caching")
+    inner class CachingTests {
+
+        @Test
+        fun `returns the same Set instance on repeated calls (cache hit)`() {
+            every { packageManager.getPackageInfo(eq("com.netflix.ninja"), 0) } returns mockk()
+
+            val first = probe.getInstalledPackages()
+            val second = probe.getInstalledPackages()
+
+            assertSame(first, second)
+        }
+
+        @Test
+        fun `reloads packages after cache is cleared by package change`() {
+            every { packageManager.getPackageInfo(eq("com.netflix.ninja"), 0) } returns mockk()
+
+            val before = probe.getInstalledPackages()
+
+            val intent = mockk<Intent>(relaxed = true)
+            receiverSlot.captured.onReceive(context, intent)
+
+            val after = probe.getInstalledPackages()
+
+            assertNotSame(before, after)
+        }
+
+        @Test
+        fun `PackageManager is queried only once before cache is invalidated`() {
+            every { packageManager.getPackageInfo(eq("com.netflix.ninja"), 0) } returns mockk()
+
+            probe.getInstalledPackages()
+            probe.getInstalledPackages()
+            probe.getInstalledPackages()
+
+            verify(exactly = 1) { packageManager.getPackageInfo(eq("com.netflix.ninja"), 0) }
+        }
+
+        @Test
+        fun `PackageManager is queried again after cache is invalidated`() {
+            every { packageManager.getPackageInfo(eq("com.netflix.ninja"), 0) } returns mockk()
+
+            probe.getInstalledPackages()
+
+            val intent = mockk<Intent>(relaxed = true)
+            receiverSlot.captured.onReceive(context, intent)
+
+            probe.getInstalledPackages()
+
+            verify(exactly = 2) { packageManager.getPackageInfo(eq("com.netflix.ninja"), 0) }
+        }
+    }
+
+    @Nested
+    @DisplayName("lifecycle — onDestroy")
+    inner class OnDestroyTests {
+
+        @Test
+        fun `unregisters BroadcastReceiver on process destroy`() {
+            probe.onDestroy(lifecycleOwner)
+
+            verify(exactly = 1) { context.unregisterReceiver(receiverSlot.captured) }
+        }
+
+        @Test
+        fun `removes lifecycle observer on process destroy`() {
+            probe.onDestroy(lifecycleOwner)
+
+            verify(exactly = 1) { lifecycle.removeObserver(any()) }
+        }
+    }
+}
