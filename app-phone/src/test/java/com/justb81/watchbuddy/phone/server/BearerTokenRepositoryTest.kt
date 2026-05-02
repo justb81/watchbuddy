@@ -95,7 +95,8 @@ class BearerTokenRepositoryTest {
         fun `persists generated token`() {
             every { prefs.getString("bearer_token", null) } returns null
 
-            makeRepo()
+            val repo = makeRepo()
+            repo.token  // trigger lazy init which generates and persists the token
 
             verify { editor.putString("bearer_token", any()) }
         }

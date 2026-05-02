@@ -95,6 +95,7 @@ class RecapViewModelTest {
                 }
                 every { this@mockk.score } returns score
                 every { this@mockk.baseUrl } returns baseUrl
+                every { this@mockk.bearerToken } returns null
             }
 
         @Test
