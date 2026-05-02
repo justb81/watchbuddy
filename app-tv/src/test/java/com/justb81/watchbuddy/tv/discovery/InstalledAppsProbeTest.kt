@@ -4,14 +4,18 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import io.mockk.every
 import io.mockk.justRun
 import io.mockk.mockk
+import io.mockk.mockkStatic
 import io.mockk.slot
+import io.mockk.unmockkStatic
 import io.mockk.verify
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotSame
 import org.junit.jupiter.api.Assertions.assertSame
@@ -36,9 +40,10 @@ class InstalledAppsProbeTest {
 
     @BeforeEach
     fun setUp() {
+        mockkStatic(ContextCompat::class)
         every { context.packageManager } returns packageManager
         every { lifecycleOwner.lifecycle } returns lifecycle
-        every { context.registerReceiver(capture(receiverSlot), any()) } returns null
+        every { ContextCompat.registerReceiver(any(), capture(receiverSlot), any(), any()) } returns null
         justRun { lifecycle.addObserver(capture(observerSlot)) }
         justRun { lifecycle.removeObserver(any()) }
         justRun { context.unregisterReceiver(any()) }
@@ -48,13 +53,20 @@ class InstalledAppsProbeTest {
         probe = InstalledAppsProbe(context, lifecycleOwner)
     }
 
+    @AfterEach
+    fun tearDown() {
+        unmockkStatic(ContextCompat::class)
+    }
+
     @Nested
     @DisplayName("initialisation")
     inner class InitialisationTests {
 
         @Test
-        fun `registers BroadcastReceiver on construction`() {
-            verify(exactly = 1) { context.registerReceiver(any(), any()) }
+        fun `registers BroadcastReceiver with RECEIVER_NOT_EXPORTED on construction`() {
+            verify(exactly = 1) {
+                ContextCompat.registerReceiver(context, any(), any(), ContextCompat.RECEIVER_NOT_EXPORTED)
+            }
         }
 
         @Test

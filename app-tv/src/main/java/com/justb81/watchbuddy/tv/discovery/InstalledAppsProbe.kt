@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import com.justb81.watchbuddy.core.deeplink.ProviderCatalog
@@ -42,7 +43,7 @@ class InstalledAppsProbe @Inject constructor(
             addAction(Intent.ACTION_PACKAGE_REMOVED)
             addDataScheme("package")
         }
-        context.registerReceiver(packageChangeReceiver, filter)
+        ContextCompat.registerReceiver(context, packageChangeReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
         lifecycleOwner.lifecycle.addObserver(this)
     }
 
