@@ -2,11 +2,13 @@ package com.justb81.watchbuddy.phone.llm
 
 import android.app.ActivityManager
 import android.content.Context
-import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import com.justb81.watchbuddy.core.model.LlmBackend
-import io.mockk.*
-import org.junit.jupiter.api.Assertions.*
+import io.mockk.every
+import io.mockk.mockk
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
@@ -70,7 +72,7 @@ class LlmOrchestratorTest {
 
         @Test
         fun `selects E4B at exact 5000 MB boundary`() {
-            mockFreeRam(5000)
+            mockFreeRam(8000)
             val config = orchestrator.selectConfig()
             assertEquals(LlmOrchestrator.ModelVariant.GEMMA4_E4B, config.modelVariant)
         }
@@ -101,7 +103,7 @@ class LlmOrchestratorTest {
 
         @Test
         fun `each variant has correct RAM requirement`() {
-            assertEquals(5_000, LlmOrchestrator.ModelVariant.GEMMA4_E4B.requiredRamMb)
+            assertEquals(8_000, LlmOrchestrator.ModelVariant.GEMMA4_E4B.requiredRamMb)
             assertEquals(3_000, LlmOrchestrator.ModelVariant.GEMMA4_E2B.requiredRamMb)
         }
 

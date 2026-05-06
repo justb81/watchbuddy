@@ -35,7 +35,7 @@ class LlmOrchestrator @Inject constructor(
         GEMMA4_E4B(
             fileName = "gemma-4-E4B-it.litertlm",
             downloadUrl = "https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm/resolve/main/gemma-4-E4B-it.litertlm",
-            requiredRamMb = 5_000,
+            requiredRamMb = 8_000,
             qualityScore = 90
         ),
         GEMMA4_E2B(
