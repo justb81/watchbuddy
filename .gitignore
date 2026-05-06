@@ -38,5 +38,7 @@ yarn-debug.log*
 yarn-error.log*
 
 # OS
-.DS_Store
 Thumbs.db
+
+.kotlin/sessions
+/.claude/settings.local.json
