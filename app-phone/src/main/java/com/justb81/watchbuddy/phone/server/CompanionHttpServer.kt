@@ -33,15 +33,14 @@ import io.ktor.server.auth.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
 import io.ktor.server.plugins.contentnegotiation.*
-import io.ktor.server.plugins.ratelimit.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.time.Duration.Companion.minutes
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -55,8 +54,32 @@ private const val MAX_PAGE_SIZE = 200
 // Security limits — adjust values before changing the rate-limit tests.
 private const val HEAVY_RATE_LIMIT = 6          // req/min for LLM-heavy endpoints
 private const val STANDARD_RATE_LIMIT = 60      // req/min for all other endpoints
+private const val RATE_LIMIT_WINDOW_MS = 60_000L
 private const val MAX_CONCURRENT_PER_IP = 4     // max simultaneous in-flight requests per source IP
 private const val MAX_EXTRACT_BODY_BYTES = 64 * 1024L // 64 KB cap for /scrobble/extract (#525)
+
+/**
+ * Fixed-window per-IP rate limiter. Thread-safe and lock-free via CAS.
+ *
+ * At most [limit] calls are allowed within any [windowMs]-ms window per IP key.
+ */
+private class IpRateLimiter(val limit: Int, val windowMs: Long) {
+    private data class Window(val count: Int, val start: Long)
+    private val windows = ConcurrentHashMap<String, AtomicReference<Window>>()
+
+    fun allow(ip: String): Boolean {
+        val now = System.currentTimeMillis()
+        val ref = windows.getOrPut(ip) { AtomicReference(Window(0, now)) }
+        // CAS retry loop: typically executes once; spins only under rare contention.
+        while (true) {
+            val w = ref.get()
+            val next = if (now - w.start >= windowMs) Window(1, now)
+                       else if (w.count >= limit) return false
+                       else Window(w.count + 1, w.start)
+            if (ref.compareAndSet(w, next)) return true
+        }
+    }
+}
 
 /**
  * Local HTTP server running on the phone (port 8765).
@@ -155,16 +178,6 @@ internal fun Application.configureCompanionRoutes(
 ) {
     val expectedToken = bearerTokenRepository.token
 
-    install(RateLimit) {
-        register(RateLimitName("standard")) {
-            rateLimiter(limit = STANDARD_RATE_LIMIT, refillPeriod = 1.minutes)
-            requestKey { call -> call.request.origin.remoteAddress }
-        }
-        register(RateLimitName("heavy")) {
-            rateLimiter(limit = HEAVY_RATE_LIMIT, refillPeriod = 1.minutes)
-            requestKey { call -> call.request.origin.remoteAddress }
-        }
-    }
     install(Authentication) {
         bearer("phone-tv") {
             authenticate { credential ->
@@ -193,6 +206,23 @@ internal fun Application.configureCompanionRoutes(
             )
         }
     }
+    // Per-IP rate limiter: heavy endpoints (LLM) get 6 req/min; everything
+    // else gets 60 req/min. Runs before auth so even unauthenticated bursts
+    // on /capability are bounded (#525).
+    val standardLimiter = IpRateLimiter(limit = STANDARD_RATE_LIMIT, windowMs = RATE_LIMIT_WINDOW_MS)
+    val heavyLimiter = IpRateLimiter(limit = HEAVY_RATE_LIMIT, windowMs = RATE_LIMIT_WINDOW_MS)
+    intercept(ApplicationCallPipeline.Plugins) {
+        val ip = call.request.origin.remoteAddress
+        val path = call.request.path()
+        val limiter = if (path.startsWith("/recap/") || path == "/scrobble/extract") heavyLimiter
+                      else standardLimiter
+        if (!limiter.allow(ip)) {
+            call.respond(HttpStatusCode.TooManyRequests, ErrorResponse("Rate limit exceeded"))
+            finish()
+            return@intercept
+        }
+        proceed()
+    }
     // Per-IP concurrent-request limiter. Guards the LLM thread pool and Netty
     // workers against a single peer issuing many parallel requests (#525).
     val activeRequestsPerIp = ConcurrentHashMap<String, AtomicInteger>()
@@ -214,218 +244,212 @@ internal fun Application.configureCompanionRoutes(
     routing {
         // /capability is intentionally unauthenticated — the TV must be able
         // to reach it before it has received the bearer token from BLE.
-        rateLimit(RateLimitName("standard")) {
-            get("/capability") {
-                stateManager.onCapabilityChecked()
-                call.respond(capabilityProvider.getCapability())
-            }
+        get("/capability") {
+            stateManager.onCapabilityChecked()
+            call.respond(capabilityProvider.getCapability())
         }
 
         authenticate("phone-tv") {
-            rateLimit(RateLimitName("standard")) {
-                get("/avatar") {
-                    val file = avatarImageStore.file()
-                    if (!avatarImageStore.exists()) {
-                        return@get call.respond(HttpStatusCode.NotFound, ErrorResponse("No custom avatar"))
-                    }
-                    val etag = "\"${sha256Hex(file.readBytes())}\""
-                    if (call.request.headers[HttpHeaders.IfNoneMatch] == etag) {
-                        return@get call.respond(HttpStatusCode.NotModified)
-                    }
-                    call.response.header(HttpHeaders.CacheControl, "private, max-age=60")
-                    call.response.header(HttpHeaders.ETag, etag)
-                    call.respondFile(file)
+        get("/avatar") {
+            val file = avatarImageStore.file()
+            if (!avatarImageStore.exists()) {
+                return@get call.respond(HttpStatusCode.NotFound, ErrorResponse("No custom avatar"))
+            }
+            val etag = "\"${sha256Hex(file.readBytes())}\""
+            if (call.request.headers[HttpHeaders.IfNoneMatch] == etag) {
+                return@get call.respond(HttpStatusCode.NotModified)
+            }
+            call.response.header(HttpHeaders.CacheControl, "private, max-age=60")
+            call.response.header(HttpHeaders.ETag, etag)
+            call.respondFile(file)
+        }
+
+        get("/shows") {
+            try {
+                tokenRepository.getAccessToken()
+                    ?: return@get call.respond(HttpStatusCode.Unauthorized, ErrorResponse("No access token"))
+                val offset = call.request.queryParameters["offset"]?.toIntOrNull()?.coerceAtLeast(0) ?: 0
+                val limit = call.request.queryParameters["limit"]?.toIntOrNull()
+                    ?.coerceIn(1, MAX_PAGE_SIZE) ?: DEFAULT_PAGE_SIZE
+                val shows = showRepository.getShows().drop(offset).take(limit)
+                call.respond(shows)
+            } catch (e: SecurityException) {
+                DiagnosticLog.error(TAG, "Keystore unavailable", e)
+                call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("Service unavailable"))
+            } catch (e: Exception) {
+                DiagnosticLog.error(TAG, "Failed to fetch shows", e)
+                call.respond(HttpStatusCode.InternalServerError, ErrorResponse("Internal server error"))
+            }
+        }
+
+        post("/recap/{traktShowId}") {
+            val showId = call.parameters["traktShowId"]?.toIntOrNull()
+                ?: return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid show ID"))
+
+            try {
+                tokenRepository.getAccessToken()
+                    ?: return@post call.respond(HttpStatusCode.Unauthorized, ErrorResponse("No access token"))
+
+                val body = try { call.receive<RecapRequest>() } catch (_: Exception) { RecapRequest() }
+                val apiKey = body.tmdbApiKey.ifBlank {
+                    settingsRepository.getTmdbApiKey().first()
                 }
 
-                get("/shows") {
-                    try {
-                        tokenRepository.getAccessToken()
-                            ?: return@get call.respond(HttpStatusCode.Unauthorized, ErrorResponse("No access token"))
-                        val offset = call.request.queryParameters["offset"]?.toIntOrNull()?.coerceAtLeast(0) ?: 0
-                        val limit = call.request.queryParameters["limit"]?.toIntOrNull()
-                            ?.coerceIn(1, MAX_PAGE_SIZE) ?: DEFAULT_PAGE_SIZE
-                        val shows = showRepository.getShows().drop(offset).take(limit)
-                        call.respond(shows)
-                    } catch (e: SecurityException) {
-                        DiagnosticLog.error(TAG, "Keystore unavailable", e)
-                        call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("Service unavailable"))
-                    } catch (e: Exception) {
-                        DiagnosticLog.error(TAG, "Failed to fetch shows", e)
-                        call.respond(HttpStatusCode.InternalServerError, ErrorResponse("Internal server error"))
-                    }
-                }
-
-                ScrobbleAction.entries.forEach { action ->
-                    post("/scrobble/${action.name.lowercase()}") {
-                        call.handleScrobble(action, tokenRefreshManager, traktApiService, stateManager)
-                    }
-                }
-
-                post("/scrobble/prompt") {
-                    val event = try {
-                        call.receive<AmbiguousScrobbleEvent>()
-                    } catch (_: Exception) {
-                        return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid request body"))
-                    }
-                    stateManager.onAmbiguousPrompt(event)
-                    DiagnosticLog.event(
-                        TAG,
-                        "ambiguous prompt received sessionKey='${event.sessionKey}' candidates=${event.candidates.size}",
+                if (apiKey.isBlank()) {
+                    return@post call.respond(
+                        HttpStatusCode.PreconditionFailed,
+                        ErrorResponse("TMDB API key not configured")
                     )
-                    call.respond(HttpStatusCode.NoContent)
                 }
 
-                post("/shows/add-to-library") {
-                    val token = tokenRefreshManager.getValidAccessToken()
-                        ?: return@post call.respond(HttpStatusCode.Unauthorized, ErrorResponse("No access token"))
-                    val body = try {
-                        call.receive<PhoneAddToLibraryRequest>()
-                    } catch (_: Exception) {
-                        return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid request body"))
-                    }
-                    try {
-                        val syncBody = SyncHistoryBody(
-                            shows = listOf(
-                                SyncHistoryShowItem(
-                                    ids = body.show.ids,
-                                    seasons = listOf(
-                                        SyncHistorySeasonItem(
-                                            number = body.episode.season,
-                                            episodes = listOf(SyncHistoryEpisodeItem(number = body.episode.number))
-                                        )
-                                    )
+                val tmdbLanguage = LocaleHelper.getTmdbLanguage()
+
+                val shows = showRepository.getShows()
+                val watchedEntry = shows.find { it.entry.show.ids.trakt == showId }?.entry
+                    ?: return@post call.respond(HttpStatusCode.NotFound, ErrorResponse("Show not found"))
+
+                val tmdbId = watchedEntry.show.ids.tmdb
+                    ?: return@post call.respond(HttpStatusCode.NotFound, ErrorResponse("No TMDB ID for show"))
+
+                val tmdbShow = tmdbCache.getShow(tmdbId)
+                    ?: tmdbApiService.getShow(tmdbId, apiKey, language = tmdbLanguage)
+                        .also { tmdbCache.putShow(tmdbId, it) }
+
+                // Collect watched episode numbers from Trakt data
+                val watchedEpisodeRefs = watchedEntry.seasons.flatMap { season ->
+                    season.episodes.map { ep -> season.number to ep.number }
+                }
+
+                // Load episode details from TMDB for the last 8 watched episodes in parallel
+                val tmdbEpisodes = coroutineScope {
+                    watchedEpisodeRefs
+                        .takeLast(8)
+                        .map { (season, episode) ->
+                            async {
+                                try {
+                                    tmdbCache.getEpisode(tmdbId, season, episode)
+                                        ?: tmdbApiService.getEpisode(tmdbId, season, episode, apiKey, language = tmdbLanguage)
+                                            .also { tmdbCache.putEpisode(tmdbId, season, episode, it) }
+                                } catch (e: Exception) {
+                                    DiagnosticLog.warn(TAG, "Failed to load TMDB episode S${season}E${episode}", e)
+                                    null
+                                }
+                            }
+                        }
+                        .awaitAll()
+                        .filterNotNull()
+                }
+
+                if (tmdbEpisodes.isEmpty()) {
+                    return@post call.respond(HttpStatusCode.NotFound, ErrorResponse("No episode data available"))
+                }
+
+                // Use last episode as the "target" (next to watch)
+                val targetEpisode = tmdbEpisodes.last()
+                val watchedEpisodes = tmdbEpisodes.dropLast(1).ifEmpty { tmdbEpisodes }
+
+                val html = recapGenerator.generateRecap(
+                    show = tmdbShow,
+                    watchedEpisodes = watchedEpisodes,
+                    targetEpisode = targetEpisode
+                )
+                call.respond(mapOf("html" to html))
+            } catch (e: SecurityException) {
+                DiagnosticLog.error(TAG, "Keystore unavailable", e)
+                call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("Service unavailable"))
+            } catch (e: Exception) {
+                DiagnosticLog.error(TAG, "Recap generation failed for show $showId", e)
+                call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("Recap generation failed"))
+            }
+        }
+
+        ScrobbleAction.entries.forEach { action ->
+            post("/scrobble/${action.name.lowercase()}") {
+                call.handleScrobble(action, tokenRefreshManager, traktApiService, stateManager)
+            }
+        }
+
+        post("/scrobble/extract") {
+            // Reject oversized bodies before reading — guards against metadata blobs
+            // exhausting the LLM thread pool memory (#525).
+            val contentLength = call.request.contentLength() ?: 0L
+            if (contentLength > MAX_EXTRACT_BODY_BYTES) {
+                return@post call.respond(
+                    HttpStatusCode.PayloadTooLarge,
+                    ErrorResponse("Request body too large")
+                )
+            }
+            val body = try {
+                call.receive<TitleExtractionRequest>()
+            } catch (_: Exception) {
+                return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid request body"))
+            }
+            // Old TV clients that pre-date the text-blob migration send the snapshot
+            // with named fields and no `text` field; WatchBuddyJson ignores unknown
+            // keys and defaults `text` to "". Detect this and return confidence=0
+            // gracefully instead of running inference on empty evidence.
+            if (body.snapshot.text.isBlank()) {
+                DiagnosticLog.warn(TAG, "extract: empty snapshot text — likely old-format client, returning confidence=0")
+                return@post call.respond(TitleExtractionResponse(confidence = 0f))
+            }
+            try {
+                val response = titleExtractor.extract(body.snapshot, body.libraryHints)
+                    ?: TitleExtractionResponse(confidence = 0f)
+                call.respond(response)
+            } catch (e: Exception) {
+                DiagnosticLog.warn(TAG, "title extraction failed", e)
+                call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("Extraction failed"))
+            }
+        }
+
+        post("/scrobble/prompt") {
+            val event = try {
+                call.receive<AmbiguousScrobbleEvent>()
+            } catch (_: Exception) {
+                return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid request body"))
+            }
+            stateManager.onAmbiguousPrompt(event)
+            DiagnosticLog.event(
+                TAG,
+                "ambiguous prompt received sessionKey='${event.sessionKey}' candidates=${event.candidates.size}",
+            )
+            call.respond(HttpStatusCode.NoContent)
+        }
+
+        post("/shows/add-to-library") {
+            val token = tokenRefreshManager.getValidAccessToken()
+                ?: return@post call.respond(HttpStatusCode.Unauthorized, ErrorResponse("No access token"))
+            val body = try {
+                call.receive<PhoneAddToLibraryRequest>()
+            } catch (_: Exception) {
+                return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid request body"))
+            }
+            try {
+                val syncBody = SyncHistoryBody(
+                    shows = listOf(
+                        SyncHistoryShowItem(
+                            ids = body.show.ids,
+                            seasons = listOf(
+                                SyncHistorySeasonItem(
+                                    number = body.episode.season,
+                                    episodes = listOf(SyncHistoryEpisodeItem(number = body.episode.number))
                                 )
                             )
                         )
-                        traktApiService.addToHistory("Bearer $token", syncBody)
-                        showRepository.invalidateCache()
-                        DiagnosticLog.event(
-                            TAG,
-                            "add-to-library ok show='${body.show.title}' S${body.episode.season}E${body.episode.number}",
-                        )
-                        call.respond(AddToLibraryResponse(success = true))
-                    } catch (e: Exception) {
-                        DiagnosticLog.error(TAG, "add-to-library failed for '${body.show.title}'", e)
-                        call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("Add to library failed"))
-                    }
-                }
-            } // rateLimit("standard")
-
-            rateLimit(RateLimitName("heavy")) {
-                post("/recap/{traktShowId}") {
-                    val showId = call.parameters["traktShowId"]?.toIntOrNull()
-                        ?: return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid show ID"))
-
-                    try {
-                        tokenRepository.getAccessToken()
-                            ?: return@post call.respond(HttpStatusCode.Unauthorized, ErrorResponse("No access token"))
-
-                        val body = try { call.receive<RecapRequest>() } catch (_: Exception) { RecapRequest() }
-                        val apiKey = body.tmdbApiKey.ifBlank {
-                            settingsRepository.getTmdbApiKey().first()
-                        }
-
-                        if (apiKey.isBlank()) {
-                            return@post call.respond(
-                                HttpStatusCode.PreconditionFailed,
-                                ErrorResponse("TMDB API key not configured")
-                            )
-                        }
-
-                        val tmdbLanguage = LocaleHelper.getTmdbLanguage()
-
-                        val shows = showRepository.getShows()
-                        val watchedEntry = shows.find { it.entry.show.ids.trakt == showId }?.entry
-                            ?: return@post call.respond(HttpStatusCode.NotFound, ErrorResponse("Show not found"))
-
-                        val tmdbId = watchedEntry.show.ids.tmdb
-                            ?: return@post call.respond(HttpStatusCode.NotFound, ErrorResponse("No TMDB ID for show"))
-
-                        val tmdbShow = tmdbCache.getShow(tmdbId)
-                            ?: tmdbApiService.getShow(tmdbId, apiKey, language = tmdbLanguage)
-                                .also { tmdbCache.putShow(tmdbId, it) }
-
-                        // Collect watched episode numbers from Trakt data
-                        val watchedEpisodeRefs = watchedEntry.seasons.flatMap { season ->
-                            season.episodes.map { ep -> season.number to ep.number }
-                        }
-
-                        // Load episode details from TMDB for the last 8 watched episodes in parallel
-                        val tmdbEpisodes = coroutineScope {
-                            watchedEpisodeRefs
-                                .takeLast(8)
-                                .map { (season, episode) ->
-                                    async {
-                                        try {
-                                            tmdbCache.getEpisode(tmdbId, season, episode)
-                                                ?: tmdbApiService.getEpisode(tmdbId, season, episode, apiKey, language = tmdbLanguage)
-                                                    .also { tmdbCache.putEpisode(tmdbId, season, episode, it) }
-                                        } catch (e: Exception) {
-                                            DiagnosticLog.warn(TAG, "Failed to load TMDB episode S${season}E${episode}", e)
-                                            null
-                                        }
-                                    }
-                                }
-                                .awaitAll()
-                                .filterNotNull()
-                        }
-
-                        if (tmdbEpisodes.isEmpty()) {
-                            return@post call.respond(HttpStatusCode.NotFound, ErrorResponse("No episode data available"))
-                        }
-
-                        // Use last episode as the "target" (next to watch)
-                        val targetEpisode = tmdbEpisodes.last()
-                        val watchedEpisodes = tmdbEpisodes.dropLast(1).ifEmpty { tmdbEpisodes }
-
-                        val html = recapGenerator.generateRecap(
-                            show = tmdbShow,
-                            watchedEpisodes = watchedEpisodes,
-                            targetEpisode = targetEpisode
-                        )
-                        call.respond(mapOf("html" to html))
-                    } catch (e: SecurityException) {
-                        DiagnosticLog.error(TAG, "Keystore unavailable", e)
-                        call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("Service unavailable"))
-                    } catch (e: Exception) {
-                        DiagnosticLog.error(TAG, "Recap generation failed for show $showId", e)
-                        call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("Recap generation failed"))
-                    }
-                }
-
-                post("/scrobble/extract") {
-                    // Reject oversized bodies before reading — guards against metadata blobs
-                    // exhausting the LLM thread pool memory (#525).
-                    val contentLength = call.request.contentLength() ?: 0L
-                    if (contentLength > MAX_EXTRACT_BODY_BYTES) {
-                        return@post call.respond(
-                            HttpStatusCode.PayloadTooLarge,
-                            ErrorResponse("Request body too large")
-                        )
-                    }
-                    val body = try {
-                        call.receive<TitleExtractionRequest>()
-                    } catch (_: Exception) {
-                        return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid request body"))
-                    }
-                    // Old TV clients that pre-date the text-blob migration send the snapshot
-                    // with named fields and no `text` field; WatchBuddyJson ignores unknown
-                    // keys and defaults `text` to "". Detect this and return confidence=0
-                    // gracefully instead of running inference on empty evidence.
-                    if (body.snapshot.text.isBlank()) {
-                        DiagnosticLog.warn(TAG, "extract: empty snapshot text — likely old-format client, returning confidence=0")
-                        return@post call.respond(TitleExtractionResponse(confidence = 0f))
-                    }
-                    try {
-                        val response = titleExtractor.extract(body.snapshot, body.libraryHints)
-                            ?: TitleExtractionResponse(confidence = 0f)
-                        call.respond(response)
-                    } catch (e: Exception) {
-                        DiagnosticLog.warn(TAG, "title extraction failed", e)
-                        call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("Extraction failed"))
-                    }
-                }
-            } // rateLimit("heavy")
+                    )
+                )
+                traktApiService.addToHistory("Bearer $token", syncBody)
+                showRepository.invalidateCache()
+                DiagnosticLog.event(
+                    TAG,
+                    "add-to-library ok show='${body.show.title}' S${body.episode.season}E${body.episode.number}",
+                )
+                call.respond(AddToLibraryResponse(success = true))
+            } catch (e: Exception) {
+                DiagnosticLog.error(TAG, "add-to-library failed for '${body.show.title}'", e)
+                call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("Add to library failed"))
+            }
+        }
         } // authenticate("phone-tv")
     }
 }
