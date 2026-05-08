@@ -21,13 +21,13 @@ import com.justb81.watchbuddy.core.trakt.SyncHistoryResult
 import com.justb81.watchbuddy.core.trakt.TraktApiService
 import com.justb81.watchbuddy.phone.auth.TokenRefreshManager
 import com.justb81.watchbuddy.phone.auth.TokenRepository
+import com.justb81.watchbuddy.phone.data.ProviderCatalogRepository
 import com.justb81.watchbuddy.phone.llm.LlmBusyException
 import com.justb81.watchbuddy.phone.llm.LlmTitleExtractor
 import com.justb81.watchbuddy.phone.llm.RecapGenerator
 import com.justb81.watchbuddy.phone.settings.AppSettings
 import com.justb81.watchbuddy.phone.settings.AvatarImageStore
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
-import com.justb81.watchbuddy.phone.data.ProviderCatalogRepository
 import com.justb81.watchbuddy.service.CompanionStateManager
 import io.ktor.client.*
 import io.ktor.client.plugins.*

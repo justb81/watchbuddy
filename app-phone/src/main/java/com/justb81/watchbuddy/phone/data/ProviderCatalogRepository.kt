@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.hilt.work.HiltWorker
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -19,7 +20,6 @@ import com.justb81.watchbuddy.core.justwatch.JustWatchPackageMap
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.model.ProviderCatalogSnapshot
 import com.justb81.watchbuddy.core.network.WatchBuddyJson
-import androidx.hilt.work.HiltWorker
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -31,7 +31,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.util.concurrent.TimeUnit
@@ -41,6 +40,7 @@ import javax.inject.Singleton
 private const val TAG = "ProviderCatalogRepo"
 private const val WORK_NAME = "provider_catalog_refresh"
 private const val REFRESH_INTERVAL_HOURS = 24L
+private const val HTTP_NOT_MODIFIED = 304
 
 @Singleton
 class ProviderCatalogRepository @Inject constructor(
@@ -95,6 +95,7 @@ class ProviderCatalogRepository @Inject constructor(
         )
     }
 
+    @Suppress("ReturnCount")
     suspend fun refresh(): Boolean {
         if (backendUrl.isBlank()) return false
         val url = backendUrl.trimEnd('/') + "/provider-catalog"
@@ -106,7 +107,7 @@ class ProviderCatalogRepository @Inject constructor(
             if (storedEtag != null) reqBuilder.header("If-None-Match", storedEtag)
             val response = client.newCall(reqBuilder.build()).execute()
             when {
-                response.code == 304 -> {
+                response.code == HTTP_NOT_MODIFIED -> {
                     DiagnosticLog.event(TAG, "catalog up to date (304 Not Modified)")
                     true
                 }

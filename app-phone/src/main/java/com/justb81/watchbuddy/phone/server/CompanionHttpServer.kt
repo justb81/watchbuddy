@@ -59,6 +59,7 @@ private const val STANDARD_RATE_LIMIT = 60 // req/min for all other endpoints
 private const val RATE_LIMIT_WINDOW_MS = 60_000L
 private const val MAX_CONCURRENT_PER_IP = 4 // max simultaneous in-flight requests per source IP
 private const val MAX_EXTRACT_BODY_BYTES = 64 * 1024L // 64 KB cap for /scrobble/extract (#525)
+private const val ETAG_HEX_CHARS = 16 // hex chars taken from SHA-256 for ETag prefix
 
 /**
  * Fixed-window per-IP rate limiter. Thread-safe and lock-free via CAS.
@@ -267,7 +268,7 @@ internal fun Application.configureCompanionRoutes(
         // for deep-link resolution independently of Trakt auth state.
         get("/provider-catalog") {
             val json = providerCatalogRepository.currentJson()
-            val etag = "\"${sha256Hex(json.toByteArray()).take(16)}\""
+            val etag = "\"${sha256Hex(json.toByteArray()).take(ETAG_HEX_CHARS)}\""
             val ifNoneMatch = call.request.headers[HttpHeaders.IfNoneMatch]
             if (ifNoneMatch == etag) {
                 call.respond(HttpStatusCode.NotModified)
