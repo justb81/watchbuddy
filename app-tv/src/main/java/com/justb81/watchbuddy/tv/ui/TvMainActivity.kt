@@ -24,7 +24,7 @@ class TvMainActivity : ComponentActivity() {
     lateinit var watchNextSource: WatchNextMetadataSource
 
     private val requestBluetoothScanPermission = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
+        ActivityResultContracts.RequestPermission(),
     ) { granted ->
         // Denial is fine — BLE is a fallback discovery channel. NSD still
         // works on most networks; we log and keep going.
@@ -32,7 +32,7 @@ class TvMainActivity : ComponentActivity() {
     }
 
     private val requestReadTvListingsPermission = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
+        ActivityResultContracts.RequestPermission(),
     ) { granted ->
         Log.i(TAG, "READ_TV_LISTINGS granted=$granted")
         if (granted) {

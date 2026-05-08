@@ -2,6 +2,7 @@ package com.justb81.watchbuddy.tv.ui.showdetail
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.justb81.watchbuddy.core.model.DeviceCapability
 import com.justb81.watchbuddy.core.model.EnrichedShowEntry
 import com.justb81.watchbuddy.core.model.ResolvedProvider
 import com.justb81.watchbuddy.core.progress.ShowProgressCalculator
@@ -24,6 +25,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.Locale
 import javax.inject.Inject
@@ -250,8 +252,8 @@ class ShowDetailViewModel @Inject constructor(
             viewModelScope.launch {
                 val url = deferred.await()
                 val newState = if (url != null) DeepLinkState.Available(url) else DeepLinkState.Unavailable
-                _deepLinks.value = _deepLinks.value + (provider.providerId to newState)
-                inFlight.remove(key)
+                _deepLinks.update { it + (provider.providerId to newState) }
+                inFlight -= key
             }
         }
     }
@@ -282,8 +284,7 @@ class ShowDetailViewModel @Inject constructor(
                 ),
             )
         }
-        val linkState = _deepLinks.value[provider.providerId]
-        return when (linkState) {
+        return when (val linkState = _deepLinks.value[provider.providerId]) {
             is DeepLinkState.Available -> linkState.url
             else -> provider.tmdbPageUrl
         }
