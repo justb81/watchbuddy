@@ -111,6 +111,7 @@ private class IpRateLimiter(val limit: Int, val windowMs: Long) {
  *   POST /shows/add-to-library → Add an episode to Trakt history (unknown-show overlay confirm)
  *   GET  /avatar               → Custom user avatar JPEG
  */
+@Suppress("LongParameterList")
 @Singleton
 class CompanionHttpServer @Inject constructor(
     private val recapGenerator: RecapGenerator,
@@ -169,6 +170,7 @@ class CompanionHttpServer @Inject constructor(
  * Configures the Ktor application with all companion server routes.
  * Extracted as a top-level function so it can be tested via [io.ktor.server.testing.testApplication].
  */
+@Suppress("LongParameterList")
 internal fun Application.configureCompanionRoutes(
     recapGenerator: RecapGenerator,
     capabilityProvider: DeviceCapabilityProvider,

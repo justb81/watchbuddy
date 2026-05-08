@@ -35,6 +35,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 private const val TAG = "TvProviderCatalogRepo"
+private const val HTTP_NOT_MODIFIED = 304
 
 // ── Room entity ───────────────────────────────────────────────────────────────
 
@@ -138,12 +139,13 @@ class TvProviderCatalogRepository @Inject constructor(
             cached?.let { reqBuilder.header("If-None-Match", "\"${it.version}\"") }
             val response = client.newCall(reqBuilder.build()).execute()
             when {
-                response.code == 304 -> {
+                response.code == HTTP_NOT_MODIFIED -> {
                     DiagnosticLog.event(TAG, "catalog up to date (304)")
                 }
                 response.isSuccessful -> {
-                    val body = response.body?.string() ?: return
-                    val parsed = parseCatalog(body) ?: return
+                    val body = response.body?.string()
+                    val parsed = if (body != null) parseCatalog(body) else null
+                    if (body == null || parsed == null) return
                     val currentVersion = cached?.version ?: 0
                     if (parsed.version < currentVersion) {
                         DiagnosticLog.warn(TAG, "phone version ${parsed.version} < cached $currentVersion, ignoring")

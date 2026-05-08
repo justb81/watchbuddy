@@ -77,6 +77,7 @@ data class TvDiagnosticsUiState(
     val catalogSource: CatalogSource = CatalogSource.BUNDLED,
 )
 
+@Suppress("LongParameterList")
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class TvDiagnosticsViewModel @Inject constructor(
