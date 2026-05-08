@@ -36,26 +36,26 @@ import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.atomic.AtomicReference
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.Serializable
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
+import javax.inject.Inject
+import javax.inject.Singleton
 
 private const val TAG = "CompanionHttpServer"
 private const val DEFAULT_PAGE_SIZE = 30
 private const val MAX_PAGE_SIZE = 200
 
 // Security limits — adjust values before changing the rate-limit tests.
-private const val HEAVY_RATE_LIMIT = 6          // req/min for LLM-heavy endpoints
-private const val STANDARD_RATE_LIMIT = 60      // req/min for all other endpoints
+private const val HEAVY_RATE_LIMIT = 6 // req/min for LLM-heavy endpoints
+private const val STANDARD_RATE_LIMIT = 60 // req/min for all other endpoints
 private const val RATE_LIMIT_WINDOW_MS = 60_000L
-private const val MAX_CONCURRENT_PER_IP = 4     // max simultaneous in-flight requests per source IP
+private const val MAX_CONCURRENT_PER_IP = 4 // max simultaneous in-flight requests per source IP
 private const val MAX_EXTRACT_BODY_BYTES = 64 * 1024L // 64 KB cap for /scrobble/extract (#525)
 
 /**
@@ -73,9 +73,13 @@ private class IpRateLimiter(val limit: Int, val windowMs: Long) {
         // CAS retry loop: typically executes once; spins only under rare contention.
         while (true) {
             val w = ref.get()
-            val next = if (now - w.start >= windowMs) Window(1, now)
-                       else if (w.count >= limit) return false
-                       else Window(w.count + 1, w.start)
+            val next = if (now - w.start >= windowMs) {
+                Window(1, now)
+            } else if (w.count >= limit) {
+                return false
+            } else {
+                Window(w.count + 1, w.start)
+            }
             if (ref.compareAndSet(w, next)) return true
         }
     }
@@ -214,8 +218,11 @@ internal fun Application.configureCompanionRoutes(
     intercept(ApplicationCallPipeline.Plugins) {
         val ip = call.request.local.remoteAddress
         val path = call.request.path()
-        val limiter = if (path.startsWith("/recap/") || path == "/scrobble/extract") heavyLimiter
-                      else standardLimiter
+        val limiter = if (path.startsWith("/recap/") || path == "/scrobble/extract") {
+            heavyLimiter
+        } else {
+            standardLimiter
+        }
         if (!limiter.allow(ip)) {
             call.respond(HttpStatusCode.TooManyRequests, ErrorResponse("Rate limit exceeded"))
             finish()
