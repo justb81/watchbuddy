@@ -348,6 +348,18 @@ Release AABs are built with `debugSymbolLevel = "FULL"`, so AGP embeds per-AAB n
 
 Release AABs likewise enable R8 (`isMinifyEnabled = true`), and AGP embeds the resulting `mapping.txt` inside each AAB so Play Console can de-obfuscate stack traces per versionCode. The Play upload is performed by [Gradle Play Publisher](https://github.com/Triple-T/gradle-play-publisher) (`./gradlew :app-phone:publishReleaseBundle`) in `artifactDir` mode, which uploads the phone + TV AABs as one atomic Play edit. Per-module `mapping.txt` files are also attached to the GitHub Release for manual symbolication.
 
+### Changing the Play Store track or status
+
+By default `release.yml` publishes to the `internal` track with status `DRAFT` (for pre-1.0 versions) or `COMPLETED` (for ≥ 1.0). To promote a build to a different track (alpha, beta, production) or change the release status, trigger the workflow manually via **Actions → Release → Run workflow** and supply the following inputs:
+
+| Input | Default | Options |
+|-------|---------|---------|
+| `tag` | *(empty — uses latest push)* | Any existing release tag, e.g. `v0.35.0` |
+| `play_track` | `internal` | `internal`, `alpha`, `beta`, `production` |
+| `play_status` | `DRAFT` | `DRAFT`, `COMPLETED` |
+
+A manual dispatch checks out the specified `tag`, rebuilds the APK/AAB, and publishes to the given track — no YAML edits required.
+
 ## Deep Links
 
 The available-provider list for each show is fetched from TMDB `/tv/{id}/watch/providers` (region-aware, keyed by device locale country code). No manual service selection is needed.

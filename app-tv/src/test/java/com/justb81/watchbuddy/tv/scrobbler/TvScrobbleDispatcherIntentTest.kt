@@ -3,6 +3,10 @@ package com.justb81.watchbuddy.tv.scrobbler
 import com.justb81.watchbuddy.core.model.TraktIds
 import com.justb81.watchbuddy.core.scrobbler.PlaybackIntent
 import com.justb81.watchbuddy.core.scrobbler.PlaybackIntentStats
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
@@ -25,6 +29,7 @@ import org.junit.jupiter.api.Test
 class TvScrobbleDispatcherIntentTest {
 
     private lateinit var registry: PlaybackIntentRegistry
+    private lateinit var testScope: CoroutineScope
 
     private val disneyPkg = "com.disney.disneyplus"
     private val nowMs get() = System.currentTimeMillis()
@@ -43,7 +48,13 @@ class TvScrobbleDispatcherIntentTest {
 
     @BeforeEach
     fun setUp() {
-        registry = PlaybackIntentRegistry()
+        testScope = CoroutineScope(SupervisorJob())
+        registry = PlaybackIntentRegistry(testScope)
+    }
+
+    @AfterEach
+    fun tearDown() {
+        testScope.cancel()
     }
 
     @Nested

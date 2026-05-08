@@ -3,6 +3,30 @@ name: Release
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to build and publish (e.g. v0.35.0). Required for manual dispatch.'
+        required: false
+        type: string
+      play_track:
+        description: 'Play Store track to publish to'
+        required: false
+        default: 'internal'
+        type: choice
+        options:
+          - internal
+          - alpha
+          - beta
+          - production
+      play_status:
+        description: 'Play Store release status'
+        required: false
+        default: 'DRAFT'
+        type: choice
+        options:
+          - DRAFT
+          - COMPLETED
 
 permissions:
   contents: read
@@ -36,7 +60,7 @@ jobs:
   build-release:
     name: Build & Publish Release
     needs: release-please
-    if: ${{ needs.release-please.outputs.release_created }}
+    if: ${{ needs.release-please.outputs.release_created || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -51,6 +75,18 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           persist-credentials: false
+          ref: ${{ inputs.tag || github.sha }}
+
+      # Resolve TAG and VERSION: prefer release-please outputs; fall back to the
+      # workflow_dispatch `tag` input so manual re-publishes work end-to-end.
+      - name: Resolve version and tag
+        if: github.event_name == 'workflow_dispatch' && inputs.tag != ''
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          echo "TAG=${INPUT_TAG}" >> "$GITHUB_ENV"
+          echo "VERSION=${INPUT_TAG#v}" >> "$GITHUB_ENV"
+
       - uses: ./.github/actions/setup-android-build
 
       # -- Re-mask signing secrets so they are redacted even if a Gradle
@@ -258,10 +294,15 @@ jobs:
             NOTES="${NOTES:0:497}..."
           fi
 
-          # Fail fast on an empty changelog — refuse to upload blank Play Store notes
+          # For workflow_dispatch re-publishes the release body is empty; write placeholder notes.
           if [ -z "${NOTES//[[:space:]]/}" ]; then
-            echo "::error::Release body is empty after markdown stripping — refusing to upload blank Play Store notes."
-            exit 1
+            echo "::notice::Release body is empty — writing placeholder Play Store notes."
+            NOTES_DIR="app-phone/src/main/play/release-notes"
+            for LOCALE in en-US de-DE fr-FR es-ES; do
+              mkdir -p "${NOTES_DIR}/${LOCALE}"
+              echo "Bug fixes and improvements." > "${NOTES_DIR}/${LOCALE}/default.txt"
+            done
+            exit 0
           fi
 
           # Write locale files — all locales get the same English text
@@ -311,7 +352,7 @@ jobs:
       # symbolicated with their respective R8 mappings.
       - name: Publish to Google Play via GPP
         if: steps.keystore.outputs.available == 'true' && steps.play-store.outputs.available == 'true'
-        run: ./gradlew :app-phone:publishReleaseBundle -PplayTrack=internal -PplayStatus=${{ steps.play-status.outputs.status }}
+        run: ./gradlew :app-phone:publishReleaseBundle -PplayTrack=${{ inputs.play_track || 'internal' }} -PplayStatus=${{ inputs.play_status || steps.play-status.outputs.status }}
 
       - name: Upload release artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
