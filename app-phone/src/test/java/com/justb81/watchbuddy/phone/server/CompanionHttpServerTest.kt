@@ -35,14 +35,14 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.testing.*
 import io.mockk.*
+import java.io.File
+import kotlinx.coroutines.flow.flowOf
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
-import java.io.File
-import kotlinx.coroutines.flow.flowOf
 
 @DisplayName("CompanionHttpServer routes")
 class CompanionHttpServerTest {

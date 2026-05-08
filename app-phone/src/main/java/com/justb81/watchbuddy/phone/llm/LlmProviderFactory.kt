@@ -8,8 +8,8 @@ import com.justb81.watchbuddy.core.model.TmdbEpisode
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import dagger.Lazy
 import dagger.hilt.android.qualifiers.ApplicationContext
-import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.Executors
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.TimeoutCancellationException
