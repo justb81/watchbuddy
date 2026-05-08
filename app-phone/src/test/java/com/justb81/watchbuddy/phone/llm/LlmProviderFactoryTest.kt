@@ -7,7 +7,6 @@ import com.justb81.watchbuddy.phone.settings.AppSettings
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import dagger.Lazy
 import io.mockk.*
-import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.flowOf
@@ -18,6 +17,7 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
+import java.util.concurrent.atomic.AtomicInteger
 
 @DisplayName("LlmProviderFactory")
 class LlmProviderFactoryTest {
