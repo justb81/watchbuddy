@@ -44,8 +44,8 @@ class LlmOrchestratorTest {
     @DisplayName("RAM-based variant selection")
     inner class RamBasedSelection {
         @Test
-        fun `selects E4B when freeRam is at least 5000 MB`() {
-            mockFreeRam(6000)
+        fun `selects E4B when freeRam is at least 8000 MB`() {
+            mockFreeRam(9000)
             val config = orchestrator.selectConfig()
             assertEquals(LlmBackend.LITERT, config.backend)
             assertEquals(LlmOrchestrator.ModelVariant.GEMMA4_E4B, config.modelVariant)
@@ -53,7 +53,7 @@ class LlmOrchestratorTest {
         }
 
         @Test
-        fun `selects E2B when freeRam is at least 3000 but less than 5000 MB`() {
+        fun `selects E2B when freeRam is at least 3000 but less than 8000 MB`() {
             mockFreeRam(4000)
             val config = orchestrator.selectConfig()
             assertEquals(LlmBackend.LITERT, config.backend)
@@ -71,7 +71,7 @@ class LlmOrchestratorTest {
         }
 
         @Test
-        fun `selects E4B at exact 5000 MB boundary`() {
+        fun `selects E4B at exact 8000 MB boundary`() {
             mockFreeRam(8000)
             val config = orchestrator.selectConfig()
             assertEquals(LlmOrchestrator.ModelVariant.GEMMA4_E4B, config.modelVariant)
@@ -135,7 +135,7 @@ class LlmOrchestratorTest {
 
         @Test
         fun `non-NONE config is cached across calls even when freeRam fluctuates`() {
-            mockFreeRam(6000) // First call -> E4B
+            mockFreeRam(9000) // First call -> E4B
             val first = orchestrator.selectConfig()
             assertEquals(LlmOrchestrator.ModelVariant.GEMMA4_E4B, first.modelVariant)
 
@@ -154,7 +154,7 @@ class LlmOrchestratorTest {
             val first = orchestrator.selectConfig()
             assertEquals(LlmBackend.NONE, first.backend)
 
-            mockFreeRam(6000) // RAM freed up -> E4B should now win
+            mockFreeRam(9000) // RAM freed up -> E4B should now win
             val second = orchestrator.selectConfig()
             assertEquals(LlmBackend.LITERT, second.backend)
             assertEquals(LlmOrchestrator.ModelVariant.GEMMA4_E4B, second.modelVariant)
