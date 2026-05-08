@@ -121,7 +121,7 @@ class LlmProviderFactoryTest {
             )
             setQueueDepth(3) // MAX_LLM_QUEUE_DEPTH
             try {
-                assertThrows<LlmProviderFactory.LlmBusyException> {
+                assertThrows<LlmBusyException> {
                     factory.generateWithCascade("recap", "p", emptyList())
                 }
             } finally {
@@ -136,7 +136,7 @@ class LlmProviderFactoryTest {
             )
             setQueueDepth(3)
             try {
-                assertThrows<LlmProviderFactory.LlmBusyException> {
+                assertThrows<LlmBusyException> {
                     factory.generateOrNull("extract", "p")
                 }
             } finally {

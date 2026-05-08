@@ -21,7 +21,7 @@ import com.justb81.watchbuddy.core.trakt.SyncHistoryResult
 import com.justb81.watchbuddy.core.trakt.TraktApiService
 import com.justb81.watchbuddy.phone.auth.TokenRefreshManager
 import com.justb81.watchbuddy.phone.auth.TokenRepository
-import com.justb81.watchbuddy.phone.llm.LlmProviderFactory
+import com.justb81.watchbuddy.phone.llm.LlmBusyException
 import com.justb81.watchbuddy.phone.llm.LlmTitleExtractor
 import com.justb81.watchbuddy.phone.llm.RecapGenerator
 import com.justb81.watchbuddy.phone.settings.AppSettings
@@ -682,7 +682,7 @@ class CompanionHttpServerTest {
             coEvery { tmdbApiService.getShow(100, "api-key", any()) } returns tmdbShow
             coEvery { tmdbApiService.getEpisode(any(), any(), any(), any(), any()) } returns ep1
             coEvery { recapGenerator.generateRecap(any(), any(), any()) } throws
-                LlmProviderFactory.LlmBusyException("LLM busy")
+                LlmBusyException("LLM busy")
 
             val response = client.post("/recap/1") {
                 contentType(ContentType.Application.Json)
@@ -1001,7 +1001,7 @@ class CompanionHttpServerTest {
         @Test
         fun `returns 503 with LLM busy message when title extractor is at capacity`() = testApp {
             coEvery { titleExtractor.extract(any<MediaMetadataSnapshot>(), any()) } throws
-                LlmProviderFactory.LlmBusyException("LLM busy")
+                LlmBusyException("LLM busy")
 
             val response = client.post("/scrobble/extract") {
                 contentType(ContentType.Application.Json)

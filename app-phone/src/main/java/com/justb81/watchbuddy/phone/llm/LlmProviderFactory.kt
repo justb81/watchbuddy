@@ -18,6 +18,9 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 
+/** Thrown when the LLM request queue is full. Callers should return HTTP 503. */
+class LlmBusyException(message: String) : Exception(message)
+
 /**
  * Creates [LlmProvider] instances based on [LlmOrchestrator.selectConfig] and
  * implements a cascade fallback:  AICore -> LiteRT-LM -> TMDB Fallback.
@@ -56,9 +59,6 @@ class LlmProviderFactory @Inject constructor(
         const val LLM_TIMEOUT_MS = 30_000L
 
         private const val MAX_LLM_QUEUE_DEPTH = 3
-
-        /** Thrown when the LLM request queue is full. Callers should return HTTP 503. */
-        class LlmBusyException(message: String) : Exception(message)
     }
 
     // Single-thread executor keeps LLM inference off Ktor's worker pool. JNI
