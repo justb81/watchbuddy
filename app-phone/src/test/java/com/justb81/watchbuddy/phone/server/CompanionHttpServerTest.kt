@@ -21,6 +21,7 @@ import com.justb81.watchbuddy.core.trakt.SyncHistoryResult
 import com.justb81.watchbuddy.core.trakt.TraktApiService
 import com.justb81.watchbuddy.phone.auth.TokenRefreshManager
 import com.justb81.watchbuddy.phone.auth.TokenRepository
+import com.justb81.watchbuddy.phone.llm.LlmBusyException
 import com.justb81.watchbuddy.phone.llm.LlmTitleExtractor
 import com.justb81.watchbuddy.phone.llm.RecapGenerator
 import com.justb81.watchbuddy.phone.settings.AppSettings
@@ -34,6 +35,7 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.testing.*
 import io.mockk.*
+import kotlinx.coroutines.flow.flowOf
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -41,7 +43,6 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
-import kotlinx.coroutines.flow.flowOf
 
 @DisplayName("CompanionHttpServer routes")
 class CompanionHttpServerTest {
@@ -673,6 +674,24 @@ class CompanionHttpServerTest {
             assertEquals(HttpStatusCode.ServiceUnavailable, response.status)
             assertTrue(response.bodyAsText().contains("Service unavailable"))
         }
+
+        @Test
+        fun `returns 503 with LLM busy message when recap generator is at capacity`() = testApp {
+            every { tokenRepository.getAccessToken() } returns "token"
+            coEvery { showRepository.getShows() } returns listOf(enrichedEntry)
+            coEvery { tmdbApiService.getShow(100, "api-key", any()) } returns tmdbShow
+            coEvery { tmdbApiService.getEpisode(any(), any(), any(), any(), any()) } returns ep1
+            coEvery { recapGenerator.generateRecap(any(), any(), any()) } throws
+                LlmBusyException("LLM busy")
+
+            val response = client.post("/recap/1") {
+                contentType(ContentType.Application.Json)
+                setBody("""{"tmdbApiKey":"api-key"}""")
+            }
+
+            assertEquals(HttpStatusCode.ServiceUnavailable, response.status)
+            assertTrue(response.bodyAsText().contains("LLM busy"))
+        }
     }
 
     // ── POST /scrobble/start, /scrobble/pause, /scrobble/stop ────────────────
@@ -977,6 +996,20 @@ class CompanionHttpServerTest {
                 setBody(extractRequestBody)
             }
             assertEquals(HttpStatusCode.ServiceUnavailable, response.status)
+        }
+
+        @Test
+        fun `returns 503 with LLM busy message when title extractor is at capacity`() = testApp {
+            coEvery { titleExtractor.extract(any<MediaMetadataSnapshot>(), any()) } throws
+                LlmBusyException("LLM busy")
+
+            val response = client.post("/scrobble/extract") {
+                contentType(ContentType.Application.Json)
+                setBody(extractRequestBody)
+            }
+
+            assertEquals(HttpStatusCode.ServiceUnavailable, response.status)
+            assertTrue(response.bodyAsText().contains("LLM busy"))
         }
 
         @Test

@@ -9,10 +9,17 @@ import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import dagger.Lazy
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
 import javax.inject.Singleton
+
+/** Thrown when the LLM request queue is full. Callers should return HTTP 503. */
+class LlmBusyException(message: String) : Exception(message)
 
 /**
  * Creates [LlmProvider] instances based on [LlmOrchestrator.selectConfig] and
@@ -45,11 +52,37 @@ class LlmProviderFactory @Inject constructor(
         private const val MAX_ERROR_MESSAGE = 200
 
         // Per-provider inference timeout. The TV-side OkHttp client allows 90 s
-        // for the recap response (`PhoneApiClientFactory.kt`); 75 s gives the
-        // cascade enough headroom to also try the next provider before the TV
-        // tears down the request, and it bounds the wait so a hung JNI call
-        // can't block the Ktor request thread indefinitely.
-        const val LLM_TIMEOUT_MS = 75_000L
+        // for the recap response (`PhoneApiClientFactory.kt`); 30 s per provider
+        // still leaves headroom to try the next provider before the TV tears
+        // down the request, and bounds the wait so a hung JNI call cannot block
+        // the dedicated inference thread indefinitely.
+        const val LLM_TIMEOUT_MS = 30_000L
+
+        private const val MAX_LLM_QUEUE_DEPTH = 3
+    }
+
+    // Single-thread executor keeps LLM inference off Ktor's worker pool. JNI
+    // calls from LiteRT-LM block this thread, not any shared dispatcher thread.
+    private val llmDispatcher = Executors
+        .newSingleThreadExecutor { r -> Thread(r, "llm-inference").also { it.isDaemon = true } }
+        .asCoroutineDispatcher()
+
+    // Tracks requests that are either waiting for the inference thread or
+    // actively running. Capped at MAX_LLM_QUEUE_DEPTH; excess requests are
+    // rejected immediately with LlmBusyException.
+    private val llmQueueDepth = AtomicInteger(0)
+
+    private suspend fun <T> withLlmQueue(block: suspend () -> T): T {
+        val depth = llmQueueDepth.incrementAndGet()
+        if (depth > MAX_LLM_QUEUE_DEPTH) {
+            llmQueueDepth.decrementAndGet()
+            throw LlmBusyException("LLM busy — $MAX_LLM_QUEUE_DEPTH requests already queued")
+        }
+        return try {
+            withContext(llmDispatcher) { block() }
+        } finally {
+            llmQueueDepth.decrementAndGet()
+        }
     }
 
     /**
@@ -71,44 +104,46 @@ class LlmProviderFactory @Inject constructor(
         val providers = buildProviderCascade(config, episodes)
         val errors = mutableListOf<String>()
 
-        for (provider in providers) {
-            try {
-                Log.d(TAG, "Trying provider: ${provider.displayName}")
-                val result = invokeWithTimeout(provider, prompt)
-                Log.d(TAG, "Success with provider: ${provider.displayName}")
-                recordEvent(
-                    enabled = loggingEnabled,
-                    caller = caller,
-                    backend = provider.displayName,
-                    startedAt = startedAt,
-                    prompt = prompt,
-                    response = result,
-                    status = LlmEventLog.Status.SUCCESS,
-                )
-                return result
-            } catch (e: TimeoutCancellationException) {
-                Log.w(TAG, "Provider ${provider.displayName} timed out after ${LLM_TIMEOUT_MS}ms", e)
-                errors += "${provider.displayName}: timeout(${LLM_TIMEOUT_MS}ms)"
-            } catch (e: Exception) {
-                Log.w(TAG, "Provider ${provider.displayName} failed: ${e.message}")
-                errors += "${provider.displayName}: ${summarize(e)}"
+        return withLlmQueue {
+            for (provider in providers) {
+                try {
+                    Log.d(TAG, "Trying provider: ${provider.displayName}")
+                    val result = invokeWithTimeout(provider, prompt)
+                    Log.d(TAG, "Success with provider: ${provider.displayName}")
+                    recordEvent(
+                        enabled = loggingEnabled,
+                        caller = caller,
+                        backend = provider.displayName,
+                        startedAt = startedAt,
+                        prompt = prompt,
+                        response = result,
+                        status = LlmEventLog.Status.SUCCESS,
+                    )
+                    return@withLlmQueue result
+                } catch (e: TimeoutCancellationException) {
+                    Log.w(TAG, "Provider ${provider.displayName} timed out after ${LLM_TIMEOUT_MS}ms", e)
+                    errors += "${provider.displayName}: timeout(${LLM_TIMEOUT_MS}ms)"
+                } catch (e: Exception) {
+                    Log.w(TAG, "Provider ${provider.displayName} failed: ${e.message}")
+                    errors += "${provider.displayName}: ${summarize(e)}"
+                }
             }
-        }
 
-        // All providers failed — return minimal fallback
-        Log.e(TAG, "All LLM providers failed, returning empty fallback")
-        val fallback = buildMinimalFallback()
-        recordEvent(
-            enabled = loggingEnabled,
-            caller = caller,
-            backend = BACKEND_FALLBACK,
-            startedAt = startedAt,
-            prompt = prompt,
-            response = fallback,
-            status = LlmEventLog.Status.ERROR,
-            errorSummary = errors.joinToString(" | ").ifEmpty { "no providers available" },
-        )
-        return fallback
+            // All providers failed — return minimal fallback
+            Log.e(TAG, "All LLM providers failed, returning empty fallback")
+            val fallback = buildMinimalFallback()
+            recordEvent(
+                enabled = loggingEnabled,
+                caller = caller,
+                backend = BACKEND_FALLBACK,
+                startedAt = startedAt,
+                prompt = prompt,
+                response = fallback,
+                status = LlmEventLog.Status.ERROR,
+                errorSummary = errors.joinToString(" | ").ifEmpty { "no providers available" },
+            )
+            fallback
+        }
     }
 
     /**
@@ -138,40 +173,46 @@ class LlmProviderFactory @Inject constructor(
             return null
         }
         val errors = mutableListOf<String>()
-        for (provider in providers) {
-            try {
-                Log.d(TAG, "Trying provider: ${provider.displayName}")
-                val result = invokeWithTimeout(provider, prompt)
-                Log.d(TAG, "Success with provider: ${provider.displayName}")
+        return withLlmQueue {
+            var result: String? = null
+            for (provider in providers) {
+                try {
+                    Log.d(TAG, "Trying provider: ${provider.displayName}")
+                    val text = invokeWithTimeout(provider, prompt)
+                    Log.d(TAG, "Success with provider: ${provider.displayName}")
+                    recordEvent(
+                        enabled = loggingEnabled,
+                        caller = caller,
+                        backend = provider.displayName,
+                        startedAt = startedAt,
+                        prompt = prompt,
+                        response = text,
+                        status = LlmEventLog.Status.SUCCESS,
+                    )
+                    result = text
+                    break
+                } catch (e: TimeoutCancellationException) {
+                    Log.w(TAG, "Provider ${provider.displayName} timed out after ${LLM_TIMEOUT_MS}ms", e)
+                    errors += "${provider.displayName}: timeout(${LLM_TIMEOUT_MS}ms)"
+                } catch (e: Exception) {
+                    Log.w(TAG, "Provider ${provider.displayName} failed: ${e.message}")
+                    errors += "${provider.displayName}: ${summarize(e)}"
+                }
+            }
+            if (result == null) {
                 recordEvent(
                     enabled = loggingEnabled,
                     caller = caller,
-                    backend = provider.displayName,
+                    backend = providers.last().displayName,
                     startedAt = startedAt,
                     prompt = prompt,
-                    response = result,
-                    status = LlmEventLog.Status.SUCCESS,
+                    response = null,
+                    status = LlmEventLog.Status.ERROR,
+                    errorSummary = errors.joinToString(" | "),
                 )
-                return result
-            } catch (e: TimeoutCancellationException) {
-                Log.w(TAG, "Provider ${provider.displayName} timed out after ${LLM_TIMEOUT_MS}ms", e)
-                errors += "${provider.displayName}: timeout(${LLM_TIMEOUT_MS}ms)"
-            } catch (e: Exception) {
-                Log.w(TAG, "Provider ${provider.displayName} failed: ${e.message}")
-                errors += "${provider.displayName}: ${summarize(e)}"
             }
+            result
         }
-        recordEvent(
-            enabled = loggingEnabled,
-            caller = caller,
-            backend = providers.last().displayName,
-            startedAt = startedAt,
-            prompt = prompt,
-            response = null,
-            status = LlmEventLog.Status.ERROR,
-            errorSummary = errors.joinToString(" | "),
-        )
-        return null
     }
 
     /**
