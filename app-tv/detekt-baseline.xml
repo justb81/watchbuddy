@@ -13,6 +13,7 @@
     <ID>LongMethod:TvDiagnosticsScreen.kt$@OptIn(ExperimentalTvMaterial3Api::class) @Composable fun TvDiagnosticsScreen( onBack: () -&gt; Unit, viewModel: TvDiagnosticsViewModel = hiltViewModel(), )</ID>
     <ID>LongMethod:TvSettingsScreen.kt$@OptIn(ExperimentalTvMaterial3Api::class) @Composable fun TvSettingsScreen( onBack: () -&gt; Unit, onStreamingServicesClick: () -&gt; Unit, onDiagnosticsClick: () -&gt; Unit, viewModel: TvSettingsViewModel = hiltViewModel(), )</ID>
     <ID>LongParameterList:StreamingSettingsScreen.kt$( service: StreamingService, isSubscribed: Boolean, priority: Int?, canMoveUp: Boolean, canMoveDown: Boolean, onToggle: () -&gt; Unit, onMoveUp: () -&gt; Unit, onMoveDown: () -&gt; Unit )</ID>
+    <ID>LongParameterList:TvDiagnosticsViewModel.kt$TvDiagnosticsViewModel$( private val application: Application, phoneDiscovery: PhoneDiscoveryManager, private val scrobbler: MediaSessionScrobbler, private val justWatchRepo: JustWatchDeepLinkRepository, private val watchNextSource: WatchNextMetadataSource, private val notificationSource: NotificationMetadataSource, private val intentProvider: PlaybackIntentProvider, private val catalogRepository: TvProviderCatalogRepository, )</ID>
     <ID>MagicNumber:InitialsAvatar.kt$0xFF26A69A</ID>
     <ID>MagicNumber:InitialsAvatar.kt$0xFF5B8DEF</ID>
     <ID>MagicNumber:InitialsAvatar.kt$0xFF66BB6A</ID>
@@ -35,6 +36,7 @@
     <ID>MagicNumber:ShowDetailScreen.kt$0.4f</ID>
     <ID>MagicNumber:ShowDetailScreen.kt$0.55f</ID>
     <ID>MagicNumber:ShowDetailScreen.kt$4</ID>
+    <ID>MagicNumber:TvProviderCatalogRepository.kt$TvProviderCatalogRepository$304</ID>
     <ID>MagicNumber:TvDiagnosticsScreen.kt$0xFF2E7D32</ID>
     <ID>MagicNumber:TvDiagnosticsScreen.kt$0xFFC62828</ID>
     <ID>MagicNumber:TvDiagnosticsScreen.kt$0xFFF9A825</ID>
@@ -134,6 +136,7 @@
     <ID>NoWildcardImports:TvScrobbleDispatcherTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
     <ID>NoWildcardImports:TvShowCacheTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
     <ID>ReturnCount:PhoneBleScanner.kt$PhoneBleScanner$@SuppressLint("MissingPermission") // Guarded by hasScanPermission() below. fun start( listener: Listener, onFailure: (Int) -&gt; Unit = {}, ): Boolean</ID>
+    <ID>ReturnCount:TvProviderCatalogRepository.kt$TvProviderCatalogRepository$suspend fun refresh()</ID>
     <ID>ReturnCount:PhoneDiscoveryManager.kt$PhoneDiscoveryManager$@VisibleForTesting internal fun parseTxtRecord(serviceInfo: NsdServiceInfo): PhoneTxtRecord?</ID>
     <ID>SpacingBetweenDeclarationsWithAnnotations:PhoneDiscoveryManager.kt$PhoneDiscoveryManager$@Volatile private var isDiscovering: Boolean = false</ID>
     <ID>SpacingBetweenDeclarationsWithAnnotations:TvDiscoveryService.kt$TvDiscoveryService$@Inject lateinit var preferences: StreamingPreferencesRepository</ID>
