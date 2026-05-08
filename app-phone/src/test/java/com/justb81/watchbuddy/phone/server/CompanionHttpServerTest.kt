@@ -161,12 +161,16 @@ class CompanionHttpServerTest {
         }
 
         @Test
-        fun `returns 304 when request ETag matches stored version`() = testApp {
+        fun `returns 304 when request ETag matches file content hash`() = testApp {
+            val avatarBytes = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte())
+            val avatarFile = File(tempDir, "avatar_304.jpg").apply { writeBytes(avatarBytes) }
             every { avatarImageStore.exists() } returns true
-            every { settingsRepository.settings } returns flowOf(AppSettings(customAvatarVersion = 5L))
+            every { avatarImageStore.file() } returns avatarFile
+            val sha256 = java.security.MessageDigest.getInstance("SHA-256")
+                .digest(avatarBytes).joinToString("") { "%02x".format(it) }
 
             val response = client.get("/avatar") {
-                header(HttpHeaders.IfNoneMatch, "\"5\"")
+                header(HttpHeaders.IfNoneMatch, "\"$sha256\"")
             }
 
             assertEquals(HttpStatusCode.NotModified, response.status)
@@ -187,15 +191,17 @@ class CompanionHttpServerTest {
         }
 
         @Test
-        fun `sets ETag header matching current avatar version`() = testApp {
-            val avatarFile = File(tempDir, "avatar.jpg").apply { writeBytes(byteArrayOf(1, 2, 3)) }
+        fun `sets ETag header as SHA-256 of file content`() = testApp {
+            val avatarBytes = byteArrayOf(1, 2, 3)
+            val avatarFile = File(tempDir, "avatar.jpg").apply { writeBytes(avatarBytes) }
             every { avatarImageStore.exists() } returns true
             every { avatarImageStore.file() } returns avatarFile
-            every { settingsRepository.settings } returns flowOf(AppSettings(customAvatarVersion = 42L))
 
             val response = client.get("/avatar")
 
-            assertEquals("\"42\"", response.headers[HttpHeaders.ETag])
+            val sha256 = java.security.MessageDigest.getInstance("SHA-256")
+                .digest(avatarBytes).joinToString("") { "%02x".format(it) }
+            assertEquals("\"$sha256\"", response.headers[HttpHeaders.ETag])
         }
 
         @Test
