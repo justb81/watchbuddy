@@ -39,13 +39,13 @@ class RecapGenerator @Inject constructor(
             .addTags("div", "span", "p", "br",
                      "h1", "h2", "h3", "strong", "em",
                      "ul", "ol", "li", "img")
-            .addAttributes("div",  "style", "class")
+            .addAttributes("div", "style", "class")
             .addAttributes("span", "style", "class")
-            .addAttributes("p",    "style", "class")
-            .addAttributes("h1",   "style")
-            .addAttributes("h2",   "style")
-            .addAttributes("h3",   "style")
-            .addAttributes("img",  "data-tmdb-still", "alt", "style")
+            .addAttributes("p", "style", "class")
+            .addAttributes("h1", "style")
+            .addAttributes("h2", "style")
+            .addAttributes("h3", "style")
+            .addAttributes("img", "data-tmdb-still", "alt", "style")
     }
 
     /**

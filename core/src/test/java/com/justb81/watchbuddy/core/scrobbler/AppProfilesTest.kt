@@ -107,10 +107,10 @@ class AppProfilesTest {
         fun `all marker regexes complete within 200ms on adversarial input`() {
             // Adversarial inputs that trigger catastrophic backtracking in poorly-written patterns.
             val adversarialInputs = listOf(
-                "S".repeat(1000) + ":",           // triggers backtracking on S/digit anchors
-                "Staffel ".repeat(200),            // triggers backtracking on German marker
-                "T" + "0".repeat(500) + " E",      // triggers backtracking on T##E## patterns
-                "a".repeat(1000),                  // long non-matching string
+                "S".repeat(1000) + ":", // triggers backtracking on S/digit anchors
+                "Staffel ".repeat(200), // triggers backtracking on German marker
+                "T" + "0".repeat(500) + " E", // triggers backtracking on T##E## patterns
+                "a".repeat(1000), // long non-matching string
             )
             AppProfiles.ALL.values.forEach { profile ->
                 profile.markerRegexes.forEach { regex ->
