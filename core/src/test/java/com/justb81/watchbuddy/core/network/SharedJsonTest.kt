@@ -1,11 +1,13 @@
 package com.justb81.watchbuddy.core.network
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 
 @DisplayName("WatchBuddyJson")
 class SharedJsonTest {
@@ -69,6 +71,72 @@ class SharedJsonTest {
             val encoded = WatchBuddyJson.encodeToString(Sample.serializer(), original)
             val decoded = WatchBuddyJson.decodeFromString<Sample>(encoded)
             assertEquals(original, decoded)
+        }
+    }
+}
+
+@DisplayName("WatchBuddyStrictJson")
+class StrictJsonTest {
+
+    @Serializable
+    private data class Sample(val name: String, val value: Int = 0)
+
+    @Nested
+    @DisplayName("unknown keys")
+    inner class UnknownKeysTest {
+        @Test
+        fun `throws on extra fields in JSON`() {
+            val json = """{"name":"test","unknown":"extra","value":1}"""
+            assertThrows<SerializationException> {
+                WatchBuddyStrictJson.decodeFromString<Sample>(json)
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("strict parsing")
+    inner class StrictParsingTest {
+        @Test
+        fun `rejects unquoted string values`() {
+            val json = """{"name":unquoted,"value":42}"""
+            assertThrows<SerializationException> {
+                WatchBuddyStrictJson.decodeFromString<Sample>(json)
+            }
+        }
+
+        @Test
+        fun `rejects null for non-nullable field`() {
+            val json = """{"name":"test","value":null}"""
+            assertThrows<SerializationException> {
+                WatchBuddyStrictJson.decodeFromString<Sample>(json)
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("valid JSON")
+    inner class ValidJsonTest {
+        @Test
+        fun `decodes well-formed JSON correctly`() {
+            val json = """{"name":"hello","value":42}"""
+            val result = WatchBuddyStrictJson.decodeFromString<Sample>(json)
+            assertEquals(Sample("hello", 42), result)
+        }
+
+        @Test
+        fun `missing optional field uses Kotlin default`() {
+            val json = """{"name":"hello"}"""
+            val result = WatchBuddyStrictJson.decodeFromString<Sample>(json)
+            assertEquals(Sample("hello", 0), result)
+        }
+    }
+
+    @Nested
+    @DisplayName("distinct from WatchBuddyJson")
+    inner class DistinctInstanceTest {
+        @Test
+        fun `is not the same instance as WatchBuddyJson`() {
+            assertNotSame(WatchBuddyJson, WatchBuddyStrictJson)
         }
     }
 }

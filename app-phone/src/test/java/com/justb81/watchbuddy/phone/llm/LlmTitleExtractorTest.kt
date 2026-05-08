@@ -8,6 +8,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
@@ -137,6 +138,74 @@ class LlmTitleExtractorTest {
         )
         assertNotNull(result)
         assertNull(result!!.showTitle)
+    }
+
+    // ── Title / traktId cross-validation (#533) ───────────────────────────────
+
+    @Test
+    fun `libraryTraktId cleared when showTitle and hint title are clearly different`() {
+        // LLM claims traktId=1 (Breaking Bad) but showTitle says "Friends" — hallucination
+        val result = extractor.parseAndValidate(
+            raw = """{"showTitle":"Friends","libraryTraktId":1,"confidence":0.95}""",
+            libraryHints = hints,
+        )
+        assertNotNull(result)
+        assertEquals("Friends", result!!.showTitle)
+        assertNull(result.libraryTraktId)
+    }
+
+    @Test
+    fun `libraryTraktId kept when showTitle closely matches hint title`() {
+        val result = extractor.parseAndValidate(
+            raw = """{"showTitle":"Breaking Bad","libraryTraktId":1,"confidence":0.9}""",
+            libraryHints = hints,
+        )
+        assertNotNull(result)
+        assertEquals(1, result!!.libraryTraktId)
+    }
+
+    @Test
+    fun `libraryTraktId kept when showTitle has minor variation from hint title`() {
+        // "Breaking Bad S3" vs "Breaking Bad" — distance ~0.20, below threshold
+        val result = extractor.parseAndValidate(
+            raw = """{"showTitle":"Breaking Bad S3","libraryTraktId":1,"confidence":0.8}""",
+            libraryHints = hints,
+        )
+        assertNotNull(result)
+        assertEquals(1, result!!.libraryTraktId)
+    }
+
+    @Test
+    fun `libraryTraktId kept when showTitle is null — no title to cross-validate`() {
+        val result = extractor.parseAndValidate(
+            raw = """{"libraryTraktId":1,"confidence":0.7}""",
+            libraryHints = hints,
+        )
+        assertNotNull(result)
+        assertEquals(1, result!!.libraryTraktId)
+    }
+
+    // ── normalizedLevenshtein unit tests ──────────────────────────────────────
+
+    @Test
+    fun `normalizedLevenshtein identical strings return 0`() {
+        assertEquals(0f, extractor.normalizedLevenshtein("breaking bad", "breaking bad"))
+    }
+
+    @Test
+    fun `normalizedLevenshtein is case-insensitive`() {
+        assertEquals(0f, extractor.normalizedLevenshtein("Breaking Bad", "breaking bad"))
+    }
+
+    @Test
+    fun `normalizedLevenshtein completely different strings near 1`() {
+        val d = extractor.normalizedLevenshtein("the office", "friends")
+        assertTrue(d > LlmTitleExtractor.TITLE_MISMATCH_THRESHOLD, "Expected d > 0.4, got $d")
+    }
+
+    @Test
+    fun `normalizedLevenshtein empty strings return 0`() {
+        assertEquals(0f, extractor.normalizedLevenshtein("", ""))
     }
 
     private fun sampleSnapshot(): MediaMetadataSnapshot {

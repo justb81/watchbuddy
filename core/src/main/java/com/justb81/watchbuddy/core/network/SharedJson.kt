@@ -11,3 +11,15 @@ val WatchBuddyJson: Json = Json {
     isLenient = true
     coerceInputValues = true
 }
+
+/**
+ * Strict [Json] instance for trust-boundary payloads such as `/capability` responses and
+ * internal IPC where schema regressions must surface immediately rather than silently
+ * defaulting. Missing optional fields with `= default` still resolve normally; only
+ * unknown keys, lenient number parsing, and null→default coercion are disabled.
+ */
+val WatchBuddyStrictJson: Json = Json {
+    ignoreUnknownKeys = false
+    isLenient = false
+    coerceInputValues = false
+}

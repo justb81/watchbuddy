@@ -35,6 +35,12 @@ class LlmTitleExtractor @Inject constructor(
         private const val MAX_SEASON = 100
         private const val MAX_EPISODE = 9_999
         private const val MIN_PRINTABLE_ASCII = 0x20
+
+        // Reject a claimed libraryTraktId when the LLM's showTitle and the hint's title
+        // are further apart than this normalized Levenshtein distance.  0.4 catches
+        // clear hallucinations ("The Office" vs "Friends" ≈ 0.89) while tolerating
+        // minor variations ("Breaking Bad S3" vs "Breaking Bad" ≈ 0.20).
+        internal const val TITLE_MISMATCH_THRESHOLD = 0.4f
     }
 
     /**
@@ -72,7 +78,19 @@ class LlmTitleExtractor @Inject constructor(
         val showTitle = parsed.showTitle?.trim()?.takeIf { it.isNotBlank() }
         val confidence = parsed.confidence.coerceIn(0f, 1f)
         val libraryTraktId = parsed.libraryTraktId?.takeIf { id ->
-            libraryHints.any { it.traktId == id }
+            val hint = libraryHints.firstOrNull { it.traktId == id } ?: return@takeIf false
+            if (showTitle == null) return@takeIf true
+            val distance = normalizedLevenshtein(showTitle, hint.title)
+            if (distance > TITLE_MISMATCH_THRESHOLD) {
+                DiagnosticLog.warn(
+                    TAG,
+                    "libraryTraktId $id cleared: title '$showTitle' vs hint '${hint.title}'" +
+                        " (dist=${"%.2f".format(distance)})",
+                )
+                false
+            } else {
+                true
+            }
         }
         val season = parsed.season?.takeIf { it in 0..MAX_SEASON }
         val episode = parsed.episode?.takeIf { it in 0..MAX_EPISODE }
@@ -181,6 +199,29 @@ Rules:
 - Only set libraryTraktId to a value that appears verbatim in the hint list above.
 - Do not invent shows; when in doubt return confidence 0.
 """.trimIndent()
+    }
+
+    /**
+     * Normalized Levenshtein distance in [0, 1]: 0 = identical, 1 = completely different.
+     * Case-insensitive. Runs in O(|a| × |b|) time with O(|b|) space.
+     */
+    internal fun normalizedLevenshtein(a: String, b: String): Float {
+        val aLc = a.lowercase()
+        val bLc = b.lowercase()
+        if (aLc == bLc) return 0f
+        val maxLen = maxOf(aLc.length, bLc.length)
+        if (maxLen == 0) return 0f
+        val dp = IntArray(bLc.length + 1) { it }
+        for (i in 1..aLc.length) {
+            var prev = dp[0]
+            dp[0] = i
+            for (j in 1..bLc.length) {
+                val temp = dp[j]
+                dp[j] = if (aLc[i - 1] == bLc[j - 1]) prev else 1 + minOf(prev, dp[j], dp[j - 1])
+                prev = temp
+            }
+        }
+        return dp[bLc.length].toFloat() / maxLen
     }
 
     private fun jsonEscape(s: String): String = buildString(s.length + 2) {

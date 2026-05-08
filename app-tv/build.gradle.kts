@@ -82,3 +82,10 @@ dependencies {
 configurations.all {
     exclude(group = "androidx.work")
 }
+
+// Room schema export — lets KSP write a versioned JSON snapshot of the database
+// schema next to the source so future Migration(n, n+1) objects can reference it.
+// The schemas/ directory is committed to git; CI generates/updates the file on each build.
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+}

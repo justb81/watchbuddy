@@ -11,6 +11,7 @@ import androidx.annotation.VisibleForTesting
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.model.DeviceCapability
 import com.justb81.watchbuddy.core.model.LlmBackend
+import com.justb81.watchbuddy.core.network.WatchBuddyStrictJson
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -29,7 +30,6 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.serialization.SerializationException
-import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.net.Inet4Address
@@ -80,14 +80,8 @@ class PhoneDiscoveryManager(
 
         // Intentionally NOT WatchBuddyJson: capability traffic must be strict so
         // a truncated or malicious peer can't pass a partially-defaulted payload
-        // through the lenient shared decoder. Missing optional fields with
-        // `= default` still resolve normally; only unknown keys, lenient number
-        // parsing, and null→default coercion are disabled.
-        private val STRICT_CAPABILITY_JSON: Json = Json {
-            ignoreUnknownKeys = false
-            isLenient = false
-            coerceInputValues = false
-        }
+        // through the lenient shared decoder.
+        private val STRICT_CAPABILITY_JSON = WatchBuddyStrictJson
     }
 
     /** Outcome of a `/capability` fetch + parse + validate. */
