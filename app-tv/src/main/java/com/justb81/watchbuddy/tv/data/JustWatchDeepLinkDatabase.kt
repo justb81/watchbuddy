@@ -11,7 +11,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
-@Database(entities = [JustWatchDeepLink::class], version = 1, exportSchema = false)
+@Database(entities = [JustWatchDeepLink::class], version = 1, exportSchema = true)
 abstract class JustWatchDeepLinkDatabase : RoomDatabase() {
     abstract fun dao(): JustWatchDeepLinkDao
 }
@@ -24,7 +24,6 @@ object JustWatchDatabaseModule {
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): JustWatchDeepLinkDatabase =
         Room.databaseBuilder(context, JustWatchDeepLinkDatabase::class.java, "justwatch_deep_links.db")
-            .fallbackToDestructiveMigration(dropAllTables = true)
             .build()
 
     @Provides

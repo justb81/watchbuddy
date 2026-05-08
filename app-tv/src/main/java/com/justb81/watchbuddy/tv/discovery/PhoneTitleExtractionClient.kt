@@ -86,7 +86,10 @@ class PhoneTitleExtractionClient @Inject constructor(
         if (deferred === newDeferred) {
             scope.launch { runExtraction(phone, snapshot, newDeferred, key) }
         }
-        return deferred.await()
+        // Per-caller timeout so a stuck in-flight deferred never blocks a caller indefinitely.
+        // runExtraction already times out the HTTP call, but a cancelled initiator coroutine
+        // or an exhausted dispatcher could leave the deferred dangling.
+        return withTimeoutOrNull(CLIENT_TIMEOUT_SECONDS * MILLIS_PER_SECOND) { deferred.await() }
     }
 
     private suspend fun runExtraction(
