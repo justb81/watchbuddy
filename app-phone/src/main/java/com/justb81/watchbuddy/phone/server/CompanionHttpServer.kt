@@ -21,6 +21,7 @@ import com.justb81.watchbuddy.core.trakt.SyncHistoryShowItem
 import com.justb81.watchbuddy.core.trakt.TraktApiService
 import com.justb81.watchbuddy.phone.auth.TokenRefreshManager
 import com.justb81.watchbuddy.phone.auth.TokenRepository
+import com.justb81.watchbuddy.phone.data.ProviderCatalogRepository
 import com.justb81.watchbuddy.phone.llm.LlmTitleExtractor
 import com.justb81.watchbuddy.phone.llm.RecapGenerator
 import com.justb81.watchbuddy.phone.settings.AvatarImageStore
@@ -97,6 +98,7 @@ private class IpRateLimiter(val limit: Int, val windowMs: Long) {
  *
  * Endpoints:
  *   GET  /capability           → DeviceCapability (unauthenticated)
+ *   GET  /provider-catalog     → Versioned provider catalog JSON (unauthenticated)
  *   GET  /shows                → List of watched shows for this user (from Trakt cache)
  *   POST /recap/{traktShowId}  → Generate + return HTML recap for a show
  *   POST /scrobble/start       → Forward scrobble start to this user's Trakt account
@@ -123,6 +125,7 @@ class CompanionHttpServer @Inject constructor(
     private val stateManager: CompanionStateManager,
     private val titleExtractor: LlmTitleExtractor,
     private val bearerTokenRepository: BearerTokenRepository,
+    private val providerCatalogRepository: ProviderCatalogRepository,
 ) {
     companion object {
         const val PORT = 8765
@@ -146,7 +149,7 @@ class CompanionHttpServer @Inject constructor(
                     recapGenerator, capabilityProvider, showRepository,
                     tokenRepository, tokenRefreshManager, traktApiService, tmdbApiService, tmdbCache,
                     settingsRepository, avatarImageStore, stateManager, titleExtractor,
-                    bearerTokenRepository,
+                    bearerTokenRepository, providerCatalogRepository,
                 )
             }.start(wait = false)
         }.onFailure {
@@ -179,6 +182,7 @@ internal fun Application.configureCompanionRoutes(
     stateManager: CompanionStateManager,
     titleExtractor: LlmTitleExtractor,
     bearerTokenRepository: BearerTokenRepository,
+    providerCatalogRepository: ProviderCatalogRepository,
 ) {
     val expectedToken = bearerTokenRepository.token
 
@@ -254,6 +258,21 @@ internal fun Application.configureCompanionRoutes(
         get("/capability") {
             stateManager.onCapabilityChecked()
             call.respond(capabilityProvider.getCapability())
+        }
+
+        // /provider-catalog is intentionally unauthenticated — the TV needs it
+        // for deep-link resolution independently of Trakt auth state.
+        get("/provider-catalog") {
+            val json = providerCatalogRepository.currentJson()
+            val etag = "\"${sha256Hex(json.toByteArray()).take(16)}\""
+            val ifNoneMatch = call.request.headers[HttpHeaders.IfNoneMatch]
+            if (ifNoneMatch == etag) {
+                call.respond(HttpStatusCode.NotModified)
+                return@get
+            }
+            call.response.header(HttpHeaders.ETag, etag)
+            call.response.header(HttpHeaders.CacheControl, "public, max-age=86400")
+            call.respondText(json, io.ktor.http.ContentType.Application.Json)
         }
 
         authenticate("phone-tv") {

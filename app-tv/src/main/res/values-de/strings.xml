@@ -77,6 +77,14 @@
     <string name="tv_diagnostics_row_jw_last_error">Letzter JustWatch-Fehler</string>
     <string name="tv_diagnostics_row_jw_recent_outcomes">Letzte Ergebnisse</string>
 
+    <!-- Diagnostics — provider catalog (#621) -->
+    <string name="tv_diagnostics_section_provider_catalog">Anbieter-Katalog</string>
+    <string name="tv_diagnostics_row_catalog_version">Version</string>
+    <string name="tv_diagnostics_row_catalog_last_fetched">Zuletzt abgerufen</string>
+    <string name="tv_diagnostics_row_catalog_source">Quelle</string>
+    <string name="tv_diagnostics_catalog_source_live">Aktuell (vom Telefon)</string>
+    <string name="tv_diagnostics_catalog_source_bundled">Eingebettet (Offline-Fallback)</string>
+
     <!-- TV Settings hub (#344 / #367) -->
     <string name="tv_settings_title">Einstellungen</string>
     <string name="tv_settings_phone_discovery_title">Telefonsuche</string>
