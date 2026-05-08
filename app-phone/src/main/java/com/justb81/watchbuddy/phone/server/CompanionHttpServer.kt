@@ -183,8 +183,7 @@ internal fun Application.configureCompanionRoutes(
             if (!avatarImageStore.exists()) {
                 return@get call.respond(HttpStatusCode.NotFound, ErrorResponse("No custom avatar"))
             }
-            val version = settingsRepository.settings.first().customAvatarVersion
-            val etag = "\"$version\""
+            val etag = "\"${sha256Hex(file.readBytes())}\""
             if (call.request.headers[HttpHeaders.IfNoneMatch] == etag) {
                 return@get call.respond(HttpStatusCode.NotModified)
             }
@@ -405,6 +404,11 @@ private suspend fun ApplicationCall.handleScrobble(
         DiagnosticLog.error(TAG, "scrobble ${action.name.lowercase()} failed", e)
         respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("Scrobble failed"))
     }
+}
+
+private fun sha256Hex(bytes: ByteArray): String {
+    val digest = java.security.MessageDigest.getInstance("SHA-256")
+    return digest.digest(bytes).joinToString("") { "%02x".format(it) }
 }
 
 @Serializable

@@ -103,6 +103,9 @@ dependencies {
     // WorkManager (background model updates)
     implementation(libs.work.runtime)
 
+    // HTML sanitization for LLM recap output (prevents XSS in WebView)
+    implementation(libs.jsoup)
+
     // Security / Encrypted Storage (Tink AEAD + Android Keystore-wrapped KEK)
     implementation(libs.tink.android)
 

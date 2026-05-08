@@ -123,7 +123,10 @@ class RecapGeneratorTest {
         fun `strips javascript URLs`() = runTest {
             val result = sanitize("""<a href="javascript:alert(1)">link</a>""")
             assertFalse(result.contains("javascript:"))
-            assertTrue(result.contains("about:blank"))
+            // JSoup removes <a> entirely (not in the allowlist), which is stricter than
+            // the old regex that replaced with about:blank; the link text is preserved.
+            assertFalse(result.contains("about:blank"))
+            assertTrue(result.contains("link"))
         }
 
         @Test

@@ -7,6 +7,8 @@ import com.justb81.watchbuddy.core.locale.LocaleHelper
 import com.justb81.watchbuddy.core.model.TmdbEpisode
 import com.justb81.watchbuddy.core.model.TmdbShow
 import com.justb81.watchbuddy.core.tmdb.TmdbImageHelper
+import org.jsoup.Jsoup
+import org.jsoup.safety.Safelist
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -29,23 +31,21 @@ class RecapGenerator @Inject constructor(
         // TMDB still placeholder pattern: data-tmdb-still="S{season}E{episode}"
         private val STILL_PLACEHOLDER_REGEX = Regex("""data-tmdb-still="S(\d+)E(\d+)"""")
 
-        // HTML sanitization: strip dangerous tags and event handlers to prevent XSS
-        private val DANGEROUS_TAGS_REGEX = Regex(
-            """<\s*/?\s*(script|iframe|object|embed|form|link|meta|base|applet)\b[^>]*>""",
-            setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)
-        )
-        private val DANGEROUS_TAG_CONTENT_REGEX = Regex(
-            """<\s*(script|style)\b[^>]*>.*?<\s*/\s*\1\s*>""",
-            setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL)
-        )
-        private val EVENT_HANDLER_REGEX = Regex(
-            """\s+on\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]*)""",
-            RegexOption.IGNORE_CASE
-        )
-        private val JAVASCRIPT_URL_REGEX = Regex(
-            """(href|src|action)\s*=\s*["']?\s*javascript:""",
-            RegexOption.IGNORE_CASE
-        )
+        // JSoup allowlist: only the tags the LLM slideshow template legitimately uses.
+        // Inline `style` is allowed on layout/text tags (needed for CSS slide animations).
+        // `<img data-tmdb-still="...">` placeholders are allowed here; the attribute is
+        // replaced with a real TMDB src= URL by replaceTmdbPlaceholders() afterwards.
+        private val RECAP_SAFELIST: Safelist = Safelist()
+            .addTags("div", "span", "p", "br",
+                     "h1", "h2", "h3", "strong", "em",
+                     "ul", "ol", "li", "img")
+            .addAttributes("div", "style", "class")
+            .addAttributes("span", "style", "class")
+            .addAttributes("p", "style", "class")
+            .addAttributes("h1", "style")
+            .addAttributes("h2", "style")
+            .addAttributes("h3", "style")
+            .addAttributes("img", "data-tmdb-still", "alt", "style")
     }
 
     /**
@@ -109,17 +109,7 @@ Respond in $language.
         )
     }
 
-    /**
-     * Strips dangerous HTML elements and attributes to prevent XSS when rendered in WebView.
-     * Removes: script/iframe/object/embed/form tags, on* event handlers, javascript: URLs.
-     */
-    private fun sanitizeHtml(html: String): String {
-        var sanitized = DANGEROUS_TAG_CONTENT_REGEX.replace(html, "")
-        sanitized = DANGEROUS_TAGS_REGEX.replace(sanitized, "")
-        sanitized = EVENT_HANDLER_REGEX.replace(sanitized, "")
-        sanitized = JAVASCRIPT_URL_REGEX.replace(sanitized, """$1="about:blank""")
-        return sanitized
-    }
+    private fun sanitizeHtml(html: String): String = Jsoup.clean(html, RECAP_SAFELIST)
 
     private fun replaceTmdbPlaceholders(
         html: String,

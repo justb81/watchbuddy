@@ -32,7 +32,12 @@ class EpisodeRepository @Inject constructor(
 ) {
     private data class Cached(val fetchedAt: Long, val seasons: List<TraktSeasonWithEpisodes>)
 
-    private val cache = mutableMapOf<String, Cached>()
+    // LRU-capped map: evicts the least-recently-accessed entry once MAX_CACHE_SIZE is
+    // exceeded, bounding memory use for users with large Trakt libraries.
+    private val cache: MutableMap<String, Cached> =
+        object : LinkedHashMap<String, Cached>(MAX_CACHE_SIZE + 1, 0.75f, true) {
+            override fun removeEldestEntry(eldest: Map.Entry<String, Cached>) = size > MAX_CACHE_SIZE
+        }
     private val mutex = Mutex()
 
     suspend fun getSeasonsWithEpisodes(showId: String): List<TraktSeasonWithEpisodes> {
@@ -92,5 +97,6 @@ class EpisodeRepository @Inject constructor(
 
     private companion object {
         const val CACHE_TTL_MS = 10 * 60 * 1000L
+        const val MAX_CACHE_SIZE = 50
     }
 }
