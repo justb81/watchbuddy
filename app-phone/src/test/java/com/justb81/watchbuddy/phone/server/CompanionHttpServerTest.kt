@@ -27,6 +27,7 @@ import com.justb81.watchbuddy.phone.llm.RecapGenerator
 import com.justb81.watchbuddy.phone.settings.AppSettings
 import com.justb81.watchbuddy.phone.settings.AvatarImageStore
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
+import com.justb81.watchbuddy.phone.data.ProviderCatalogRepository
 import com.justb81.watchbuddy.service.CompanionStateManager
 import io.ktor.client.*
 import io.ktor.client.plugins.*
@@ -66,6 +67,7 @@ class CompanionHttpServerTest {
     private val titleExtractor: LlmTitleExtractor = mockk(relaxed = true)
     private val testToken = "test-bearer-token"
     private val bearerTokenRepository: BearerTokenRepository = mockk()
+    private val providerCatalogRepository: ProviderCatalogRepository = mockk(relaxed = true)
 
     // ── Shared test fixtures ──────────────────────────────────────────────────
 
@@ -121,7 +123,7 @@ class CompanionHttpServerTest {
                 recapGenerator, capabilityProvider, showRepository,
                 tokenRepository, tokenRefreshManager, traktApiService, tmdbApiService, tmdbCache,
                 settingsRepository, avatarImageStore, stateManager, titleExtractor,
-                bearerTokenRepository,
+                bearerTokenRepository, providerCatalogRepository,
             )
         }
         TestScope(this).block()
