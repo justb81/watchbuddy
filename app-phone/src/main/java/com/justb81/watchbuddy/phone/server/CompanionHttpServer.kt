@@ -287,7 +287,7 @@ internal fun Application.configureCompanionRoutes(
                 DiagnosticLog.error(TAG, "Keystore unavailable", e)
                 call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("Service unavailable"))
             } catch (e: LlmBusyException) {
-                DiagnosticLog.warn(TAG, "recap: LLM busy, rejecting request for show $showId")
+                DiagnosticLog.warn(TAG, "recap: LLM busy, rejecting request for show $showId", e)
                 call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("LLM busy, try again later"))
             } catch (e: Exception) {
                 DiagnosticLog.error(TAG, "Recap generation failed for show $showId", e)
@@ -320,7 +320,7 @@ internal fun Application.configureCompanionRoutes(
                     ?: TitleExtractionResponse(confidence = 0f)
                 call.respond(response)
             } catch (e: LlmBusyException) {
-                DiagnosticLog.warn(TAG, "extract: LLM busy, rejecting request")
+                DiagnosticLog.warn(TAG, "extract: LLM busy, rejecting request", e)
                 call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("LLM busy, try again later"))
             } catch (e: Exception) {
                 DiagnosticLog.warn(TAG, "title extraction failed", e)
