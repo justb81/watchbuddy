@@ -27,7 +27,7 @@ androidx-arch-core = "2.2.0"
 errorprone-annotations = "2.49.0"
 gradlePlayPublisher = "4.0.0"
 detekt = "1.23.8"
-jsoup = "1.18.3"
+jsoup = "1.22.2"
 room = "2.8.4"
 androidx-tvprovider = "1.1.0"
 
