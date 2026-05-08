@@ -102,6 +102,30 @@ class AppProfilesTest {
                 "Only the YouTube TV profile should have skipPhase1=true",
             )
         }
+
+        @Test
+        fun `all marker regexes complete within 200ms on adversarial input`() {
+            // Adversarial inputs that trigger catastrophic backtracking in poorly-written patterns.
+            val adversarialInputs = listOf(
+                "S".repeat(1000) + ":",           // triggers backtracking on S/digit anchors
+                "Staffel ".repeat(200),            // triggers backtracking on German marker
+                "T" + "0".repeat(500) + " E",      // triggers backtracking on T##E## patterns
+                "a".repeat(1000),                  // long non-matching string
+            )
+            AppProfiles.ALL.values.forEach { profile ->
+                profile.markerRegexes.forEach { regex ->
+                    adversarialInputs.forEach { input ->
+                        val start = System.currentTimeMillis()
+                        regex.find(input)
+                        val elapsed = System.currentTimeMillis() - start
+                        assertTrue(
+                            elapsed < 200,
+                            "Regex in ${profile.packageName} took ${elapsed}ms on adversarial input",
+                        )
+                    }
+                }
+            }
+        }
     }
 
     // ── Netflix fixture ───────────────────────────────────────────────────────
@@ -385,6 +409,91 @@ class AppProfilesTest {
         fun `joyn profile has llmHint`() {
             val profile = AppProfiles.forPackage("de.prosiebensat1digital.seventv")!!
             assertNotNull(profile.llmHint)
+        }
+    }
+
+    // ── Apple TV+ fixture ─────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("Apple TV+ (com.apple.atve.androidtv.appletv)")
+    inner class AppleTvFixture {
+
+        @Test
+        fun `forPackage returns profile for apple tv`() {
+            val profile = AppProfiles.forPackage("com.apple.atve.androidtv.appletv")
+            assertNotNull(profile)
+            assertEquals("com.apple.atve.androidtv.appletv", profile!!.packageName)
+        }
+
+        @Test
+        fun `apple tv profile has no markerRegexes`() {
+            val profile = AppProfiles.forPackage("com.apple.atve.androidtv.appletv")!!
+            assertTrue(profile.markerRegexes.isEmpty())
+        }
+
+        @Test
+        fun `apple tv profile prefers watchNext title and notification title`() {
+            val profile = AppProfiles.forPackage("com.apple.atve.androidtv.appletv")!!
+            assertEquals("watchNext.title", profile.preferredSourceTags[0])
+            assertEquals("notification.title", profile.preferredSourceTags[1])
+        }
+
+        @Test
+        fun `apple tv profile has llmHint about Episode N format`() {
+            val profile = AppProfiles.forPackage("com.apple.atve.androidtv.appletv")!!
+            assertNotNull(profile.llmHint)
+            assertTrue(profile.llmHint!!.contains("Episode", ignoreCase = true))
+        }
+    }
+
+    // ── Kodi fixture ──────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("Kodi (org.xbmc.kodi)")
+    inner class KodiFixture {
+
+        private val extractor: TitleExtractor = mockk()
+        private val gameOfThrones = TraktShow(
+            title = "Game of Thrones",
+            year = 2011,
+            ids = TraktIds(trakt = 1390, tmdb = 1399),
+        )
+
+        @Test
+        fun `forPackage returns profile for kodi`() {
+            val profile = AppProfiles.forPackage("org.xbmc.kodi")
+            assertNotNull(profile)
+            assertEquals("org.xbmc.kodi", profile!!.packageName)
+        }
+
+        @Test
+        fun `kodi profile has no markerRegexes`() {
+            val profile = AppProfiles.forPackage("org.xbmc.kodi")!!
+            assertTrue(profile.markerRegexes.isEmpty())
+        }
+
+        @Test
+        fun `kodi profile prefers mediaSession title only`() {
+            val profile = AppProfiles.forPackage("org.xbmc.kodi")!!
+            assertEquals(listOf("mediaSession.title"), profile.preferredSourceTags)
+        }
+
+        @Test
+        fun `resolves show from mediaSession title with standard S##E## marker`() = runTest {
+            coEvery { extractor.extract(any()) } returns null
+            val scrobbler = makeScrobbler(listOf(gameOfThrones), extractor)
+            val snapshot = buildTaggedSnapshot(
+                packageName = "org.xbmc.kodi",
+                lines = listOf("mediaSession.title: Game of Thrones S01E09"),
+            )
+
+            val result = scrobbler.matchSnapshot(snapshot)
+
+            assertNotNull(result)
+            assertEquals("Game of Thrones", result!!.matchedShow?.title)
+            assertEquals(1, result.matchedEpisode?.season)
+            assertEquals(9, result.matchedEpisode?.number)
+            coVerify(exactly = 0) { extractor.extract(any()) }
         }
     }
 

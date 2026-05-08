@@ -27,6 +27,7 @@ androidx-arch-core = "2.2.0"
 errorprone-annotations = "2.49.0"
 gradlePlayPublisher = "4.0.0"
 detekt = "1.23.8"
+jsoup = "1.18.3"
 room = "2.8.4"
 androidx-tvprovider = "1.1.0"
 
@@ -112,6 +113,7 @@ robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "
 androidx-test-core = { group = "androidx.test", name = "core-ktx", version.ref = "androidx-test-core" }
 androidx-arch-core-testing = { group = "androidx.arch.core", name = "core-testing", version.ref = "androidx-arch-core" }
 errorprone-annotations = { group = "com.google.errorprone", name = "error_prone_annotations", version.ref = "errorprone-annotations" }
+jsoup = { group = "org.jsoup", name = "jsoup", version.ref = "jsoup" }
 
 # TV Provider (WatchNext programs content provider — TV-side only)
 androidx-tvprovider = { group = "androidx.tvprovider", name = "tvprovider", version.ref = "androidx-tvprovider" }
