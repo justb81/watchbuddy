@@ -17,6 +17,7 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
+import java.util.concurrent.atomic.AtomicInteger
 
 @DisplayName("LlmProviderFactory")
 class LlmProviderFactoryTest {
@@ -100,6 +101,58 @@ class LlmProviderFactoryTest {
             )
             val result = factory.generateWithCascade("recap", "prompt", episodes)
             assertNotNull(result)
+        }
+    }
+
+    @Nested
+    @DisplayName("queue depth limiting")
+    inner class QueueDepthTest {
+
+        private fun setQueueDepth(value: Int) {
+            val field = LlmProviderFactory::class.java.getDeclaredField("llmQueueDepth")
+            field.isAccessible = true
+            (field.get(factory) as AtomicInteger).set(value)
+        }
+
+        @Test
+        fun `generateWithCascade throws LlmBusyException when queue is at max depth`() = runTest {
+            every { orchestrator.selectConfig() } returns LlmOrchestrator.LlmConfig(
+                LlmBackend.NONE, null, 0
+            )
+            setQueueDepth(3) // MAX_LLM_QUEUE_DEPTH
+            try {
+                assertThrows<LlmBusyException> {
+                    factory.generateWithCascade("recap", "p", emptyList())
+                }
+            } finally {
+                setQueueDepth(0)
+            }
+        }
+
+        @Test
+        fun `generateOrNull throws LlmBusyException when queue is at max depth`() = runTest {
+            every { orchestrator.selectConfig() } returns LlmOrchestrator.LlmConfig(
+                LlmBackend.AICORE, null, 150
+            )
+            setQueueDepth(3)
+            try {
+                assertThrows<LlmBusyException> {
+                    factory.generateOrNull("extract", "p")
+                }
+            } finally {
+                setQueueDepth(0)
+            }
+        }
+
+        @Test
+        fun `slot is released after a call completes so next call succeeds`() = runTest {
+            every { orchestrator.selectConfig() } returns LlmOrchestrator.LlmConfig(
+                LlmBackend.NONE, null, 0
+            )
+            factory.generateWithCascade("recap", "prompt", emptyList())
+            // Slot must be released — second call must also succeed.
+            val result = factory.generateWithCascade("recap", "prompt", emptyList())
+            assertTrue(result.isNotBlank())
         }
     }
 

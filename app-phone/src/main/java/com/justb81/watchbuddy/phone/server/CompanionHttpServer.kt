@@ -21,6 +21,7 @@ import com.justb81.watchbuddy.core.trakt.SyncHistoryShowItem
 import com.justb81.watchbuddy.core.trakt.TraktApiService
 import com.justb81.watchbuddy.phone.auth.TokenRefreshManager
 import com.justb81.watchbuddy.phone.auth.TokenRepository
+import com.justb81.watchbuddy.phone.llm.LlmBusyException
 import com.justb81.watchbuddy.phone.llm.LlmTitleExtractor
 import com.justb81.watchbuddy.phone.llm.RecapGenerator
 import com.justb81.watchbuddy.phone.settings.AvatarImageStore
@@ -364,6 +365,9 @@ internal fun Application.configureCompanionRoutes(
             } catch (e: SecurityException) {
                 DiagnosticLog.error(TAG, "Keystore unavailable", e)
                 call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("Service unavailable"))
+            } catch (e: LlmBusyException) {
+                DiagnosticLog.warn(TAG, "recap: LLM busy, rejecting request for show $showId", e)
+                call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("LLM busy, try again later"))
             } catch (e: Exception) {
                 DiagnosticLog.error(TAG, "Recap generation failed for show $showId", e)
                 call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("Recap generation failed"))
@@ -403,6 +407,9 @@ internal fun Application.configureCompanionRoutes(
                 val response = titleExtractor.extract(body.snapshot, body.libraryHints)
                     ?: TitleExtractionResponse(confidence = 0f)
                 call.respond(response)
+            } catch (e: LlmBusyException) {
+                DiagnosticLog.warn(TAG, "extract: LLM busy, rejecting request", e)
+                call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("LLM busy, try again later"))
             } catch (e: Exception) {
                 DiagnosticLog.warn(TAG, "title extraction failed", e)
                 call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("Extraction failed"))
