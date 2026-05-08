@@ -2,6 +2,10 @@ package com.justb81.watchbuddy.tv.scrobbler
 
 import com.justb81.watchbuddy.core.model.TraktIds
 import com.justb81.watchbuddy.core.scrobbler.PlaybackIntent
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
@@ -14,6 +18,7 @@ import org.junit.jupiter.api.Test
 class PlaybackIntentRegistryTest {
 
     private lateinit var registry: PlaybackIntentRegistry
+    private lateinit var testScope: CoroutineScope
 
     private val disneyPkg = "com.disney.disneyplus"
     private val netflixPkg = "com.netflix.mediaclient"
@@ -39,7 +44,13 @@ class PlaybackIntentRegistryTest {
 
     @BeforeEach
     fun setUp() {
-        registry = PlaybackIntentRegistry()
+        testScope = CoroutineScope(SupervisorJob())
+        registry = PlaybackIntentRegistry(testScope)
+    }
+
+    @AfterEach
+    fun tearDown() {
+        testScope.cancel()
     }
 
     @Nested
