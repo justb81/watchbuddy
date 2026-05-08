@@ -217,8 +217,7 @@ Rules:
             dp[0] = i
             for (j in 1..bLc.length) {
                 val temp = dp[j]
-                dp[j] = if (aLc[i - 1] == bLc[j - 1]) prev
-                         else 1 + minOf(prev, dp[j], dp[j - 1])
+                dp[j] = if (aLc[i - 1] == bLc[j - 1]) prev else 1 + minOf(prev, dp[j], dp[j - 1])
                 prev = temp
             }
         }

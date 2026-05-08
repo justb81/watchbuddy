@@ -11,6 +11,7 @@ import androidx.annotation.VisibleForTesting
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.model.DeviceCapability
 import com.justb81.watchbuddy.core.model.LlmBackend
+import com.justb81.watchbuddy.core.network.WatchBuddyStrictJson
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -28,7 +29,6 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import com.justb81.watchbuddy.core.network.WatchBuddyStrictJson
 import kotlinx.serialization.SerializationException
 import okhttp3.OkHttpClient
 import okhttp3.Request
