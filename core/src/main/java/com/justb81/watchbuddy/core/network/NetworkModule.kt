@@ -79,7 +79,7 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    @Named("trakt")
+    @TraktClient
     fun provideTraktRetrofit(client: OkHttpClient): Retrofit = Retrofit.Builder()
         .baseUrl("https://api.trakt.tv/")
         .client(client)
@@ -88,7 +88,7 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    @Named("tmdb")
+    @TmdbClient
     fun provideTmdbRetrofit(client: OkHttpClient): Retrofit = Retrofit.Builder()
         .baseUrl("https://api.themoviedb.org/3/")
         .client(client)
@@ -97,12 +97,12 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideTraktApiService(@Named("trakt") retrofit: Retrofit): TraktApiService =
+    fun provideTraktApiService(@TraktClient retrofit: Retrofit): TraktApiService =
         retrofit.create(TraktApiService::class.java)
 
     @Provides
     @Singleton
-    fun provideTmdbApiService(@Named("tmdb") retrofit: Retrofit): TmdbApiService =
+    fun provideTmdbApiService(@TmdbClient retrofit: Retrofit): TmdbApiService =
         retrofit.create(TmdbApiService::class.java)
 
     /**
@@ -118,7 +118,7 @@ object NetworkModule {
      */
     @Provides
     @Singleton
-    @Named("justwatch")
+    @JustWatchClient
     fun provideJustWatchOkHttpClient(): OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(JUSTWATCH_TIMEOUT_SECONDS, TimeUnit.SECONDS)
         .readTimeout(JUSTWATCH_TIMEOUT_SECONDS, TimeUnit.SECONDS)
@@ -136,8 +136,8 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    @Named("justwatch")
-    fun provideJustWatchRetrofit(@Named("justwatch") client: OkHttpClient): Retrofit = Retrofit.Builder()
+    @JustWatchClient
+    fun provideJustWatchRetrofit(@JustWatchClient client: OkHttpClient): Retrofit = Retrofit.Builder()
         .baseUrl("https://apis.justwatch.com/")
         .client(client)
         .addConverterFactory(WatchBuddyJson.asConverterFactory("application/json".toMediaType()))
@@ -145,7 +145,7 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideJustWatchApiService(@Named("justwatch") retrofit: Retrofit): JustWatchApiService =
+    fun provideJustWatchApiService(@JustWatchClient retrofit: Retrofit): JustWatchApiService =
         retrofit.create(JustWatchApiService::class.java)
 
     /**
