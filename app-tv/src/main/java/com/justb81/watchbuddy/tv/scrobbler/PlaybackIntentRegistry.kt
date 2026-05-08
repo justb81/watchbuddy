@@ -4,13 +4,13 @@ import com.justb81.watchbuddy.core.scrobbler.PlaybackIntent
 import com.justb81.watchbuddy.core.scrobbler.PlaybackIntentProvider
 import com.justb81.watchbuddy.core.scrobbler.PlaybackIntentStats
 import com.justb81.watchbuddy.tv.di.ApplicationScope
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 /**
  * TV-local, in-memory store for Watch-Now intents captured when the user taps a provider chip
