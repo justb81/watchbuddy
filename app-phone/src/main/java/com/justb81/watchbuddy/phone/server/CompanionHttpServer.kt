@@ -212,7 +212,7 @@ internal fun Application.configureCompanionRoutes(
     val standardLimiter = IpRateLimiter(limit = STANDARD_RATE_LIMIT, windowMs = RATE_LIMIT_WINDOW_MS)
     val heavyLimiter = IpRateLimiter(limit = HEAVY_RATE_LIMIT, windowMs = RATE_LIMIT_WINDOW_MS)
     intercept(ApplicationCallPipeline.Plugins) {
-        val ip = call.request.origin.remoteAddress
+        val ip = call.request.local.remoteAddress
         val path = call.request.path()
         val limiter = if (path.startsWith("/recap/") || path == "/scrobble/extract") heavyLimiter
                       else standardLimiter
@@ -227,7 +227,7 @@ internal fun Application.configureCompanionRoutes(
     // workers against a single peer issuing many parallel requests (#525).
     val activeRequestsPerIp = ConcurrentHashMap<String, AtomicInteger>()
     intercept(ApplicationCallPipeline.Plugins) {
-        val ip = call.request.origin.remoteAddress
+        val ip = call.request.local.remoteAddress
         val counter = activeRequestsPerIp.getOrPut(ip) { AtomicInteger(0) }
         if (counter.incrementAndGet() > MAX_CONCURRENT_PER_IP) {
             counter.decrementAndGet()
