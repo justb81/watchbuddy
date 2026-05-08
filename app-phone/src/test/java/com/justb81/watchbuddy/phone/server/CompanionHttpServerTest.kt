@@ -1097,6 +1097,95 @@ class CompanionHttpServerTest {
         }
     }
 
+    // ── Security: rate limiting ───────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("Rate limiting")
+    inner class RateLimiting {
+
+        @Test
+        fun `POST scrobble extract returns 429 after heavy rate limit exceeded`() = testApp {
+            // The heavy rate limit is 6 req/min; the 7th must be rejected.
+            coEvery { titleExtractor.extract(any<MediaMetadataSnapshot>(), any()) } returns
+                TitleExtractionResponse(confidence = 0f)
+            val body = """
+                {"snapshot":{"packageName":"com.netflix.ninja","text":"mediaSession.title: Pilot"},"libraryHints":[]}
+            """.trimIndent()
+            repeat(6) { i ->
+                val r = client.post("/scrobble/extract") {
+                    contentType(ContentType.Application.Json)
+                    setBody(body)
+                }
+                assertEquals(HttpStatusCode.OK, r.status, "Request ${i + 1} should succeed")
+            }
+            val limited = client.post("/scrobble/extract") {
+                contentType(ContentType.Application.Json)
+                setBody(body)
+            }
+            assertEquals(HttpStatusCode.TooManyRequests, limited.status)
+        }
+
+        @Test
+        fun `GET shows returns 429 after standard rate limit exceeded`() = testApp {
+            // The standard rate limit is 60 req/min; the 61st must be rejected.
+            every { tokenRepository.getAccessToken() } returns "token"
+            coEvery { showRepository.getShows() } returns emptyList()
+            repeat(60) { i ->
+                val r = client.get("/shows")
+                assertEquals(HttpStatusCode.OK, r.status, "Request ${i + 1} should succeed")
+            }
+            val limited = client.get("/shows")
+            assertEquals(HttpStatusCode.TooManyRequests, limited.status)
+        }
+
+        @Test
+        fun `GET capability returns 429 after standard rate limit exceeded`() = testApp {
+            // /capability is unauthenticated but still rate-limited.
+            coEvery { capabilityProvider.getCapability() } returns capability
+            repeat(60) { i ->
+                val r = unauthClient.get("/capability")
+                assertEquals(HttpStatusCode.OK, r.status, "Request ${i + 1} should succeed")
+            }
+            val limited = unauthClient.get("/capability")
+            assertEquals(HttpStatusCode.TooManyRequests, limited.status)
+        }
+    }
+
+    // ── Security: body size cap ───────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("Body size cap")
+    inner class BodySizeCap {
+
+        @Test
+        fun `POST scrobble extract returns 413 when Content-Length exceeds 64 KB`() = testApp {
+            // Build a JSON body whose text field pushes the payload above the 64 KB cap.
+            val oversizedText = "x".repeat(70_000)
+            val oversizedBody = """{"snapshot":{"packageName":"com.pkg","text":"$oversizedText"},"libraryHints":[]}"""
+            val response = client.post("/scrobble/extract") {
+                contentType(ContentType.Application.Json)
+                setBody(oversizedBody)
+            }
+            assertEquals(HttpStatusCode.PayloadTooLarge, response.status)
+        }
+
+        @Test
+        fun `POST scrobble extract accepts body at exactly the 64 KB boundary`() = testApp {
+            // Body exactly at the limit (64 * 1024 bytes) must be accepted.
+            coEvery { titleExtractor.extract(any<MediaMetadataSnapshot>(), any()) } returns
+                TitleExtractionResponse(confidence = 0f)
+            val overhead = """{"snapshot":{"packageName":"com.pkg","text":""},"libraryHints":[]}""".length
+            val paddingNeeded = (64 * 1024 - overhead).coerceAtLeast(0)
+            val boundaryBody = """{"snapshot":{"packageName":"com.pkg","text":"${"x".repeat(paddingNeeded)}"},"libraryHints":[]}"""
+            assertTrue(boundaryBody.toByteArray().size <= 64 * 1024)
+            val response = client.post("/scrobble/extract") {
+                contentType(ContentType.Application.Json)
+                setBody(boundaryBody)
+            }
+            assertEquals(HttpStatusCode.OK, response.status)
+        }
+    }
+
     // ── Bearer auth ───────────────────────────────────────────────────────────
 
     @Nested

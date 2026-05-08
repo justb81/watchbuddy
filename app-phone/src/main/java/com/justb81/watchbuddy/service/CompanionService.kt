@@ -141,10 +141,11 @@ class CompanionService : Service() {
             return START_NOT_STICKY
         }
         try {
-            companionHttpServer.start()
-            stateManager.setHttpServerBinding("0.0.0.0:${CompanionHttpServer.PORT}")
+            val host = ipv4.hostAddress ?: "0.0.0.0"
+            companionHttpServer.start(host)
+            stateManager.setHttpServerBinding("$host:${CompanionHttpServer.PORT}")
             stateManager.setWifiIpv4(ipv4.hostAddress)
-            DiagnosticLog.event(TAG, "HTTP server bound 0.0.0.0:${CompanionHttpServer.PORT}")
+            DiagnosticLog.event(TAG, "HTTP server bound $host:${CompanionHttpServer.PORT}")
             startBleAdvertising()
             stateManager.setServiceRunning(true)
             registerNetworkCallback()
@@ -245,7 +246,17 @@ class CompanionService : Service() {
             }
 
             override fun onAvailable(network: Network) {
-                DiagnosticLog.event(TAG, "Wi-Fi onAvailable — restarting BLE advertiser")
+                DiagnosticLog.event(TAG, "Wi-Fi onAvailable — restarting HTTP server and BLE advertiser")
+                // Restart the HTTP server so it binds to the new Wi-Fi interface
+                // address rather than the IP that was assigned before the handoff (#525).
+                companionHttpServer.stop()
+                val newIpv4 = wifiIpv4Address()
+                if (newIpv4 != null) {
+                    val host = newIpv4.hostAddress ?: "0.0.0.0"
+                    companionHttpServer.start(host)
+                    stateManager.setHttpServerBinding("$host:${CompanionHttpServer.PORT}")
+                    stateManager.setWifiIpv4(newIpv4.hostAddress)
+                }
                 startBleAdvertising()
             }
         }
