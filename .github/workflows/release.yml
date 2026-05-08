@@ -81,10 +81,11 @@ jobs:
       # workflow_dispatch `tag` input so manual re-publishes work end-to-end.
       - name: Resolve version and tag
         if: github.event_name == 'workflow_dispatch' && inputs.tag != ''
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
         run: |
-          TAG="${{ inputs.tag }}"
-          echo "TAG=${TAG}" >> "$GITHUB_ENV"
-          echo "VERSION=${TAG#v}" >> "$GITHUB_ENV"
+          echo "TAG=${INPUT_TAG}" >> "$GITHUB_ENV"
+          echo "VERSION=${INPUT_TAG#v}" >> "$GITHUB_ENV"
 
       - uses: ./.github/actions/setup-android-build
 
