@@ -41,12 +41,49 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.Serializable
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
 import javax.inject.Singleton
 
 private const val TAG = "CompanionHttpServer"
 private const val DEFAULT_PAGE_SIZE = 30
 private const val MAX_PAGE_SIZE = 200
+
+// Security limits — adjust values before changing the rate-limit tests.
+private const val HEAVY_RATE_LIMIT = 6 // req/min for LLM-heavy endpoints
+private const val STANDARD_RATE_LIMIT = 60 // req/min for all other endpoints
+private const val RATE_LIMIT_WINDOW_MS = 60_000L
+private const val MAX_CONCURRENT_PER_IP = 4 // max simultaneous in-flight requests per source IP
+private const val MAX_EXTRACT_BODY_BYTES = 64 * 1024L // 64 KB cap for /scrobble/extract (#525)
+
+/**
+ * Fixed-window per-IP rate limiter. Thread-safe and lock-free via CAS.
+ *
+ * At most [limit] calls are allowed within any [windowMs]-ms window per IP key.
+ */
+private class IpRateLimiter(val limit: Int, val windowMs: Long) {
+    private data class Window(val count: Int, val start: Long)
+    private val windows = ConcurrentHashMap<String, AtomicReference<Window>>()
+
+    fun allow(ip: String): Boolean {
+        val now = System.currentTimeMillis()
+        val ref = windows.getOrPut(ip) { AtomicReference(Window(0, now)) }
+        // CAS retry loop: typically executes once; spins only under rare contention.
+        while (true) {
+            val w = ref.get()
+            val next = if (now - w.start >= windowMs) {
+                Window(1, now)
+            } else if (w.count >= limit) {
+                return false
+            } else {
+                Window(w.count + 1, w.start)
+            }
+            if (ref.compareAndSet(w, next)) return true
+        }
+    }
+}
 
 /**
  * Local HTTP server running on the phone (port 8765).
@@ -93,14 +130,18 @@ class CompanionHttpServer @Inject constructor(
 
     private var server: EmbeddedServer<*, *>? = null
 
-    fun start() {
+    /**
+     * Starts the Ktor/Netty server bound to [host].
+     *
+     * [host] should be the phone's current Wi-Fi IPv4 address so that the server
+     * is only reachable on the LAN interface and not on VPN tunnels, USB-tethering
+     * adapters, or hotspot clients (#525). The caller is responsible for stopping
+     * and restarting whenever the Wi-Fi interface changes.
+     */
+    fun start(host: String) {
         if (server != null) return
-        // Bind explicitly to 0.0.0.0 so Netty never falls back to loopback-only
-        // on devices where the default binding behaves unexpectedly — the NSD
-        // advertisement pins the Wi-Fi IPv4, so the listener must accept
-        // connections on that interface (#265).
         runCatching {
-            server = embeddedServer(Netty, host = "0.0.0.0", port = PORT) {
+            server = embeddedServer(Netty, host = host, port = PORT) {
                 configureCompanionRoutes(
                     recapGenerator, capabilityProvider, showRepository,
                     tokenRepository, tokenRefreshManager, traktApiService, tmdbApiService, tmdbCache,
@@ -109,7 +150,7 @@ class CompanionHttpServer @Inject constructor(
                 )
             }.start(wait = false)
         }.onFailure {
-            DiagnosticLog.error(TAG, "Netty bind 0.0.0.0:$PORT failed", it)
+            DiagnosticLog.error(TAG, "Netty bind $host:$PORT failed", it)
         }
     }
 
@@ -167,6 +208,44 @@ internal fun Application.configureCompanionRoutes(
                 TAG,
                 "${call.request.httpMethod.value} $path → $status ${latency}ms"
             )
+        }
+    }
+    // Per-IP rate limiter: heavy endpoints (LLM) get 6 req/min; everything
+    // else gets 60 req/min. Runs before auth so even unauthenticated bursts
+    // on /capability are bounded (#525).
+    val standardLimiter = IpRateLimiter(limit = STANDARD_RATE_LIMIT, windowMs = RATE_LIMIT_WINDOW_MS)
+    val heavyLimiter = IpRateLimiter(limit = HEAVY_RATE_LIMIT, windowMs = RATE_LIMIT_WINDOW_MS)
+    intercept(ApplicationCallPipeline.Plugins) {
+        val ip = call.request.local.remoteAddress
+        val path = call.request.path()
+        val limiter = if (path.startsWith("/recap/") || path == "/scrobble/extract") {
+            heavyLimiter
+        } else {
+            standardLimiter
+        }
+        if (!limiter.allow(ip)) {
+            call.respond(HttpStatusCode.TooManyRequests, ErrorResponse("Rate limit exceeded"))
+            finish()
+            return@intercept
+        }
+        proceed()
+    }
+    // Per-IP concurrent-request limiter. Guards the LLM thread pool and Netty
+    // workers against a single peer issuing many parallel requests (#525).
+    val activeRequestsPerIp = ConcurrentHashMap<String, AtomicInteger>()
+    intercept(ApplicationCallPipeline.Plugins) {
+        val ip = call.request.local.remoteAddress
+        val counter = activeRequestsPerIp.getOrPut(ip) { AtomicInteger(0) }
+        if (counter.incrementAndGet() > MAX_CONCURRENT_PER_IP) {
+            counter.decrementAndGet()
+            call.respond(HttpStatusCode.TooManyRequests, ErrorResponse("Too many concurrent requests"))
+            finish()
+            return@intercept
+        }
+        try {
+            proceed()
+        } finally {
+            if (counter.decrementAndGet() <= 0) activeRequestsPerIp.remove(ip)
         }
     }
     routing {
@@ -298,6 +377,15 @@ internal fun Application.configureCompanionRoutes(
         }
 
         post("/scrobble/extract") {
+            // Reject oversized bodies before reading — guards against metadata blobs
+            // exhausting the LLM thread pool memory (#525).
+            val contentLength = call.request.contentLength() ?: 0L
+            if (contentLength > MAX_EXTRACT_BODY_BYTES) {
+                return@post call.respond(
+                    HttpStatusCode.PayloadTooLarge,
+                    ErrorResponse("Request body too large")
+                )
+            }
             val body = try {
                 call.receive<TitleExtractionRequest>()
             } catch (_: Exception) {
