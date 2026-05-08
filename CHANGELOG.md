@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.35.3](https://github.com/justb81/watchbuddy/compare/v0.35.2...v0.35.3) (2026-05-08)
+
+
+### Bug Fixes
+
+* **build:** add workflow_dispatch inputs for Play Store track/status ([#577](https://github.com/justb81/watchbuddy/issues/577)) ([b2c9ad9](https://github.com/justb81/watchbuddy/commit/b2c9ad9314d677c6a9425fed456524a41c23bf44))
+* four quick-win security, stability, and test improvements ([#530](https://github.com/justb81/watchbuddy/issues/530), [#528](https://github.com/justb81/watchbuddy/issues/528), [#536](https://github.com/justb81/watchbuddy/issues/536), [#569](https://github.com/justb81/watchbuddy/issues/569)) ([#661](https://github.com/justb81/watchbuddy/issues/661)) ([17560fa](https://github.com/justb81/watchbuddy/commit/17560fad2213139bc94014c17617bc50325ee0fd))
+* **phone:** harden CompanionHttpServer against multi-interface exposure and abuse ([#525](https://github.com/justb81/watchbuddy/issues/525)) ([#663](https://github.com/justb81/watchbuddy/issues/663)) ([26b1ab9](https://github.com/justb81/watchbuddy/commit/26b1ab9d820cb53b9472a8492e4f864073ddff61))
+* **phone:** prevent LLM inference from exhausting Ktor worker pool ([#526](https://github.com/justb81/watchbuddy/issues/526)) ([#664](https://github.com/justb81/watchbuddy/issues/664)) ([63cfa54](https://github.com/justb81/watchbuddy/commit/63cfa54bc2e26b3fa8529cb18cb2c46603363dc3))
+* raise-mem-limits-for-e4b-to-8gb ([#655](https://github.com/justb81/watchbuddy/issues/655)) ([c99a0ec](https://github.com/justb81/watchbuddy/commit/c99a0ec7010a7003131e0c33005eb9d3fada9339))
+* **tv:** periodic cleanup coroutine for PlaybackIntentRegistry ([#546](https://github.com/justb81/watchbuddy/issues/546)) ([b2c9ad9](https://github.com/justb81/watchbuddy/commit/b2c9ad9314d677c6a9425fed456524a41c23bf44))
+* typed Hilt qualifiers, workflow_dispatch for Play Store, periodic intent cleanup ([#573](https://github.com/justb81/watchbuddy/issues/573), [#577](https://github.com/justb81/watchbuddy/issues/577), [#546](https://github.com/justb81/watchbuddy/issues/546)) ([#660](https://github.com/justb81/watchbuddy/issues/660)) ([b2c9ad9](https://github.com/justb81/watchbuddy/commit/b2c9ad9314d677c6a9425fed456524a41c23bf44))
+* validation hardening and TV robustness ([#533](https://github.com/justb81/watchbuddy/issues/533), [#544](https://github.com/justb81/watchbuddy/issues/544), [#549](https://github.com/justb81/watchbuddy/issues/549), [#568](https://github.com/justb81/watchbuddy/issues/568)) ([#662](https://github.com/justb81/watchbuddy/issues/662)) ([9cd80c0](https://github.com/justb81/watchbuddy/commit/9cd80c0829d33ccafe0d9f7fd4051a77f5300607))
+
 ## [0.35.2](https://github.com/justb81/watchbuddy/compare/v0.35.1...v0.35.2) (2026-05-02)
 
 
