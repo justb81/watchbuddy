@@ -42,3 +42,5 @@ Thumbs.db
 
 .kotlin/sessions
 /.claude/settings.local.json
+/hs_err_*.log
+/replay_*.log
