@@ -78,6 +78,14 @@
     <string name="tv_diagnostics_row_jw_last_error">Last JustWatch error</string>
     <string name="tv_diagnostics_row_jw_recent_outcomes">Last outcomes</string>
 
+    <!-- Diagnostics — provider catalog (#621) -->
+    <string name="tv_diagnostics_section_provider_catalog">Provider catalog</string>
+    <string name="tv_diagnostics_row_catalog_version">Version</string>
+    <string name="tv_diagnostics_row_catalog_last_fetched">Last fetched</string>
+    <string name="tv_diagnostics_row_catalog_source">Source</string>
+    <string name="tv_diagnostics_catalog_source_live">Live (from phone)</string>
+    <string name="tv_diagnostics_catalog_source_bundled">Bundled (offline fallback)</string>
+
     <!-- TV Settings hub (#344 / #367) -->
     <string name="tv_settings_title">Settings</string>
     <string name="tv_settings_phone_discovery_title">Phone discovery</string>

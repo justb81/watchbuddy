@@ -8,6 +8,8 @@ import com.justb81.watchbuddy.core.model.TitleExtractionResponse
 import com.justb81.watchbuddy.core.model.TraktEpisode
 import com.justb81.watchbuddy.core.model.TraktShow
 import kotlinx.serialization.Serializable
+import okhttp3.ResponseBody
+import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
@@ -25,6 +27,9 @@ interface PhoneApiService {
     companion object {
         const val PAGE_SIZE = 30
     }
+
+    @GET("/provider-catalog")
+    suspend fun getProviderCatalog(): Response<ResponseBody>
 
     @POST("/recap/{traktShowId}")
     suspend fun getRecap(@Path("traktShowId") showId: Int): RecapResponse

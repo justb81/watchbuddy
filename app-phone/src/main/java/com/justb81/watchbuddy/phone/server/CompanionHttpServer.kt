@@ -21,6 +21,7 @@ import com.justb81.watchbuddy.core.trakt.SyncHistoryShowItem
 import com.justb81.watchbuddy.core.trakt.TraktApiService
 import com.justb81.watchbuddy.phone.auth.TokenRefreshManager
 import com.justb81.watchbuddy.phone.auth.TokenRepository
+import com.justb81.watchbuddy.phone.data.ProviderCatalogRepository
 import com.justb81.watchbuddy.phone.llm.LlmBusyException
 import com.justb81.watchbuddy.phone.llm.LlmTitleExtractor
 import com.justb81.watchbuddy.phone.llm.RecapGenerator
@@ -58,6 +59,7 @@ private const val STANDARD_RATE_LIMIT = 60 // req/min for all other endpoints
 private const val RATE_LIMIT_WINDOW_MS = 60_000L
 private const val MAX_CONCURRENT_PER_IP = 4 // max simultaneous in-flight requests per source IP
 private const val MAX_EXTRACT_BODY_BYTES = 64 * 1024L // 64 KB cap for /scrobble/extract (#525)
+private const val ETAG_HEX_CHARS = 16 // hex chars taken from SHA-256 for ETag prefix
 
 /**
  * Fixed-window per-IP rate limiter. Thread-safe and lock-free via CAS.
@@ -98,6 +100,7 @@ private class IpRateLimiter(val limit: Int, val windowMs: Long) {
  *
  * Endpoints:
  *   GET  /capability           → DeviceCapability (unauthenticated)
+ *   GET  /provider-catalog     → Versioned provider catalog JSON (unauthenticated)
  *   GET  /shows                → List of watched shows for this user (from Trakt cache)
  *   POST /recap/{traktShowId}  → Generate + return HTML recap for a show
  *   POST /scrobble/start       → Forward scrobble start to this user's Trakt account
@@ -109,6 +112,7 @@ private class IpRateLimiter(val limit: Int, val windowMs: Long) {
  *   POST /shows/add-to-library → Add an episode to Trakt history (unknown-show overlay confirm)
  *   GET  /avatar               → Custom user avatar JPEG
  */
+@Suppress("LongParameterList")
 @Singleton
 class CompanionHttpServer @Inject constructor(
     private val recapGenerator: RecapGenerator,
@@ -124,6 +128,7 @@ class CompanionHttpServer @Inject constructor(
     private val stateManager: CompanionStateManager,
     private val titleExtractor: LlmTitleExtractor,
     private val bearerTokenRepository: BearerTokenRepository,
+    private val providerCatalogRepository: ProviderCatalogRepository,
 ) {
     companion object {
         const val PORT = 8765
@@ -147,7 +152,7 @@ class CompanionHttpServer @Inject constructor(
                     recapGenerator, capabilityProvider, showRepository,
                     tokenRepository, tokenRefreshManager, traktApiService, tmdbApiService, tmdbCache,
                     settingsRepository, avatarImageStore, stateManager, titleExtractor,
-                    bearerTokenRepository,
+                    bearerTokenRepository, providerCatalogRepository,
                 )
             }.start(wait = false)
         }.onFailure {
@@ -166,6 +171,7 @@ class CompanionHttpServer @Inject constructor(
  * Configures the Ktor application with all companion server routes.
  * Extracted as a top-level function so it can be tested via [io.ktor.server.testing.testApplication].
  */
+@Suppress("LongParameterList")
 internal fun Application.configureCompanionRoutes(
     recapGenerator: RecapGenerator,
     capabilityProvider: DeviceCapabilityProvider,
@@ -180,6 +186,7 @@ internal fun Application.configureCompanionRoutes(
     stateManager: CompanionStateManager,
     titleExtractor: LlmTitleExtractor,
     bearerTokenRepository: BearerTokenRepository,
+    providerCatalogRepository: ProviderCatalogRepository,
 ) {
     val expectedToken = bearerTokenRepository.token
 
@@ -255,6 +262,21 @@ internal fun Application.configureCompanionRoutes(
         get("/capability") {
             stateManager.onCapabilityChecked()
             call.respond(capabilityProvider.getCapability())
+        }
+
+        // /provider-catalog is intentionally unauthenticated — the TV needs it
+        // for deep-link resolution independently of Trakt auth state.
+        get("/provider-catalog") {
+            val json = providerCatalogRepository.currentJson()
+            val etag = "\"${sha256Hex(json.toByteArray()).take(ETAG_HEX_CHARS)}\""
+            val ifNoneMatch = call.request.headers[HttpHeaders.IfNoneMatch]
+            if (ifNoneMatch == etag) {
+                call.respond(HttpStatusCode.NotModified)
+                return@get
+            }
+            call.response.header(HttpHeaders.ETag, etag)
+            call.response.header(HttpHeaders.CacheControl, "public, max-age=86400")
+            call.respondText(json, io.ktor.http.ContentType.Application.Json)
         }
 
         authenticate("phone-tv") {

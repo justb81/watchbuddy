@@ -5,8 +5,11 @@ import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.scrobbler.MediaSessionScrobbler
 import com.justb81.watchbuddy.core.scrobbler.NoOpPlaybackIntentProvider
 import com.justb81.watchbuddy.tv.MainDispatcherRule
+import com.justb81.watchbuddy.tv.data.CatalogSource
+import com.justb81.watchbuddy.tv.data.CatalogStatus
 import com.justb81.watchbuddy.tv.data.JustWatchDeepLinkRepository
 import com.justb81.watchbuddy.tv.data.JustWatchOutcomeEvent
+import com.justb81.watchbuddy.tv.data.TvProviderCatalogRepository
 import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
 import com.justb81.watchbuddy.tv.scrobbler.NotificationMetadataSource
 import com.justb81.watchbuddy.tv.scrobbler.WatchNextMetadataSource
@@ -42,6 +45,7 @@ class TvDiagnosticsViewModelTest {
     private val justWatchRepo: JustWatchDeepLinkRepository = mockk(relaxed = true)
     private val watchNextSource: WatchNextMetadataSource = mockk(relaxed = true)
     private val notificationSource: NotificationMetadataSource = NotificationMetadataSource()
+    private val catalogRepository: TvProviderCatalogRepository = mockk(relaxed = true)
 
     @BeforeEach
     fun setUp() {
@@ -63,6 +67,9 @@ class TvDiagnosticsViewModelTest {
         every { justWatchRepo.searchMissCount() } returns 0
         every { justWatchRepo.outcomeEvents } returns MutableStateFlow(emptyList<JustWatchOutcomeEvent>())
         every { watchNextSource.countPublishingApps() } returns WatchNextMetadataSource.CountResult.Success(0)
+        every { catalogRepository.status } returns MutableStateFlow(
+            CatalogStatus(version = 0, fetchedAtMs = 0L, source = CatalogSource.BUNDLED),
+        )
     }
 
     @AfterEach
@@ -73,7 +80,8 @@ class TvDiagnosticsViewModelTest {
     @Test
     fun `recentEvents is empty on fresh VM`() = runTest {
         val vm = TvDiagnosticsViewModel(
-            application, phoneDiscovery, scrobbler, justWatchRepo, watchNextSource, notificationSource, NoOpPlaybackIntentProvider(),
+            application, phoneDiscovery, scrobbler, justWatchRepo,
+            watchNextSource, notificationSource, NoOpPlaybackIntentProvider(), catalogRepository,
         )
         advanceUntilIdle()
 
@@ -83,7 +91,8 @@ class TvDiagnosticsViewModelTest {
     @Test
     fun `single event is projected with correct level and newest-first order`() = runTest {
         val vm = TvDiagnosticsViewModel(
-            application, phoneDiscovery, scrobbler, justWatchRepo, watchNextSource, notificationSource, NoOpPlaybackIntentProvider(),
+            application, phoneDiscovery, scrobbler, justWatchRepo,
+            watchNextSource, notificationSource, NoOpPlaybackIntentProvider(), catalogRepository,
         )
         advanceUntilIdle()
 
@@ -100,7 +109,8 @@ class TvDiagnosticsViewModelTest {
     @Test
     fun `recentEvents is truncated to 100 entries newest first`() = runTest {
         val vm = TvDiagnosticsViewModel(
-            application, phoneDiscovery, scrobbler, justWatchRepo, watchNextSource, notificationSource, NoOpPlaybackIntentProvider(),
+            application, phoneDiscovery, scrobbler, justWatchRepo,
+            watchNextSource, notificationSource, NoOpPlaybackIntentProvider(), catalogRepository,
         )
         advanceUntilIdle()
 
@@ -118,7 +128,8 @@ class TvDiagnosticsViewModelTest {
         val isListeningFlow = MutableStateFlow(false)
         every { scrobbler.isListening } returns isListeningFlow
         val vm = TvDiagnosticsViewModel(
-            application, phoneDiscovery, scrobbler, justWatchRepo, watchNextSource, notificationSource, NoOpPlaybackIntentProvider(),
+            application, phoneDiscovery, scrobbler, justWatchRepo,
+            watchNextSource, notificationSource, NoOpPlaybackIntentProvider(), catalogRepository,
         )
         advanceUntilIdle()
 
@@ -133,7 +144,8 @@ class TvDiagnosticsViewModelTest {
         val isListeningFlow = MutableStateFlow(true)
         every { scrobbler.isListening } returns isListeningFlow
         val vm = TvDiagnosticsViewModel(
-            application, phoneDiscovery, scrobbler, justWatchRepo, watchNextSource, notificationSource, NoOpPlaybackIntentProvider(),
+            application, phoneDiscovery, scrobbler, justWatchRepo,
+            watchNextSource, notificationSource, NoOpPlaybackIntentProvider(), catalogRepository,
         )
         advanceUntilIdle()
 
@@ -147,7 +159,8 @@ class TvDiagnosticsViewModelTest {
     fun `scrobblerListening starts as false when scrobbler is not listening`() = runTest {
         every { scrobbler.isListening } returns MutableStateFlow(false)
         val vm = TvDiagnosticsViewModel(
-            application, phoneDiscovery, scrobbler, justWatchRepo, watchNextSource, notificationSource, NoOpPlaybackIntentProvider(),
+            application, phoneDiscovery, scrobbler, justWatchRepo,
+            watchNextSource, notificationSource, NoOpPlaybackIntentProvider(), catalogRepository,
         )
         advanceUntilIdle()
 
@@ -157,7 +170,8 @@ class TvDiagnosticsViewModelTest {
     @Test
     fun `notificationTrackedCount reflects snippets in NotificationMetadataSource`() = runTest {
         val vm = TvDiagnosticsViewModel(
-            application, phoneDiscovery, scrobbler, justWatchRepo, watchNextSource, notificationSource, NoOpPlaybackIntentProvider(),
+            application, phoneDiscovery, scrobbler, justWatchRepo,
+            watchNextSource, notificationSource, NoOpPlaybackIntentProvider(), catalogRepository,
         )
         advanceUntilIdle()
         assertEquals(0, vm.uiState.value.notificationTrackedCount)
@@ -184,7 +198,8 @@ class TvDiagnosticsViewModelTest {
         coEvery { justWatchRepo.count() } returnsMany listOf(5, 0)
         coEvery { justWatchRepo.negativeCount() } returnsMany listOf(3, 0)
         val vm = TvDiagnosticsViewModel(
-            application, phoneDiscovery, scrobbler, justWatchRepo, watchNextSource, notificationSource, NoOpPlaybackIntentProvider(),
+            application, phoneDiscovery, scrobbler, justWatchRepo,
+            watchNextSource, notificationSource, NoOpPlaybackIntentProvider(), catalogRepository,
         )
         advanceUntilIdle()
 

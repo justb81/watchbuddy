@@ -1,7 +1,15 @@
 package com.justb81.watchbuddy.core.deeplink
 
+import com.justb81.watchbuddy.core.model.ProviderCatalogSnapshot
+
 /**
- * Central mapping from TMDB [providerId] to the streaming app's package name.
+ * Thin façade for TMDB provider_id → TV package name lookups.
+ *
+ * The canonical data comes from the backend-served provider catalog (fetched and
+ * cached by [com.justb81.watchbuddy.phone.data.ProviderCatalogRepository] on phone
+ * and [com.justb81.watchbuddy.tv.data.TvProviderCatalogRepository] on TV).
+ * When no live catalog is injected the object falls back to the bundled snapshot
+ * baked in via [ProviderCatalogSnapshot].
  *
  * The static deep-link template catalog has been removed — per-episode deep links
  * are now sourced live from JustWatch (see `JustWatchDeepLinkRepository`).
@@ -17,7 +25,26 @@ data class ProviderEntry(
 
 object ProviderCatalog {
 
-    val entries: List<ProviderEntry> = listOf(
+    @Volatile private var snapshot: ProviderCatalogSnapshot? = null
+
+    fun updateFromSnapshot(catalog: ProviderCatalogSnapshot) {
+        snapshot = catalog
+    }
+
+    val entries: List<ProviderEntry>
+        get() = snapshot?.let { s ->
+            s.providers.flatMap { p ->
+                p.androidPackages.tv.map { pkg -> ProviderEntry(p.tmdbProviderId, pkg) }
+            }
+        } ?: BUNDLED_ENTRIES
+
+    val byId: Map<Int, ProviderEntry>
+        get() = entries.associateBy { it.providerId }
+
+    val knownPackageNames: Set<String>
+        get() = entries.map { it.packageName }.toSet()
+
+    private val BUNDLED_ENTRIES: List<ProviderEntry> = listOf(
         ProviderEntry(8, "com.netflix.ninja"),
         ProviderEntry(9, "com.amazon.amazonvideo.livingroom"),
         ProviderEntry(119, "com.amazon.amazonvideo.livingroom"),
@@ -32,10 +59,4 @@ object ProviderCatalog {
         ProviderEntry(192, "com.google.android.youtube.tv"),
         ProviderEntry(35, "tv.wuaki.apptv"),
     )
-
-    /** Fast lookup by provider_id. */
-    val byId: Map<Int, ProviderEntry> = entries.associateBy { it.providerId }
-
-    /** Set of all known package names (for <queries> and PackageManager checks). */
-    val knownPackageNames: Set<String> = entries.map { it.packageName }.toSet()
 }

@@ -15,6 +15,7 @@ import com.justb81.watchbuddy.core.scrobbler.NoOpTitleExtractor
 import com.justb81.watchbuddy.core.scrobbler.PlaybackIntentProvider
 import com.justb81.watchbuddy.core.scrobbler.ScrobbleTuning
 import com.justb81.watchbuddy.core.scrobbler.TitleExtractor
+import com.justb81.watchbuddy.phone.data.ProviderCatalogRepository
 import com.justb81.watchbuddy.phone.network.WifiStateProvider
 import dagger.Module
 import dagger.Provides
@@ -141,4 +142,23 @@ object AppModule {
         }
         return provider
     }
+
+    /**
+     * Provider catalog repository — fetches versioned provider/JustWatch mapping JSON from
+     * the backend (when [BuildConfig.TOKEN_BACKEND_URL] is set), caches in DataStore, and
+     * relays to TV via CompanionHttpServer. Falls back to the bundled asset on first run
+     * or when the backend is unavailable.
+     */
+    @Provides
+    @Singleton
+    fun provideProviderCatalogRepository(
+        @ApplicationContext context: Context,
+        dataStore: DataStore<Preferences>,
+        workManager: WorkManager,
+    ): ProviderCatalogRepository = ProviderCatalogRepository(
+        context = context,
+        dataStore = dataStore,
+        workManager = workManager,
+        backendUrl = BuildConfig.TOKEN_BACKEND_URL,
+    )
 }

@@ -21,6 +21,7 @@ import com.justb81.watchbuddy.core.trakt.SyncHistoryResult
 import com.justb81.watchbuddy.core.trakt.TraktApiService
 import com.justb81.watchbuddy.phone.auth.TokenRefreshManager
 import com.justb81.watchbuddy.phone.auth.TokenRepository
+import com.justb81.watchbuddy.phone.data.ProviderCatalogRepository
 import com.justb81.watchbuddy.phone.llm.LlmBusyException
 import com.justb81.watchbuddy.phone.llm.LlmTitleExtractor
 import com.justb81.watchbuddy.phone.llm.RecapGenerator
@@ -66,6 +67,7 @@ class CompanionHttpServerTest {
     private val titleExtractor: LlmTitleExtractor = mockk(relaxed = true)
     private val testToken = "test-bearer-token"
     private val bearerTokenRepository: BearerTokenRepository = mockk()
+    private val providerCatalogRepository: ProviderCatalogRepository = mockk(relaxed = true)
 
     // ── Shared test fixtures ──────────────────────────────────────────────────
 
@@ -121,7 +123,7 @@ class CompanionHttpServerTest {
                 recapGenerator, capabilityProvider, showRepository,
                 tokenRepository, tokenRefreshManager, traktApiService, tmdbApiService, tmdbCache,
                 settingsRepository, avatarImageStore, stateManager, titleExtractor,
-                bearerTokenRepository,
+                bearerTokenRepository, providerCatalogRepository,
             )
         }
         TestScope(this).block()

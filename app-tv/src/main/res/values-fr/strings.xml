@@ -80,6 +80,14 @@
     <string name="tv_diagnostics_row_jw_last_error">Dernière erreur JustWatch</string>
     <string name="tv_diagnostics_row_jw_recent_outcomes">Derniers résultats</string>
 
+    <!-- Diagnostics — provider catalog (#621) -->
+    <string name="tv_diagnostics_section_provider_catalog">Catalogue de fournisseurs</string>
+    <string name="tv_diagnostics_row_catalog_version">Version</string>
+    <string name="tv_diagnostics_row_catalog_last_fetched">Dernière récupération</string>
+    <string name="tv_diagnostics_row_catalog_source">Source</string>
+    <string name="tv_diagnostics_catalog_source_live">En ligne (depuis le téléphone)</string>
+    <string name="tv_diagnostics_catalog_source_bundled">Intégré (hors ligne)</string>
+
     <!-- TV Settings hub (#344 / #367) -->
     <string name="tv_settings_title">Paramètres</string>
     <string name="tv_settings_phone_discovery_title">Recherche de téléphones</string>

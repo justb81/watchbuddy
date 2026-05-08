@@ -9,6 +9,7 @@ import { timingSafeEqual } from 'crypto';
 import express from 'express';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import { createProviderCatalogRouter } from './routes/provider-catalog.js';
 
 const TOKEN_PATTERN = /^[a-zA-Z0-9_-]+$/;
 const MAX_TOKEN_LENGTH = 256;
@@ -368,6 +369,10 @@ export function createApp(config) {
       return false;
     }
   }
+
+  // ── GET /provider-catalog ───────────────────────────────────────────────────
+  // Public read-only endpoint — no auth required.
+  app.use(createProviderCatalogRouter());
 
   // ── POST /trakt/token ───────────────────────────────────────────────────────
   // Body: { "code": "<device_code>" }

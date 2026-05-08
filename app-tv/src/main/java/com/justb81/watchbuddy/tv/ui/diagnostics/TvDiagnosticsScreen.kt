@@ -33,6 +33,7 @@ import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.model.PlaybackTick
 import com.justb81.watchbuddy.core.scrobbler.MediaSessionScrobbler
 import com.justb81.watchbuddy.core.scrobbler.PlaybackIntentStats
+import com.justb81.watchbuddy.tv.data.CatalogSource
 import com.justb81.watchbuddy.tv.data.JustWatchOutcomeEvent
 import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
 import com.justb81.watchbuddy.tv.scrobbler.WatchNextMetadataSource
@@ -228,6 +229,14 @@ fun TvDiagnosticsScreen(
 
             item {
                 IntentStatsSection(stats = uiState.intentStats)
+            }
+
+            item {
+                ProviderCatalogSection(
+                    version = uiState.catalogVersion,
+                    fetchedAtMs = uiState.catalogFetchedAtMs,
+                    source = uiState.catalogSource,
+                )
             }
 
             item {
@@ -819,6 +828,42 @@ private fun WatchNextSection(countResult: WatchNextMetadataSource.CountResult?) 
             ),
         ) { cardContent() }
     }
+}
+
+@Composable
+private fun ProviderCatalogSection(
+    version: Int,
+    fetchedAtMs: Long,
+    source: CatalogSource,
+) {
+    val sourceLabel = when (source) {
+        CatalogSource.LIVE -> stringResource(R.string.tv_diagnostics_catalog_source_live)
+        CatalogSource.BUNDLED -> stringResource(R.string.tv_diagnostics_catalog_source_bundled)
+    }
+    val sourceStatus = when (source) {
+        CatalogSource.LIVE -> Status.OK
+        CatalogSource.BUNDLED -> Status.WARN
+    }
+    DiagnosticsSection(
+        title = stringResource(R.string.tv_diagnostics_section_provider_catalog),
+        rows = listOf(
+            DiagRow(
+                label = stringResource(R.string.tv_diagnostics_row_catalog_version),
+                value = if (version > 0) version.toString() else "—",
+                status = if (version > 0) Status.OK else Status.NEUTRAL,
+            ),
+            DiagRow(
+                label = stringResource(R.string.tv_diagnostics_row_catalog_last_fetched),
+                value = formatAge(fetchedAtMs),
+                status = Status.NEUTRAL,
+            ),
+            DiagRow(
+                label = stringResource(R.string.tv_diagnostics_row_catalog_source),
+                value = sourceLabel,
+                status = sourceStatus,
+            ),
+        ),
+    )
 }
 
 private fun formatLastCandidate(last: MediaSessionScrobbler.LastCandidate?): String {

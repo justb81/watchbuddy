@@ -9,8 +9,10 @@ import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.scrobbler.MediaSessionScrobbler
 import com.justb81.watchbuddy.core.scrobbler.PlaybackIntentProvider
 import com.justb81.watchbuddy.core.scrobbler.PlaybackIntentStats
+import com.justb81.watchbuddy.tv.data.CatalogSource
 import com.justb81.watchbuddy.tv.data.JustWatchDeepLinkRepository
 import com.justb81.watchbuddy.tv.data.JustWatchOutcomeEvent
+import com.justb81.watchbuddy.tv.data.TvProviderCatalogRepository
 import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
 import com.justb81.watchbuddy.tv.scrobbler.NotificationMetadataSource
 import com.justb81.watchbuddy.tv.scrobbler.WatchNextMetadataSource
@@ -67,8 +69,15 @@ data class TvDiagnosticsUiState(
      * Most recent event is last. Empty until the user navigates to a show-detail screen.
      */
     val recentJustWatchOutcomes: List<JustWatchOutcomeEvent> = emptyList(),
+    /** Current catalog version number (0 = bundled fallback not yet loaded). */
+    val catalogVersion: Int = 0,
+    /** Epoch-ms of last successful catalog fetch from a phone; 0 = never fetched. */
+    val catalogFetchedAtMs: Long = 0L,
+    /** Whether the active catalog was fetched live from a phone or loaded from bundled assets. */
+    val catalogSource: CatalogSource = CatalogSource.BUNDLED,
 )
 
+@Suppress("LongParameterList")
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class TvDiagnosticsViewModel @Inject constructor(
@@ -79,6 +88,7 @@ class TvDiagnosticsViewModel @Inject constructor(
     private val watchNextSource: WatchNextMetadataSource,
     private val notificationSource: NotificationMetadataSource,
     private val intentProvider: PlaybackIntentProvider,
+    private val catalogRepository: TvProviderCatalogRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(TvDiagnosticsUiState())
@@ -156,6 +166,18 @@ class TvDiagnosticsViewModel @Inject constructor(
         viewModelScope.launch {
             justWatchRepo.outcomeEvents.collect { events ->
                 _uiState.update { it.copy(recentJustWatchOutcomes = events.takeLast(MAX_DISPLAYED_OUTCOMES)) }
+            }
+        }
+
+        viewModelScope.launch {
+            catalogRepository.status.collect { status ->
+                _uiState.update {
+                    it.copy(
+                        catalogVersion = status.version,
+                        catalogFetchedAtMs = status.fetchedAtMs,
+                        catalogSource = status.source,
+                    )
+                }
             }
         }
     }
