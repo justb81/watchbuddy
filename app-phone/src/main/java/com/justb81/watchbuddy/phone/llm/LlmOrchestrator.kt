@@ -12,7 +12,7 @@ import javax.inject.Singleton
  *
  * Priority:
  *   1. AICore (Gemini Nano) — if device supports it (no download, auto-updated)
- *   2. LiteRT-LM + Gemma 4 E4B — ≥ 5 GB free RAM  (~3.4 GB model)
+ *   2. LiteRT-LM + Gemma 4 E4B — ≥ 8 GB free RAM  (~3.4 GB model)
  *   3. LiteRT-LM + Gemma 4 E2B — ≥ 3 GB free RAM  (~2.4 GB model)
  *   4. No LLM — TMDB synopsis text only
  */
@@ -35,7 +35,7 @@ class LlmOrchestrator @Inject constructor(
         GEMMA4_E4B(
             fileName = "gemma-4-E4B-it.litertlm",
             downloadUrl = "https://huggingface.co/litert-community/gemma-4-E4B-it-litert-lm/resolve/main/gemma-4-E4B-it.litertlm",
-            requiredRamMb = 5_000,
+            requiredRamMb = 8_000,
             qualityScore = 90
         ),
         GEMMA4_E2B(

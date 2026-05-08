@@ -2,11 +2,13 @@ package com.justb81.watchbuddy.phone.llm
 
 import android.app.ActivityManager
 import android.content.Context
-import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import com.justb81.watchbuddy.core.model.LlmBackend
-import io.mockk.*
-import org.junit.jupiter.api.Assertions.*
+import io.mockk.every
+import io.mockk.mockk
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
@@ -42,8 +44,8 @@ class LlmOrchestratorTest {
     @DisplayName("RAM-based variant selection")
     inner class RamBasedSelection {
         @Test
-        fun `selects E4B when freeRam is at least 5000 MB`() {
-            mockFreeRam(6000)
+        fun `selects E4B when freeRam is at least 8000 MB`() {
+            mockFreeRam(9000)
             val config = orchestrator.selectConfig()
             assertEquals(LlmBackend.LITERT, config.backend)
             assertEquals(LlmOrchestrator.ModelVariant.GEMMA4_E4B, config.modelVariant)
@@ -51,7 +53,7 @@ class LlmOrchestratorTest {
         }
 
         @Test
-        fun `selects E2B when freeRam is at least 3000 but less than 5000 MB`() {
+        fun `selects E2B when freeRam is at least 3000 but less than 8000 MB`() {
             mockFreeRam(4000)
             val config = orchestrator.selectConfig()
             assertEquals(LlmBackend.LITERT, config.backend)
@@ -69,8 +71,8 @@ class LlmOrchestratorTest {
         }
 
         @Test
-        fun `selects E4B at exact 5000 MB boundary`() {
-            mockFreeRam(5000)
+        fun `selects E4B at exact 8000 MB boundary`() {
+            mockFreeRam(8000)
             val config = orchestrator.selectConfig()
             assertEquals(LlmOrchestrator.ModelVariant.GEMMA4_E4B, config.modelVariant)
         }
@@ -101,7 +103,7 @@ class LlmOrchestratorTest {
 
         @Test
         fun `each variant has correct RAM requirement`() {
-            assertEquals(5_000, LlmOrchestrator.ModelVariant.GEMMA4_E4B.requiredRamMb)
+            assertEquals(8_000, LlmOrchestrator.ModelVariant.GEMMA4_E4B.requiredRamMb)
             assertEquals(3_000, LlmOrchestrator.ModelVariant.GEMMA4_E2B.requiredRamMb)
         }
 
@@ -133,7 +135,7 @@ class LlmOrchestratorTest {
 
         @Test
         fun `non-NONE config is cached across calls even when freeRam fluctuates`() {
-            mockFreeRam(6000) // First call -> E4B
+            mockFreeRam(9000) // First call -> E4B
             val first = orchestrator.selectConfig()
             assertEquals(LlmOrchestrator.ModelVariant.GEMMA4_E4B, first.modelVariant)
 
@@ -152,7 +154,7 @@ class LlmOrchestratorTest {
             val first = orchestrator.selectConfig()
             assertEquals(LlmBackend.NONE, first.backend)
 
-            mockFreeRam(6000) // RAM freed up -> E4B should now win
+            mockFreeRam(9000) // RAM freed up -> E4B should now win
             val second = orchestrator.selectConfig()
             assertEquals(LlmBackend.LITERT, second.backend)
             assertEquals(LlmOrchestrator.ModelVariant.GEMMA4_E4B, second.modelVariant)

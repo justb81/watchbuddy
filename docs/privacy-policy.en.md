@@ -83,7 +83,7 @@ Unencrypted configuration values (source: `app-tv/src/main/java/com/justb81/watc
 
 ### 4.4 LLM models in the app file system (phone app)
 
-- **Gemma 4 E4B** (~3.4 GB, quality score 90) — on devices with ≥ 5 GB free RAM
+- **Gemma 4 E4B** (~3.4 GB, quality score 90) — on devices with ≥ 8 GB free RAM
 - **Gemma 4 E2B** (~2.4 GB, quality score 70) — on devices with ≥ 3 GB free RAM
 - **AICore / Gemini Nano** — managed by the system, no separate download required
 

@@ -83,7 +83,7 @@ Unverschlüsselte Konfigurationswerte (Quelle: `app-tv/src/main/java/com/justb81
 
 ### 4.4 LLM-Modelle im App-Dateisystem (Phone App)
 
-- **Gemma 4 E4B** (ca. 3,4 GB, Qualitätsscore 90) — auf Geräten mit ≥ 5 GB freiem RAM
+- **Gemma 4 E4B** (ca. 3,4 GB, Qualitätsscore 90) — auf Geräten mit ≥ 8 GB freiem RAM
 - **Gemma 4 E2B** (ca. 2,4 GB, Qualitätsscore 70) — auf Geräten mit ≥ 3 GB freiem RAM
 - **AICore / Gemini Nano** — systemseitig verwaltet, kein separater Download nötig
 

@@ -134,7 +134,7 @@ flowchart TD
     Start([App start]) --> AICore{"AICore\navailable?"}
     AICore -->|Yes| Gemini["Use Gemini Nano\n(auto-updated, no download)"]
     AICore -->|No| RAM{"Free RAM check\n(LiteRT-LM runtime)"}
-    RAM -->|">= 5 GB"| E4B["Gemma 4 E4B\n(~3.4 GB · quality 90)"]
+    RAM -->|">= 8 GB"| E4B["Gemma 4 E4B\n(~3.4 GB · quality 90)"]
     RAM -->|">= 3 GB"| E2B["Gemma 4 E2B\n(~2.4 GB · quality 70)"]
     RAM -->|"< 3 GB"| TextOnly["TMDB text only\n(no model downloaded)"]
 ```
