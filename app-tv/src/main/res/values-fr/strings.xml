@@ -9,9 +9,9 @@
     <string name="tv_no_shows">Aucune série trouvée.\nConnectez l\'application WatchBuddy sur votre téléphone avec Trakt.</string>
     <string name="tv_no_phone">Aucun téléphone connecté.\nDémarrez l\'application WatchBuddy sur votre smartphone.\nSi votre Wi-Fi bloque la détection d\'appareils, activez le Bluetooth sur les deux appareils.</string>
     <string name="tv_retry">Réessayer</string>
-    <string name="tv_last_watched">Dernier : %1$s, %2$s</string>
-    <string name="tv_last_aired_episode">Diffusé : %1$s, %2$s</string>
-    <string name="tv_next_aired">Suivant : %1$s, %2$s</string>
+    <string name="tv_last_watched">Dernier : %1$s, %2$s</string>
+    <string name="tv_last_aired_episode">Diffusé : %1$s, %2$s</string>
+    <string name="tv_next_aired">Suivant : %1$s, %2$s</string>
     <string name="tv_time_today">aujourd\'hui</string>
     <string name="tv_time_tomorrow">demain</string>
     <string name="tv_time_yesterday">hier</string>
@@ -44,21 +44,28 @@
     </plurals>
     <string name="tv_back">Retour</string>
     <string name="tv_back_arrow">‹ Retour</string>
-    <string name="tv_available_at">Disponible sur :</string>
+    <string name="tv_available_at">Disponible sur :</string>
     <string name="tv_no_description">Aucune description disponible.</string>
 
     <!-- Recap -->
     <string name="tv_recap_title">Précédemment</string>
     <string name="tv_recap_generating_on">Génération du récap sur %1$s…</string>
     <string name="tv_recap_error">Impossible de charger le récap.</string>
-    <string name="tv_recap_fallback">Aucun résumé IA disponible.\nDescription courte de TMDB :</string>
-    <string name="tv_recap_fallback_phones_failed">Récap indisponible — application compagnon inaccessible.\nDescription de TMDB :</string>
+    <string name="tv_recap_fallback">Aucun résumé IA disponible.\nDescription courte de TMDB :</string>
+    <string name="tv_recap_fallback_phones_failed">Récap indisponible — application compagnon inaccessible.\nDescription de TMDB :</string>
     <string name="tv_recap_close">Fermer</string>
     <string name="tv_recap_watch_now">Regarder maintenant</string>
 
     <!-- Error states -->
     <string name="tv_error_phone_unreachable">Application compagnon inaccessible. Affichage des données en cache.</string>
     <string name="tv_error_phone_unreachable_no_cache">Application compagnon inaccessible. Assurez-vous que WatchBuddy est en cours d\'exécution sur votre téléphone.</string>
+    <string name="tv_stale_cache_banner">Liste en cache affichée — téléphone hors ligne</string>
+
+    <!-- Show detail — one-tap mark as watched (#671) -->
+    <string name="tv_mark_watched">Marquer comme vu</string>
+    <string name="tv_mark_watched_no_phones">Aucun téléphone connecté — connectez un téléphone pour marquer les épisodes.</string>
+    <string name="tv_mark_watched_error">Impossible de marquer l\'épisode comme vu.</string>
+    <string name="tv_mark_watched_cd">Marquer l\'épisode actuel comme vu</string>
 
     <!-- Show detail — manually mark episodes watched (#217) -->
     <string name="tv_detail_episodes">Épisodes</string>
@@ -66,7 +73,7 @@
     <string name="tv_detail_mark_watched_cd">Marquer comme vu</string>
     <string name="tv_detail_mark_unwatched_cd">Marquer comme non vu</string>
     <string name="tv_detail_toggle_failed_all">Impossible de mettre à jour le statut. Veuillez réessayer.</string>
-    <string name="tv_detail_toggle_failed_partial">Impossible de mettre à jour pour : %1$s</string>
+    <string name="tv_detail_toggle_failed_partial">Impossible de mettre à jour pour : %1$s</string>
 
     <!-- User-scope picker dialog (#217) -->
     <string name="tv_scope_title">Marquer comme vu pour</string>
@@ -112,8 +119,8 @@
     <string name="tv_settings_show_non_installed_title">Afficher les services non installés</string>
     <string name="tv_settings_show_non_installed_subtitle">Afficher aussi les services de streaming non installés sur ce téléviseur</string>
     <string name="tv_settings_diagnostics">Diagnostics</string>
-    <string name="tv_settings_debug_log_media_session_title">Débogage : consigner chaque session média</string>
-    <string name="tv_settings_debug_log_media_session_subtitle">Consigne chaque session média détectée dans le journal d\'événements</string>
+    <string name="tv_settings_debug_log_media_session_title">Débogage : consigner chaque session média</string>
+    <string name="tv_settings_debug_log_media_session_subtitle">Consigne chaque session média détectée dans le journal d\'vénements</string>
     <string name="tv_settings_notification_access_title">Accès aux notifications</string>
     <string name="tv_settings_notification_access_subtitle">Requis pour le scrobble — WatchBuddy lit les notifications multimédias et les sessions actives pour identifier ce qui est en cours de lecture sur votre téléviseur</string>
     <string name="tv_settings_status_granted">Accordé</string>
@@ -122,7 +129,7 @@
     <string name="tv_discovery_notification_text">Recherche de téléphones WatchBuddy sur le réseau</string>
 
     <!-- Scrobble overlay -->
-    <string name="tv_scrobble_question">Regardez-vous %1$s ?</string>
+    <string name="tv_scrobble_question">Regardez-vous %1$s ?</string>
     <string name="tv_scrobble_episode">S%1$02dE%2$02d</string>
     <string name="tv_scrobble_yes">Oui, suivre</string>
     <string name="tv_scrobble_no">Non</string>
@@ -212,10 +219,10 @@
 
     <!-- Diagnostics — match quality (#474) -->
     <string name="tv_diagnostics_section_match_quality">Qualité de correspondance</string>
-    <string name="tv_diagnostics_row_ambiguous_emitted">Demandes ambiguës envoyées</string>
+    <string name="tv_diagnostics_row_ambiguous_emitted">Demandes ambigues envoyées</string>
     <string name="tv_diagnostics_row_ambiguous_resolved">Demandes résolues</string>
     <string name="tv_diagnostics_row_ambiguous_dismissed">Demandes ignorées</string>
-    <string name="tv_diagnostics_section_watch_now_intent">Intention « Regarder maintenant »</string>
+    <string name="tv_diagnostics_section_watch_now_intent">Intention « Regarder maintenant »</string>
     <string name="tv_diagnostics_row_intent_hits">Scrobbles automatiques Phase 0</string>
     <string name="tv_diagnostics_row_intent_fallthroughs">Replis Phase 0</string>
     <string name="tv_diagnostics_row_intent_overridden">Remplacé par marque manuelle</string>
