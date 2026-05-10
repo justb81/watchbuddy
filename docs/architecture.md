@@ -84,6 +84,7 @@ distributed via BLE scan response; see above). Missing or wrong bearer returns H
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/capability` | Device info + LLM score + TMDB API key + `avatarSource` + `lastResolvedSessionKey` + `lastResolvedTraktId` (#342, #474) — **unauthenticated** |
+| GET | `/provider-catalog` | Streaming provider catalog (Netflix, Disney+, etc.) with TMDB provider IDs and package names; ETag-revalidated (`Cache-Control: public, max-age=86400`); 404 until the catalog has been fetched from the backend — **unauthenticated** |
 | GET | `/avatar` | Custom avatar JPEG (200 bytes, ETag-revalidated; 404 when `avatarSource != CUSTOM`) |
 | GET | `/shows` | User's Trakt watched shows (cached), paginated via `offset` + `limit` query params |
 | POST | `/recap/{traktShowId}` | Generate HTML recap for a show |
