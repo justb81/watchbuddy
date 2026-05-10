@@ -112,7 +112,7 @@ class EpisodeRepository @Inject constructor(
         traktApi.addToHistory("Bearer $token", body)
         Unit
     }.onFailure {
-        Log.w(TAG, "markEpisodesWatchedUpTo S${targetSeason}E${targetEpisode} (${candidates.size} eps) failed", it)
+        Log.w(TAG, "markEpisodesWatchedUpTo S${targetSeason}E$targetEpisode (${candidates.size} eps) failed", it)
     }
 
     private fun buildBody(ids: TraktIds, season: Int, episode: Int): SyncHistoryBody =
