@@ -176,6 +176,19 @@
     <string name="show_detail_cd_toggle_watched">Toggle watched status for episode %1$d of season %2$d</string>
     <string name="show_detail_cd_expand_season">Expand season %1$d</string>
     <string name="show_detail_cd_collapse_season">Collapse season %1$d</string>
+    <string name="show_detail_cd_episode_menu">Episode %1$d of season %2$d options</string>
+    <string name="show_detail_mark_earlier_watched">Mark this and all earlier as watched</string>
+    <string name="show_detail_bulk_confirm_title">Mark earlier episodes as watched?</string>
+    <plurals name="show_detail_bulk_confirm_body">
+        <item quantity="one">S%1$02dE%2$02d and %3$d earlier episode will be marked watched on Trakt.</item>
+        <item quantity="other">S%1$02dE%2$02d and %3$d earlier episodes will be marked watched on Trakt.</item>
+    </plurals>
+    <string name="show_detail_bulk_confirm_action">Mark watched</string>
+    <plurals name="show_detail_bulk_success">
+        <item quantity="one">%d episode marked watched</item>
+        <item quantity="other">%d episodes marked watched</item>
+    </plurals>
+    <string name="show_detail_error_bulk_toggle">Could not mark episodes — try again</string>
 
     <!-- Common -->
     <string name="no_description">No description available.</string>
