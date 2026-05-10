@@ -488,11 +488,14 @@ class ShowDetailViewModel @Inject constructor(
             )).sortedBy { it.number }
             existing.episodes.any { it.number == episode } -> enriched.entry.seasons
             else -> enriched.entry.seasons.map { s ->
-                if (s.number != season) s
-                else s.copy(
-                    episodes = (s.episodes + TraktWatchedEpisode(number = episode, last_watched_at = nowIso))
-                        .sortedBy { it.number },
-                )
+                if (s.number != season) {
+                    s
+                } else {
+                    s.copy(
+                        episodes = (s.episodes + TraktWatchedEpisode(number = episode, last_watched_at = nowIso))
+                            .sortedBy { it.number },
+                    )
+                }
             }
         }
         return enriched.copy(entry = enriched.entry.copy(seasons = updatedSeasons))
