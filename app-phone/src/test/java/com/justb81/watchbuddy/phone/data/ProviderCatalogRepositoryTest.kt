@@ -15,7 +15,6 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
@@ -32,7 +31,7 @@ class ProviderCatalogRepositoryTest {
     private val testScope = TestScope(testDispatcher)
     private val workManager: WorkManager = mockk(relaxed = true)
 
-    private val CATALOG_JSON_KEY = stringPreferencesKey("provider_catalog_json")
+    private val catalogJsonKey = stringPreferencesKey("provider_catalog_json")
 
     private val minimalV8Json = """
         {
@@ -70,7 +69,7 @@ class ProviderCatalogRepositoryTest {
     @Test
     fun `currentJson returns stored JSON after it has been persisted`() = runTest {
         val dataStore = buildDataStore()
-        dataStore.edit { it[CATALOG_JSON_KEY] = minimalV8Json }
+        dataStore.edit { it[catalogJsonKey] = minimalV8Json }
 
         val repo = ProviderCatalogRepository(
             dataStore = dataStore,
@@ -98,7 +97,7 @@ class ProviderCatalogRepositoryTest {
     @Test
     fun `isLive returns true when catalog JSON is stored`() = runTest {
         val dataStore = buildDataStore()
-        dataStore.edit { it[CATALOG_JSON_KEY] = minimalV8Json }
+        dataStore.edit { it[catalogJsonKey] = minimalV8Json }
 
         val repo = ProviderCatalogRepository(
             dataStore = dataStore,
@@ -124,7 +123,7 @@ class ProviderCatalogRepositoryTest {
     @Test
     fun `catalog StateFlow reflects parsed snapshot from stored JSON`() = runTest {
         val dataStore = buildDataStore()
-        dataStore.edit { it[CATALOG_JSON_KEY] = minimalV8Json }
+        dataStore.edit { it[catalogJsonKey] = minimalV8Json }
 
         val repo = ProviderCatalogRepository(
             dataStore = dataStore,
