@@ -236,6 +236,12 @@
     <ID>WildcardImport:CompanionHttpServerTest.kt$import io.ktor.server.testing.*</ID>
     <ID>WildcardImport:CompanionHttpServerTest.kt$import io.mockk.*</ID>
     <ID>WildcardImport:CompanionHttpServerTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>WildcardImport:CompanionHttpServerWatchedTest.kt$import io.ktor.client.*</ID>
+    <ID>WildcardImport:CompanionHttpServerWatchedTest.kt$import io.ktor.client.plugins.*</ID>
+    <ID>WildcardImport:CompanionHttpServerWatchedTest.kt$import io.ktor.client.request.*</ID>
+    <ID>WildcardImport:CompanionHttpServerWatchedTest.kt$import io.ktor.client.statement.*</ID>
+    <ID>WildcardImport:CompanionHttpServerWatchedTest.kt$import io.ktor.http.*</ID>
+    <ID>WildcardImport:CompanionHttpServerWatchedTest.kt$import io.ktor.server.testing.*</ID>
     <ID>WildcardImport:DeviceCapabilityProviderTest.kt$import io.mockk.*</ID>
     <ID>WildcardImport:DeviceCapabilityProviderTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
     <ID>WildcardImport:DiagnosticsScreen.kt$import androidx.compose.foundation.layout.*</ID>

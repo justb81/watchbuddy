@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.justb81.watchbuddy.core.model.DeviceCapability
 import com.justb81.watchbuddy.core.model.EnrichedShowEntry
 import com.justb81.watchbuddy.core.model.ResolvedProvider
+import com.justb81.watchbuddy.core.model.TraktIds
+import com.justb81.watchbuddy.core.model.TraktSeasonWithEpisodes
 import com.justb81.watchbuddy.core.progress.ShowProgressCalculator
 import com.justb81.watchbuddy.core.scrobbler.PlaybackIntent
 import com.justb81.watchbuddy.core.scrobbler.PlaybackIntentProvider
@@ -14,16 +16,25 @@ import com.justb81.watchbuddy.tv.data.JustWatchDeepLinkRepository
 import com.justb81.watchbuddy.tv.data.LastUsedProviderRepository
 import com.justb81.watchbuddy.tv.data.StreamingPreferencesRepository
 import com.justb81.watchbuddy.tv.data.WatchProvidersRepository
+import com.justb81.watchbuddy.tv.discovery.PhoneApiClientFactory
 import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
+import com.justb81.watchbuddy.tv.discovery.WatchedToggleRequest
+import com.justb81.watchbuddy.tv.ui.components.ConnectedUser
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -80,6 +91,42 @@ sealed interface DeepLinkState {
     object Unavailable : DeepLinkState
 }
 
+/** UI state for the season+episode list loaded from the phone's /shows/{id}/seasons endpoint. */
+sealed interface EpisodeListUiState {
+    /** Initial state — no load has been triggered yet. */
+    object Idle : EpisodeListUiState
+
+    /** Fetching seasons from the phone. */
+    object Loading : EpisodeListUiState
+
+    /**
+     * Seasons successfully loaded.
+     *
+     * @param seasons    Full season+episode structure.
+     * @param watchedSet Set of (season, episode) pairs already watched by this user.
+     */
+    data class Success(
+        val seasons: List<TraktSeasonWithEpisodes>,
+        val watchedSet: Set<Pair<Int, Int>>,
+    ) : EpisodeListUiState
+
+    /** Phone unreachable or returned an error. */
+    object Error : EpisodeListUiState
+}
+
+/** One-shot events emitted when a toggle operation partially or fully fails. */
+sealed interface EpisodeToggleEvent {
+    /** Every selected phone failed — the UI reverts the optimistic toggle. */
+    data class AllFailed(val season: Int, val episode: Int) : EpisodeToggleEvent
+
+    /** At least one phone succeeded but some failed. */
+    data class PartialFailed(
+        val season: Int,
+        val episode: Int,
+        val failedUserNames: List<String>,
+    ) : EpisodeToggleEvent
+}
+
 private data class DeepLinkKey(
     val tmdbShowId: Int,
     val season: Int,
@@ -89,6 +136,7 @@ private data class DeepLinkKey(
 )
 
 @HiltViewModel
+@Suppress("LongParameterList")
 class ShowDetailViewModel @Inject constructor(
     private val watchProviders: WatchProvidersRepository,
     private val lastUsedRepo: LastUsedProviderRepository,
@@ -97,6 +145,7 @@ class ShowDetailViewModel @Inject constructor(
     private val tmdbApi: TmdbApiService,
     private val justWatchRepo: JustWatchDeepLinkRepository,
     private val intentProvider: PlaybackIntentProvider,
+    private val clientFactory: PhoneApiClientFactory,
 ) : ViewModel() {
 
     private val _nextEpisode = MutableStateFlow(NextEpisodeUiState())
@@ -107,6 +156,23 @@ class ShowDetailViewModel @Inject constructor(
 
     private val _deepLinks = MutableStateFlow<Map<Int, DeepLinkState>>(emptyMap())
     val deepLinks: StateFlow<Map<Int, DeepLinkState>> = _deepLinks.asStateFlow()
+
+    private val _episodeList = MutableStateFlow<EpisodeListUiState>(EpisodeListUiState.Idle)
+    val episodeList: StateFlow<EpisodeListUiState> = _episodeList.asStateFlow()
+
+    private val _episodeToggleEvents = MutableSharedFlow<EpisodeToggleEvent>()
+    val episodeToggleEvents: SharedFlow<EpisodeToggleEvent> = _episodeToggleEvents.asSharedFlow()
+
+    /**
+     * When true, [toggleEpisodeWatched] skips showing the scope picker and uses
+     * all connected users. Set via [onDontAskAgainSet].
+     */
+    var skipScopePickerThisSession: Boolean = false
+        private set
+
+    fun onDontAskAgainSet() {
+        skipScopePickerThisSession = true
+    }
 
     /**
      * Aggregated "Watch Now" button state derived from [providers] and [deepLinks].
@@ -289,4 +355,122 @@ class ShowDetailViewModel @Inject constructor(
             else -> provider.tmdbPageUrl
         }
     }
+
+    /**
+     * Returns all currently-discovered phones as [ConnectedUser] objects.
+     * Used by the UI to populate the scope picker dialog.
+     */
+    fun connectedUsers(): List<ConnectedUser> =
+        phoneDiscovery.discoveredPhones.value
+            .mapNotNull { phone ->
+                val name = phone.capability?.userName?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                ConnectedUser(id = phone.baseUrl, displayName = name)
+            }
+
+    /**
+     * Fetches all seasons + episodes for [enriched] from the best available phone and
+     * derives the initial [watchedSet] from the Trakt history embedded in the entry.
+     */
+    fun loadEpisodeList(enriched: EnrichedShowEntry) {
+        val showId = enriched.entry.show.ids.trakt?.toString() ?: return
+        viewModelScope.launch {
+            _episodeList.value = EpisodeListUiState.Loading
+            val phone = phoneDiscovery.getBestPhone()
+            if (phone == null) {
+                _episodeList.value = EpisodeListUiState.Error
+                return@launch
+            }
+            try {
+                val client = clientFactory.createClient(phone.baseUrl, phone.bearerToken)
+                val seasons = client.getSeasons(showId)
+                val watchedSet = buildWatchedSet(enriched)
+                _episodeList.value = EpisodeListUiState.Success(seasons, watchedSet)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                _episodeList.value = EpisodeListUiState.Error
+            }
+        }
+    }
+
+    /**
+     * Toggles the watched state of a single episode across all phones whose IDs are
+     * in [selectedUserIds].
+     *
+     * - Optimistically updates the UI state before the network calls.
+     * - On all-failure: emits [EpisodeToggleEvent.AllFailed] and reverts the toggle.
+     * - On partial failure: emits [EpisodeToggleEvent.PartialFailed] but keeps the
+     *   successful state (majority wins).
+     */
+    fun toggleEpisodeWatched(
+        showIds: TraktIds,
+        season: Int,
+        episode: Int,
+        markAsWatched: Boolean,
+        selectedUserIds: Set<String>,
+    ) {
+        viewModelScope.launch {
+            // Optimistic update
+            applyEpisodeToggle(season, episode, markAsWatched)
+
+            val allPhones = phoneDiscovery.discoveredPhones.first()
+            val targetPhones = allPhones.filter { it.baseUrl in selectedUserIds }
+
+            if (targetPhones.isEmpty()) {
+                _episodeToggleEvents.emit(EpisodeToggleEvent.AllFailed(season, episode))
+                revertEpisodeToggle(season, episode, markAsWatched)
+                return@launch
+            }
+
+            data class PhoneResult(val phone: PhoneDiscoveryManager.DiscoveredPhone, val success: Boolean)
+
+            val results = coroutineScope {
+                targetPhones.map { phone ->
+                    async {
+                        val success = runCatching {
+                            val client = clientFactory.createClient(phone.baseUrl, phone.bearerToken)
+                            val req = WatchedToggleRequest(showIds = showIds, season = season, episode = episode)
+                            val response = if (markAsWatched) client.markWatched(req) else client.markUnwatched(req)
+                            response.isSuccessful
+                        }.getOrDefault(false)
+                        PhoneResult(phone, success)
+                    }
+                }.awaitAll()
+            }
+
+            val failed = results.filter { !it.success }
+            when {
+                failed.size == results.size -> {
+                    // All phones failed — revert
+                    _episodeToggleEvents.emit(EpisodeToggleEvent.AllFailed(season, episode))
+                    revertEpisodeToggle(season, episode, markAsWatched)
+                }
+                failed.isNotEmpty() -> {
+                    // Partial failure — keep optimistic state, notify user
+                    val failedNames = failed.mapNotNull { it.phone.capability?.userName }
+                    _episodeToggleEvents.emit(
+                        EpisodeToggleEvent.PartialFailed(season, episode, failedNames)
+                    )
+                }
+                // else: all succeeded — nothing more to do
+            }
+        }
+    }
+
+    private fun applyEpisodeToggle(season: Int, episode: Int, markAsWatched: Boolean) {
+        val current = _episodeList.value as? EpisodeListUiState.Success ?: return
+        val key = season to episode
+        val newSet = if (markAsWatched) current.watchedSet + key else current.watchedSet - key
+        _episodeList.value = current.copy(watchedSet = newSet)
+    }
+
+    private fun revertEpisodeToggle(season: Int, episode: Int, wasMarkingWatched: Boolean) {
+        // revert means undoing the optimistic toggle
+        applyEpisodeToggle(season, episode, !wasMarkingWatched)
+    }
+
+    private fun buildWatchedSet(enriched: EnrichedShowEntry): Set<Pair<Int, Int>> =
+        enriched.entry.seasons.flatMapTo(mutableSetOf()) { season ->
+            season.episodes.map { ep -> season.number to ep.number }
+        }
 }

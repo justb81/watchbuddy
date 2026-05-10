@@ -42,6 +42,7 @@ dependencies {
 
     // Standard Material3 — CircularProgressIndicator / LinearProgressIndicator for TV
     implementation(libs.compose.material3)
+    implementation(libs.compose.material.icons.core)
 
     // Lifecycle
     implementation(libs.androidx.lifecycle.runtime)
@@ -84,7 +85,7 @@ configurations.all {
 }
 
 // Room schema export — lets KSP write a versioned JSON snapshot of the database
-// schema next to the source so future Migration(n, n+1) objects can reference it.
+// schema next to the source so future Migration(n, n+1) objects can generate it.
 // The schemas/ directory is committed to git; CI generates/updates the file on each build.
 ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
