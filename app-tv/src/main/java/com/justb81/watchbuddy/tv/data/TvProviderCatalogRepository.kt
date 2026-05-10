@@ -29,8 +29,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import okhttp3.OkHttpClient
-import okhttp3.Request
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -90,7 +88,13 @@ object ProviderCatalogDatabaseModule {
 
 // ── Repository ────────────────────────────────────────────────────────────────
 
-/** Source of the active provider catalog on TV. */
+/**
+ * Source of the active provider catalog on TV.
+ *
+ * BUNDLED means the in-code fallback maps ([ProviderCatalog.BUNDLED_ENTRIES] /
+ * [JustWatchPackageMap.BUNDLED_MAP]) are providing data — no live JSON has been
+ * cached in Room yet.
+ */
 enum class CatalogSource { LIVE, BUNDLED }
 
 data class CatalogStatus(
@@ -101,7 +105,6 @@ data class CatalogStatus(
 
 @Singleton
 class TvProviderCatalogRepository @Inject constructor(
-    @param:ApplicationContext private val context: Context,
     private val dao: ProviderCatalogCacheDao,
     private val discoveryManager: PhoneDiscoveryManager,
 ) {
@@ -118,9 +121,8 @@ class TvProviderCatalogRepository @Inject constructor(
                     applySnapshot(snapshot, CatalogSource.valueOf(cached.source), cached.fetchedAt)
                 }
             }
-            if (_status.value.version == 0) {
-                loadBundled()
-            }
+            // When no live catalog is available, ProviderCatalog and JustWatchPackageMap
+            // fall back to their in-code BUNDLED_ENTRIES / BUNDLED_MAP constants.
         }
     }
 
@@ -179,17 +181,6 @@ class TvProviderCatalogRepository @Inject constructor(
             source = source,
         )
     }
-
-    private fun loadBundled() {
-        val json = loadBundledJson() ?: return
-        parseCatalog(json)?.let { snapshot ->
-            applySnapshot(snapshot, CatalogSource.BUNDLED, 0L)
-        }
-    }
-
-    private fun loadBundledJson(): String? = runCatching {
-        context.assets.open("provider-catalog-bundled.json").bufferedReader().readText()
-    }.getOrNull()
 
     private fun parseCatalog(json: String): ProviderCatalogSnapshot? = runCatching {
         WatchBuddyJson.decodeFromString(ProviderCatalogSnapshot.serializer(), json)

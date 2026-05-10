@@ -19,19 +19,22 @@ describe('GET /provider-catalog', () => {
     expect(res.headers['content-type']).toMatch(/application\/json/);
   });
 
-  it('response conforms to the catalog schema', async () => {
+  it('response conforms to the v8 catalog schema', async () => {
     const app = buildApp();
     const res = await request(app).get('/provider-catalog');
     expect(res.status).toBe(200);
 
     const body = res.body;
     expect(typeof body.version).toBe('number');
+    expect(body.version).toBe(8);
     expect(typeof body.lastUpdated).toBe('string');
     expect(Array.isArray(body.providers)).toBe(true);
     expect(body.providers.length).toBeGreaterThan(0);
 
     for (const provider of body.providers) {
-      expect(typeof provider.tmdbProviderId).toBe('number');
+      expect(Array.isArray(provider.tmdbProviderIds)).toBe(true);
+      expect(provider.tmdbProviderIds.length).toBeGreaterThan(0);
+      expect(provider).not.toHaveProperty('tmdbProviderId');
       expect(typeof provider.name).toBe('string');
       expect(Array.isArray(provider.regions)).toBe(true);
       expect(typeof provider.androidPackages).toBe('object');
@@ -72,17 +75,45 @@ describe('GET /provider-catalog', () => {
     expect(res.status).toBe(200);
   });
 
-  it('contains known providers from the existing hardcoded catalog', async () => {
+  it('contains known providers by TMDB ID', async () => {
     const app = buildApp();
     const res = await request(app).get('/provider-catalog');
     expect(res.status).toBe(200);
 
-    const ids = res.body.providers.map((p) => p.tmdbProviderId);
-    expect(ids).toContain(8); // Netflix
-    expect(ids).toContain(119); // Prime Video
-    expect(ids).toContain(337); // Disney+
-    expect(ids).toContain(2184); // Joyn
-    expect(ids).toContain(192); // YouTube
+    const allIds = res.body.providers.flatMap((p) => p.tmdbProviderIds);
+    expect(allIds).toContain(8); // Netflix
+    expect(allIds).toContain(119); // Prime Video
+    expect(allIds).toContain(9); // Amazon Video (merged into Prime Video entry)
+    expect(allIds).toContain(337); // Disney+
+    expect(allIds).toContain(2184); // Joyn
+    expect(allIds).toContain(192); // YouTube
+  });
+
+  it('has exactly one entry covering both Amazon TMDB IDs 9 and 119', async () => {
+    const app = buildApp();
+    const res = await request(app).get('/provider-catalog');
+    expect(res.status).toBe(200);
+
+    const amazonEntries = res.body.providers.filter(
+      (p) => p.tmdbProviderIds.includes(9) || p.tmdbProviderIds.includes(119)
+    );
+    expect(amazonEntries).toHaveLength(1);
+    expect(amazonEntries[0].tmdbProviderIds).toContain(9);
+    expect(amazonEntries[0].tmdbProviderIds).toContain(119);
+    expect(amazonEntries[0].justWatchTechnicalNames).toContain('amazonprime');
+    expect(amazonEntries[0].justWatchTechnicalNames).toContain('amazonprimevideowithads');
+  });
+
+  it('Joyn entry uses the correct Android TV package and not the old Seven.TV package', async () => {
+    const app = buildApp();
+    const res = await request(app).get('/provider-catalog');
+    expect(res.status).toBe(200);
+
+    const joyn = res.body.providers.find((p) => p.tmdbProviderIds.includes(2184));
+    expect(joyn).toBeDefined();
+    expect(joyn.androidPackages.tv).toContain('de.prosiebensat1.joyn.tv');
+    expect(joyn.androidPackages.tv).not.toContain('de.prosiebensat1digital.seventv');
+    expect(joyn.justWatchTechnicalNames).toContain('joynde');
   });
 
   it('contains JustWatch technical names for known providers', async () => {
@@ -90,13 +121,9 @@ describe('GET /provider-catalog', () => {
     const res = await request(app).get('/provider-catalog');
     expect(res.status).toBe(200);
 
-    const netflix = res.body.providers.find((p) => p.tmdbProviderId === 8);
+    const netflix = res.body.providers.find((p) => p.tmdbProviderIds.includes(8));
     expect(netflix).toBeDefined();
     expect(netflix.justWatchTechnicalNames).toContain('netflix');
-
-    const joyn = res.body.providers.find((p) => p.tmdbProviderId === 2184);
-    expect(joyn).toBeDefined();
-    expect(joyn.justWatchTechnicalNames).toContain('joynde');
   });
 
   it('is not rate-limited by the standard limiter for typical usage', async () => {

@@ -9,7 +9,10 @@ import com.justb81.watchbuddy.core.model.ProviderCatalogSnapshot
  * The canonical data comes from the backend-served provider catalog (fetched and
  * cached by [com.justb81.watchbuddy.phone.data.ProviderCatalogRepository] on phone
  * and [com.justb81.watchbuddy.tv.data.TvProviderCatalogRepository] on TV).
- * When no live catalog is injected the object falls back to the bundled snapshot.
+ * When no live catalog is injected the object falls back to the in-code [BUNDLED_MAP].
+ *
+ * For entries with multiple TMDB IDs (e.g. Amazon Prime Video covers IDs 119 and 9),
+ * JustWatch technical names resolve to the first ID in the list (the canonical one).
  *
  * Entries not present here are silently dropped — they will not produce deep links but
  * TMDB's watch-provider list still renders them with their logo and name.
@@ -28,8 +31,9 @@ object JustWatchPackageMap {
         get() = snapshot?.let { s ->
             buildMap {
                 for (provider in s.providers) {
+                    val canonicalId = provider.tmdbProviderIds.first()
                     for (name in provider.justWatchTechnicalNames) {
-                        put(name.lowercase(), provider.tmdbProviderId)
+                        put(name.lowercase(), canonicalId)
                     }
                 }
             }

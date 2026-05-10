@@ -275,6 +275,10 @@ internal fun Application.configureCompanionRoutes(
         // for deep-link resolution independently of Trakt auth state.
         get("/provider-catalog") {
             val json = providerCatalogRepository.currentJson()
+            if (json == null) {
+                call.respond(HttpStatusCode.NotFound, ErrorResponse("catalog not yet fetched from backend"))
+                return@get
+            }
             val etag = "\"${sha256Hex(json.toByteArray()).take(ETAG_HEX_CHARS)}\""
             val ifNoneMatch = call.request.headers[HttpHeaders.IfNoneMatch]
             if (ifNoneMatch == etag) {

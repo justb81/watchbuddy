@@ -22,7 +22,7 @@ data class ProviderCatalogSnapshot(
 
 @Serializable
 data class CatalogProviderEntry(
-    @SerialName("tmdbProviderId") val tmdbProviderId: Int,
+    @SerialName("tmdbProviderIds") val tmdbProviderIds: List<Int>,
     val name: String,
     val regions: List<String>,
     @SerialName("androidPackages") val androidPackages: CatalogAndroidPackages,

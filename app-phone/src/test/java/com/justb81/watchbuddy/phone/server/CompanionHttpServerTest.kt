@@ -149,6 +149,62 @@ class CompanionHttpServerTest {
         }
     }
 
+    // ── GET /provider-catalog ─────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("GET /provider-catalog")
+    inner class ProviderCatalogEndpoint {
+
+        private val catalogJson = """{"version":8,"lastUpdated":"2026-05-10T00:00:00Z","providers":[]}"""
+
+        @Test
+        fun `returns 404 when no catalog has been fetched from backend`() = testApp {
+            coEvery { providerCatalogRepository.currentJson() } returns null
+
+            val response = unauthClient.get("/provider-catalog")
+            assertEquals(HttpStatusCode.NotFound, response.status)
+        }
+
+        @Test
+        fun `returns 200 with JSON when catalog is available`() = testApp {
+            coEvery { providerCatalogRepository.currentJson() } returns catalogJson
+
+            val response = unauthClient.get("/provider-catalog")
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertEquals(ContentType.Application.Json, response.contentType()?.withoutParameters())
+        }
+
+        @Test
+        fun `returns ETag header when catalog is available`() = testApp {
+            coEvery { providerCatalogRepository.currentJson() } returns catalogJson
+
+            val response = unauthClient.get("/provider-catalog")
+            assertEquals(HttpStatusCode.OK, response.status)
+            assertNotNull(response.headers["ETag"])
+        }
+
+        @Test
+        fun `returns 304 when If-None-Match matches ETag`() = testApp {
+            coEvery { providerCatalogRepository.currentJson() } returns catalogJson
+
+            val first = unauthClient.get("/provider-catalog")
+            val etag = first.headers["ETag"]!!
+
+            val second = unauthClient.get("/provider-catalog") {
+                header(HttpHeaders.IfNoneMatch, etag)
+            }
+            assertEquals(HttpStatusCode.NotModified, second.status)
+        }
+
+        @Test
+        fun `is accessible without authentication`() = testApp {
+            coEvery { providerCatalogRepository.currentJson() } returns catalogJson
+
+            val response = unauthClient.get("/provider-catalog")
+            assertNotEquals(HttpStatusCode.Unauthorized, response.status)
+        }
+    }
+
     // ── GET /avatar ───────────────────────────────────────────────────────────
 
     @Nested
