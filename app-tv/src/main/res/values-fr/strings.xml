@@ -61,11 +61,10 @@
     <string name="tv_error_phone_unreachable_no_cache">Application compagnon inaccessible. Assurez-vous que WatchBuddy est en cours d\'exécution sur votre téléphone.</string>
     <string name="tv_stale_cache_banner">Liste en cache affichée — téléphone hors ligne</string>
 
-    <!-- Show detail — one-tap mark as watched (#671) -->
+    <!-- Show detail — mark current episode watched (#671) -->
     <string name="tv_mark_watched">Marquer comme vu</string>
-    <string name="tv_mark_watched_no_phones">Aucun téléphone connecté — connectez un téléphone pour marquer les épisodes.</string>
-    <string name="tv_mark_watched_error">Impossible de marquer l\'épisode comme vu.</string>
-    <string name="tv_mark_watched_cd">Marquer l\'épisode actuel comme vu</string>
+    <string name="tv_mark_watched_no_phones">Aucun téléphone connecté — impossible de marquer comme vu.</string>
+    <string name="tv_mark_watched_error">Impossible de marquer comme vu. Veuillez réessayer.</string>
 
     <!-- Show detail — manually mark episodes watched (#217) -->
     <string name="tv_detail_episodes">Épisodes</string>
@@ -120,7 +119,7 @@
     <string name="tv_settings_show_non_installed_subtitle">Afficher aussi les services de streaming non installés sur ce téléviseur</string>
     <string name="tv_settings_diagnostics">Diagnostics</string>
     <string name="tv_settings_debug_log_media_session_title">Débogage : consigner chaque session média</string>
-    <string name="tv_settings_debug_log_media_session_subtitle">Consigne chaque session média détectée dans le journal d\'vénements</string>
+    <string name="tv_settings_debug_log_media_session_subtitle">Consigne chaque session média détectée dans le journal d\'événements</string>
     <string name="tv_settings_notification_access_title">Accès aux notifications</string>
     <string name="tv_settings_notification_access_subtitle">Requis pour le scrobble — WatchBuddy lit les notifications multimédias et les sessions actives pour identifier ce qui est en cours de lecture sur votre téléviseur</string>
     <string name="tv_settings_status_granted">Accordé</string>
@@ -219,7 +218,7 @@
 
     <!-- Diagnostics — match quality (#474) -->
     <string name="tv_diagnostics_section_match_quality">Qualité de correspondance</string>
-    <string name="tv_diagnostics_row_ambiguous_emitted">Demandes ambigues envoyées</string>
+    <string name="tv_diagnostics_row_ambiguous_emitted">Demandes ambiguës envoyées</string>
     <string name="tv_diagnostics_row_ambiguous_resolved">Demandes résolues</string>
     <string name="tv_diagnostics_row_ambiguous_dismissed">Demandes ignorées</string>
     <string name="tv_diagnostics_section_watch_now_intent">Intention « Regarder maintenant »</string>
