@@ -15,14 +15,7 @@ import com.justb81.watchbuddy.phone.MainDispatcherRule
 import com.justb81.watchbuddy.phone.server.EpisodeRepository
 import com.justb81.watchbuddy.phone.server.ShowRepository
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
-import io.mockk.Runs
-import io.mockk.coAnswers
-import io.mockk.coEvery
-import io.mockk.coVerify
-import io.mockk.every
-import io.mockk.just
-import io.mockk.match
-import io.mockk.mockk
+import io.mockk.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -516,7 +509,7 @@ class ShowDetailViewModelTest {
             coEvery {
                 episodeRepository.markEpisodesWatchedUpTo(any(), any(), any(), any())
             } coAnswers {
-                kotlinx.coroutines.delay(10_000)
+                delay(10_000)
                 Result.success(Unit)
             }
 
