@@ -9,6 +9,7 @@ import com.justb81.watchbuddy.core.model.TraktWatchedEntry
 import com.justb81.watchbuddy.core.model.TraktWatchedEpisode
 import com.justb81.watchbuddy.core.model.TraktWatchedSeason
 import com.justb81.watchbuddy.tv.MainDispatcherRule
+import com.justb81.watchbuddy.tv.data.PersistedShowCacheRepository
 import com.justb81.watchbuddy.tv.data.StreamingPreferencesRepository
 import com.justb81.watchbuddy.tv.data.TvShowCache
 import com.justb81.watchbuddy.tv.discovery.PhoneApiClientFactory
@@ -44,6 +45,7 @@ class TvHomeViewModelTest {
     private val phoneApiClientFactory: PhoneApiClientFactory = mockk()
     private val tvShowCache: TvShowCache = mockk(relaxed = true)
     private val preferencesRepository: StreamingPreferencesRepository = mockk()
+    private val persistedShowCacheRepository: PersistedShowCacheRepository = mockk()
     private val phonesFlow = MutableStateFlow<List<PhoneDiscoveryManager.DiscoveredPhone>>(emptyList())
     private val phoneApiService: PhoneApiService = mockk()
 
@@ -61,6 +63,8 @@ class TvHomeViewModelTest {
         every { phoneDiscovery.setEnabled(any()) } just runs
         every { phoneDiscovery.getBestPhone() } returns null
         every { preferencesRepository.isPhoneDiscoveryEnabled } returns flowOf(true)
+        coEvery { persistedShowCacheRepository.save(any()) } just runs
+        coEvery { persistedShowCacheRepository.load() } returns null
     }
 
     private fun createViewModel(): TvHomeViewModel {
@@ -69,6 +73,7 @@ class TvHomeViewModelTest {
             phoneApiClientFactory,
             tvShowCache,
             preferencesRepository,
+            persistedShowCacheRepository,
         )
     }
 
