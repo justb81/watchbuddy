@@ -36,14 +36,6 @@ import androidx.tv.material3.Text
 import com.justb81.watchbuddy.R
 
 /**
- * Represents a connected phone user selectable in the scope picker.
- *
- * @param id Stable unique identifier (e.g. [DeviceCapability.deviceId]).
- * @param displayName Human-readable name for the user, shown in the picker row.
- */
-data class ConnectedUser(val id: String, val displayName: String)
-
-/**
  * TV-friendly dialog that lets the user pick which connected phones/accounts
  * should receive a manual mark-watched (or unmark) action.
  *
@@ -66,7 +58,6 @@ fun UserScopePickerDialog(
 ) {
     var selected by remember(initialSelection) { mutableStateOf(initialSelection) }
     var dontAskAgain by remember { mutableStateOf(false) }
-
     val allSelected = connectedUsers.isNotEmpty() && selected.containsAll(connectedUsers.map { it.id })
 
     Dialog(onDismissRequest = onDismiss) {
@@ -83,97 +74,92 @@ fun UserScopePickerDialog(
                     fontWeight = FontWeight.Bold,
                     color = Color.White,
                 )
-
-                // "All users" select-all toggle
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Checkbox(
-                        checked = allSelected,
-                        onCheckedChange = { checked ->
-                            selected = if (checked) connectedUsers.map { it.id }.toSet() else emptySet()
-                        },
-                        colors = CheckboxDefaults.colors(
-                            checkedColor = MaterialTheme.colorScheme.primary
-                        ),
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text = stringResource(R.string.tv_scope_all_users),
-                        fontSize = 16.sp,
-                        color = Color.White,
-                    )
+                ScopePickerSelectAllRow(allSelected) { checked ->
+                    selected = if (checked) connectedUsers.map { it.id }.toSet() else emptySet()
                 }
-
-                // Per-user checkboxes
-                LazyColumn(modifier = Modifier.fillMaxWidth()) {
-                    items(connectedUsers, key = { it.id }) { user ->
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Checkbox(
-                                checked = selected.contains(user.id),
-                                onCheckedChange = { checked ->
-                                    selected = if (checked) selected + user.id else selected - user.id
-                                },
-                                colors = CheckboxDefaults.colors(
-                                    checkedColor = MaterialTheme.colorScheme.primary
-                                ),
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                text = user.displayName,
-                                fontSize = 14.sp,
-                                color = Color.White.copy(alpha = 0.87f),
-                            )
-                        }
-                    }
+                ScopePickerUserList(connectedUsers, selected) { id, checked ->
+                    selected = if (checked) selected + id else selected - id
                 }
-
                 Spacer(Modifier.height(4.dp))
-
-                // "Don't ask again" toggle
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Checkbox(
-                        checked = dontAskAgain,
-                        onCheckedChange = { dontAskAgain = it },
-                        colors = CheckboxDefaults.colors(
-                            checkedColor = MaterialTheme.colorScheme.secondary
-                        ),
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text = stringResource(R.string.tv_scope_dont_ask_again),
-                        fontSize = 13.sp,
-                        color = Color.White.copy(alpha = 0.6f),
-                    )
-                }
-
-                // Action buttons
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    OutlinedButton(
-                        onClick = onDismiss,
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        androidx.compose.material3.Text(stringResource(R.string.tv_scope_cancel))
-                    }
-                    Button(
-                        onClick = { onConfirm(selected, dontAskAgain) },
-                        enabled = selected.isNotEmpty(),
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Text(stringResource(R.string.tv_scope_apply))
-                    }
-                }
+                ScopePickerDontAskRow(dontAskAgain) { dontAskAgain = it }
+                ScopePickerActionRow(
+                    isConfirmEnabled = selected.isNotEmpty(),
+                    onDismiss = onDismiss,
+                    onConfirm = { onConfirm(selected, dontAskAgain) },
+                )
             }
+        }
+    }
+}
+
+@Composable
+private fun ScopePickerSelectAllRow(allSelected: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        Checkbox(
+            checked = allSelected,
+            onCheckedChange = onCheckedChange,
+            colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary),
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(text = stringResource(R.string.tv_scope_all_users), fontSize = 16.sp, color = Color.White)
+    }
+}
+
+@Composable
+private fun ScopePickerUserList(
+    connectedUsers: List<ConnectedUser>,
+    selected: Set<String>,
+    onToggle: (id: String, checked: Boolean) -> Unit,
+) {
+    LazyColumn(modifier = Modifier.fillMaxWidth()) {
+        items(connectedUsers, key = { it.id }) { user ->
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Checkbox(
+                    checked = selected.contains(user.id),
+                    onCheckedChange = { checked -> onToggle(user.id, checked) },
+                    colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(text = user.displayName, fontSize = 14.sp, color = Color.White.copy(alpha = 0.87f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun ScopePickerDontAskRow(dontAskAgain: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        Checkbox(
+            checked = dontAskAgain,
+            onCheckedChange = onCheckedChange,
+            colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.secondary),
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = stringResource(R.string.tv_scope_dont_ask_again),
+            fontSize = 13.sp,
+            color = Color.White.copy(alpha = 0.6f),
+        )
+    }
+}
+
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+private fun ScopePickerActionRow(
+    isConfirmEnabled: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+        OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) {
+            androidx.compose.material3.Text(stringResource(R.string.tv_scope_cancel))
+        }
+        Button(
+            onClick = onConfirm,
+            enabled = isConfirmEnabled,
+            modifier = Modifier.weight(1f),
+        ) {
+            Text(stringResource(R.string.tv_scope_apply))
         }
     }
 }

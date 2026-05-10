@@ -19,7 +19,6 @@ import com.justb81.watchbuddy.tv.data.WatchProvidersRepository
 import com.justb81.watchbuddy.tv.discovery.PhoneApiClientFactory
 import com.justb81.watchbuddy.tv.discovery.PhoneApiService
 import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
-import com.justb81.watchbuddy.tv.discovery.WatchedToggleRequest
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.just
@@ -119,7 +118,7 @@ class ShowDetailViewModelTvTest {
         )
     }
 
-    // ── loadEpisodeList ──────────────────────────────────────────────────────────────────────
+    // ── loadEpisodeList ────────────────────────────────────────────────────────────────
 
     @Nested
     @DisplayName("loadEpisodeList")
@@ -178,7 +177,7 @@ class ShowDetailViewModelTvTest {
         }
     }
 
-    // ── toggleEpisodeWatched — success paths ──────────────────────────────────────────────
+    // ── toggleEpisodeWatched — success paths ────────────────────────────────────────────
 
     @Nested
     @DisplayName("toggleEpisodeWatched — success")
@@ -187,9 +186,7 @@ class ShowDetailViewModelTvTest {
         private fun setupWithPhones(phones: List<PhoneDiscoveryManager.DiscoveredPhone>) {
             every { phoneDiscovery.discoveredPhones } returns MutableStateFlow(phones)
             every { phoneDiscovery.getBestPhone() } returns phones.firstOrNull()
-            phones.forEach { phone ->
-                every { clientFactory.createClient(phone.baseUrl, phone.bearerToken) } returns phoneApiService
-            }
+            every { clientFactory.createClient(any(), any()) } returns phoneApiService
         }
 
         @Test
@@ -288,7 +285,7 @@ class ShowDetailViewModelTvTest {
             }
     }
 
-    // ── toggleEpisodeWatched — failure paths ──────────────────────────────────────────────
+    // ── toggleEpisodeWatched — failure paths ────────────────────────────────────────────
 
     @Nested
     @DisplayName("toggleEpisodeWatched — failures")
@@ -387,7 +384,7 @@ class ShowDetailViewModelTvTest {
             }
     }
 
-    // ── skipScopePickerThisSession ────────────────────────────────────────────────────────────────────────────
+    // ── skipScopePickerThisSession ─────────────────────────────────────────────────────────────────────────────────
 
     @Nested
     @DisplayName("skipScopePickerThisSession")
@@ -405,7 +402,7 @@ class ShowDetailViewModelTvTest {
         }
     }
 
-    // ── connectedUsers ─────────────────────────────────────────────────────────────────────────────
+    // ── connectedUsers ───────────────────────────────────────────────────────────────────────────────────────
 
     @Nested
     @DisplayName("connectedUsers")

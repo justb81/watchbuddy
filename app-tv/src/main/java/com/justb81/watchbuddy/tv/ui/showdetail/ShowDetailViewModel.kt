@@ -28,8 +28,8 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -136,7 +136,7 @@ private data class DeepLinkKey(
 )
 
 @HiltViewModel
-class ShowDetailViewModel @Inject constructor(
+class ShowDetailViewModel @Suppress("LongParameterList") @Inject constructor(
     private val watchProviders: WatchProvidersRepository,
     private val lastUsedRepo: LastUsedProviderRepository,
     private val streamingPrefs: StreamingPreferencesRepository,
