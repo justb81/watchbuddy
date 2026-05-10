@@ -16,12 +16,15 @@ import com.justb81.watchbuddy.phone.server.EpisodeRepository
 import com.justb81.watchbuddy.phone.server.ShowRepository
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import io.mockk.Runs
+import io.mockk.coAnswers
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.just
+import io.mockk.match
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -392,6 +395,172 @@ class ShowDetailViewModelTest {
 
             vm.clearToggleError()
             assertNull(vm.uiState.value.toggleError)
+        }
+    }
+
+    @Nested
+    @DisplayName("markEarlierWatched")
+    inner class BulkMarkTest {
+
+        @Test
+        fun `filters out already-watched episodes and specials`() = runTest {
+            // S0 (special), S1 E1 watched, S1 E2 unwatched, S2 E1 unwatched.
+            seedLibrary(
+                watchedSeasons = listOf(
+                    TraktWatchedSeason(1, listOf(TraktWatchedEpisode(1)))
+                )
+            )
+            coEvery { episodeRepository.getSeasonsWithEpisodes(any()) } returns seasonsPayload(
+                mapOf(0 to 1, 1 to 2, 2 to 1)
+            )
+            coEvery {
+                episodeRepository.markEpisodesWatchedUpTo(any(), any(), any(), any())
+            } returns Result.success(Unit)
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            // Target: S2E1. Candidates should be S1E2 + S2E1 (S0 excluded, S1E1 already watched).
+            val target = vm.uiState.value.seasons.first { it.number == 2 }.episodes.first { it.number == 1 }
+            vm.markEarlierWatched(target)
+            advanceUntilIdle()
+
+            coVerify(exactly = 1) {
+                episodeRepository.markEpisodesWatchedUpTo(
+                    ids = any(),
+                    targetSeason = 2,
+                    targetEpisode = 1,
+                    candidates = match { list ->
+                        list.toSet() == setOf(1 to 2, 2 to 1)
+                    }
+                )
+            }
+        }
+
+        @Test
+        fun `optimistic flip then updateLocalWatched called per candidate on success`() = runTest {
+            seedLibrary()
+            coEvery { episodeRepository.getSeasonsWithEpisodes(any()) } returns seasonsPayload(
+                mapOf(1 to 3)
+            )
+            coEvery {
+                episodeRepository.markEpisodesWatchedUpTo(any(), any(), any(), any())
+            } returns Result.success(Unit)
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            // All 3 episodes are unwatched; target S1E2 → candidates S1E1, S1E2.
+            val target = vm.uiState.value.seasons.first().episodes.first { it.number == 2 }
+            vm.markEarlierWatched(target)
+            advanceUntilIdle()
+
+            assertFalse(vm.uiState.value.bulkInProgress)
+            assertNull(vm.uiState.value.toggleError)
+            assertEquals(2, vm.uiState.value.bulkSuccessCount)
+
+            // Both candidates flipped to watched in the UI.
+            val eps = vm.uiState.value.seasons.first().episodes
+            assertTrue(eps.first { it.number == 1 }.watched)
+            assertTrue(eps.first { it.number == 2 }.watched)
+            assertFalse(eps.first { it.number == 3 }.watched) // not a candidate
+
+            coVerify(exactly = 1) { showRepository.updateLocalWatched(TRAKT_SHOW_ID, 1, 1, true) }
+            coVerify(exactly = 1) { showRepository.updateLocalWatched(TRAKT_SHOW_ID, 1, 2, true) }
+            coVerify(exactly = 0) { showRepository.updateLocalWatched(TRAKT_SHOW_ID, 1, 3, any()) }
+        }
+
+        @Test
+        fun `failure path reverts only candidate episodes, not pre-existing watched episodes`() = runTest {
+            // S1E1 already watched before the operation.
+            seedLibrary(
+                watchedSeasons = listOf(
+                    TraktWatchedSeason(1, listOf(TraktWatchedEpisode(1)))
+                )
+            )
+            coEvery { episodeRepository.getSeasonsWithEpisodes(any()) } returns seasonsPayload(
+                mapOf(1 to 3)
+            )
+            every { application.getString(any()) } returns "bulk-error"
+            coEvery {
+                episodeRepository.markEpisodesWatchedUpTo(any(), any(), any(), any())
+            } returns Result.failure(RuntimeException("network"))
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            // Target S1E3 — candidates are S1E2, S1E3 (S1E1 already watched).
+            val target = vm.uiState.value.seasons.first().episodes.first { it.number == 3 }
+            vm.markEarlierWatched(target)
+            advanceUntilIdle()
+
+            assertFalse(vm.uiState.value.bulkInProgress)
+            assertNotNull(vm.uiState.value.toggleError)
+
+            val eps = vm.uiState.value.seasons.first().episodes
+            // Pre-existing watched episode must remain watched after revert.
+            assertTrue(eps.first { it.number == 1 }.watched)
+            // Candidate episodes reverted to unwatched.
+            assertFalse(eps.first { it.number == 2 }.watched)
+            assertFalse(eps.first { it.number == 3 }.watched)
+            coVerify(exactly = 0) { showRepository.updateLocalWatched(any(), any(), any(), any()) }
+        }
+
+        @Test
+        fun `re-entry while bulkInProgress is a no-op`() = runTest {
+            seedLibrary()
+            coEvery { episodeRepository.getSeasonsWithEpisodes(any()) } returns seasonsPayload(
+                mapOf(1 to 2)
+            )
+            // Suspend the operation so bulkInProgress stays true.
+            coEvery {
+                episodeRepository.markEpisodesWatchedUpTo(any(), any(), any(), any())
+            } coAnswers {
+                kotlinx.coroutines.delay(10_000)
+                Result.success(Unit)
+            }
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            val target = vm.uiState.value.seasons.first().episodes.first { it.number == 2 }
+            vm.markEarlierWatched(target)
+
+            // bulkInProgress should be true now (operation not finished).
+            assertTrue(vm.uiState.value.bulkInProgress)
+
+            // Second call is a no-op — only one HTTP call ever issued.
+            vm.markEarlierWatched(target)
+
+            coVerify(exactly = 1) {
+                episodeRepository.markEpisodesWatchedUpTo(any(), any(), any(), any())
+            }
+        }
+
+        @Test
+        fun `no-op when all episodes at or before target are already watched`() = runTest {
+            // Both S1E1 and S1E2 already watched.
+            seedLibrary(
+                watchedSeasons = listOf(
+                    TraktWatchedSeason(1, listOf(TraktWatchedEpisode(1), TraktWatchedEpisode(2)))
+                )
+            )
+            coEvery { episodeRepository.getSeasonsWithEpisodes(any()) } returns seasonsPayload(
+                mapOf(1 to 2)
+            )
+
+            val vm = createViewModel()
+            advanceUntilIdle()
+
+            val target = vm.uiState.value.seasons.first().episodes.first { it.number == 2 }
+            vm.markEarlierWatched(target)
+            advanceUntilIdle()
+
+            // No bulk call made, no progress flag set.
+            assertFalse(vm.uiState.value.bulkInProgress)
+            coVerify(exactly = 0) {
+                episodeRepository.markEpisodesWatchedUpTo(any(), any(), any(), any())
+            }
         }
     }
 }
