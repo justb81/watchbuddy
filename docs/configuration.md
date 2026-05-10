@@ -1,63 +1,63 @@
-# WatchBuddy — Konfigurationswerte
+# WatchBuddy — Configuration Values
 
-Diese Datei listet alle Stellen im Repository, an denen **manuell Konfigurationswerte gepflegt** werden müssen, bevor die App gebaut oder das Backend gestartet werden kann.
+This file lists all places in the repository where **configuration values must be maintained manually** before the app can be built or the backend started.
 
 ---
 
 ## Android App (`app-phone`)
 
-**Datei:** `app-phone/build.gradle.kts` → `defaultConfig { … }`
+**File:** `app-phone/build.gradle.kts` → `defaultConfig { … }`
 
-| BuildConfig-Feld    | Typ     | Beschreibung                                                                                                 |
-|---------------------|---------|--------------------------------------------------------------------------------------------------------------|
-| `TRAKT_CLIENT_ID`   | String  | Trakt API Client-ID der registrierten App (https://trakt.tv/oauth/applications). Leerstring → Trakt-Login deaktiviert. |
-| `TOKEN_BACKEND_URL` | String  | Basis-URL des WatchBuddy Token-Proxy-Backends (z.B. `https://watchbuddy-backend.example.com`). Leerstring → Proxy nicht genutzt, Trakt-Login deaktiviert. |
+| BuildConfig field   | Type    | Description                                                                                                 |
+|---------------------|---------|-------------------------------------------------------------------------------------------------------------|
+| `TRAKT_CLIENT_ID`   | String  | Trakt API client ID of the registered app (https://trakt.tv/oauth/applications). Empty string → Trakt login disabled. |
+| `TOKEN_BACKEND_URL` | String  | Base URL of the WatchBuddy token proxy backend (e.g. `https://watchbuddy-backend.example.com`). Empty string → proxy not used, Trakt login disabled. |
 
-Beide Felder können alternativ als **CI-Umgebungsvariablen** gesetzt werden:
+Both fields can alternatively be set as **CI environment variables**:
 
 ```
 TRAKT_CLIENT_ID=xxx
 TOKEN_BACKEND_URL=https://...
 ```
 
-Das Gradle-Skript liest diese Variablen via `System.getenv()` und priorisiert sie gegenüber Hardcode-Werten. Für lokale Entwicklung die Werte direkt im Skript eintragen (Leerstring ist der sichere Default).
+The Gradle script reads these variables via `System.getenv()` and gives them priority over hardcoded values. For local development, enter the values directly in the script (an empty string is the safe default).
 
-> **Wichtig:** Beide Felder müssen gesetzt sein, damit der Trakt-Login-Flow in der App aktiviert wird (`OnboardingViewModel.isTraktConfigured`). Fehlt eines der beiden, bleibt die Onboarding-UI im Zustand `NotConfigured`.
+> **Important:** Both fields must be set for the Trakt login flow to be activated in the app (`OnboardingViewModel.isTraktConfigured`). If either is missing, the onboarding UI remains in the `NotConfigured` state.
 
 ---
 
-## Token-Proxy-Backend (`backend/`)
+## Token Proxy Backend (`backend/`)
 
-**Konfiguration:** Umgebungsvariablen werden direkt an den Docker-Container weitergereicht (siehe `backend/docker-compose.yml`).
+**Configuration:** Environment variables are passed directly to the Docker container (see `backend/docker-compose.yml`).
 
-| Variable              | Beschreibung                                                      |
-|-----------------------|-------------------------------------------------------------------|
-| `TRAKT_CLIENT_ID`     | Trakt API Client-ID (identisch mit dem App-Wert oben).            |
-| `TRAKT_CLIENT_SECRET` | Trakt API Client-Secret. **Nur hier** — niemals in der APK.      |
-| `PORT`                | HTTP-Port des Backends (Default: `3000`).                         |
+| Variable              | Description                                                      |
+|-----------------------|------------------------------------------------------------------|
+| `TRAKT_CLIENT_ID`     | Trakt API client ID (identical to the app value above).          |
+| `TRAKT_CLIENT_SECRET` | Trakt API client secret. **Here only** — never in the APK.       |
+| `PORT`                | HTTP port of the backend (default: `3000`).                      |
 
 ```bash
-# Umgebungsvariablen auf dem Host setzen (z.B. in der Shell oder in CI/CD)
+# Set environment variables on the host (e.g. in the shell or in CI/CD)
 export TRAKT_CLIENT_ID=your_trakt_client_id_here
 export TRAKT_CLIENT_SECRET=your_trakt_client_secret_here
-export PORT=3000   # optional, Default: 3000
+export PORT=3000   # optional, default: 3000
 ```
 
 ---
 
-## Trakt-App registrieren
+## Register a Trakt App
 
-Alle Werte erhältst du unter: **https://trakt.tv/oauth/applications/new**
+All values are available at: **https://trakt.tv/oauth/applications/new**
 
-- **Redirect URI:** `urn:ietf:wg:oauth:2.0:oob` (Device-Auth-Flow, kein Redirect nötig)
+- **Redirect URI:** `urn:ietf:wg:oauth:2.0:oob` (device auth flow, no redirect required)
 - **Grant type:** Device Auth
 
 ---
 
-## Zusammenfassung: Checkliste vor dem ersten Build
+## Summary: Pre-build Checklist
 
-- [ ] Trakt-App unter https://trakt.tv/oauth/applications registriert
-- [ ] `TRAKT_CLIENT_ID` in `app-phone/build.gradle.kts` (oder CI-Env) gesetzt
-- [ ] `TOKEN_BACKEND_URL` in `app-phone/build.gradle.kts` (oder CI-Env) gesetzt
-- [ ] Umgebungsvariablen `TRAKT_CLIENT_ID` und `TRAKT_CLIENT_SECRET` auf dem Host gesetzt
-- [ ] Backend deployed / lokal gestartet (`npm start` in `backend/`)
+- [ ] Trakt app registered at https://trakt.tv/oauth/applications
+- [ ] `TRAKT_CLIENT_ID` set in `app-phone/build.gradle.kts` (or CI env)
+- [ ] `TOKEN_BACKEND_URL` set in `app-phone/build.gradle.kts` (or CI env)
+- [ ] Environment variables `TRAKT_CLIENT_ID` and `TRAKT_CLIENT_SECRET` set on the host
+- [ ] Backend deployed / started locally (`npm start` in `backend/`)
