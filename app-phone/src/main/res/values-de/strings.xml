@@ -167,6 +167,19 @@
     <string name="show_detail_cd_toggle_watched">Sehstatus für Folge %1$d in Staffel %2$d umschalten</string>
     <string name="show_detail_cd_expand_season">Staffel %1$d ausklappen</string>
     <string name="show_detail_cd_collapse_season">Staffel %1$d einklappen</string>
+    <string name="show_detail_cd_episode_menu">Optionen für Folge %1$d in Staffel %2$d</string>
+    <string name="show_detail_mark_earlier_watched">Diese und alle früheren Folgen als gesehen markieren</string>
+    <string name="show_detail_bulk_confirm_title">Frühere Folgen als gesehen markieren?</string>
+    <plurals name="show_detail_bulk_confirm_body">
+        <item quantity="one">S%1$02dF%2$02d und %3$d frühere Folge werden auf Trakt als gesehen markiert.</item>
+        <item quantity="other">S%1$02dF%2$02d und %3$d frühere Folgen werden auf Trakt als gesehen markiert.</item>
+    </plurals>
+    <string name="show_detail_bulk_confirm_action">Als gesehen markieren</string>
+    <plurals name="show_detail_bulk_success">
+        <item quantity="one">%d Folge als gesehen markiert</item>
+        <item quantity="other">%d Folgen als gesehen markiert</item>
+    </plurals>
+    <string name="show_detail_error_bulk_toggle">Folgen konnten nicht markiert werden — bitte erneut versuchen</string>
 
     <!-- Common -->
     <string name="no_description">Keine Beschreibung verfügbar.</string>
