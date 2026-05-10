@@ -8,8 +8,8 @@ import com.justb81.watchbuddy.core.model.ProviderCatalogSnapshot
  * The canonical data comes from the backend-served provider catalog (fetched and
  * cached by [com.justb81.watchbuddy.phone.data.ProviderCatalogRepository] on phone
  * and [com.justb81.watchbuddy.tv.data.TvProviderCatalogRepository] on TV).
- * When no live catalog is injected the object falls back to the bundled snapshot
- * baked in via [ProviderCatalogSnapshot].
+ * When no live catalog is injected the object falls back to the in-code
+ * [BUNDLED_ENTRIES] constant.
  *
  * The static deep-link template catalog has been removed — per-episode deep links
  * are now sourced live from JustWatch (see `JustWatchDeepLinkRepository`).
@@ -34,7 +34,9 @@ object ProviderCatalog {
     val entries: List<ProviderEntry>
         get() = snapshot?.let { s ->
             s.providers.flatMap { p ->
-                p.androidPackages.tv.map { pkg -> ProviderEntry(p.tmdbProviderId, pkg) }
+                p.tmdbProviderIds.flatMap { id ->
+                    p.androidPackages.tv.map { pkg -> ProviderEntry(id, pkg) }
+                }
             }
         } ?: BUNDLED_ENTRIES
 
@@ -45,18 +47,17 @@ object ProviderCatalog {
         get() = entries.map { it.packageName }.toSet()
 
     private val BUNDLED_ENTRIES: List<ProviderEntry> = listOf(
-        ProviderEntry(8, "com.netflix.ninja"),
-        ProviderEntry(9, "com.amazon.amazonvideo.livingroom"),
-        ProviderEntry(119, "com.amazon.amazonvideo.livingroom"),
-        ProviderEntry(337, "com.disney.disneyplus"),
-        ProviderEntry(350, "com.apple.atve.androidtv.appletv"),
-        ProviderEntry(531, "com.cbs.app"),
-        ProviderEntry(1899, "com.hbo.hbonow"),
-        ProviderEntry(2187, "de.exaring.waipu"),
-        ProviderEntry(2184, "de.prosiebensat1digital.seventv"),
-        ProviderEntry(195, "de.swr.avp.ard.tv"),
-        ProviderEntry(231, "com.zdf.android.mediathek"),
-        ProviderEntry(192, "com.google.android.youtube.tv"),
-        ProviderEntry(35, "tv.wuaki.apptv"),
-    )
+        listOf(8) to "com.netflix.ninja",
+        listOf(119, 9) to "com.amazon.amazonvideo.livingroom",
+        listOf(337) to "com.disney.disneyplus",
+        listOf(350) to "com.apple.atve.androidtv.appletv",
+        listOf(531) to "com.cbs.app",
+        listOf(1899) to "com.hbo.hbonow",
+        listOf(2187) to "de.exaring.waipu",
+        listOf(2184) to "de.prosiebensat1.joyn.tv",
+        listOf(195) to "de.swr.avp.ard.tv",
+        listOf(231) to "com.zdf.android.mediathek",
+        listOf(192) to "com.google.android.youtube.tv",
+        listOf(35) to "tv.wuaki.apptv",
+    ).flatMap { (ids, pkg) -> ids.map { ProviderEntry(it, pkg) } }
 }

@@ -375,7 +375,7 @@ The available-provider list for each show is fetched from TMDB `/tv/{id}/watch/p
 | 531 | Paramount+ | `com.cbs.app` |
 | 1899 | Max / HBO | `com.hbo.hbonow` |
 | 2187 | WaipuTV | `de.exaring.waipu` |
-| 2184 | Joyn / 7TV | `de.prosiebensat1digital.seventv` |
+| 2184 | Joyn | `de.prosiebensat1.joyn.tv` |
 | 192 | YouTube | `com.google.android.youtube.tv` |
 | 35 | Rakuten TV | `tv.wuaki.apptv` |
 | 195 | ARD Mediathek | `de.swr.avp.ard.tv` |

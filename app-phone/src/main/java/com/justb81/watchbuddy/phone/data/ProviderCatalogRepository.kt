@@ -1,6 +1,5 @@
 package com.justb81.watchbuddy.phone.data
 
-import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
@@ -22,7 +21,6 @@ import com.justb81.watchbuddy.core.model.ProviderCatalogSnapshot
 import com.justb81.watchbuddy.core.network.WatchBuddyJson
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -44,7 +42,6 @@ private const val HTTP_NOT_MODIFIED = 304
 
 @Singleton
 class ProviderCatalogRepository @Inject constructor(
-    @param:ApplicationContext private val context: Context,
     private val dataStore: DataStore<Preferences>,
     private val workManager: WorkManager,
     private val backendUrl: String,
@@ -68,9 +65,6 @@ class ProviderCatalogRepository @Inject constructor(
             val json = prefs[Keys.CATALOG_JSON]
             if (json != null) {
                 parseCatalog(json)?.let { applySnapshot(it) }
-            }
-            if (_catalog.value == null) {
-                loadBundled()
             }
             if (backendUrl.isNotBlank()) {
                 schedulePeriodicRefresh()
@@ -136,10 +130,8 @@ class ProviderCatalogRepository @Inject constructor(
         }
     }
 
-    suspend fun currentJson(): String {
-        val prefs = dataStore.data.first()
-        return prefs[Keys.CATALOG_JSON] ?: loadBundledJson()
-    }
+    /** Returns the live catalog JSON, or null if no catalog has been fetched from the backend yet. */
+    suspend fun currentJson(): String? = dataStore.data.first()[Keys.CATALOG_JSON]
 
     fun currentVersion(): Int = _catalog.value?.version ?: 0
 
@@ -152,15 +144,6 @@ class ProviderCatalogRepository @Inject constructor(
         ProviderCatalog.updateFromSnapshot(snapshot)
         JustWatchPackageMap.updateFromSnapshot(snapshot)
     }
-
-    private fun loadBundled() {
-        val json = loadBundledJson()
-        parseCatalog(json)?.let { applySnapshot(it) }
-    }
-
-    private fun loadBundledJson(): String = runCatching {
-        context.assets.open("provider-catalog-bundled.json").bufferedReader().readText()
-    }.getOrElse { "{\"version\":0,\"lastUpdated\":\"\",\"providers\":[]}" }
 
     private fun parseCatalog(json: String): ProviderCatalogSnapshot? = runCatching {
         WatchBuddyJson.decodeFromString(ProviderCatalogSnapshot.serializer(), json)
@@ -182,7 +165,7 @@ class ProviderCatalogRepository @Inject constructor(
 
 @HiltWorker
 class CatalogRefreshWorker @AssistedInject constructor(
-    @Assisted context: Context,
+    @Assisted context: android.content.Context,
     @Assisted params: WorkerParameters,
     private val repository: ProviderCatalogRepository,
 ) : CoroutineWorker(context, params) {

@@ -91,7 +91,7 @@
         <package android:name="com.cbs.app" />
         <package android:name="com.hbo.hbonow" />
         <package android:name="de.exaring.waipu" />
-        <package android:name="de.prosiebensat1digital.seventv" />
+        <package android:name="de.prosiebensat1.joyn.tv" />
         <package android:name="de.swr.avp.ard.tv" />
         <package android:name="com.zdf.android.mediathek" />
         <package android:name="com.google.android.youtube.tv" />

@@ -1,9 +1,9 @@
 {
-  "version": 7,
-  "lastUpdated": "2026-04-30T12:00:00Z",
+  "version": 8,
+  "lastUpdated": "2026-05-10T00:00:00Z",
   "providers": [
     {
-      "tmdbProviderId": 8,
+      "tmdbProviderIds": [8],
       "name": "Netflix",
       "regions": ["*"],
       "androidPackages": {
@@ -13,18 +13,8 @@
       "justWatchTechnicalNames": ["netflix", "netflixbasicwithads"]
     },
     {
-      "tmdbProviderId": 9,
-      "name": "Amazon Video",
-      "regions": ["*"],
-      "androidPackages": {
-        "tv": ["com.amazon.amazonvideo.livingroom"],
-        "phone": ["com.amazon.avod.thirdpartyclient"]
-      },
-      "justWatchTechnicalNames": []
-    },
-    {
-      "tmdbProviderId": 119,
-      "name": "Prime Video",
+      "tmdbProviderIds": [119, 9],
+      "name": "Amazon Prime Video",
       "regions": ["*"],
       "androidPackages": {
         "tv": ["com.amazon.amazonvideo.livingroom"],
@@ -33,7 +23,7 @@
       "justWatchTechnicalNames": ["amazonprime", "amazonprimevideowithads"]
     },
     {
-      "tmdbProviderId": 337,
+      "tmdbProviderIds": [337],
       "name": "Disney+",
       "regions": ["*"],
       "androidPackages": {
@@ -43,7 +33,7 @@
       "justWatchTechnicalNames": ["disneyplus"]
     },
     {
-      "tmdbProviderId": 350,
+      "tmdbProviderIds": [350],
       "name": "Apple TV+",
       "regions": ["*"],
       "androidPackages": {
@@ -53,7 +43,7 @@
       "justWatchTechnicalNames": ["appletvplus"]
     },
     {
-      "tmdbProviderId": 531,
+      "tmdbProviderIds": [531],
       "name": "Paramount+",
       "regions": ["*"],
       "androidPackages": {
@@ -63,7 +53,7 @@
       "justWatchTechnicalNames": ["paramountplus"]
     },
     {
-      "tmdbProviderId": 1899,
+      "tmdbProviderIds": [1899],
       "name": "Max",
       "regions": ["*"],
       "androidPackages": {
@@ -73,7 +63,7 @@
       "justWatchTechnicalNames": ["max"]
     },
     {
-      "tmdbProviderId": 2187,
+      "tmdbProviderIds": [2187],
       "name": "waipu.tv",
       "regions": ["DE", "AT"],
       "androidPackages": {
@@ -83,17 +73,17 @@
       "justWatchTechnicalNames": []
     },
     {
-      "tmdbProviderId": 2184,
+      "tmdbProviderIds": [2184],
       "name": "Joyn",
       "regions": ["DE", "AT", "CH"],
       "androidPackages": {
-        "tv": ["de.prosiebensat1digital.seventv"],
+        "tv": ["de.prosiebensat1.joyn.tv"],
         "phone": ["de.prosiebensat1.joyn"]
       },
       "justWatchTechnicalNames": ["joynde"]
     },
     {
-      "tmdbProviderId": 195,
+      "tmdbProviderIds": [195],
       "name": "ARD Mediathek",
       "regions": ["DE", "AT", "CH"],
       "androidPackages": {
@@ -103,7 +93,7 @@
       "justWatchTechnicalNames": ["daserstemediathek", "ardplus"]
     },
     {
-      "tmdbProviderId": 231,
+      "tmdbProviderIds": [231],
       "name": "ZDF Mediathek",
       "regions": ["DE", "AT", "CH"],
       "androidPackages": {
@@ -113,7 +103,7 @@
       "justWatchTechnicalNames": ["zdf"]
     },
     {
-      "tmdbProviderId": 192,
+      "tmdbProviderIds": [192],
       "name": "YouTube",
       "regions": ["*"],
       "androidPackages": {
@@ -123,7 +113,7 @@
       "justWatchTechnicalNames": ["youtubered", "yti", "yot", "ytv"]
     },
     {
-      "tmdbProviderId": 35,
+      "tmdbProviderIds": [35],
       "name": "Rakuten TV",
       "regions": ["*"],
       "androidPackages": {

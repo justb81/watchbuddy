@@ -1,6 +1,9 @@
 package com.justb81.watchbuddy.core.justwatch
 
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
+import com.justb81.watchbuddy.core.model.CatalogAndroidPackages
+import com.justb81.watchbuddy.core.model.CatalogProviderEntry
+import com.justb81.watchbuddy.core.model.ProviderCatalogSnapshot
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
@@ -15,13 +18,21 @@ import org.junit.jupiter.params.provider.CsvSource
 class JustWatchPackageMapTest {
 
     @BeforeEach
-    fun clearLog() {
+    fun setUp() {
         DiagnosticLog.clear()
+        resetSnapshot()
     }
 
     @AfterEach
-    fun resetLog() {
+    fun tearDown() {
         DiagnosticLog.clear()
+        resetSnapshot()
+    }
+
+    private fun resetSnapshot() {
+        val field = JustWatchPackageMap::class.java.getDeclaredField("snapshot")
+        field.isAccessible = true
+        field.set(JustWatchPackageMap, null)
     }
 
     @ParameterizedTest(name = "{0} → TMDB {1}")
@@ -100,5 +111,55 @@ class JustWatchPackageMapTest {
         // Multiple keys sharing a TMDB id (e.g. netflix/netflixbasicwithads → 8) is intentional
         val uniqueEntries = JustWatchPackageMap.technicalNameToProviderId.keys
         assertEquals(uniqueEntries.size, uniqueEntries.toSet().size)
+    }
+
+    @Test
+    fun `snapshot with merged Amazon entry resolves amazonprime to canonical ID 119`() {
+        val snapshot = ProviderCatalogSnapshot(
+            version = 8,
+            lastUpdated = "2026-05-10T00:00:00Z",
+            providers = listOf(
+                CatalogProviderEntry(
+                    tmdbProviderIds = listOf(119, 9),
+                    name = "Amazon Prime Video",
+                    regions = listOf("*"),
+                    androidPackages = CatalogAndroidPackages(
+                        tv = listOf("com.amazon.amazonvideo.livingroom"),
+                        phone = listOf("com.amazon.avod.thirdpartyclient"),
+                    ),
+                    justWatchTechnicalNames = listOf("amazonprime", "amazonprimevideowithads"),
+                ),
+            ),
+        )
+
+        JustWatchPackageMap.updateFromSnapshot(snapshot)
+
+        assertEquals(119, JustWatchPackageMap.resolveProviderId("amazonprime"))
+        assertEquals(119, JustWatchPackageMap.resolveProviderId("amazonprimevideowithads"))
+    }
+
+    @Test
+    fun `snapshot resolveProviderId uses first tmdbProviderId as canonical`() {
+        val snapshot = ProviderCatalogSnapshot(
+            version = 8,
+            lastUpdated = "2026-05-10T00:00:00Z",
+            providers = listOf(
+                CatalogProviderEntry(
+                    tmdbProviderIds = listOf(8),
+                    name = "Netflix",
+                    regions = listOf("*"),
+                    androidPackages = CatalogAndroidPackages(
+                        tv = listOf("com.netflix.ninja"),
+                        phone = listOf("com.netflix.mediaclient"),
+                    ),
+                    justWatchTechnicalNames = listOf("netflix", "netflixbasicwithads"),
+                ),
+            ),
+        )
+
+        JustWatchPackageMap.updateFromSnapshot(snapshot)
+
+        assertEquals(8, JustWatchPackageMap.resolveProviderId("netflix"))
+        assertEquals(8, JustWatchPackageMap.resolveProviderId("netflixbasicwithads"))
     }
 }

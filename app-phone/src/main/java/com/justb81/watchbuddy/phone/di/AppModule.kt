@@ -146,17 +146,15 @@ object AppModule {
     /**
      * Provider catalog repository — fetches versioned provider/JustWatch mapping JSON from
      * the backend (when [BuildConfig.TOKEN_BACKEND_URL] is set), caches in DataStore, and
-     * relays to TV via CompanionHttpServer. Falls back to the bundled asset on first run
-     * or when the backend is unavailable.
+     * relays to TV via CompanionHttpServer. Falls back to in-code BUNDLED_ENTRIES /
+     * BUNDLED_MAP constants when no live catalog has been fetched yet.
      */
     @Provides
     @Singleton
     fun provideProviderCatalogRepository(
-        @ApplicationContext context: Context,
         dataStore: DataStore<Preferences>,
         workManager: WorkManager,
     ): ProviderCatalogRepository = ProviderCatalogRepository(
-        context = context,
         dataStore = dataStore,
         workManager = workManager,
         backendUrl = BuildConfig.TOKEN_BACKEND_URL,

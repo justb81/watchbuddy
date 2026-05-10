@@ -1,6 +1,5 @@
 package com.justb81.watchbuddy.tv.di
 
-import android.content.Context
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import com.justb81.watchbuddy.core.scrobbler.MetadataEnricher
@@ -22,7 +21,6 @@ import dagger.Binds
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
-import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -104,14 +102,14 @@ abstract class AppModule {
         /**
          * TV provider catalog repository — fetches catalog from the best-connected phone,
          * persists in Room, and applies to the [ProviderCatalog] and [JustWatchPackageMap]
-         * façades. Falls back to the bundled asset when no phone is reachable.
+         * façades. Falls back to in-code BUNDLED_ENTRIES / BUNDLED_MAP constants when no
+         * phone is reachable.
          */
         @Provides
         @Singleton
         fun provideTvProviderCatalogRepository(
-            @ApplicationContext context: Context,
             dao: ProviderCatalogCacheDao,
             discoveryManager: PhoneDiscoveryManager,
-        ): TvProviderCatalogRepository = TvProviderCatalogRepository(context, dao, discoveryManager)
+        ): TvProviderCatalogRepository = TvProviderCatalogRepository(dao, discoveryManager)
     }
 }
