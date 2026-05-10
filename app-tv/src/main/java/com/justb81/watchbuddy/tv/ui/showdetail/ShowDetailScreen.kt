@@ -2,6 +2,13 @@ package com.justb81.watchbuddy.tv.ui.showdetail
 
 import android.content.Context
 import android.content.Intent
+import android.widget.Toast
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -36,6 +43,7 @@ import com.justb81.watchbuddy.core.model.ResolvedProvider
 import com.justb81.watchbuddy.core.tmdb.TmdbImageHelper
 import com.justb81.watchbuddy.tv.ui.components.SeasonEpisodeListPicker
 import com.justb81.watchbuddy.tv.ui.components.UserScopePickerDialog
+import kotlinx.coroutines.delay
 
 private const val TMDB_POSTER_WIDTH = 500
 
@@ -44,6 +52,7 @@ private data class ShowDetailActions(
     val onProviderClick: (ResolvedProvider) -> Unit,
     val onRetryProviders: () -> Unit,
     val onRecapClick: () -> Unit,
+    val onMarkWatched: () -> Unit,
     val onEpisodeToggle: (season: Int, episode: Int, currentlyWatched: Boolean) -> Unit,
 )
 
@@ -59,12 +68,16 @@ fun ShowDetailScreen(
     viewModel: ShowDetailViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
-    val entry = enriched.entry
+    val advanced by viewModel.advancedEntry.collectAsState()
+    // Transparently switch to the optimistically-advanced entry once a mark-watched succeeds.
+    val effectiveEntry = advanced ?: enriched
+    val entry = effectiveEntry.entry
     val nextEpisodeUi by viewModel.nextEpisode.collectAsState()
     val providerState by viewModel.providers.collectAsState()
     val deepLinks by viewModel.deepLinks.collectAsState()
     val watchNowState by viewModel.watchNowState.collectAsState()
     val episodeListState by viewModel.episodeList.collectAsState()
+    val markState by viewModel.markWatchedState.collectAsState()
     val watchNowFocus = remember { FocusRequester() }
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -84,18 +97,31 @@ fun ShowDetailScreen(
         partialFailedMsg = partialFailedMsg,
     )
 
-    val imageUrl = nextEpisodeUi.stillUrl ?: TmdbImageHelper.poster(enriched.posterPath, TMDB_POSTER_WIDTH)
+    // One-shot toast for mark-watched feedback, then acknowledge to reset to Idle.
+    LaunchedEffect(markState) {
+        val msgRes = when (markState) {
+            MarkWatchedState.NoPhones -> R.string.tv_mark_watched_no_phones
+            MarkWatchedState.Error -> R.string.tv_mark_watched_error
+            else -> null
+        } ?: return@LaunchedEffect
+        Toast.makeText(context, context.getString(msgRes), Toast.LENGTH_LONG).show()
+        delay(3_000)
+        viewModel.acknowledgeMarkWatchedFeedback()
+    }
+
+    val imageUrl = nextEpisodeUi.stillUrl ?: TmdbImageHelper.poster(effectiveEntry.posterPath, TMDB_POSTER_WIDTH)
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         ShowDetailImagePanel(imageUrl, modifier = Modifier.align(Alignment.CenterStart))
         ShowDetailGradient()
         ShowDetailContent(
-            enriched = enriched,
+            enriched = effectiveEntry,
             nextEpisode = nextEpisodeUi,
             providerState = providerState,
             deepLinks = deepLinks,
             watchNowState = watchNowState,
             episodeListState = episodeListState,
+            markState = markState,
             watchNowFocus = watchNowFocus,
             actions = ShowDetailActions(
                 onWatchNow = {
@@ -107,11 +133,12 @@ fun ShowDetailScreen(
                     }
                 },
                 onProviderClick = { provider ->
-                    val link = viewModel.onProviderSelected(provider, enriched)
+                    val link = viewModel.onProviderSelected(provider, effectiveEntry)
                     launchProvider(context, provider, link)
                 },
-                onRetryProviders = { viewModel.loadProviders(enriched) },
+                onRetryProviders = { viewModel.loadProviders(effectiveEntry) },
                 onRecapClick = onRecapClick,
+                onMarkWatched = { viewModel.markCurrentEpisodeWatched(effectiveEntry) },
                 onEpisodeToggle = { season, episode, currentlyWatched ->
                     if (viewModel.skipScopePickerThisSession) {
                         val allIds = viewModel.connectedUsers().map { it.id }.toSet()
@@ -143,7 +170,7 @@ fun ShowDetailScreen(
 
     ShowDetailScopePicker(
         viewModel = viewModel,
-        enriched = enriched,
+        enriched = effectiveEntry,
         pendingToggle = pendingToggle,
         onDismiss = { pendingToggle = null },
     )
@@ -236,6 +263,7 @@ private fun ShowDetailContent(
     deepLinks: Map<Int, DeepLinkState>,
     watchNowState: WatchNowState,
     episodeListState: EpisodeListUiState,
+    markState: MarkWatchedState,
     watchNowFocus: FocusRequester,
     actions: ShowDetailActions,
     modifier: Modifier = Modifier,
@@ -268,21 +296,39 @@ private fun ShowDetailContent(
         }
         Spacer(Modifier.height(8.dp))
         Text(text = stringResource(R.string.tv_next_episode), fontSize = 14.sp, color = Color.White.copy(alpha = 0.5f))
-        Text(
-            text = episodeTitle ?: stringResource(R.string.tv_next_episode),
-            fontSize = 20.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = Color.White,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
-        )
-        Text(text = episodeCode, fontSize = 14.sp, color = Color.White.copy(alpha = 0.6f))
+        // AnimatedContent slides the episode info out left and slides new episode in from the right
+        // whenever the episodeCode changes (driven by advancedEntry optimistic update).
+        AnimatedContent(
+            targetState = episodeCode,
+            transitionSpec = {
+                (slideInHorizontally { it } + fadeIn()) togetherWith
+                    (slideOutHorizontally { -it } + fadeOut())
+            },
+            label = "next-episode",
+        ) { code ->
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = episodeTitle ?: stringResource(R.string.tv_next_episode),
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(text = code, fontSize = 14.sp, color = Color.White.copy(alpha = 0.6f))
+            }
+        }
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             WatchNowButton(
                 state = watchNowState,
                 onClick = actions.onWatchNow,
                 focusRequester = watchNowFocus,
+            )
+            MarkWatchedButton(
+                state = markState,
+                hasNextEpisode = nextEpisode.episodeCode != null,
+                onClick = actions.onMarkWatched,
             )
             OutlinedButton(onClick = actions.onRecapClick) { Text(stringResource(R.string.tv_recap)) }
         }
@@ -354,6 +400,38 @@ private fun WatchNowButton(
                 Text(text = stringResource(R.string.tv_watch_now_no_provider), fontWeight = FontWeight.Bold)
             }
         }
+    }
+}
+
+/**
+ * "Mark as watched" button for the current next-unwatched episode.
+ *
+ * - Disabled while [state] is [MarkWatchedState.Loading] or [hasNextEpisode] is false.
+ * - Shows a small spinner inline while [state] is [MarkWatchedState.Loading].
+ * - Error / no-phones states are surfaced via one-shot toasts in [ShowDetailScreen];
+ *   the button renders as Idle in those states (they reset back to Idle after the toast).
+ */
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+private fun MarkWatchedButton(
+    state: MarkWatchedState,
+    hasNextEpisode: Boolean,
+    onClick: () -> Unit,
+) {
+    val isLoading = state is MarkWatchedState.Loading
+    OutlinedButton(
+        onClick = onClick,
+        enabled = !isLoading && hasNextEpisode,
+    ) {
+        if (isLoading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(16.dp),
+                color = Color.White,
+                strokeWidth = 2.dp,
+            )
+            Spacer(Modifier.width(8.dp))
+        }
+        Text(stringResource(R.string.tv_mark_watched))
     }
 }
 

@@ -59,6 +59,13 @@
     <!-- Error states -->
     <string name="tv_error_phone_unreachable">Aplicación compañera inaccesible. Mostrando datos en caché.</string>
     <string name="tv_error_phone_unreachable_no_cache">Aplicación compañera inaccesible. Asegúrate de que WatchBuddy está en ejecución en tu teléfono.</string>
+    <string name="tv_stale_cache_banner">Mostrando lista en caché — teléfono sin conexión</string>
+
+    <!-- Show detail — one-tap mark as watched (#671) -->
+    <string name="tv_mark_watched">Marcar como visto</string>
+    <string name="tv_mark_watched_no_phones">Ningún teléfono conectado — conecta un teléfono para marcar episodios.</string>
+    <string name="tv_mark_watched_error">No se pudo marcar el episodio como visto.</string>
+    <string name="tv_mark_watched_cd">Marcar el episodio actual como visto</string>
 
     <!-- Show detail — manually mark episodes watched (#217) -->
     <string name="tv_detail_episodes">Episodios</string>

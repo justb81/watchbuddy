@@ -45,7 +45,7 @@ watchbuddy/
 │       │   ├── diagnostics/ TvDiagnosticsScreen, TvDiagnosticsViewModel (discovery / BLE / discovered-phones health — view-only, no Share)
 │       │   ├── scrobble/   ScrobbleOverlay, ScrobbleViewModel
 │       │   ├── settings/   TvSettingsScreen + TvSettingsViewModel (settings hub — discovery, autostart, show-non-installed toggle, diagnostics)
-│       │   ├── showdetail/ ShowDetailScreen, ShowDetailViewModel (next-episode still + TMDB watch providers + installed-app filter + last-used ranking + JustWatch deep links; `NextEpisodeUiState`, `ProviderListUiState`, `DeepLinkState` flows)
+│       │   ├── showdetail/ ShowDetailScreen, ShowDetailViewModel (next-episode still + TMDB watch providers + installed-app filter + last-used ranking + JustWatch deep links; `NextEpisodeUiState`, `ProviderListUiState`, `DeepLinkState` flows; one-tap mark-as-watched via `MarkWatchedState` sealed interface, `markCurrentEpisodeWatched`, `advancedEntry` optimistic StateFlow, `AnimatedContent` slide transition)
 │       │   └── theme/      TV Material theme
 ├── build-logic/        Gradle convention plugins (included build)
 │   └── convention/

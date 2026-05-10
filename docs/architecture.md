@@ -191,6 +191,42 @@ A connected TV picks up the change on its next 5-minute `/shows` poll from the p
 The TV side has no write path for Trakt history; all manual edits originate from the
 phone (#216).
 
+## TV One-Tap Mark as Watched (#671)
+
+The TV `ShowDetailScreen` exposes a **"Mark as watched"** button next to the Watch Now
+and Recap buttons. Pressing it marks the currently-displayed next episode as watched
+for **every** connected phone account simultaneously.
+
+**Implementation in `ShowDetailViewModel.markCurrentEpisodeWatched`:**
+
+1. Resolves `(season, episode)` via `ShowProgressCalculator.nextUnwatchedEpisodeNumbers`.
+2. Reads all currently-discovered phones from `phoneDiscovery.discoveredPhones.value`.
+3. If the list is empty, emits `MarkWatchedState.NoPhones` — a one-shot Toast is shown
+   and the card does not advance.
+4. Fires a `WatchedToggleRequest` at each phone's `POST /scrobble/watched` endpoint in
+   parallel using `coroutineScope { phones.map { async { … } }.awaitAll() }` — the same
+   fan-out infrastructure used by the episode-list toggle in #217.
+5. If **all** phones fail, emits `MarkWatchedState.Error` — a one-shot Toast is shown and
+   the card does not advance. Partial failure (at least one success) is treated as success.
+6. On success: calls `advanceWatched(enriched, season, episode)` to produce an
+   optimistically-updated `EnrichedShowEntry` that records the episode as watched with the
+   current timestamp. This is written to `_advancedEntry` (a `StateFlow<EnrichedShowEntry?>`).
+7. The screen uses `effectiveEntry = advancedEntry ?: enriched`. Once `_advancedEntry` is set,
+   `ShowDetailContent` recomputes `episodeCode` and the `AnimatedContent` block slides the
+   episode info to the new next-unwatched episode (slide-in from the right, slide-out to the
+   left). No `/shows` poll wait is needed.
+8. The `WatchedToggleRequest` includes `resolvesSessionKey` from the best phone's
+   `DeviceCapability.lastResolvedSessionKey`, integrating with the #474 scrobble-learning loop.
+
+**State machine (`MarkWatchedState`):**
+
+| State | Button | Toast |
+|-------|--------|-------|
+| `Idle` | Enabled | — |
+| `Loading` | Disabled, spinner | — |
+| `NoPhones` | (resets to Idle) | `tv_mark_watched_no_phones` |
+| `Error` | (resets to Idle) | `tv_mark_watched_error` |
+
 ## Companion Service Lifecycle (Phone)
 
 The phone's companion service is controlled via the "I am watching TV" toggle on the HomeScreen.
