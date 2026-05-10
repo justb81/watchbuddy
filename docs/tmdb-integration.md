@@ -167,8 +167,8 @@ When no LLM backend is available (AICore unavailable, insufficient RAM for LiteR
 ### 2. Deep Link Resolution (TV App)
 
 When the user opens a show's detail screen on the TV, `ShowDetailViewModel.loadDeepLinks()` resolves
-per-episode streaming URLs via JustWatch's unofficial GraphQL API. Static deep-link templates were
-removed; every link is resolved at runtime and cached in a Room database on the TV.
+per-episode streaming URLs via JustWatch's unofficial GraphQL API. Deep-link URLs are resolved at
+runtime and cached in a Room database on the TV.
 
 ```mermaid
 flowchart TD

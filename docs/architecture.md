@@ -140,7 +140,7 @@ flowchart TD
 ```
 
 Model updates: WorkManager (`ModelDownloadWorker`), WiFi only.
-Auto-migrate to AICore if OS update adds support.
+Automatically use AICore when OS update adds support.
 Model download URL is configurable in Advanced Settings (default: HuggingFace `litert-community`).
 
 ## Scrobbling Flow
@@ -322,7 +322,7 @@ this flow and shows a "Now Watching" card with the show title, episode number, a
 
 ### Private APK (sideload)
 - `client_secret` embedded via NDK + hidden-secrets-gradle-plugin (XOR + signature binding)
-- On first run: migrated to Android Keystore (TEE/hardware-backed)
+- On first run: stored in Android Keystore (TEE/hardware-backed)
 - `access_token` / `refresh_token`: always in Android Keystore
 
 ### Play Store APK
