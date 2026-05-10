@@ -51,6 +51,7 @@ private const val EPISODE_LIST_MAX_HEIGHT_DP = 320
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
+@Suppress("LongMethod")
 fun ShowDetailScreen(
     enriched: EnrichedShowEntry,
     onRecapClick: () -> Unit,
@@ -227,6 +228,7 @@ private fun ShowDetailGradient() {
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
+@Suppress("LongParameterList")
 private fun ShowDetailContent(
     enriched: EnrichedShowEntry,
     nextEpisode: NextEpisodeUiState,

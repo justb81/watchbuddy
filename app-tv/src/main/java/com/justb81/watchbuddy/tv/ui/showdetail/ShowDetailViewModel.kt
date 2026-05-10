@@ -136,7 +136,8 @@ private data class DeepLinkKey(
 )
 
 @HiltViewModel
-class ShowDetailViewModel @Suppress("LongParameterList") @Inject constructor(
+@Suppress("LongParameterList")
+class ShowDetailViewModel @Inject constructor(
     private val watchProviders: WatchProvidersRepository,
     private val lastUsedRepo: LastUsedProviderRepository,
     private val streamingPrefs: StreamingPreferencesRepository,
