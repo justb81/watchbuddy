@@ -90,7 +90,7 @@ flowchart TD
 
 1. After Trakt login, user enables the **Companion Service** in Settings.
 2. The phone starts a foreground service with a persistent notification.
-3. The phone is now discoverable by TV apps on the same Wi-Fi network.
+3. The phone is discoverable by TV apps on the same Wi-Fi network.
 
 ### Technical Flow
 
