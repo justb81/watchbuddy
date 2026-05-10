@@ -1,6 +1,7 @@
 package com.justb81.watchbuddy.tv.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,15 +16,18 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -108,6 +112,9 @@ private fun EpisodeRow(
     isWatched: Boolean,
     onToggle: () -> Unit,
 ) {
+    val watchedCd = stringResource(R.string.tv_detail_mark_unwatched_cd)
+    val unwatchedCd = stringResource(R.string.tv_detail_mark_watched_cd)
+
     Card(
         onClick = onToggle,
         modifier = Modifier.fillMaxWidth(),
@@ -123,16 +130,28 @@ private fun EpisodeRow(
                 .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                imageVector = if (isWatched) Icons.Filled.CheckCircle else Icons.Filled.RadioButtonUnchecked,
-                contentDescription = if (isWatched) {
-                    stringResource(R.string.tv_detail_mark_unwatched_cd)
-                } else {
-                    stringResource(R.string.tv_detail_mark_watched_cd)
-                },
-                tint = if (isWatched) MaterialTheme.colorScheme.primary else Color.White.copy(alpha = 0.4f),
-                modifier = Modifier.size(20.dp),
-            )
+            if (isWatched) {
+                Icon(
+                    imageVector = Icons.Filled.CheckCircle,
+                    contentDescription = watchedCd,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp),
+                )
+            } else {
+                val circleColor = Color.White.copy(alpha = 0.4f)
+                Box(
+                    modifier = Modifier
+                        .size(20.dp)
+                        .semantics { contentDescription = unwatchedCd }
+                        .drawBehind {
+                            drawCircle(
+                                color = circleColor,
+                                radius = size.minDimension / 2f - 1.5.dp.toPx(),
+                                style = Stroke(width = 1.5.dp.toPx()),
+                            )
+                        },
+                )
+            }
             Spacer(Modifier.width(12.dp))
             Column {
                 Text(
