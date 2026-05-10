@@ -117,7 +117,7 @@ class ShowDetailViewModelTvTest {
         )
     }
 
-    // ── loadEpisodeList ───────────────────────────────────────────────────────
+    // ── loadEpisodeList ──────────────────────────────────────────────────────────────────────
 
     @Nested
     @DisplayName("loadEpisodeList")
@@ -176,7 +176,7 @@ class ShowDetailViewModelTvTest {
         }
     }
 
-    // ── toggleEpisodeWatched — success paths ──────────────────────────────────
+    // ── toggleEpisodeWatched — success paths ──────────────────────────────────────────────
 
     @Nested
     @DisplayName("toggleEpisodeWatched — success")
@@ -281,7 +281,7 @@ class ShowDetailViewModelTvTest {
         }
     }
 
-    // ── toggleEpisodeWatched — failure paths ──────────────────────────────────
+    // ── toggleEpisodeWatched — failure paths ──────────────────────────────────────────────
 
     @Nested
     @DisplayName("toggleEpisodeWatched — failures")
@@ -293,7 +293,7 @@ class ShowDetailViewModelTvTest {
             every { phoneDiscovery.getBestPhone() } returns null
 
             val events = mutableListOf<EpisodeToggleEvent>()
-            val job = kotlinx.coroutines.launch {
+            val job = backgroundScope.launch {
                 viewModel.episodeToggleEvents.collect { events.add(it) }
             }
 
@@ -324,7 +324,7 @@ class ShowDetailViewModelTvTest {
             viewModel.loadEpisodeList(makeEntry(watchedSeasons = emptyList()))
 
             val events = mutableListOf<EpisodeToggleEvent>()
-            val job = kotlinx.coroutines.launch {
+            val job = backgroundScope.launch {
                 viewModel.episodeToggleEvents.collect { events.add(it) }
             }
 
@@ -356,7 +356,7 @@ class ShowDetailViewModelTvTest {
             viewModel.loadEpisodeList(makeEntry(watchedSeasons = emptyList()))
 
             val events = mutableListOf<EpisodeToggleEvent>()
-            val job = kotlinx.coroutines.launch {
+            val job = backgroundScope.launch {
                 viewModel.episodeToggleEvents.collect { events.add(it) }
             }
 
@@ -375,7 +375,7 @@ class ShowDetailViewModelTvTest {
         }
     }
 
-    // ── skipScopePickerThisSession ────────────────────────────────────────────
+    // ── skipScopePickerThisSession ────────────────────────────────────────────────────────────────────────────
 
     @Nested
     @DisplayName("skipScopePickerThisSession")
@@ -393,7 +393,7 @@ class ShowDetailViewModelTvTest {
         }
     }
 
-    // ── connectedUsers ────────────────────────────────────────────────────────
+    // ── connectedUsers ─────────────────────────────────────────────────────────────────────────────
 
     @Nested
     @DisplayName("connectedUsers")
