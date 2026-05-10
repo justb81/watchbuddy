@@ -29,6 +29,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -192,94 +193,99 @@ class ShowDetailViewModelTvTest {
         }
 
         @Test
-        fun `marks episode watched — updates watchedSet`() = runTest {
-            val phone = makePhone()
-            setupWithPhones(listOf(phone))
-            coEvery { phoneApiService.getSeasons("1") } returns seasonFixture
-            coEvery { phoneApiService.markWatched(any()) } returns Response.success(null)
-            // Pre-load so there's a Success state
-            viewModel.loadEpisodeList(makeEntry(watchedSeasons = emptyList()))
+        fun `marks episode watched — updates watchedSet`() =
+            runTest(mainDispatcherRule.testDispatcher) {
+                val phone = makePhone()
+                setupWithPhones(listOf(phone))
+                coEvery { phoneApiService.getSeasons("1") } returns seasonFixture
+                coEvery { phoneApiService.markWatched(any()) } returns Response.success(null)
+                viewModel.loadEpisodeList(makeEntry(watchedSeasons = emptyList()))
 
-            viewModel.toggleEpisodeWatched(
-                showIds = TraktIds(trakt = 1),
-                season = 1,
-                episode = 3,
-                markAsWatched = true,
-                selectedUserIds = setOf(phone.baseUrl),
-            )
+                viewModel.toggleEpisodeWatched(
+                    showIds = TraktIds(trakt = 1),
+                    season = 1,
+                    episode = 3,
+                    markAsWatched = true,
+                    selectedUserIds = setOf(phone.baseUrl),
+                )
+                advanceUntilIdle()
 
-            val state = viewModel.episodeList.value as EpisodeListUiState.Success
-            assertTrue(state.watchedSet.contains(1 to 3))
-        }
-
-        @Test
-        fun `unmarks episode — removes from watchedSet`() = runTest {
-            val phone = makePhone()
-            setupWithPhones(listOf(phone))
-            coEvery { phoneApiService.getSeasons("1") } returns seasonFixture
-            coEvery { phoneApiService.markUnwatched(any()) } returns Response.success(null)
-            viewModel.loadEpisodeList(makeEntry(watchedSeasons = listOf(
-                TraktWatchedSeason(1, listOf(TraktWatchedEpisode(1)))
-            )))
-
-            viewModel.toggleEpisodeWatched(
-                showIds = TraktIds(trakt = 1),
-                season = 1,
-                episode = 1,
-                markAsWatched = false,
-                selectedUserIds = setOf(phone.baseUrl),
-            )
-
-            val state = viewModel.episodeList.value as EpisodeListUiState.Success
-            assertFalse(state.watchedSet.contains(1 to 1))
-        }
+                val state = assertInstanceOf(EpisodeListUiState.Success::class.java, viewModel.episodeList.value)
+                assertTrue(state.watchedSet.contains(1 to 3))
+            }
 
         @Test
-        fun `fans out to each selected phone`() = runTest {
-            val phone1 = makePhone("http://p1:8765/", "tok1", "Alice")
-            val phone2 = makePhone("http://p2:8765/", "tok2", "Bob")
-            val api2: PhoneApiService = mockk()
-            setupWithPhones(listOf(phone1, phone2))
-            every { clientFactory.createClient("http://p2:8765/", "tok2") } returns api2
-            coEvery { phoneApiService.getSeasons("1") } returns seasonFixture
-            coEvery { phoneApiService.markWatched(any()) } returns Response.success(null)
-            coEvery { api2.markWatched(any()) } returns Response.success(null)
-            viewModel.loadEpisodeList(makeEntry(watchedSeasons = emptyList()))
+        fun `unmarks episode — removes from watchedSet`() =
+            runTest(mainDispatcherRule.testDispatcher) {
+                val phone = makePhone()
+                setupWithPhones(listOf(phone))
+                coEvery { phoneApiService.getSeasons("1") } returns seasonFixture
+                coEvery { phoneApiService.markUnwatched(any()) } returns Response.success(null)
+                viewModel.loadEpisodeList(makeEntry(watchedSeasons = listOf(
+                    TraktWatchedSeason(1, listOf(TraktWatchedEpisode(1)))
+                )))
 
-            viewModel.toggleEpisodeWatched(
-                showIds = TraktIds(trakt = 1),
-                season = 1,
-                episode = 2,
-                markAsWatched = true,
-                selectedUserIds = setOf(phone1.baseUrl, phone2.baseUrl),
-            )
+                viewModel.toggleEpisodeWatched(
+                    showIds = TraktIds(trakt = 1),
+                    season = 1,
+                    episode = 1,
+                    markAsWatched = false,
+                    selectedUserIds = setOf(phone.baseUrl),
+                )
+                advanceUntilIdle()
 
-            io.mockk.coVerify(exactly = 1) { phoneApiService.markWatched(any()) }
-            io.mockk.coVerify(exactly = 1) { api2.markWatched(any()) }
-        }
+                val state = assertInstanceOf(EpisodeListUiState.Success::class.java, viewModel.episodeList.value)
+                assertFalse(state.watchedSet.contains(1 to 1))
+            }
 
         @Test
-        fun `only fans out to selected subset`() = runTest {
-            val phone1 = makePhone("http://p1:8765/", "tok1", "Alice")
-            val phone2 = makePhone("http://p2:8765/", "tok2", "Bob")
-            setupWithPhones(listOf(phone1, phone2))
-            coEvery { phoneApiService.getSeasons("1") } returns seasonFixture
-            coEvery { phoneApiService.markWatched(any()) } returns Response.success(null)
-            viewModel.loadEpisodeList(makeEntry(watchedSeasons = emptyList()))
+        fun `fans out to each selected phone`() =
+            runTest(mainDispatcherRule.testDispatcher) {
+                val phone1 = makePhone("http://p1:8765/", "tok1", "Alice")
+                val phone2 = makePhone("http://p2:8765/", "tok2", "Bob")
+                val api2: PhoneApiService = mockk()
+                setupWithPhones(listOf(phone1, phone2))
+                every { clientFactory.createClient("http://p2:8765/", "tok2") } returns api2
+                coEvery { phoneApiService.getSeasons("1") } returns seasonFixture
+                coEvery { phoneApiService.markWatched(any()) } returns Response.success(null)
+                coEvery { api2.markWatched(any()) } returns Response.success(null)
+                viewModel.loadEpisodeList(makeEntry(watchedSeasons = emptyList()))
 
-            // Only select phone1
-            viewModel.toggleEpisodeWatched(
-                showIds = TraktIds(trakt = 1),
-                season = 1,
-                episode = 1,
-                markAsWatched = true,
-                selectedUserIds = setOf(phone1.baseUrl),
-            )
+                viewModel.toggleEpisodeWatched(
+                    showIds = TraktIds(trakt = 1),
+                    season = 1,
+                    episode = 2,
+                    markAsWatched = true,
+                    selectedUserIds = setOf(phone1.baseUrl, phone2.baseUrl),
+                )
+                advanceUntilIdle()
 
-            io.mockk.coVerify(exactly = 1) { phoneApiService.markWatched(any()) }
-            // phone2's client was never created for this call
-            io.mockk.verify(exactly = 0) { clientFactory.createClient("http://p2:8765/", "tok2") }
-        }
+                io.mockk.coVerify(exactly = 1) { phoneApiService.markWatched(any()) }
+                io.mockk.coVerify(exactly = 1) { api2.markWatched(any()) }
+            }
+
+        @Test
+        fun `only fans out to selected subset`() =
+            runTest(mainDispatcherRule.testDispatcher) {
+                val phone1 = makePhone("http://p1:8765/", "tok1", "Alice")
+                val phone2 = makePhone("http://p2:8765/", "tok2", "Bob")
+                setupWithPhones(listOf(phone1, phone2))
+                coEvery { phoneApiService.getSeasons("1") } returns seasonFixture
+                coEvery { phoneApiService.markWatched(any()) } returns Response.success(null)
+                viewModel.loadEpisodeList(makeEntry(watchedSeasons = emptyList()))
+
+                viewModel.toggleEpisodeWatched(
+                    showIds = TraktIds(trakt = 1),
+                    season = 1,
+                    episode = 1,
+                    markAsWatched = true,
+                    selectedUserIds = setOf(phone1.baseUrl),
+                )
+                advanceUntilIdle()
+
+                io.mockk.coVerify(exactly = 1) { phoneApiService.markWatched(any()) }
+                io.mockk.verify(exactly = 0) { clientFactory.createClient("http://p2:8765/", "tok2") }
+            }
     }
 
     // ── toggleEpisodeWatched — failure paths ──────────────────────────────────────────────
@@ -289,91 +295,96 @@ class ShowDetailViewModelTvTest {
     inner class ToggleWatchedFailureTest {
 
         @Test
-        fun `emits AllFailed and reverts when no selected phones match`() = runTest {
-            every { phoneDiscovery.discoveredPhones } returns MutableStateFlow(emptyList())
-            every { phoneDiscovery.getBestPhone() } returns null
+        fun `emits AllFailed and reverts when no selected phones match`() =
+            runTest(mainDispatcherRule.testDispatcher) {
+                every { phoneDiscovery.discoveredPhones } returns MutableStateFlow(emptyList())
+                every { phoneDiscovery.getBestPhone() } returns null
 
-            val events = mutableListOf<EpisodeToggleEvent>()
-            val job = backgroundScope.launch {
-                viewModel.episodeToggleEvents.collect { events.add(it) }
+                val events = mutableListOf<EpisodeToggleEvent>()
+                val job = backgroundScope.launch {
+                    viewModel.episodeToggleEvents.collect { events.add(it) }
+                }
+
+                viewModel.toggleEpisodeWatched(
+                    showIds = TraktIds(trakt = 1),
+                    season = 1,
+                    episode = 1,
+                    markAsWatched = true,
+                    selectedUserIds = setOf("http://notfound:8765/"),
+                )
+                advanceUntilIdle()
+
+                job.cancel()
+                assertTrue(events.any { it is EpisodeToggleEvent.AllFailed })
             }
-
-            viewModel.toggleEpisodeWatched(
-                showIds = TraktIds(trakt = 1),
-                season = 1,
-                episode = 1,
-                markAsWatched = true,
-                selectedUserIds = setOf("http://notfound:8765/"),
-            )
-
-            job.cancel()
-            assertTrue(events.any { it is EpisodeToggleEvent.AllFailed })
-        }
 
         @Test
-        fun `emits PartialFailed when one phone succeeds and one fails`() = runTest {
-            val phone1 = makePhone("http://p1:8765/", "tok1", "Alice")
-            val phone2 = makePhone("http://p2:8765/", "tok2", "Bob")
-            val api2: PhoneApiService = mockk()
-            every { phoneDiscovery.discoveredPhones } returns MutableStateFlow(listOf(phone1, phone2))
-            every { phoneDiscovery.getBestPhone() } returns phone1
-            every { clientFactory.createClient("http://p1:8765/", "tok1") } returns phoneApiService
-            every { clientFactory.createClient("http://p2:8765/", "tok2") } returns api2
-            coEvery { phoneApiService.getSeasons("1") } returns seasonFixture
-            coEvery { phoneApiService.markWatched(any()) } returns Response.success(null)
-            coEvery { api2.markWatched(any()) } throws RuntimeException("timeout")
-            viewModel.loadEpisodeList(makeEntry(watchedSeasons = emptyList()))
+        fun `emits PartialFailed when one phone succeeds and one fails`() =
+            runTest(mainDispatcherRule.testDispatcher) {
+                val phone1 = makePhone("http://p1:8765/", "tok1", "Alice")
+                val phone2 = makePhone("http://p2:8765/", "tok2", "Bob")
+                val api2: PhoneApiService = mockk()
+                every { phoneDiscovery.discoveredPhones } returns MutableStateFlow(listOf(phone1, phone2))
+                every { phoneDiscovery.getBestPhone() } returns phone1
+                every { clientFactory.createClient("http://p1:8765/", "tok1") } returns phoneApiService
+                every { clientFactory.createClient("http://p2:8765/", "tok2") } returns api2
+                coEvery { phoneApiService.getSeasons("1") } returns seasonFixture
+                coEvery { phoneApiService.markWatched(any()) } returns Response.success(null)
+                coEvery { api2.markWatched(any()) } throws RuntimeException("timeout")
+                viewModel.loadEpisodeList(makeEntry(watchedSeasons = emptyList()))
 
-            val events = mutableListOf<EpisodeToggleEvent>()
-            val job = backgroundScope.launch {
-                viewModel.episodeToggleEvents.collect { events.add(it) }
+                val events = mutableListOf<EpisodeToggleEvent>()
+                val job = backgroundScope.launch {
+                    viewModel.episodeToggleEvents.collect { events.add(it) }
+                }
+
+                viewModel.toggleEpisodeWatched(
+                    showIds = TraktIds(trakt = 1),
+                    season = 1,
+                    episode = 1,
+                    markAsWatched = true,
+                    selectedUserIds = setOf(phone1.baseUrl, phone2.baseUrl),
+                )
+                advanceUntilIdle()
+
+                job.cancel()
+                val partialFailed = events.filterIsInstance<EpisodeToggleEvent.PartialFailed>()
+                assertTrue(partialFailed.isNotEmpty())
+                assertTrue(partialFailed.first().failedUserNames.contains("Bob"))
+                val state = viewModel.episodeList.value as? EpisodeListUiState.Success
+                if (state != null) assertTrue(state.watchedSet.contains(1 to 1))
             }
-
-            viewModel.toggleEpisodeWatched(
-                showIds = TraktIds(trakt = 1),
-                season = 1,
-                episode = 1,
-                markAsWatched = true,
-                selectedUserIds = setOf(phone1.baseUrl, phone2.baseUrl),
-            )
-
-            job.cancel()
-            val partialFailed = events.filterIsInstance<EpisodeToggleEvent.PartialFailed>()
-            assertTrue(partialFailed.isNotEmpty())
-            assertTrue(partialFailed.first().failedUserNames.contains("Bob"))
-            // Optimistic state kept (episode is still in watchedSet)
-            val state = viewModel.episodeList.value as? EpisodeListUiState.Success
-            if (state != null) assertTrue(state.watchedSet.contains(1 to 1))
-        }
 
         @Test
-        fun `reverts watchedSet on all-failure`() = runTest {
-            val phone = makePhone()
-            every { phoneDiscovery.discoveredPhones } returns MutableStateFlow(listOf(phone))
-            every { phoneDiscovery.getBestPhone() } returns phone
-            every { clientFactory.createClient(any(), any()) } returns phoneApiService
-            coEvery { phoneApiService.getSeasons("1") } returns seasonFixture
-            coEvery { phoneApiService.markWatched(any()) } returns Response.error(500, "".toResponseBody())
-            viewModel.loadEpisodeList(makeEntry(watchedSeasons = emptyList()))
+        fun `reverts watchedSet on all-failure`() =
+            runTest(mainDispatcherRule.testDispatcher) {
+                val phone = makePhone()
+                every { phoneDiscovery.discoveredPhones } returns MutableStateFlow(listOf(phone))
+                every { phoneDiscovery.getBestPhone() } returns phone
+                every { clientFactory.createClient(any(), any()) } returns phoneApiService
+                coEvery { phoneApiService.getSeasons("1") } returns seasonFixture
+                coEvery { phoneApiService.markWatched(any()) } returns Response.error(500, "".toResponseBody())
+                viewModel.loadEpisodeList(makeEntry(watchedSeasons = emptyList()))
 
-            val events = mutableListOf<EpisodeToggleEvent>()
-            val job = backgroundScope.launch {
-                viewModel.episodeToggleEvents.collect { events.add(it) }
+                val events = mutableListOf<EpisodeToggleEvent>()
+                val job = backgroundScope.launch {
+                    viewModel.episodeToggleEvents.collect { events.add(it) }
+                }
+
+                viewModel.toggleEpisodeWatched(
+                    showIds = TraktIds(trakt = 1),
+                    season = 1,
+                    episode = 3,
+                    markAsWatched = true,
+                    selectedUserIds = setOf(phone.baseUrl),
+                )
+                advanceUntilIdle()
+
+                job.cancel()
+                assertTrue(events.any { it is EpisodeToggleEvent.AllFailed })
+                val state = viewModel.episodeList.value as? EpisodeListUiState.Success
+                if (state != null) assertFalse(state.watchedSet.contains(1 to 3))
             }
-
-            viewModel.toggleEpisodeWatched(
-                showIds = TraktIds(trakt = 1),
-                season = 1,
-                episode = 3,
-                markAsWatched = true,
-                selectedUserIds = setOf(phone.baseUrl),
-            )
-
-            job.cancel()
-            assertTrue(events.any { it is EpisodeToggleEvent.AllFailed })
-            val state = viewModel.episodeList.value as? EpisodeListUiState.Success
-            if (state != null) assertFalse(state.watchedSet.contains(1 to 3))
-        }
     }
 
     // ── skipScopePickerThisSession ────────────────────────────────────────────────────────────────────────────
@@ -405,7 +416,6 @@ class ShowDetailViewModelTvTest {
             val phone1 = makePhone("http://p1:8765/", "tok1", "Alice")
             val phone2 = makePhone("http://p2:8765/", "tok2", "Bob")
             every { phoneDiscovery.discoveredPhones } returns MutableStateFlow(listOf(phone1, phone2))
-            // Re-create viewModel so it picks up the new discoveredPhones stub
             viewModel = ShowDetailViewModel(
                 watchProviders, lastUsedRepo, streamingPrefs, phoneDiscovery, tmdbApi, justWatchRepo,
                 com.justb81.watchbuddy.core.scrobbler.NoOpPlaybackIntentProvider(),
