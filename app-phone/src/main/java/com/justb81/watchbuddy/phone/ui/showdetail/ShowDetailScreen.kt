@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
@@ -19,6 +20,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -42,6 +45,18 @@ fun ShowDetailScreen(
         val error = uiState.toggleError ?: return@LaunchedEffect
         snackbarHostState.showSnackbar(message = error.ifBlank { toggleFailedLabel })
         viewModel.clearToggleError()
+    }
+
+    val context = LocalContext.current
+    LaunchedEffect(uiState.bulkSuccessCount) {
+        val count = uiState.bulkSuccessCount ?: return@LaunchedEffect
+        val message = context.resources.getQuantityString(
+            R.plurals.show_detail_bulk_success,
+            count,
+            count
+        )
+        snackbarHostState.showSnackbar(message = message)
+        viewModel.clearBulkSuccess()
     }
 
     Scaffold(
@@ -140,8 +155,11 @@ fun ShowDetailScreen(
                                 SeasonCard(
                                     season = season,
                                     togglingEpisode = uiState.togglingEpisode,
+                                    bulkInProgress = uiState.bulkInProgress,
                                     onExpandToggle = { viewModel.toggleSeasonExpanded(season.number) },
-                                    onEpisodeToggle = { episode -> viewModel.toggleEpisodeWatched(episode) }
+                                    onEpisodeToggle = { episode -> viewModel.toggleEpisodeWatched(episode) },
+                                    onMarkEarlierWatched = { episode -> viewModel.markEarlierWatched(episode) },
+                                    allSeasons = uiState.seasons
                                 )
                             }
                         }
@@ -218,8 +236,11 @@ private fun ShowHeader(
 private fun SeasonCard(
     season: SeasonUi,
     togglingEpisode: Pair<Int, Int>?,
+    bulkInProgress: Boolean,
     onExpandToggle: () -> Unit,
-    onEpisodeToggle: (EpisodeUi) -> Unit
+    onEpisodeToggle: (EpisodeUi) -> Unit,
+    onMarkEarlierWatched: (EpisodeUi) -> Unit,
+    allSeasons: List<SeasonUi>
 ) {
     val rotation by animateFloatAsState(
         targetValue = if (season.expanded) 180f else 0f,
@@ -278,7 +299,10 @@ private fun SeasonCard(
                         EpisodeRow(
                             episode = episode,
                             isToggling = togglingEpisode == (episode.season to episode.number),
-                            onToggle = { onEpisodeToggle(episode) }
+                            bulkInProgress = bulkInProgress,
+                            allSeasons = allSeasons,
+                            onToggle = { onEpisodeToggle(episode) },
+                            onMarkEarlierWatched = { onMarkEarlierWatched(episode) }
                         )
                     }
                     Spacer(Modifier.height(8.dp))
@@ -288,17 +312,50 @@ private fun SeasonCard(
     }
 }
 
+/** Counts unwatched episodes in season >= 1 that are at or before [episode]. */
+private fun candidateCount(episode: EpisodeUi, allSeasons: List<SeasonUi>): Int =
+    allSeasons
+        .filter { it.number >= 1 }
+        .sumOf { season ->
+            season.episodes.count { ep ->
+                !ep.watched &&
+                    (season.number < episode.season ||
+                        (season.number == episode.season && ep.number <= episode.number))
+            }
+        }
+
 @Composable
 private fun EpisodeRow(
     episode: EpisodeUi,
     isToggling: Boolean,
-    onToggle: () -> Unit
+    bulkInProgress: Boolean,
+    allSeasons: List<SeasonUi>,
+    onToggle: () -> Unit,
+    onMarkEarlierWatched: () -> Unit
 ) {
+    var menuExpanded by remember { mutableStateOf(false) }
+    var showBulkConfirm by remember { mutableStateOf(false) }
+    val count = candidateCount(episode, allSeasons)
+
     val toggleCd = stringResource(
         R.string.show_detail_cd_toggle_watched,
         episode.number,
         episode.season
     )
+
+    if (showBulkConfirm) {
+        BulkConfirmDialog(
+            episode = episode,
+            candidateCount = count,
+            bulkInProgress = bulkInProgress,
+            onConfirm = {
+                showBulkConfirm = false
+                onMarkEarlierWatched()
+            },
+            onDismiss = { showBulkConfirm = false }
+        )
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -330,7 +387,83 @@ private fun EpisodeRow(
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f)
         )
+        Box {
+            IconButton(
+                onClick = { menuExpanded = true },
+                modifier = Modifier.size(32.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.MoreVert,
+                    contentDescription = stringResource(
+                        R.string.show_detail_cd_episode_menu,
+                        episode.number,
+                        episode.season
+                    ),
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            DropdownMenu(
+                expanded = menuExpanded,
+                onDismissRequest = { menuExpanded = false }
+            ) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.show_detail_mark_earlier_watched)) },
+                    onClick = {
+                        menuExpanded = false
+                        showBulkConfirm = true
+                    },
+                    enabled = count > 0 && !bulkInProgress
+                )
+            }
+        }
     }
+}
+
+@Composable
+private fun BulkConfirmDialog(
+    episode: EpisodeUi,
+    candidateCount: Int,
+    bulkInProgress: Boolean,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.show_detail_bulk_confirm_title)) },
+        text = {
+            Text(
+                pluralStringResource(
+                    R.plurals.show_detail_bulk_confirm_body,
+                    candidateCount,
+                    episode.season,
+                    episode.number,
+                    candidateCount
+                )
+            )
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                enabled = !bulkInProgress
+            ) {
+                if (bulkInProgress) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                } else {
+                    Text(stringResource(R.string.show_detail_bulk_confirm_action))
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.settings_cancel))
+            }
+        }
+    )
 }
 
 @Composable

@@ -33,7 +33,11 @@ data class ShowDetailUiState(
     val error: String? = null,
     val toggleError: String? = null,
     /** (seasonNumber, episodeNumber) currently being toggled, or null. */
-    val togglingEpisode: Pair<Int, Int>? = null
+    val togglingEpisode: Pair<Int, Int>? = null,
+    /** True while a bulk mark-watched operation is in flight. */
+    val bulkInProgress: Boolean = false,
+    /** Non-null after a successful bulk operation; cleared after the snackbar is shown. */
+    val bulkSuccessCount: Int? = null
 )
 
 data class SeasonUi(
@@ -248,8 +252,103 @@ class ShowDetailViewModel @Inject constructor(
         )
     }
 
+    /**
+     * Marks all unwatched episodes up to and including [target] as watched in a single
+     * Trakt `POST /sync/history` call. Specials (season 0) are never included.
+     *
+     * The UI is updated optimistically before the network call; on failure the flip reverts
+     * and [ShowDetailUiState.toggleError] is set. A second call while
+     * [ShowDetailUiState.bulkInProgress] is true is a no-op.
+     */
+    fun markEarlierWatched(target: EpisodeUi) {
+        val show = _uiState.value.show ?: return
+        if (_uiState.value.bulkInProgress) return
+
+        val candidates = _uiState.value.seasons
+            .flatMap { s -> s.episodes.map { Triple(s.number, it.number, it.watched) } }
+            .filter { (s, _, _) -> s >= 1 }
+            .filter { (s, e, _) ->
+                s < target.season || (s == target.season && e <= target.number)
+            }
+            .filter { (_, _, watched) -> !watched }
+            .map { (s, e, _) -> s to e }
+            .sortedWith(compareBy({ it.first }, { it.second }))
+
+        if (candidates.isEmpty()) return
+
+        _uiState.update { state ->
+            state.copy(
+                bulkInProgress = true,
+                toggleError = null,
+                bulkSuccessCount = null,
+                seasons = state.seasons.map { season -> markCandidatesWatched(season, candidates) }
+            )
+        }
+
+        viewModelScope.launch {
+            val result = episodeRepository.markEpisodesWatchedUpTo(
+                ids = show.ids,
+                targetSeason = target.season,
+                targetEpisode = target.number,
+                candidates = candidates
+            )
+            result.fold(
+                onSuccess = {
+                    candidates.forEach { (s, e) ->
+                        showRepository.updateLocalWatched(traktShowId, s, e, watched = true)
+                    }
+                    _uiState.update { it.copy(bulkInProgress = false, bulkSuccessCount = candidates.size) }
+                },
+                onFailure = {
+                    _uiState.update { state ->
+                        state.copy(
+                            bulkInProgress = false,
+                            toggleError = getApplication<Application>()
+                                .getString(R.string.show_detail_error_bulk_toggle),
+                            seasons = state.seasons.map { season -> revertCandidates(season, candidates) }
+                        )
+                    }
+                }
+            )
+        }
+    }
+
+    private fun markCandidatesWatched(
+        season: SeasonUi,
+        candidates: List<Pair<Int, Int>>
+    ): SeasonUi {
+        val candidateEps = candidates
+            .filter { (s, _) -> s == season.number }
+            .map { (_, e) -> e }
+            .toSet()
+        if (candidateEps.isEmpty()) return season
+        val updated = season.episodes.map { ep ->
+            if (ep.number in candidateEps) ep.copy(watched = true) else ep
+        }
+        return season.copy(episodes = updated, watchedCount = updated.count { it.watched })
+    }
+
+    private fun revertCandidates(
+        season: SeasonUi,
+        candidates: List<Pair<Int, Int>>
+    ): SeasonUi {
+        val candidateEps = candidates
+            .filter { (s, _) -> s == season.number }
+            .map { (_, e) -> e }
+            .toSet()
+        if (candidateEps.isEmpty()) return season
+        val updated = season.episodes.map { ep ->
+            if (ep.number in candidateEps) ep.copy(watched = false) else ep
+        }
+        return season.copy(episodes = updated, watchedCount = updated.count { it.watched })
+    }
+
     fun clearToggleError() {
         _uiState.update { it.copy(toggleError = null) }
+    }
+
+    fun clearBulkSuccess() {
+        _uiState.update { it.copy(bulkSuccessCount = null) }
     }
 
     private suspend fun loadTmdbDetails(tmdbId: Int) {
