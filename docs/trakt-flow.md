@@ -30,7 +30,7 @@ graph TB
     subgraph WIFI["LOCAL WIFI NETWORK"]
         TV["Google TV (app-tv)\n─────────────\nScrobbler\nShow grid\nDeep links\nRecap WebView"]
         Phone["Android Phone(s) (app-phone)\n─────────────\nTrakt OAuth login\nToken storage\nLLM recap engine\nShow cache"]
-        TV <-->|"NSD/mDNS + HTTP\nport 8765\nGET /shows · GET /capability\nPOST /recap · POST /scrobble/*"| Phone
+        TV <-->|"BLE beacon + HTTP\nport 8765\nGET /shows · GET /capability\nPOST /recap · POST /scrobble/*"| Phone
     end
 
     Phone -->|"Auth · sync · scrobble"| Trakt["Trakt API\ntrakt.tv/api"]
@@ -98,7 +98,7 @@ flowchart TD
 flowchart TD
     A["SettingsViewModel.toggleCompanionService()"] --> B["CompanionService starts\n(foreground, persistent notification)"]
     B --> C["Starts CompanionHttpServer\n(Ktor Netty, port 8765)"]
-    B --> D["Registers NSD (mDNS) service:\nname: watchbuddy-username\ntype: _watchbuddy._tcp.\nport: 8765\nTXT: version=1, modelQuality=90, llmBackend=LITERT"]
+    B --> D["Starts CompanionBleAdvertiser\nBroadcasts 9-byte BLE service-data payload:\nIPv4 address, port 8765,\nmodelQuality, llmBackend ordinal"]
 ```
 
 ### HTTP Endpoints (Phone Serves)
@@ -127,8 +127,8 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A["TV app starts"] --> B["PhoneDiscoveryManager.startDiscovery()\nListens for NSD type: _watchbuddy._tcp."]
-    B --> C["Phone discovered\nresolve IP + port"]
+    A["TV app starts"] --> B["PhoneDiscoveryManager.startDiscovery()\nPhoneBleScanner listens for BLE advertisements"]
+    B --> C["Phone BLE advertisement received\nextract IPv4 + port from 9-byte service-data payload"]
     C --> D["GET http://phone_ip:8765/capability"]
     D --> E["Response: DeviceCapability\n{ deviceName, userName, llmBackend,\nmodelQuality, freeRamMb, tmdbApiKey }"]
     E --> F["Rank phone:\nscore = modelQuality (0–150)\n+ ramBonus (0–10)"]
@@ -141,7 +141,7 @@ RAM bonus calculation: ≥ 6 GB → +10 | 4–6 GB → +6 | 3–4 GB → +3 | < 
 
 | Class | Responsibility |
 |-------|----------------|
-| `PhoneDiscoveryManager` | NSD listener, phone ranking, best-phone selection |
+| `PhoneDiscoveryManager` | BLE advertisement listener, phone ranking, best-phone selection |
 | `PhoneApiService` | Retrofit interface for phone HTTP endpoints |
 | `PhoneApiClientFactory` | Creates per-phone Retrofit clients (cached by base URL) |
 
@@ -374,7 +374,7 @@ The `TraktApiService` and `TokenProxyService` both define refresh endpoints (`PO
 | Media session poll interval | 30 seconds | `MediaSessionScrobbler` |
 | Phone show cache TTL | 5 minutes | `ShowRepository` |
 | Companion server port | 8765 | `CompanionHttpServer` |
-| NSD service type | `_watchbuddy._tcp.` | `CompanionService` |
+| BLE service UUID | `5e4b4d3a-9f7c-4b7e-8e6b-6c0e5f27e4a0` | `CompanionBleAdvertiser` |
 | Backend rate limit | 60 req/min per IP | `backend/src/app.js` |
 | Recap episode context | Last 8 episodes | `RecapGenerator` |
 
@@ -484,7 +484,7 @@ sequenceDiagram
 | `app-phone/.../server/CompanionHttpServer.kt` | Ktor HTTP server (endpoints listed above) |
 | `app-phone/.../server/ShowRepository.kt` | Trakt show cache with 5-min TTL |
 | `app-phone/.../server/DeviceCapabilityProvider.kt` | Device info + TMDB API key for `/capability` |
-| `app-phone/.../service/CompanionService.kt` | Foreground service, NSD registration |
+| `app-phone/.../service/CompanionService.kt` | Foreground service, BLE advertisement via `CompanionBleAdvertiser` |
 
 ### Phone App — Library UI
 
@@ -499,7 +499,7 @@ sequenceDiagram
 
 | File | Purpose |
 |------|---------|
-| `app-tv/.../discovery/PhoneDiscoveryManager.kt` | NSD listener, phone ranking |
+| `app-tv/.../discovery/PhoneDiscoveryManager.kt` | BLE advertisement listener, phone ranking |
 | `app-tv/.../discovery/PhoneApiService.kt` | Retrofit interface for phone HTTP API |
 | `app-tv/.../discovery/PhoneApiClientFactory.kt` | Per-phone Retrofit client factory |
 
