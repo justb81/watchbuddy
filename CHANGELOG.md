@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.36.0](https://github.com/justb81/watchbuddy/compare/v0.35.3...v0.36.0) (2026-05-10)
+
+
+### Features
+
+* backend-served provider catalog ([#666](https://github.com/justb81/watchbuddy/issues/666)) ([a77601e](https://github.com/justb81/watchbuddy/commit/a77601e98061b1f1d78df598f1feb0914d5784a7))
+* **phone:** bulk-mark earlier episodes as watched up to a chosen episode ([#680](https://github.com/justb81/watchbuddy/issues/680)) ([46276cf](https://github.com/justb81/watchbuddy/commit/46276cf9a89bfcf7bbeda0ccea965aba6276b95b))
+* **tv:** manually mark episodes watched with per-user scope picker ([#217](https://github.com/justb81/watchbuddy/issues/217)) ([#682](https://github.com/justb81/watchbuddy/issues/682)) ([79305d5](https://github.com/justb81/watchbuddy/commit/79305d584d384d972c0abab55547fd3a421664d7))
+
+
+### Bug Fixes
+
+* merge Amazon entries, correct Joyn TV package, drop bundled asset ([#685](https://github.com/justb81/watchbuddy/issues/685)) ([5c62398](https://github.com/justb81/watchbuddy/commit/5c623984dc0e9bb9b0c34a46d756521615fa7471))
+
 ## [0.35.3](https://github.com/justb81/watchbuddy/compare/v0.35.2...v0.35.3) (2026-05-08)
 
 
