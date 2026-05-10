@@ -13,20 +13,12 @@ import com.justb81.watchbuddy.phone.llm.RecapGenerator
 import com.justb81.watchbuddy.phone.settings.AvatarImageStore
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import com.justb81.watchbuddy.service.CompanionStateManager
-import io.ktor.client.HttpClient
-import io.ktor.client.plugins.HttpSend
-import io.ktor.client.plugins.plugin
-import io.ktor.client.request.contentType
-import io.ktor.client.request.delete
-import io.ktor.client.request.get
-import io.ktor.client.request.post
-import io.ktor.client.request.setBody
-import io.ktor.client.statement.bodyAsText
-import io.ktor.http.ContentType
-import io.ktor.http.HttpHeaders
-import io.ktor.http.HttpStatusCode
-import io.ktor.server.testing.ApplicationTestBuilder
-import io.ktor.server.testing.testApplication
+import io.ktor.client.*
+import io.ktor.client.plugins.*
+import io.ktor.client.request.*
+import io.ktor.client.statement.*
+import io.ktor.http.*
+import io.ktor.server.testing.*
 import io.mockk.*
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -99,7 +91,7 @@ class CompanionHttpServerWatchedTest {
         TestScope(this).block()
     }
 
-    // ── GET /shows/{showId}/seasons ─────────────────────────────────────────────────────
+    // ── GET /shows/{showId}/seasons ────────────────────────────────────────────────────────
 
     @Nested
     @DisplayName("GET /shows/{showId}/seasons")
@@ -162,7 +154,7 @@ class CompanionHttpServerWatchedTest {
         }
     }
 
-    // ── POST /watched ───────────────────────────────────────────────────────────────────────────
+    // ── POST /watched ─────────────────────────────────────────────────────────────────────
 
     @Nested
     @DisplayName("POST /watched")
@@ -260,7 +252,7 @@ class CompanionHttpServerWatchedTest {
         }
     }
 
-    // ── DELETE /watched ───────────────────────────────────────────────────────────────────────────
+    // ── DELETE /watched ────────────────────────────────────────────────────────────────────────
 
     @Nested
     @DisplayName("DELETE /watched")
