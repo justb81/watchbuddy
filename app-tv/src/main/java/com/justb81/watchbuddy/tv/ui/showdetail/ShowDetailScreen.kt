@@ -46,6 +46,7 @@ import com.justb81.watchbuddy.tv.ui.components.UserScopePickerDialog
 import kotlinx.coroutines.delay
 
 private const val TMDB_POSTER_WIDTH = 500
+private const val MARK_WATCHED_TOAST_DELAY_MS = 3_000L
 
 private data class ShowDetailActions(
     val onWatchNow: () -> Unit,
@@ -105,7 +106,7 @@ fun ShowDetailScreen(
             else -> null
         } ?: return@LaunchedEffect
         Toast.makeText(context, context.getString(msgRes), Toast.LENGTH_LONG).show()
-        delay(3_000)
+        delay(MARK_WATCHED_TOAST_DELAY_MS)
         viewModel.acknowledgeMarkWatchedFeedback()
     }
 
