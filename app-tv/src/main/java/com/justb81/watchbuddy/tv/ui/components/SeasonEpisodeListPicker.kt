@@ -15,7 +15,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.outlined.RadioButtonUnchecked
+import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -124,7 +124,7 @@ private fun EpisodeRow(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
-                imageVector = if (isWatched) Icons.Filled.CheckCircle else Icons.Outlined.RadioButtonUnchecked,
+                imageVector = if (isWatched) Icons.Filled.CheckCircle else Icons.Filled.RadioButtonUnchecked,
                 contentDescription = if (isWatched) {
                     stringResource(R.string.tv_detail_mark_unwatched_cd)
                 } else {
