@@ -333,10 +333,8 @@ private fun EpisodeRow(
     onToggle: () -> Unit,
     onMarkEarlierWatched: () -> Unit
 ) {
-    var menuExpanded by remember { mutableStateOf(false) }
     var showBulkConfirm by remember { mutableStateOf(false) }
     val count = candidateCount(episode, allSeasons)
-
     val toggleCd = stringResource(
         R.string.show_detail_cd_toggle_watched,
         episode.number,
@@ -387,35 +385,51 @@ private fun EpisodeRow(
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f)
         )
-        Box {
-            IconButton(
-                onClick = { menuExpanded = true },
-                modifier = Modifier.size(32.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.MoreVert,
-                    contentDescription = stringResource(
-                        R.string.show_detail_cd_episode_menu,
-                        episode.number,
-                        episode.season
-                    ),
-                    modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            DropdownMenu(
-                expanded = menuExpanded,
-                onDismissRequest = { menuExpanded = false }
-            ) {
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.show_detail_mark_earlier_watched)) },
-                    onClick = {
-                        menuExpanded = false
-                        showBulkConfirm = true
-                    },
-                    enabled = count > 0 && !bulkInProgress
-                )
-            }
+        EpisodeOverflowMenu(
+            episode = episode,
+            candidateCount = count,
+            bulkInProgress = bulkInProgress,
+            onShowBulkConfirm = { showBulkConfirm = true }
+        )
+    }
+}
+
+@Composable
+private fun EpisodeOverflowMenu(
+    episode: EpisodeUi,
+    candidateCount: Int,
+    bulkInProgress: Boolean,
+    onShowBulkConfirm: () -> Unit
+) {
+    var menuExpanded by remember { mutableStateOf(false) }
+    Box {
+        IconButton(
+            onClick = { menuExpanded = true },
+            modifier = Modifier.size(32.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.MoreVert,
+                contentDescription = stringResource(
+                    R.string.show_detail_cd_episode_menu,
+                    episode.number,
+                    episode.season
+                ),
+                modifier = Modifier.size(16.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        DropdownMenu(
+            expanded = menuExpanded,
+            onDismissRequest = { menuExpanded = false }
+        ) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.show_detail_mark_earlier_watched)) },
+                onClick = {
+                    menuExpanded = false
+                    onShowBulkConfirm()
+                },
+                enabled = candidateCount > 0 && !bulkInProgress
+            )
         }
     }
 }
