@@ -187,9 +187,7 @@ class ShowDetailViewModelTvTest {
         private fun setupWithPhones(phones: List<PhoneDiscoveryManager.DiscoveredPhone>) {
             every { phoneDiscovery.discoveredPhones } returns MutableStateFlow(phones)
             every { phoneDiscovery.getBestPhone() } returns phones.firstOrNull()
-            phones.forEach { phone ->
-                every { clientFactory.createClient(phone.baseUrl, phone.bearerToken) } returns phoneApiService
-            }
+            every { clientFactory.createClient(any(), any()) } returns phoneApiService
         }
 
         @Test
