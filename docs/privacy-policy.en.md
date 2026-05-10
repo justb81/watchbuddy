@@ -73,7 +73,7 @@ Unencrypted configuration values (source: `app-phone/src/main/java/com/justb81/w
 
 ### 4.3 DataStore preferences (TV app)
 
-Unencrypted configuration values (source: `app-tv/src/main/java/com/justb81/watchbuddy/tv/data/UserSessionRepository.kt`, `StreamingPreferencesRepository.kt`):
+Unencrypted configuration values (source: `app-tv/src/main/java/com/justb81/watchbuddy/tv/data/UserSessionRepository.kt`, `app-tv/src/main/java/com/justb81/watchbuddy/tv/data/StreamingPreferencesRepository.kt`):
 
 | Key | Content |
 |-----|---------|
@@ -129,7 +129,7 @@ Once the TV app has discovered the service, it calls `GET /capability` over HTTP
 
 ## 6. Scrobbling (Trakt forwarding)
 
-The TV app automatically detects what is being played on the television and reports it to the Trakt account of each connected phone user (source: `app-tv/src/main/java/com/justb81/watchbuddy/tv/scrobbler/MediaSessionScrobbler.kt`).
+The TV app automatically detects what is being played on the television and reports it to the Trakt account of each connected phone user (source: `core/src/main/java/com/justb81/watchbuddy/core/scrobbler/MediaSessionScrobbler.kt`).
 
 ### 6.1 Fields read from Android Media Sessions
 
