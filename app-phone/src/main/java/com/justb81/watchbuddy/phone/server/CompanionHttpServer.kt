@@ -177,7 +177,7 @@ class CompanionHttpServer @Inject constructor(
  * Configures the Ktor application with all companion server routes.
  * Extracted as a top-level function so it can be tested via [io.ktor.server.testing.testApplication].
  */
-@Suppress("LongParameterList")
+@Suppress("LongParameterList", "LongMethod", "CyclomaticComplexMethod")
 internal fun Application.configureCompanionRoutes(
     recapGenerator: RecapGenerator,
     capabilityProvider: DeviceCapabilityProvider,

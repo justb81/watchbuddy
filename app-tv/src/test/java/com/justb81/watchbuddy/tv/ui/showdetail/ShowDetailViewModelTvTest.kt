@@ -19,7 +19,6 @@ import com.justb81.watchbuddy.tv.data.WatchProvidersRepository
 import com.justb81.watchbuddy.tv.discovery.PhoneApiClientFactory
 import com.justb81.watchbuddy.tv.discovery.PhoneApiService
 import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
-import com.justb81.watchbuddy.tv.discovery.WatchedToggleRequest
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.just
