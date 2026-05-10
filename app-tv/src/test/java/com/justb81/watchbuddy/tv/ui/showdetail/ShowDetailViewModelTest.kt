@@ -18,6 +18,7 @@ import com.justb81.watchbuddy.tv.data.JustWatchDeepLinkRepository
 import com.justb81.watchbuddy.tv.data.LastUsedProviderRepository
 import com.justb81.watchbuddy.tv.data.StreamingPreferencesRepository
 import com.justb81.watchbuddy.tv.data.WatchProvidersRepository
+import com.justb81.watchbuddy.tv.discovery.PhoneApiClientFactory
 import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -26,6 +27,7 @@ import io.mockk.just
 import io.mockk.mockk
 import io.mockk.runs
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertInstanceOf
@@ -52,6 +54,7 @@ class ShowDetailViewModelTest {
     private val phoneDiscovery: PhoneDiscoveryManager = mockk()
     private val tmdbApi: TmdbApiService = mockk()
     private val justWatchRepo: JustWatchDeepLinkRepository = mockk()
+    private val clientFactory: PhoneApiClientFactory = mockk(relaxed = true)
     private lateinit var viewModel: ShowDetailViewModel
 
     private fun makeCapability(apiKey: String?, countryCode: String? = null) = DeviceCapability(
@@ -117,9 +120,11 @@ class ShowDetailViewModelTest {
         coEvery { streamingPrefs.getShowNonInstalledProviders() } returns false
         coEvery { lastUsedRepo.recordUsed(any(), any()) } just runs
         coEvery { justWatchRepo.resolveDeepLink(any(), any(), any(), any(), any(), any()) } returns null
+        every { phoneDiscovery.discoveredPhones } returns MutableStateFlow(emptyList())
         viewModel = ShowDetailViewModel(
             watchProviders, lastUsedRepo, streamingPrefs, phoneDiscovery, tmdbApi, justWatchRepo,
             com.justb81.watchbuddy.core.scrobbler.NoOpPlaybackIntentProvider(),
+            clientFactory,
         )
     }
 

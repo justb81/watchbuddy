@@ -57,6 +57,21 @@
     <string name="tv_error_phone_unreachable">Begleit-App nicht erreichbar. Zwischengespeicherte Daten werden angezeigt.</string>
     <string name="tv_error_phone_unreachable_no_cache">Begleit-App nicht erreichbar. Stelle sicher, dass WatchBuddy auf deinem Handy läuft.</string>
 
+    <!-- Show detail — manually mark episodes watched (#217) -->
+    <string name="tv_detail_episodes">Folgen</string>
+    <string name="tv_detail_season_header">Staffel %1$d</string>
+    <string name="tv_detail_mark_watched_cd">Als gesehen markieren</string>
+    <string name="tv_detail_mark_unwatched_cd">Als nicht gesehen markieren</string>
+    <string name="tv_detail_toggle_failed_all">Sehstatus konnte nicht aktualisiert werden. Bitte erneut versuchen.</string>
+    <string name="tv_detail_toggle_failed_partial">Konnte nicht aktualisiert werden für: %1$s</string>
+
+    <!-- User-scope picker dialog (#217) -->
+    <string name="tv_scope_title">Als gesehen markieren für</string>
+    <string name="tv_scope_all_users">Alle Benutzer</string>
+    <string name="tv_scope_dont_ask_again">In dieser Sitzung nicht mehr fragen</string>
+    <string name="tv_scope_apply">Übernehmen</string>
+    <string name="tv_scope_cancel">Abbrechen</string>
+
     <!-- Show detail — provider availability (#367) -->
     <string name="tv_not_available_region">In deiner Region nicht zum Streaming verfügbar.</string>
     <string name="tv_providers_retry">Streaming-Infos konnten nicht geladen werden. Tippen zum Wiederholen.</string>

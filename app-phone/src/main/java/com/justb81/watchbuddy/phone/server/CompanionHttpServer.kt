@@ -9,6 +9,7 @@ import com.justb81.watchbuddy.core.model.ScrobbleDisplayEvent
 import com.justb81.watchbuddy.core.model.TitleExtractionRequest
 import com.justb81.watchbuddy.core.model.TitleExtractionResponse
 import com.justb81.watchbuddy.core.model.TraktEpisode
+import com.justb81.watchbuddy.core.model.TraktIds
 import com.justb81.watchbuddy.core.model.TraktShow
 import com.justb81.watchbuddy.core.network.WatchBuddyJson
 import com.justb81.watchbuddy.core.tmdb.TmdbApiService
@@ -38,6 +39,7 @@ import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import io.ktor.server.routing.delete
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -111,6 +113,9 @@ private class IpRateLimiter(val limit: Int, val windowMs: Long) {
  *   POST /scrobble/prompt      → Deliver ambiguous-scrobble prompt; consumed via state stream
  *   POST /shows/add-to-library → Add an episode to Trakt history (unknown-show overlay confirm)
  *   GET  /avatar               → Custom user avatar JPEG
+ *   GET  /shows/{showId}/seasons → All seasons + episodes for the given show (Trakt)
+ *   POST /watched              → Mark a single episode watched in this user's Trakt account
+ *   DELETE /watched            → Remove a single episode from this user's Trakt history
  */
 @Suppress("LongParameterList")
 @Singleton
@@ -129,6 +134,7 @@ class CompanionHttpServer @Inject constructor(
     private val titleExtractor: LlmTitleExtractor,
     private val bearerTokenRepository: BearerTokenRepository,
     private val providerCatalogRepository: ProviderCatalogRepository,
+    private val episodeRepository: EpisodeRepository,
 ) {
     companion object {
         const val PORT = 8765
@@ -152,7 +158,7 @@ class CompanionHttpServer @Inject constructor(
                     recapGenerator, capabilityProvider, showRepository,
                     tokenRepository, tokenRefreshManager, traktApiService, tmdbApiService, tmdbCache,
                     settingsRepository, avatarImageStore, stateManager, titleExtractor,
-                    bearerTokenRepository, providerCatalogRepository,
+                    bearerTokenRepository, providerCatalogRepository, episodeRepository,
                 )
             }.start(wait = false)
         }.onFailure {
@@ -187,6 +193,7 @@ internal fun Application.configureCompanionRoutes(
     titleExtractor: LlmTitleExtractor,
     bearerTokenRepository: BearerTokenRepository,
     providerCatalogRepository: ProviderCatalogRepository,
+    episodeRepository: EpisodeRepository,
 ) {
     val expectedToken = bearerTokenRepository.token
 
@@ -452,6 +459,57 @@ internal fun Application.configureCompanionRoutes(
             call.respond(HttpStatusCode.NoContent)
         }
 
+        get("/shows/{showId}/seasons") {
+            val showId = call.parameters["showId"]
+                ?: return@get call.respond(HttpStatusCode.BadRequest, ErrorResponse("Missing show ID"))
+            try {
+                tokenRepository.getAccessToken()
+                    ?: return@get call.respond(HttpStatusCode.Unauthorized, ErrorResponse("No access token"))
+                val seasons = episodeRepository.getSeasonsWithEpisodes(showId)
+                call.respond(seasons)
+            } catch (e: SecurityException) {
+                DiagnosticLog.error(TAG, "Keystore unavailable in /shows/$showId/seasons", e)
+                call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("Service unavailable"))
+            } catch (e: Exception) {
+                DiagnosticLog.error(TAG, "Failed to fetch seasons for show $showId", e)
+                call.respond(HttpStatusCode.InternalServerError, ErrorResponse("Internal server error"))
+            }
+        }
+
+        post("/watched") {
+            tokenRefreshManager.getValidAccessToken()
+                ?: return@post call.respond(HttpStatusCode.Unauthorized, ErrorResponse("No access token"))
+            val body = try {
+                call.receive<WatchedToggleRequest>()
+            } catch (_: Exception) {
+                return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid request body"))
+            }
+            val result = episodeRepository.markEpisodeWatched(body.showIds, body.season, body.episode)
+            if (result.isSuccess) {
+                call.respond(WatchedToggleResponse(success = true))
+            } else {
+                DiagnosticLog.error(TAG, "markEpisodeWatched failed S${body.season}E${body.episode}", result.exceptionOrNull())
+                call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("Mark watched failed"))
+            }
+        }
+
+        delete("/watched") {
+            tokenRefreshManager.getValidAccessToken()
+                ?: return@delete call.respond(HttpStatusCode.Unauthorized, ErrorResponse("No access token"))
+            val body = try {
+                call.receive<WatchedToggleRequest>()
+            } catch (_: Exception) {
+                return@delete call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid request body"))
+            }
+            val result = episodeRepository.markEpisodeUnwatched(body.showIds, body.season, body.episode)
+            if (result.isSuccess) {
+                call.respond(WatchedToggleResponse(success = true))
+            } else {
+                DiagnosticLog.error(TAG, "markEpisodeUnwatched failed S${body.season}E${body.episode}", result.exceptionOrNull())
+                call.respond(HttpStatusCode.ServiceUnavailable, ErrorResponse("Mark unwatched failed"))
+            }
+        }
+
         post("/shows/add-to-library") {
             val token = tokenRefreshManager.getValidAccessToken()
                 ?: return@post call.respond(HttpStatusCode.Unauthorized, ErrorResponse("No access token"))
@@ -552,5 +610,19 @@ private data class ScrobbleActionResponse(
 
 @Serializable
 private data class AddToLibraryResponse(
+    val success: Boolean
+)
+
+@Serializable
+internal data class WatchedToggleRequest(
+    val showIds: TraktIds,
+    val season: Int,
+    val episode: Int,
+    /** Returned to the TV so it can correlate the response with the triggering session. */
+    val resolvesSessionKey: String? = null,
+)
+
+@Serializable
+internal data class WatchedToggleResponse(
     val success: Boolean
 )

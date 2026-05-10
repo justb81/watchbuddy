@@ -68,6 +68,7 @@ class CompanionHttpServerTest {
     private val testToken = "test-bearer-token"
     private val bearerTokenRepository: BearerTokenRepository = mockk()
     private val providerCatalogRepository: ProviderCatalogRepository = mockk(relaxed = true)
+    private val episodeRepository: EpisodeRepository = mockk(relaxed = true)
 
     // ── Shared test fixtures ──────────────────────────────────────────────────
 
@@ -123,7 +124,7 @@ class CompanionHttpServerTest {
                 recapGenerator, capabilityProvider, showRepository,
                 tokenRepository, tokenRefreshManager, traktApiService, tmdbApiService, tmdbCache,
                 settingsRepository, avatarImageStore, stateManager, titleExtractor,
-                bearerTokenRepository, providerCatalogRepository,
+                bearerTokenRepository, providerCatalogRepository, episodeRepository,
             )
         }
         TestScope(this).block()
