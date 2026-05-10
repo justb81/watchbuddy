@@ -58,10 +58,11 @@
     <string name="tv_error_phone_unreachable_no_cache">Begleit-App nicht erreichbar. Stelle sicher, dass WatchBuddy auf deinem Handy läuft.</string>
     <string name="tv_stale_cache_banner">Gespeicherte Liste wird angezeigt – Handy offline</string>
 
-    <!-- Show detail — mark current episode watched (#671) -->
+    <!-- Show detail — one-tap mark as watched (#671) -->
     <string name="tv_mark_watched">Als gesehen markieren</string>
-    <string name="tv_mark_watched_no_phones">Kein Handy verbunden – Markierung nicht möglich.</string>
-    <string name="tv_mark_watched_error">Markierung fehlgeschlagen. Bitte erneut versuchen.</string>
+    <string name="tv_mark_watched_no_phones">Kein Handy verbunden – Verbinde ein Handy zum Markieren.</string>
+    <string name="tv_mark_watched_error">Folge konnte nicht als gesehen markiert werden.</string>
+    <string name="tv_mark_watched_cd">Aktuelle Folge als gesehen markieren</string>
 
     <!-- Show detail — manually mark episodes watched (#217) -->
     <string name="tv_detail_episodes">Folgen</string>

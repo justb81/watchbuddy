@@ -61,10 +61,11 @@
     <string name="tv_error_phone_unreachable_no_cache">Application compagnon inaccessible. Assurez-vous que WatchBuddy est en cours d\'exécution sur votre téléphone.</string>
     <string name="tv_stale_cache_banner">Liste en cache affichée — téléphone hors ligne</string>
 
-    <!-- Show detail — mark current episode watched (#671) -->
+    <!-- Show detail — one-tap mark as watched (#671) -->
     <string name="tv_mark_watched">Marquer comme vu</string>
-    <string name="tv_mark_watched_no_phones">Aucun téléphone connecté — impossible de marquer comme vu.</string>
-    <string name="tv_mark_watched_error">Impossible de marquer comme vu. Veuillez réessayer.</string>
+    <string name="tv_mark_watched_no_phones">Aucun téléphone connecté — connectez un téléphone pour marquer des épisodes.</string>
+    <string name="tv_mark_watched_error">Impossible de marquer l\'épisode comme vu.</string>
+    <string name="tv_mark_watched_cd">Marquer l\'épisode actuel comme vu</string>
 
     <!-- Show detail — manually mark episodes watched (#217) -->
     <string name="tv_detail_episodes">Épisodes</string>
