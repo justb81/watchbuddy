@@ -7,8 +7,12 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,7 +35,10 @@ import coil3.compose.AsyncImage
 import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.core.model.EnrichedShowEntry
 import com.justb81.watchbuddy.core.model.ResolvedProvider
+import com.justb81.watchbuddy.core.model.TraktIds
 import com.justb81.watchbuddy.core.tmdb.TmdbImageHelper
+import com.justb81.watchbuddy.tv.ui.components.SeasonEpisodeListPicker
+import com.justb81.watchbuddy.tv.ui.components.UserScopePickerDialog
 
 private const val TMDB_POSTER_WIDTH = 500
 
@@ -41,6 +48,8 @@ private data class ShowDetailActions(
     val onRetryProviders: () -> Unit,
     val onRecapClick: () -> Unit,
 )
+
+private const val EPISODE_LIST_MAX_HEIGHT_DP = 320
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
@@ -56,11 +65,20 @@ fun ShowDetailScreen(
     val providerState by viewModel.providers.collectAsState()
     val deepLinks by viewModel.deepLinks.collectAsState()
     val watchNowState by viewModel.watchNowState.collectAsState()
+    val episodeListState by viewModel.episodeList.collectAsState()
     val watchNowFocus = remember { FocusRequester() }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // (season, episode, markAsWatched) waiting for the scope picker
+    var pendingToggle by remember { mutableStateOf<Triple<Int, Int, Boolean>?>(null) }
+
+    val allFailedMsg = stringResource(R.string.tv_detail_toggle_failed_all)
+    val partialFailedMsg = stringResource(R.string.tv_detail_toggle_failed_partial)
 
     LaunchedEffect(entry.show.ids.trakt) {
         viewModel.loadNextEpisode(enriched)
         viewModel.loadProviders(enriched)
+        viewModel.loadEpisodeList(enriched)
         watchNowFocus.requestFocus()
     }
 
@@ -68,6 +86,20 @@ fun ShowDetailScreen(
     LaunchedEffect(providerState) {
         if (providerState is ProviderListUiState.Success) {
             viewModel.loadDeepLinks(enriched)
+        }
+    }
+
+    // Observe toggle-failure events and show snackbars
+    LaunchedEffect(Unit) {
+        viewModel.episodeToggleEvents.collect { event ->
+            when (event) {
+                is EpisodeToggleEvent.AllFailed ->
+                    snackbarHostState.showSnackbar(allFailedMsg)
+                is EpisodeToggleEvent.PartialFailed ->
+                    snackbarHostState.showSnackbar(
+                        partialFailedMsg.format(event.failedUserNames.joinToString(", "))
+                    )
+            }
         }
     }
 
@@ -82,6 +114,7 @@ fun ShowDetailScreen(
             providerState = providerState,
             deepLinks = deepLinks,
             watchNowState = watchNowState,
+            episodeListState = episodeListState,
             watchNowFocus = watchNowFocus,
             actions = ShowDetailActions(
                 onWatchNow = {
@@ -99,6 +132,21 @@ fun ShowDetailScreen(
                 onRetryProviders = { viewModel.loadProviders(enriched) },
                 onRecapClick = onRecapClick,
             ),
+            onEpisodeToggle = { season, episode, currentlyWatched ->
+                if (viewModel.skipScopePickerThisSession) {
+                    // Skip picker — fan out to all phones immediately
+                    val allIds = viewModel.connectedUsers().map { it.id }.toSet()
+                    viewModel.toggleEpisodeWatched(
+                        showIds = entry.show.ids,
+                        season = season,
+                        episode = episode,
+                        markAsWatched = !currentlyWatched,
+                        selectedUserIds = allIds,
+                    )
+                } else {
+                    pendingToggle = Triple(season, episode, !currentlyWatched)
+                }
+            },
             modifier = Modifier.align(Alignment.CenterEnd),
         )
         OutlinedButton(
@@ -107,6 +155,31 @@ fun ShowDetailScreen(
         ) {
             Text(stringResource(R.string.tv_back_arrow))
         }
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp)
+        )
+    }
+
+    // Scope picker dialog
+    pendingToggle?.let { (season, episode, markAsWatched) ->
+        val users = viewModel.connectedUsers()
+        UserScopePickerDialog(
+            connectedUsers = users,
+            initialSelection = users.map { it.id }.toSet(),
+            onConfirm = { selectedIds, dontAskAgain ->
+                if (dontAskAgain) viewModel.onDontAskAgainSet()
+                viewModel.toggleEpisodeWatched(
+                    showIds = entry.show.ids,
+                    season = season,
+                    episode = episode,
+                    markAsWatched = markAsWatched,
+                    selectedUserIds = selectedIds,
+                )
+                pendingToggle = null
+            },
+            onDismiss = { pendingToggle = null },
+        )
     }
 }
 
@@ -195,8 +268,10 @@ private fun ShowDetailContent(
     providerState: ProviderListUiState,
     deepLinks: Map<Int, DeepLinkState>,
     watchNowState: WatchNowState,
+    episodeListState: EpisodeListUiState,
     watchNowFocus: FocusRequester,
     actions: ShowDetailActions,
+    onEpisodeToggle: (season: Int, episode: Int, currentlyWatched: Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val entry = enriched.entry
@@ -251,6 +326,11 @@ private fun ShowDetailContent(
             deepLinks = deepLinks,
             onProviderClick = actions.onProviderClick,
             onRetry = actions.onRetryProviders,
+        )
+
+        EpisodeListSection(
+            state = episodeListState,
+            onToggle = onEpisodeToggle,
         )
     }
 }
@@ -488,6 +568,37 @@ private fun JustWatchAttributionBadge() {
         color = Color.White.copy(alpha = 0.4f),
         modifier = Modifier.padding(top = 4.dp),
     )
+}
+
+@Composable
+private fun EpisodeListSection(
+    state: EpisodeListUiState,
+    onToggle: (season: Int, episode: Int, currentlyWatched: Boolean) -> Unit,
+) {
+    when (state) {
+        is EpisodeListUiState.Idle, is EpisodeListUiState.Loading -> {
+            // Show nothing while loading to keep the layout clean
+        }
+        is EpisodeListUiState.Error -> {
+            // Silently swallow — the user doesn't need a dedicated error for episode list
+        }
+        is EpisodeListUiState.Success -> {
+            Text(
+                text = stringResource(R.string.tv_detail_episodes),
+                fontSize = 12.sp,
+                color = Color.White.copy(alpha = 0.4f),
+            )
+            SeasonEpisodeListPicker(
+                seasons = state.seasons,
+                watchedSet = state.watchedSet,
+                highlightSeason = null,
+                onToggle = onToggle,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = EPISODE_LIST_MAX_HEIGHT_DP.dp),
+            )
+        }
+    }
 }
 
 @Composable

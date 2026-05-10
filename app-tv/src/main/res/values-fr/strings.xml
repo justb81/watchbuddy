@@ -60,6 +60,21 @@
     <string name="tv_error_phone_unreachable">Application compagnon inaccessible. Affichage des données en cache.</string>
     <string name="tv_error_phone_unreachable_no_cache">Application compagnon inaccessible. Assurez-vous que WatchBuddy est en cours d\'exécution sur votre téléphone.</string>
 
+    <!-- Show detail — manually mark episodes watched (#217) -->
+    <string name="tv_detail_episodes">Épisodes</string>
+    <string name="tv_detail_season_header">Saison %1$d</string>
+    <string name="tv_detail_mark_watched_cd">Marquer comme vu</string>
+    <string name="tv_detail_mark_unwatched_cd">Marquer comme non vu</string>
+    <string name="tv_detail_toggle_failed_all">Impossible de mettre à jour le statut. Veuillez réessayer.</string>
+    <string name="tv_detail_toggle_failed_partial">Impossible de mettre à jour pour : %1$s</string>
+
+    <!-- User-scope picker dialog (#217) -->
+    <string name="tv_scope_title">Marquer comme vu pour</string>
+    <string name="tv_scope_all_users">Tous les utilisateurs</string>
+    <string name="tv_scope_dont_ask_again">Ne plus demander cette session</string>
+    <string name="tv_scope_apply">Appliquer</string>
+    <string name="tv_scope_cancel">Annuler</string>
+
     <!-- Show detail — provider availability (#367) -->
     <string name="tv_not_available_region">Non disponible en streaming dans votre région.</string>
     <string name="tv_providers_retry">Impossible de charger les infos streaming. Appuyer pour réessayer.</string>

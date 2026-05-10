@@ -57,6 +57,21 @@
     <string name="tv_error_phone_unreachable">Companion app unreachable. Showing cached data.</string>
     <string name="tv_error_phone_unreachable_no_cache">Companion app unreachable. Make sure WatchBuddy is running on your phone.</string>
 
+    <!-- Show detail — manually mark episodes watched (#217) -->
+    <string name="tv_detail_episodes">Episodes</string>
+    <string name="tv_detail_season_header">Season %1$d</string>
+    <string name="tv_detail_mark_watched_cd">Mark as watched</string>
+    <string name="tv_detail_mark_unwatched_cd">Mark as unwatched</string>
+    <string name="tv_detail_toggle_failed_all">Could not update watch status. Please try again.</string>
+    <string name="tv_detail_toggle_failed_partial">Could not update for: %1$s</string>
+
+    <!-- User-scope picker dialog (#217) -->
+    <string name="tv_scope_title">Mark watched for</string>
+    <string name="tv_scope_all_users">All users</string>
+    <string name="tv_scope_dont_ask_again">Don\'t ask again this session</string>
+    <string name="tv_scope_apply">Apply</string>
+    <string name="tv_scope_cancel">Cancel</string>
+
     <!-- Show detail — provider availability (#367) -->
     <string name="tv_not_available_region">Not available for streaming in your region.</string>
     <string name="tv_providers_retry">Could not load streaming info. Tap to retry.</string>
