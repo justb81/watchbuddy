@@ -134,3 +134,90 @@ class EpisodeRepositoryTest {
         assertTrue(result.exceptionOrNull() is IllegalStateException)
     }
 }
+
+class EpisodeRepositoryBulkTest {
+
+    private val traktApi: TraktApiService = mockk()
+    private val tokenRefreshManager: TokenRefreshManager = mockk()
+    private lateinit var repository: EpisodeRepository
+
+    @BeforeEach
+    fun setUp() {
+        repository = EpisodeRepository(traktApi, tokenRefreshManager)
+        coEvery { tokenRefreshManager.getValidAccessToken() } returns "test-token"
+    }
+
+    @Test
+    fun `markEpisodesWatchedUpTo builds one SyncHistoryBody grouped by season`() = runTest {
+        val slot = slot<SyncHistoryBody>()
+        coEvery { traktApi.addToHistory(any(), capture(slot)) } returns SyncHistoryResult()
+
+        val ids = TraktIds(trakt = 42, slug = "test-show")
+        val candidates = listOf(1 to 1, 1 to 3, 2 to 1, 2 to 2)
+        val result = repository.markEpisodesWatchedUpTo(
+            ids = ids,
+            targetSeason = 2,
+            targetEpisode = 2,
+            candidates = candidates
+        )
+
+        assertTrue(result.isSuccess)
+        val body = slot.captured
+        assertEquals(1, body.shows.size)
+        assertEquals(ids, body.shows[0].ids)
+
+        val seasons = body.shows[0].seasons.sortedBy { it.number }
+        assertEquals(2, seasons.size)
+
+        val s1 = seasons[0]
+        assertEquals(1, s1.number)
+        assertEquals(setOf(1, 3), s1.episodes.map { it.number }.toSet())
+
+        val s2 = seasons[1]
+        assertEquals(2, s2.number)
+        assertEquals(setOf(1, 2), s2.episodes.map { it.number }.toSet())
+    }
+
+    @Test
+    fun `markEpisodesWatchedUpTo returns success and makes no HTTP call for empty candidates`() = runTest {
+        val result = repository.markEpisodesWatchedUpTo(
+            ids = TraktIds(trakt = 1),
+            targetSeason = 1,
+            targetEpisode = 1,
+            candidates = emptyList()
+        )
+
+        assertTrue(result.isSuccess)
+        coVerify(exactly = 0) { traktApi.addToHistory(any(), any()) }
+    }
+
+    @Test
+    fun `markEpisodesWatchedUpTo returns failure when API throws`() = runTest {
+        coEvery { traktApi.addToHistory(any(), any()) } throws RuntimeException("Network error")
+
+        val result = repository.markEpisodesWatchedUpTo(
+            ids = TraktIds(trakt = 1),
+            targetSeason = 2,
+            targetEpisode = 3,
+            candidates = listOf(1 to 1, 1 to 2)
+        )
+
+        assertTrue(result.isFailure)
+        assertEquals("Network error", result.exceptionOrNull()?.message)
+    }
+
+    @Test
+    fun `markEpisodesWatchedUpTo returns failure when no access token`() = runTest {
+        coEvery { tokenRefreshManager.getValidAccessToken() } returns null
+
+        val result = repository.markEpisodesWatchedUpTo(
+            ids = TraktIds(trakt = 1),
+            targetSeason = 1,
+            targetEpisode = 1,
+            candidates = listOf(1 to 1)
+        )
+
+        assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull() is IllegalStateException)
+    }
+}

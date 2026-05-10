@@ -168,6 +168,21 @@
     <string name="show_detail_cd_toggle_watched">Cambiar estado de visto del episodio %1$d de la temporada %2$d</string>
     <string name="show_detail_cd_expand_season">Expandir la temporada %1$d</string>
     <string name="show_detail_cd_collapse_season">Contraer la temporada %1$d</string>
+    <string name="show_detail_cd_episode_menu">Opciones del episodio %1$d de la temporada %2$d</string>
+    <string name="show_detail_mark_earlier_watched">Marcar este y todos los anteriores como vistos</string>
+    <string name="show_detail_bulk_confirm_title">¿Marcar los episodios anteriores como vistos?</string>
+    <plurals name="show_detail_bulk_confirm_body">
+        <item quantity="one">T%1$02dE%2$02d y %3$d episodio anterior se marcarán como vistos en Trakt.</item>
+        <item quantity="many">T%1$02dE%2$02d y %3$d episodios anteriores se marcarán como vistos en Trakt.</item>
+        <item quantity="other">T%1$02dE%2$02d y %3$d episodios anteriores se marcarán como vistos en Trakt.</item>
+    </plurals>
+    <string name="show_detail_bulk_confirm_action">Marcar como vistos</string>
+    <plurals name="show_detail_bulk_success">
+        <item quantity="one">%d episodio marcado como visto</item>
+        <item quantity="many">%d episodios marcados como vistos</item>
+        <item quantity="other">%d episodios marcados como vistos</item>
+    </plurals>
+    <string name="show_detail_error_bulk_toggle">No se pudieron marcar los episodios — inténtalo de nuevo</string>
 
     <!-- Common -->
     <string name="no_description">No hay descripción disponible.</string>

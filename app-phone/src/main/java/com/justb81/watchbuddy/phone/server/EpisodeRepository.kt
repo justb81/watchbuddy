@@ -80,6 +80,41 @@ class EpisodeRepository @Inject constructor(
         Unit
     }.onFailure { Log.w(TAG, "markEpisodeUnwatched S${season}E${episode} failed", it) }
 
+    /**
+     * Marks all [candidates] (season, episode) pairs as watched in a single
+     * `POST /sync/history` call. The caller is responsible for pre-filtering
+     * the candidate list (season >= 1, not already watched, <= target position).
+     *
+     * Returns [Result.success] immediately when [candidates] is empty (no HTTP
+     * call is made). Returns [Result.failure] if the network call fails.
+     */
+    suspend fun markEpisodesWatchedUpTo(
+        ids: TraktIds,
+        targetSeason: Int,
+        targetEpisode: Int,
+        candidates: List<Pair<Int, Int>>
+    ): Result<Unit> = runCatching {
+        if (candidates.isEmpty()) return@runCatching Unit
+        val seasonsBody = candidates
+            .groupBy { it.first }
+            .toSortedMap()
+            .map { (season, eps) ->
+                SyncHistorySeasonItem(
+                    number = season,
+                    episodes = eps.map { SyncHistoryEpisodeItem(number = it.second) }
+                )
+            }
+        val body = SyncHistoryBody(
+            shows = listOf(SyncHistoryShowItem(ids = ids, seasons = seasonsBody))
+        )
+        val token = tokenRefreshManager.getValidAccessToken()
+            ?: error("No access token available")
+        traktApi.addToHistory("Bearer $token", body)
+        Unit
+    }.onFailure {
+        Log.w(TAG, "markEpisodesWatchedUpTo S${targetSeason}E$targetEpisode (${candidates.size} eps) failed", it)
+    }
+
     private fun buildBody(ids: TraktIds, season: Int, episode: Int): SyncHistoryBody =
         SyncHistoryBody(
             shows = listOf(

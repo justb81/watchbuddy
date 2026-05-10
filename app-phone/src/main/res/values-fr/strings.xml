@@ -168,6 +168,21 @@
     <string name="show_detail_cd_toggle_watched">Modifier le statut de visionnage de l\'épisode %1$d de la saison %2$d</string>
     <string name="show_detail_cd_expand_season">Développer la saison %1$d</string>
     <string name="show_detail_cd_collapse_season">Réduire la saison %1$d</string>
+    <string name="show_detail_cd_episode_menu">Options de l\'épisode %1$d de la saison %2$d</string>
+    <string name="show_detail_mark_earlier_watched">Marquer cet épisode et tous les précédents comme vus</string>
+    <string name="show_detail_bulk_confirm_title">Marquer les épisodes précédents comme vus ?</string>
+    <plurals name="show_detail_bulk_confirm_body">
+        <item quantity="one">S%1$02dÉ%2$02d et %3$d épisode précédent seront marqués comme vus sur Trakt.</item>
+        <item quantity="many">S%1$02dÉ%2$02d et %3$d épisodes précédents seront marqués comme vus sur Trakt.</item>
+        <item quantity="other">S%1$02dÉ%2$02d et %3$d épisodes précédents seront marqués comme vus sur Trakt.</item>
+    </plurals>
+    <string name="show_detail_bulk_confirm_action">Marquer comme vus</string>
+    <plurals name="show_detail_bulk_success">
+        <item quantity="one">%d épisode marqué comme vu</item>
+        <item quantity="many">%d épisodes marqués comme vus</item>
+        <item quantity="other">%d épisodes marqués comme vus</item>
+    </plurals>
+    <string name="show_detail_error_bulk_toggle">Impossible de marquer les épisodes — veuillez réessayer</string>
 
     <!-- Common -->
     <string name="no_description">Aucune description disponible.</string>
