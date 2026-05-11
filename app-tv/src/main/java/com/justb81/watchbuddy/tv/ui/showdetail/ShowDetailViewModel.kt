@@ -7,6 +7,8 @@ import com.justb81.watchbuddy.core.model.EnrichedShowEntry
 import com.justb81.watchbuddy.core.model.ResolvedProvider
 import com.justb81.watchbuddy.core.model.TraktIds
 import com.justb81.watchbuddy.core.model.TraktSeasonWithEpisodes
+import com.justb81.watchbuddy.core.model.TraktWatchedEpisode
+import com.justb81.watchbuddy.core.model.TraktWatchedSeason
 import com.justb81.watchbuddy.core.progress.ShowProgressCalculator
 import com.justb81.watchbuddy.core.scrobbler.PlaybackIntent
 import com.justb81.watchbuddy.core.scrobbler.PlaybackIntentProvider
@@ -114,6 +116,23 @@ sealed interface EpisodeListUiState {
     object Error : EpisodeListUiState
 }
 
+/**
+ * State machine for the one-tap "Mark as watched" button on [ShowDetailScreen].
+ *
+ * - [Idle] — the button is ready for the next press.
+ * - [Loading] — a mark-watched request is in flight; the button shows a spinner.
+ * - [NoPhones] — no phones were connected at the time of the press; card does not advance.
+ *   The UI should surface a one-shot toast and then reset to [Idle].
+ * - [Error] — all connected phones failed the write; card does not advance.
+ *   The UI should surface a one-shot toast and then reset to [Idle].
+ */
+sealed interface MarkWatchedState {
+    data object Idle : MarkWatchedState
+    data object Loading : MarkWatchedState
+    data object NoPhones : MarkWatchedState
+    data object Error : MarkWatchedState
+}
+
 /** One-shot events emitted when a toggle operation partially or fully fails. */
 sealed interface EpisodeToggleEvent {
     /** Every selected phone failed — the UI reverts the optimistic toggle. */
@@ -162,6 +181,20 @@ class ShowDetailViewModel @Inject constructor(
 
     private val _episodeToggleEvents = MutableSharedFlow<EpisodeToggleEvent>()
     val episodeToggleEvents: SharedFlow<EpisodeToggleEvent> = _episodeToggleEvents.asSharedFlow()
+
+    private val _markWatchedState = MutableStateFlow<MarkWatchedState>(MarkWatchedState.Idle)
+
+    /** UI state for the one-tap "Mark as watched" button. */
+    val markWatchedState: StateFlow<MarkWatchedState> = _markWatchedState.asStateFlow()
+
+    /**
+     * Optimistically-advanced [EnrichedShowEntry] after at least one successful mark.
+     * The screen uses `advancedEntry ?: enriched` so it transparently switches to the
+     * advanced entry once the first mark-watched write succeeds, without waiting for
+     * the next `/shows` poll.
+     */
+    private val _advancedEntry = MutableStateFlow<EnrichedShowEntry?>(null)
+    val advancedEntry: StateFlow<EnrichedShowEntry?> = _advancedEntry.asStateFlow()
 
     /**
      * When true, [toggleEpisodeWatched] skips showing the scope picker and uses
@@ -366,6 +399,107 @@ class ShowDetailViewModel @Inject constructor(
                 val name = phone.capability?.userName?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
                 ConnectedUser(id = phone.baseUrl, displayName = name)
             }
+
+    /**
+     * Marks the currently-displayed next episode as watched for **every** connected phone.
+     *
+     * - If no phones are connected, emits [MarkWatchedState.NoPhones] and does not advance.
+     * - If all phone writes fail, emits [MarkWatchedState.Error] and does not advance.
+     * - If at least one phone succeeds (partial failure is still a success), advances the
+     *   next-episode card via [_advancedEntry] and reloads deep links for the new episode.
+     *
+     * Reuses #217's fan-out infrastructure via [clientFactory] and [phoneDiscovery].
+     * No new transport or endpoint is added here.
+     */
+    fun markCurrentEpisodeWatched(enriched: EnrichedShowEntry) {
+        val (season, episode) = ShowProgressCalculator
+            .nextUnwatchedEpisodeNumbers(enriched.entry, enriched.tmdb) ?: return
+
+        viewModelScope.launch {
+            val phones = phoneDiscovery.discoveredPhones.value
+            if (phones.isEmpty()) {
+                _markWatchedState.value = MarkWatchedState.NoPhones
+                return@launch
+            }
+            _markWatchedState.value = MarkWatchedState.Loading
+
+            val pendingKey = phones.firstNotNullOfOrNull { it.capability?.lastResolvedSessionKey }
+            val request = WatchedToggleRequest(
+                showIds = enriched.entry.show.ids,
+                season = season,
+                episode = episode,
+                resolvesSessionKey = pendingKey,
+            )
+
+            data class PhoneResult(val success: Boolean)
+
+            val results = coroutineScope {
+                phones.map { phone ->
+                    async {
+                        val success = runCatching {
+                            val client = clientFactory.createClient(phone.baseUrl, phone.bearerToken)
+                            client.markWatched(request).isSuccessful
+                        }.getOrDefault(false)
+                        PhoneResult(success)
+                    }
+                }.awaitAll()
+            }
+
+            val anySuccess = results.any { it.success }
+            if (!anySuccess) {
+                _markWatchedState.value = MarkWatchedState.Error
+                return@launch
+            }
+
+            // Optimistic local advance — drives AnimatedContent in the screen.
+            val advanced = advanceWatched(enriched, season, episode)
+            _advancedEntry.value = advanced
+            loadNextEpisode(advanced)
+            _deepLinks.value = emptyMap()
+            loadDeepLinks(advanced)
+            _markWatchedState.value = MarkWatchedState.Idle
+        }
+    }
+
+    /**
+     * Resets [markWatchedState] to [MarkWatchedState.Idle] after the UI has shown the
+     * one-shot [MarkWatchedState.NoPhones] or [MarkWatchedState.Error] toast.
+     */
+    fun acknowledgeMarkWatchedFeedback() {
+        _markWatchedState.value = MarkWatchedState.Idle
+    }
+
+    /**
+     * Returns a copy of [enriched] in which (season, episode) is recorded as watched
+     * with the current timestamp. This drives the optimistic UI update in [markCurrentEpisodeWatched]
+     * and does not wait for the phone's `/shows` poll.
+     */
+    private fun advanceWatched(
+        enriched: EnrichedShowEntry,
+        season: Int,
+        episode: Int,
+    ): EnrichedShowEntry {
+        val nowIso = java.time.Instant.now().toString()
+        val existing = enriched.entry.seasons.find { it.number == season }
+        val updatedSeasons = when {
+            existing == null -> (enriched.entry.seasons + TraktWatchedSeason(
+                number = season,
+                episodes = listOf(TraktWatchedEpisode(number = episode, last_watched_at = nowIso)),
+            )).sortedBy { it.number }
+            existing.episodes.any { it.number == episode } -> enriched.entry.seasons
+            else -> enriched.entry.seasons.map { s ->
+                if (s.number != season) {
+                    s
+                } else {
+                    s.copy(
+                        episodes = (s.episodes + TraktWatchedEpisode(number = episode, last_watched_at = nowIso))
+                            .sortedBy { it.number },
+                    )
+                }
+            }
+        }
+        return enriched.copy(entry = enriched.entry.copy(seasons = updatedSeasons))
+    }
 
     /**
      * Fetches all seasons + episodes for [enriched] from the best available phone and
