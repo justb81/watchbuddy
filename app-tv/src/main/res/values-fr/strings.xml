@@ -60,6 +60,10 @@
     <string name="tv_error_phone_unreachable">Application compagnon inaccessible. Affichage des données en cache.</string>
     <string name="tv_error_phone_unreachable_no_cache">Application compagnon inaccessible. Assurez-vous que WatchBuddy est en cours d\'exécution sur votre téléphone.</string>
     <string name="tv_stale_cache_banner">Liste en cache affichée — téléphone hors ligne</string>
+    <!-- Show detail — one-tap mark as watched (#671) -->
+    <string name="tv_mark_watched">Marquer comme vu</string>
+    <string name="tv_mark_watched_no_phones">Aucun téléphone connecté — connectez un téléphone pour marquer les épisodes.</string>
+    <string name="tv_mark_watched_error">Impossible de marquer l\'episode comme vu.</string>
 
     <!-- Show detail — manually mark episodes watched (#217) -->
     <string name="tv_detail_episodes">Épisodes</string>
@@ -114,7 +118,7 @@
     <string name="tv_settings_show_non_installed_subtitle">Afficher aussi les services de streaming non installés sur ce téléviseur</string>
     <string name="tv_settings_diagnostics">Diagnostics</string>
     <string name="tv_settings_debug_log_media_session_title">Débogage : consigner chaque session média</string>
-    <string name="tv_settings_debug_log_media_session_subtitle">Consigne chaque session média détectée dans le journal d\'événements</string>
+    <string name="tv_settings_debug_log_media_session_subtitle">Consigne chaque session média détectée dans le journal d\'vénements</string>
     <string name="tv_settings_notification_access_title">Accès aux notifications</string>
     <string name="tv_settings_notification_access_subtitle">Requis pour le scrobble — WatchBuddy lit les notifications multimédias et les sessions actives pour identifier ce qui est en cours de lecture sur votre téléviseur</string>
     <string name="tv_settings_status_granted">Accordé</string>
