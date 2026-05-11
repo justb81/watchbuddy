@@ -109,11 +109,6 @@ class ProviderCatalogRepository @Inject constructor(
                     val body = response.body?.string() ?: return false
                     val etag = response.header("ETag")
                     val parsed = parseCatalog(body) ?: return false
-                    val currentVersion = prefs[Keys.CATALOG_VERSION] ?: 0
-                    if (parsed.version < currentVersion) {
-                        DiagnosticLog.warn(TAG, "server version ${parsed.version} < cached $currentVersion, ignoring")
-                        return false
-                    }
                     persist(body, parsed.version, etag)
                     applySnapshot(parsed)
                     DiagnosticLog.event(TAG, "catalog updated to v${parsed.version}")

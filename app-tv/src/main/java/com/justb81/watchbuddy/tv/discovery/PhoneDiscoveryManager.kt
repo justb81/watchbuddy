@@ -159,10 +159,8 @@ class PhoneDiscoveryManager(
          */
         val rssi: Int? = null,
         val lastSuccessfulCheck: Long = System.currentTimeMillis(),
-        /** Base64url-encoded bearer token received via BLE scan response. Null for schema-v1 phones. */
+        /** Base64url-encoded bearer token received via BLE scan response. */
         val bearerToken: String? = null,
-        /** True when the phone emitted a schema-v2 advertisement (bearer auth capable). */
-        val authCapable: Boolean = false,
     )
 
     fun startDiscovery() {
@@ -543,7 +541,6 @@ class PhoneDiscoveryManager(
         modelQuality: Int,
         llmBackendOrdinal: Int,
         rssi: Int,
-        authCapable: Boolean = false,
         bearerTokenBytes: ByteArray? = null,
     ) {
         val hostAddress = ipv4.hostAddress ?: return
@@ -560,7 +557,6 @@ class PhoneDiscoveryManager(
                     it.copy(
                         rssi = rssi,
                         bearerToken = bearerToken ?: it.bearerToken,
-                        authCapable = authCapable || it.authCapable,
                     )
                 } else {
                     it
@@ -576,9 +572,9 @@ class PhoneDiscoveryManager(
             llmBackend = runCatching { LlmBackend.entries[llmBackendOrdinal] }
                 .getOrDefault(LlmBackend.NONE),
         )
-        Log.i(TAG, "BLE advertisement → resolving phone at $baseUrl (rssi=$rssi dBm auth=$authCapable)")
+        Log.i(TAG, "BLE advertisement → resolving phone at $baseUrl (rssi=$rssi dBm)")
         heartbeatScope.launch {
-            fetchCapabilityAndAdd(serviceName, txtRecord, baseUrl, rssi, authCapable, bearerToken)
+            fetchCapabilityAndAdd(serviceName, txtRecord, baseUrl, rssi, bearerToken)
         }
     }
 
@@ -598,7 +594,6 @@ class PhoneDiscoveryManager(
         txtRecord: PhoneTxtRecord,
         baseUrl: String,
         rssi: Int,
-        authCapable: Boolean = false,
         bearerToken: String? = null,
     ) {
         when (val result = fetchCapability(baseUrl)) {
@@ -607,7 +602,7 @@ class PhoneDiscoveryManager(
                 addOrUpdatePhone(
                     DiscoveredPhone(
                         serviceName, txtRecord, result.capability, score, baseUrl,
-                        rssi = rssi, authCapable = authCapable, bearerToken = bearerToken,
+                        rssi = rssi, bearerToken = bearerToken,
                     )
                 )
             }
@@ -628,7 +623,7 @@ class PhoneDiscoveryManager(
                 addOrUpdatePhone(
                     DiscoveredPhone(
                         serviceName, txtRecord, null, score, baseUrl,
-                        rssi = rssi, authCapable = authCapable, bearerToken = bearerToken,
+                        rssi = rssi, bearerToken = bearerToken,
                     )
                 )
             }
@@ -637,8 +632,8 @@ class PhoneDiscoveryManager(
 
     private fun startBleScan() {
         val started = bleScanner.start(
-            listener = { ipv4, port, quality, backend, rssi, authCapable, tokenBytes ->
-                onBleAdvertisement(ipv4, port, quality, backend, rssi, authCapable, tokenBytes)
+            listener = { ipv4, port, quality, backend, rssi, tokenBytes ->
+                onBleAdvertisement(ipv4, port, quality, backend, rssi, tokenBytes)
             },
             onFailure = { errorCode ->
                 _bleScanState.value = BleScanState.FAILED

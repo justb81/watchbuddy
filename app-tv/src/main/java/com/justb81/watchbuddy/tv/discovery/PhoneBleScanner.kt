@@ -45,7 +45,6 @@ class PhoneBleScanner @Inject constructor(
             modelQuality: Int,
             llmBackendOrdinal: Int,
             rssi: Int,
-            authCapable: Boolean,
             bearerTokenBytes: ByteArray?,
         )
     }
@@ -81,18 +80,9 @@ class PhoneBleScanner @Inject constructor(
         // Stop any prior scan — e.g. after permission grant or Wi-Fi reconnect.
         stopInternal(leScanner)
 
-        // Two filters: one for schema v1 (legacy phones without bearer auth)
-        // and one for schema v2 (current phones with BLE-distributed bearer token).
-        // Separate filters allow the OS to match either advertisement — a single
-        // filter with mask 0x00 on the version byte would accept any schema version
-        // including unknown future ones and garbled adverts from other apps.
-        val filterV1 = ScanFilter.Builder()
-            .setServiceData(
-                ParcelUuid(BleDiscoveryContract.SERVICE_UUID),
-                byteArrayOf(BleDiscoveryContract.PAYLOAD_SCHEMA_VERSION_LEGACY),
-                byteArrayOf(0xFF.toByte()),
-            )
-            .build()
+        // Filter on schema v2 — the only version we accept. Filtering on the
+        // version byte prevents matching garbled adverts from other apps using
+        // adjacent UUID space (mask 0x00 on that byte would accept any version).
         val filterV2 = ScanFilter.Builder()
             .setServiceData(
                 ParcelUuid(BleDiscoveryContract.SERVICE_UUID),
@@ -133,7 +123,7 @@ class PhoneBleScanner @Inject constructor(
         }
 
         return runCatching {
-            leScanner.startScan(listOf(filterV1, filterV2), settings, callback)
+            leScanner.startScan(listOf(filterV2), settings, callback)
             synchronized(this) {
                 scanner = leScanner
                 activeCallback = callback
@@ -177,18 +167,14 @@ class PhoneBleScanner @Inject constructor(
         when (val decoded = BleDiscoveryContract.decode(data)) {
             is BleDiscoveryContract.DecodeResult.Ok -> {
                 val payload = decoded.payload
-                val bearerTokenBytes = if (decoded.authCapable) {
-                    BleDiscoveryContract.decodeTokenPayload(
-                        scanRecord?.serviceData?.get(ParcelUuid(BleDiscoveryContract.TOKEN_SERVICE_UUID))
-                    )
-                } else {
-                    null
-                }
+                val bearerTokenBytes = BleDiscoveryContract.decodeTokenPayload(
+                    scanRecord?.serviceData?.get(ParcelUuid(BleDiscoveryContract.TOKEN_SERVICE_UUID))
+                )
                 Log.d(
                     TAG,
                     "advertisement: ip=${payload.ipv4.hostAddress} port=${payload.port} " +
                         "quality=${payload.modelQuality} backend=${payload.llmBackendOrdinal} " +
-                        "rssi=${result.rssi} auth=${decoded.authCapable}"
+                        "rssi=${result.rssi}"
                 )
                 listener.onAdvertisement(
                     ipv4 = payload.ipv4,
@@ -196,7 +182,6 @@ class PhoneBleScanner @Inject constructor(
                     modelQuality = payload.modelQuality,
                     llmBackendOrdinal = payload.llmBackendOrdinal,
                     rssi = result.rssi,
-                    authCapable = decoded.authCapable,
                     bearerTokenBytes = bearerTokenBytes,
                 )
             }

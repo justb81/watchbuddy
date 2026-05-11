@@ -148,8 +148,7 @@ data class DeviceCapability(
     /**
      * Session key of the most recently resolved ambiguous prompt, or null when no prompt
      * has been resolved since service start. The TV reads this to stop re-dispatching the
-     * same ambiguous prompt (#474). Null-safe: old phone builds without this field default
-     * it to null via WatchBuddyJson's lenient decoding.
+     * same ambiguous prompt (#474).
      */
     val lastResolvedSessionKey: String? = null,
     /**
@@ -163,7 +162,6 @@ data class DeviceCapability(
      * when the phone's locale has no country component. The TV uses this for watch-provider
      * and JustWatch lookups so that region-specific services (e.g. Joyn in DE/AT) appear
      * correctly even when the TV's own UI locale returns an empty country string.
-     * Nullable for backward compatibility with older phone builds that don't include this field.
      */
     val countryCode: String? = null,
 )
@@ -227,11 +225,6 @@ data class ScrobbleCandidate(
  * in priority order by [com.justb81.watchbuddy.core.scrobbler.MediaSnapshotBuilder].
  * For the MediaSession-only case the tag prefix is `mediaSession.*`. Additional
  * enrichers (#471, #472) append their own prefixed lines without changing the schema.
- *
- * Wire-format note: [text] defaults to an empty string so that a TV client built
- * against the old schema (which sent 8 named fields instead of [text]) is
- * deserialized gracefully by a new phone — [WatchBuddyJson] ignores unknown keys,
- * and an empty [text] naturally yields confidence 0 from the extraction cascade.
  *
  * [sources] records which enrichers contributed; used for diagnostics only.
  */

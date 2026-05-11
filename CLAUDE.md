@@ -142,6 +142,15 @@ The GitHub MCP server tools (prefixed with `mcp__github__`) remain available as 
 
 The only exceptions are **localization string resources** (`values-de/`, `values-fr/`, `values-es/`) which contain translated user-facing strings by design. The default `values/strings.xml` must remain in English.
 
+### Active Early Development — No Cross-Component Fallbacks
+
+The app is in active early development. Phone, TV and backend are always deployed together from the same repository, so **version/schema fallbacks between components are not needed and must not be added**. Concretely:
+
+- The BLE discovery payload supports only the current schema version. Legacy schema versions are rejected.
+- The HTTP server API has no backward-compatibility shims or version negotiation.
+- The token storage format is always the current v1 format. Migration code for older formats is not needed.
+- When changing a shared protocol or data format, update all components in the same commit/PR.
+
 ### Code Style
 - Kotlin official code style (`kotlin.code.style=official`)
 - Compose UI follows single-Activity, screen-level composables

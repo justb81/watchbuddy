@@ -17,7 +17,7 @@ import java.util.UUID
  *
  *   | offset | bytes | field                                              |
  *   |--------|-------|----------------------------------------------------|
- *   | 0      | 1     | schema version (1 = legacy, 2 = auth-capable)      |
+ *   | 0      | 1     | schema version (2 = current, bearer-auth capable)  |
  *   | 1..4   | 4     | IPv4 address (network byte order)                  |
  *   | 5..6   | 2     | TCP port (big-endian, unsigned)                    |
  *   | 7      | 1     | modelQuality (0..255 clamped; semantic range 0..150) |
@@ -25,9 +25,9 @@ import java.util.UUID
  *
  * ## Scan response (service data attached to [TOKEN_SERVICE_UUID]): 13 bytes.
  *
- * Schema-v2 phones also emit a BLE scan response carrying a 13-byte bearer
- * token for HTTP authentication. Token bytes are raw random material;
- * callers encode to Base64url for use in `Authorization: Bearer` headers.
+ * Phones emit a BLE scan response carrying a 13-byte bearer token for HTTP
+ * authentication. Token bytes are raw random material; callers encode to
+ * Base64url for use in `Authorization: Bearer` headers.
  *
  *   | offset | bytes | field               |
  *   |--------|-------|---------------------|
@@ -52,7 +52,7 @@ import java.util.UUID
  * `(ip, port)` pair.
  *
  * Schema evolution: additive changes must bump [PAYLOAD_SCHEMA_VERSION];
- * unknown versions beyond the recognised set are rejected.
+ * unknown versions are rejected.
  */
 object BleDiscoveryContract {
 
@@ -67,9 +67,6 @@ object BleDiscoveryContract {
      * Separate from [SERVICE_UUID] to avoid collision in Android's merged ScanRecord map.
      */
     val TOKEN_SERVICE_UUID: UUID = UUID.fromString("7a2c1f8b-3e5d-4c9a-b0e7-8d4f2a6c0b3e")
-
-    /** Legacy schema emitted by phone builds before bearer-token auth was introduced. */
-    const val PAYLOAD_SCHEMA_VERSION_LEGACY: Byte = 1
 
     /** Current schema — phone emits scan response with [TOKEN_SERVICE_UUID] bearer token. */
     const val PAYLOAD_SCHEMA_VERSION: Byte = 2
@@ -89,15 +86,10 @@ object BleDiscoveryContract {
 
     /** Typed result returned by [decode] so callers can distinguish failure modes. */
     sealed class DecodeResult {
-        /**
-         * Successfully decoded payload.
-         *
-         * [authCapable] is true for schema v2 phones that also emit a bearer-token
-         * scan response; false for legacy v1 phones with no token.
-         */
-        data class Ok(val payload: Payload, val authCapable: Boolean) : DecodeResult()
+        /** Successfully decoded payload. */
+        data class Ok(val payload: Payload) : DecodeResult()
 
-        /** Schema version is not 1 or 2 — unknown future schema or garbled advert. */
+        /** Schema version is not 2 — unknown schema or garbled advert. */
         data class WrongVersion(val found: Byte, val expected: Byte) : DecodeResult()
 
         /** Payload is null or shorter than [PAYLOAD_SIZE_BYTES]. */
@@ -137,20 +129,16 @@ object BleDiscoveryContract {
     /**
      * Reads a payload emitted by [encode]. Returns a [DecodeResult] that distinguishes
      * the failure mode so callers can log unexpected cases separately from expected
-     * schema-version mismatches (old client on the same network).
+     * schema-version mismatches (other apps using adjacent UUID space, radio corruption).
      *
-     * Accepts both schema v1 (legacy, [authCapable]=false) and v2 ([authCapable]=true).
-     * Never throws — this runs on every scan callback and bad data is a normal
-     * network condition (other apps using adjacent UUID space, radio corruption,
-     * schema drift from a newer phone build).
+     * Only accepts [PAYLOAD_SCHEMA_VERSION] (v2). Never throws — this runs on every
+     * scan callback and bad data is a normal network condition.
      */
     fun decode(bytes: ByteArray?): DecodeResult {
         if (bytes == null || bytes.size < PAYLOAD_SIZE_BYTES) return DecodeResult.Truncated
         val version = bytes[0]
-        val authCapable = when (version) {
-            PAYLOAD_SCHEMA_VERSION_LEGACY -> false
-            PAYLOAD_SCHEMA_VERSION -> true
-            else -> return DecodeResult.WrongVersion(found = version, expected = PAYLOAD_SCHEMA_VERSION)
+        if (version != PAYLOAD_SCHEMA_VERSION) {
+            return DecodeResult.WrongVersion(found = version, expected = PAYLOAD_SCHEMA_VERSION)
         }
         val ipv4 = runCatching {
             InetAddress.getByAddress(bytes.copyOfRange(1, 5)) as? Inet4Address
@@ -165,7 +153,6 @@ object BleDiscoveryContract {
                 modelQuality = modelQuality,
                 llmBackendOrdinal = llmBackendOrdinal,
             ),
-            authCapable = authCapable,
         )
     }
 
