@@ -135,6 +135,7 @@ fun TvHomeScreen(
                 else -> {
                     Column(Modifier.fillMaxSize()) {
                         if (uiState.phoneApiError) PhoneUnreachableBanner()
+                        if (uiState.isShowingStaleCache) StaleCacheBanner()
                         TvHomeShelves(
                             state = uiState,
                             onShowClick = onShowClick,
@@ -395,6 +396,22 @@ private fun PhoneUnreachableBanner() {
             text = stringResource(R.string.tv_error_phone_unreachable),
             fontSize = 13.sp,
             color = MaterialTheme.colorScheme.onErrorContainer
+        )
+    }
+}
+
+@Composable
+private fun StaleCacheBanner() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.secondaryContainer)
+            .padding(horizontal = 48.dp, vertical = 8.dp)
+    ) {
+        Text(
+            text = stringResource(R.string.tv_stale_cache_banner),
+            fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onSecondaryContainer
         )
     }
 }
