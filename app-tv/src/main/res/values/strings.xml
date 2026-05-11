@@ -56,13 +56,10 @@
     <!-- Error states -->
     <string name="tv_error_phone_unreachable">Companion app unreachable. Showing cached data.</string>
     <string name="tv_error_phone_unreachable_no_cache">Companion app unreachable. Make sure WatchBuddy is running on your phone.</string>
-    <string name="tv_stale_cache_banner">Showing cached list — phone offline</string>
-
     <!-- Show detail — one-tap mark as watched (#671) -->
     <string name="tv_mark_watched">Mark as watched</string>
     <string name="tv_mark_watched_no_phones">No connected phone — connect a phone to mark episodes.</string>
     <string name="tv_mark_watched_error">Could not mark episode as watched.</string>
-    <string name="tv_mark_watched_cd">Mark current episode as watched</string>
 
     <!-- Show detail — manually mark episodes watched (#217) -->
     <string name="tv_detail_episodes">Episodes</string>

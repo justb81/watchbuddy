@@ -87,6 +87,8 @@ fun ShowDetailScreen(
 
     val allFailedMsg = stringResource(R.string.tv_detail_toggle_failed_all)
     val partialFailedMsg = stringResource(R.string.tv_detail_toggle_failed_partial)
+    val markWatchedNoPhonesMsg = stringResource(R.string.tv_mark_watched_no_phones)
+    val markWatchedErrorMsg = stringResource(R.string.tv_mark_watched_error)
 
     ShowDetailEffects(
         viewModel = viewModel,
@@ -100,12 +102,12 @@ fun ShowDetailScreen(
 
     // One-shot toast for mark-watched feedback, then acknowledge to reset to Idle.
     LaunchedEffect(markState) {
-        val msgRes = when (markState) {
-            MarkWatchedState.NoPhones -> R.string.tv_mark_watched_no_phones
-            MarkWatchedState.Error -> R.string.tv_mark_watched_error
+        val msg = when (markState) {
+            MarkWatchedState.NoPhones -> markWatchedNoPhonesMsg
+            MarkWatchedState.Error -> markWatchedErrorMsg
             else -> null
         } ?: return@LaunchedEffect
-        Toast.makeText(context, context.getString(msgRes), Toast.LENGTH_LONG).show()
+        Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
         delay(MARK_WATCHED_TOAST_DELAY_MS)
         viewModel.acknowledgeMarkWatchedFeedback()
     }
