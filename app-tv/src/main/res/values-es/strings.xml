@@ -59,6 +59,7 @@
     <!-- Error states -->
     <string name="tv_error_phone_unreachable">Aplicación compañera inaccesible. Mostrando datos en caché.</string>
     <string name="tv_error_phone_unreachable_no_cache">Aplicación compañera inaccesible. Asegúrate de que WatchBuddy está en ejecución en tu teléfono.</string>
+    <string name="tv_stale_cache_banner">Mostrando lista en caché — teléfono sin conexión</string>
 
     <!-- Show detail — manually mark episodes watched (#217) -->
     <string name="tv_detail_episodes">Episodios</string>
