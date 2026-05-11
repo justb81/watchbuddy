@@ -7,6 +7,7 @@ import com.justb81.watchbuddy.core.model.DeviceCapability
 import com.justb81.watchbuddy.core.model.EnrichedShowEntry
 import com.justb81.watchbuddy.core.progress.ShowProgress
 import com.justb81.watchbuddy.core.progress.ShowProgressCalculator
+import com.justb81.watchbuddy.tv.data.PersistedShowCacheRepository
 import com.justb81.watchbuddy.tv.data.StreamingPreferencesRepository
 import com.justb81.watchbuddy.tv.data.TvShowCache
 import com.justb81.watchbuddy.tv.discovery.PhoneApiClientFactory
@@ -52,7 +53,9 @@ data class TvHomeUiState(
     val phoneApiError: Boolean = false,
     val error: String? = null,
     /** True when there are more pages available on the phone API. */
-    val canLoadMore: Boolean = false
+    val canLoadMore: Boolean = false,
+    /** True when the displayed show list comes from the on-device persistent cache while the phone is offline. */
+    val isShowingStaleCache: Boolean = false,
 )
 
 private sealed interface FailureReason {
@@ -65,7 +68,8 @@ class TvHomeViewModel @Inject constructor(
     private val phoneDiscovery: PhoneDiscoveryManager,
     private val phoneApiClientFactory: PhoneApiClientFactory,
     private val tvShowCache: TvShowCache,
-    private val preferencesRepository: StreamingPreferencesRepository
+    private val preferencesRepository: StreamingPreferencesRepository,
+    private val persistedShowCacheRepository: PersistedShowCacheRepository,
 ) : ViewModel() {
 
     companion object {
@@ -73,13 +77,17 @@ class TvHomeViewModel @Inject constructor(
 
         /** Shows last watched within this window appear in "Continue Watching". */
         val CONTINUE_WATCHING_WINDOW: Duration = Duration.ofDays(30)
+
+        /** Maximum age of the persisted cache before it is considered too stale to display. */
+        val FALLBACK_CACHE_TTL: Duration = Duration.ofHours(1)
     }
 
     private val _uiState = MutableStateFlow(TvHomeUiState())
     val uiState: StateFlow<TvHomeUiState> = _uiState.asStateFlow()
 
-    // TTL-aware resilience cache: retains EnrichedShowEntry (with TMDB data) for offline fallback.
-    // Separate from TvShowCache which stores raw TraktWatchedEntry for scrobble fuzzy-matching.
+    // In-memory layer of the resilience cache. After a successful fetch this mirrors what
+    // was written to PersistedShowCacheRepository. On ViewModel recreation the persisted
+    // store is the authoritative source; this field is populated from there on first load.
     private var fallbackCache: List<EnrichedShowEntry>? = null
     private var fallbackCacheTimestamp: Long = 0L
     private var loadedOffset: Int = 0
@@ -176,6 +184,7 @@ class TvHomeViewModel @Inject constructor(
 
                 fallbackCache = allShows
                 fallbackCacheTimestamp = System.currentTimeMillis()
+                persistedShowCacheRepository.save(allShows)
                 tvShowCache.updateEnrichedShows(allShows)
 
                 val (continueWatching, otherShows) = partitionShows(allShows)
@@ -188,7 +197,8 @@ class TvHomeViewModel @Inject constructor(
                         allShows = otherShows,
                         progress = computeProgress(allShows),
                         hasNewSeason = computeHasNewSeason(allShows),
-                        canLoadMore = hasMore
+                        canLoadMore = hasMore,
+                        isShowingStaleCache = false,
                     )
                 }
             } else {
@@ -201,7 +211,7 @@ class TvHomeViewModel @Inject constructor(
         }
     }
 
-    private fun handleLoadFailure(reason: FailureReason) {
+    private suspend fun handleLoadFailure(reason: FailureReason) {
         val cached = getFallbackCache()
         _uiState.update {
             when (reason) {
@@ -217,14 +227,16 @@ class TvHomeViewModel @Inject constructor(
                             progress = computeProgress(cached),
                             hasNewSeason = computeHasNewSeason(cached),
                             noPhoneConnected = true,
-                            canLoadMore = false
+                            canLoadMore = false,
+                            isShowingStaleCache = true,
                         )
                     }
                     else -> it.copy(
                         isLoading = false,
                         isLoadingMore = false,
                         noPhoneConnected = true,
-                        canLoadMore = false
+                        canLoadMore = false,
+                        isShowingStaleCache = false,
                     )
                 }
                 is FailureReason.ApiError -> when {
@@ -240,7 +252,8 @@ class TvHomeViewModel @Inject constructor(
                             hasNewSeason = computeHasNewSeason(cached),
                             phoneApiError = reason.phoneFound,
                             error = reason.message,
-                            canLoadMore = false
+                            canLoadMore = false,
+                            isShowingStaleCache = true,
                         )
                     }
                     else -> it.copy(
@@ -249,7 +262,8 @@ class TvHomeViewModel @Inject constructor(
                         phoneApiError = reason.phoneFound,
                         noPhoneConnected = !reason.phoneFound,
                         error = reason.message,
-                        canLoadMore = false
+                        canLoadMore = false,
+                        isShowingStaleCache = false,
                     )
                 }
             }
@@ -284,10 +298,23 @@ class TvHomeViewModel @Inject constructor(
             }
         }.toMap()
 
-    private fun getFallbackCache(): List<EnrichedShowEntry>? {
-        val ttl = 5 * 60 * 1000L // 5 minutes
-        val cached = fallbackCache
-        return if (cached != null && System.currentTimeMillis() - fallbackCacheTimestamp < ttl) cached else null
+    private suspend fun getFallbackCache(): List<EnrichedShowEntry>? {
+        val ttlMs = FALLBACK_CACHE_TTL.toMillis()
+        val now = System.currentTimeMillis()
+
+        val inMemory = fallbackCache
+        if (inMemory != null && now - fallbackCacheTimestamp < ttlMs) {
+            return inMemory
+        }
+
+        val persisted = persistedShowCacheRepository.load()
+        if (persisted != null && now - persisted.savedAtMs < ttlMs) {
+            fallbackCache = persisted.shows
+            fallbackCacheTimestamp = persisted.savedAtMs
+            return persisted.shows
+        }
+
+        return null
     }
 
 }
