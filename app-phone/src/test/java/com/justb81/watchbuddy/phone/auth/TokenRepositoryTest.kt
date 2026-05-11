@@ -22,7 +22,6 @@ import java.util.Base64
 class TokenRepositoryTest {
 
     private val context: Context = mockk(relaxed = true)
-    private val legacyPrefs: SharedPreferences = mockk(relaxed = true)
     private val mockPrefs: SharedPreferences = mockk(relaxed = true)
     private val mockEditor: SharedPreferences.Editor = mockk(relaxed = true)
     private val aead: Aead = mockk()
@@ -30,16 +29,12 @@ class TokenRepositoryTest {
 
     @BeforeEach
     fun setUp() {
-        every { context.getSharedPreferences("watchbuddy_tokens", Context.MODE_PRIVATE) } returns legacyPrefs
-        every { legacyPrefs.all } returns emptyMap()
-
         every { context.getSharedPreferences("watchbuddy_tokens_v2", Context.MODE_PRIVATE) } returns mockPrefs
         every { mockPrefs.edit() } returns mockEditor
         every { mockEditor.putString(any(), any()) } returns mockEditor
         every { mockEditor.remove(any()) } returns mockEditor
 
         // Fixed-AAD AEAD: ciphertext layout is "enc(FIXED_AAD):$plaintext" for v1 format.
-        // Supports both the new fixed-AAD and the legacy key-name AAD for migration tests.
         val plaintextSlot = slot<ByteArray>()
         val encryptAssociatedSlot = slot<ByteArray>()
         every { aead.encrypt(capture(plaintextSlot), capture(encryptAssociatedSlot)) } answers {
@@ -65,32 +60,6 @@ class TokenRepositoryTest {
         val fixed = "watchbuddy_aead_v1"
         val raw = "enc($fixed):$plaintext".toByteArray(Charsets.UTF_8)
         return "v1:" + Base64.getEncoder().encodeToString(raw)
-    }
-
-    /** Builds a legacy-format storage string using the key name as AAD. */
-    private fun legacyCiphertext(key: String, plaintext: String): String {
-        val bytes = "enc($key):$plaintext".toByteArray(Charsets.UTF_8)
-        return Base64.getEncoder().encodeToString(bytes)
-    }
-
-    @Nested
-    @DisplayName("legacy migration (EncryptedSharedPreferences)")
-    inner class LegacyMigration {
-
-        @Test
-        fun `deletes legacy EncryptedSharedPreferences file when present`() {
-            every { legacyPrefs.all } returns mapOf("access_token" to "legacy-blob")
-            every { context.deleteSharedPreferences("watchbuddy_tokens") } returns true
-
-            TokenRepository(context, aead)
-
-            verify { context.deleteSharedPreferences("watchbuddy_tokens") }
-        }
-
-        @Test
-        fun `skips deletion when legacy file is empty`() {
-            verify(exactly = 0) { context.deleteSharedPreferences("watchbuddy_tokens") }
-        }
     }
 
     @Nested
@@ -150,59 +119,6 @@ class TokenRepositoryTest {
         fun `getClientSecret returns empty string when nothing stored`() {
             every { mockPrefs.getString("trakt_client_secret", null) } returns null
             assertEquals("", repository.getClientSecret())
-        }
-    }
-
-    @Nested
-    @DisplayName("legacy AAD migration (key-name to fixed AAD)")
-    inner class LegacyAadMigration {
-
-        @Test
-        fun `decrypts legacy access_token and re-encrypts in v1 format`() {
-            every { mockPrefs.getString("access_token", null) } returns
-                legacyCiphertext("access_token", "legacy-access")
-
-            val result = repository.getAccessToken()
-
-            assertEquals("legacy-access", result)
-            // Verify re-encryption was triggered (putString called with v1: prefix)
-            verify { mockEditor.putString(eq("access_token"), match { it.startsWith("v1:") }) }
-        }
-
-        @Test
-        fun `decrypts legacy refresh_token and re-encrypts in v1 format`() {
-            every { mockPrefs.getString("refresh_token", null) } returns
-                legacyCiphertext("refresh_token", "legacy-refresh")
-
-            val result = repository.getRefreshToken()
-
-            assertEquals("legacy-refresh", result)
-            verify { mockEditor.putString(eq("refresh_token"), match { it.startsWith("v1:") }) }
-        }
-
-        @Test
-        fun `decrypts legacy client_secret and re-encrypts in v1 format`() {
-            every { mockPrefs.getString("trakt_client_secret", null) } returns
-                legacyCiphertext("trakt_client_secret", "old-secret")
-
-            val result = repository.getClientSecret()
-
-            assertEquals("old-secret", result)
-            verify { mockEditor.putString(eq("trakt_client_secret"), match { it.startsWith("v1:") }) }
-        }
-
-        @Test
-        fun `legacy format with wrong key-name AAD fails and sets hadDecryptionFailure`() {
-            // Simulate a ciphertext with AAD "wrong_key" stored under "access_token".
-            // Decrypt with key-name "access_token" will fail due to AAD mismatch.
-            val wrongAad = "enc(wrong_key):bad-plaintext".toByteArray(Charsets.UTF_8)
-            val encoded = Base64.getEncoder().encodeToString(wrongAad)
-            every { mockPrefs.getString("access_token", null) } returns encoded
-
-            val result = repository.getAccessToken()
-
-            assertNull(result)
-            assertTrue(repository.hadDecryptionFailure)
         }
     }
 

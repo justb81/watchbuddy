@@ -19,11 +19,9 @@ import javax.inject.Singleton
  * plumbing lives in [TokenAeadModule]; this class consumes the primitive via
  * dependency injection so unit tests can inject a fake.
  *
- * ## Ciphertext versioning
- * All new encryptions write a `v1:` prefix before the Base64 ciphertext and use a
- * fixed AAD constant ([AEAD_FIXED_AAD]) independent of the storage key name. Values
- * written by earlier builds (no prefix, key-name AAD) are detected and transparently
- * re-encrypted on first read so the fleet self-migrates without a forced re-auth.
+ * ## Ciphertext format
+ * All encryptions write a `v1:` prefix before the Base64 ciphertext and use a
+ * fixed AAD constant ([AEAD_FIXED_AAD]) independent of the storage key name.
  *
  * ## Error handling
  * - AEAD primitive unavailable (Keystore locked / hardware failure): every call that
@@ -32,12 +30,6 @@ import javax.inject.Singleton
  * - Ciphertext corruption / AAD mismatch: [hadDecryptionFailure] is set to `true`, an
  *   ERROR-level breadcrumb is emitted via [DiagnosticLog], and the affected getter
  *   returns `null` so the app falls back to the sign-in screen with an informative banner.
- *
- * On first launch after an upgrade from a build that used
- * `androidx.security:security-crypto` (deprecated, #430) the legacy
- * `watchbuddy_tokens.xml` shared-prefs file is deleted — the user has to sign in again
- * once. This avoids dragging the abandoned security-crypto dependency into the APK just
- * to decrypt a single file.
  */
 @Singleton
 class TokenRepository @Inject constructor(
@@ -57,7 +49,6 @@ class TokenRepository @Inject constructor(
         private set
 
     init {
-        migrateLegacyStoreIfPresent(context)
         prefs = context.getSharedPreferences(PREFS_FILE, Context.MODE_PRIVATE)
         DiagnosticLog.event(TAG, "init: ready (file=$PREFS_FILE)")
     }
@@ -127,12 +118,7 @@ class TokenRepository @Inject constructor(
     }
 
     /**
-     * Decrypts a stored value, handling both the current v1 format and the legacy
-     * key-name-AAD format written by earlier builds.
-     *
-     * - `v1:` prefix → strip prefix, Base64-decode, decrypt with [AEAD_FIXED_AAD].
-     * - No prefix → Base64-decode, decrypt with [storageKey] as AAD (legacy), then
-     *   immediately re-encrypt in v1 format so the value self-migrates.
+     * Decrypts a stored value in v1 format (`v1:` prefix + Base64 ciphertext with [AEAD_FIXED_AAD]).
      *
      * Returns `null` when [encoded] is `null` (nothing stored) or when decryption
      * fails due to ciphertext corruption — in the latter case [hadDecryptionFailure]
@@ -143,27 +129,10 @@ class TokenRepository @Inject constructor(
     private fun decrypt(storageKey: String, encoded: String?): String? {
         if (encoded == null) return null
         return try {
-            if (encoded.startsWith(V1_PREFIX)) {
-                val b64 = encoded.removePrefix(V1_PREFIX)
-                val ciphertext = Base64.getDecoder().decode(b64)
-                aead.decrypt(ciphertext, AEAD_FIXED_AAD.toByteArray(StandardCharsets.UTF_8))
-                    .toString(StandardCharsets.UTF_8)
-            } else {
-                // Legacy format: no prefix, AAD was the storage key name.
-                val ciphertext = Base64.getDecoder().decode(encoded)
-                val plaintext = aead.decrypt(
-                    ciphertext,
-                    storageKey.toByteArray(StandardCharsets.UTF_8),
-                ).toString(StandardCharsets.UTF_8)
-                // Re-encrypt in v1 format (best-effort; failure is non-fatal here).
-                runCatching {
-                    prefs.edit { putString(storageKey, encrypt(plaintext)) }
-                    DiagnosticLog.event(TAG, "migrated key=$storageKey to v1 AAD format")
-                }.onFailure { e ->
-                    DiagnosticLog.warn(TAG, "re-encrypt migration failed for key=$storageKey", e)
-                }
-                plaintext
-            }
+            val b64 = encoded.removePrefix(V1_PREFIX)
+            val ciphertext = Base64.getDecoder().decode(b64)
+            aead.decrypt(ciphertext, AEAD_FIXED_AAD.toByteArray(StandardCharsets.UTF_8))
+                .toString(StandardCharsets.UTF_8)
         } catch (e: AuthUnavailableException) {
             throw e
         } catch (e: Exception) {
@@ -177,21 +146,6 @@ class TokenRepository @Inject constructor(
         }
     }
 
-    /**
-     * One-shot migration from the legacy `EncryptedSharedPreferences` file written by
-     * `androidx.security:security-crypto` in earlier builds. We cannot decrypt the old
-     * ciphertext without dragging the deprecated library back in, so the file is deleted
-     * outright — the user has to sign in again once. The event is logged via
-     * [DiagnosticLog] so upgrade rollouts can be audited.
-     */
-    private fun migrateLegacyStoreIfPresent(context: Context) {
-        val legacyFile = LEGACY_PREFS_FILE
-        val exists = context.getSharedPreferences(legacyFile, Context.MODE_PRIVATE).all.isNotEmpty()
-        if (!exists) return
-        val deleted = context.deleteSharedPreferences(legacyFile)
-        DiagnosticLog.event(TAG, "migrated legacy EncryptedSharedPreferences (deleted=$deleted); user must re-sign-in")
-    }
-
     private companion object {
         const val KEY_ACCESS_TOKEN = "access_token"
         const val KEY_REFRESH_TOKEN = "refresh_token"
@@ -200,7 +154,6 @@ class TokenRepository @Inject constructor(
         const val TAG = "TokenRepository"
 
         const val PREFS_FILE = "watchbuddy_tokens_v2"
-        const val LEGACY_PREFS_FILE = "watchbuddy_tokens"
 
         /** Prefix prepended to all v1-format stored ciphertexts. */
         const val V1_PREFIX = "v1:"

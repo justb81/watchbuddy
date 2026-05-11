@@ -428,14 +428,6 @@ internal fun Application.configureCompanionRoutes(
             } catch (_: Exception) {
                 return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid request body"))
             }
-            // Old TV clients that pre-date the text-blob migration send the snapshot
-            // with named fields and no `text` field; WatchBuddyJson ignores unknown
-            // keys and defaults `text` to "". Detect this and return confidence=0
-            // gracefully instead of running inference on empty evidence.
-            if (body.snapshot.text.isBlank()) {
-                DiagnosticLog.warn(TAG, "extract: empty snapshot text — likely old-format client, returning confidence=0")
-                return@post call.respond(TitleExtractionResponse(confidence = 0f))
-            }
             try {
                 val response = titleExtractor.extract(body.snapshot, body.libraryHints)
                     ?: TitleExtractionResponse(confidence = 0f)

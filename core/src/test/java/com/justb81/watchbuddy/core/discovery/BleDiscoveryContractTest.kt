@@ -2,7 +2,6 @@ package com.justb81.watchbuddy.core.discovery
 
 import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.DisplayName
@@ -37,25 +36,13 @@ class BleDiscoveryContractTest {
     }
 
     @Test
-    fun `decode v2 sets authCapable true`() {
+    fun `decode v2 returns Ok`() {
         val bytes = BleDiscoveryContract.encode(
             BleDiscoveryContract.Payload(ipv4("10.0.0.1"), 8765, 0, 0)
         )
         assertEquals(BleDiscoveryContract.PAYLOAD_SCHEMA_VERSION, bytes[0])
         val result = BleDiscoveryContract.decode(bytes)
         assertTrue(result is BleDiscoveryContract.DecodeResult.Ok)
-        assertTrue((result as BleDiscoveryContract.DecodeResult.Ok).authCapable)
-    }
-
-    @Test
-    fun `decode v1 legacy sets authCapable false`() {
-        val bytes = BleDiscoveryContract.encode(
-            BleDiscoveryContract.Payload(ipv4("10.0.0.1"), 8765, 0, 0)
-        ).copyOf()
-        bytes[0] = BleDiscoveryContract.PAYLOAD_SCHEMA_VERSION_LEGACY
-        val result = BleDiscoveryContract.decode(bytes)
-        assertTrue(result is BleDiscoveryContract.DecodeResult.Ok)
-        assertFalse((result as BleDiscoveryContract.DecodeResult.Ok).authCapable)
     }
 
     @Test
