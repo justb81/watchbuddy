@@ -96,11 +96,7 @@ class ShowRepositoryTest {
         coEvery { traktApi.getWatchedShows(any()) } returns testShows
 
         repository.getShows()
-
-        ShowRepository::class.java.getDeclaredField("lastFetch").apply {
-            isAccessible = true
-            setLong(repository, 0L)
-        }
+        repository.invalidateCache()
 
         coEvery { traktApi.getWatchedShows(any()) } throws RuntimeException("Trakt unavailable")
 

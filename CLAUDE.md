@@ -54,6 +54,7 @@ watchbuddy/
 │           └── watchbuddy.android.application.gradle.kts  Everything above + compose-compiler, signing config, NDK debugSymbolLevel, build types, Lint SARIF
 ├── core/               Shared library module
 │   └── src/main/java/com/justb81/watchbuddy/core/
+│       ├── cache/      TimedCachedResource (generic TTL cache with per-key mutex and injectable clock)
 │       ├── deeplink/   ProviderCatalog (TMDB provider_id → packageName; deep links handled by JustWatch)
 │       ├── justwatch/  JustWatchApiService (GraphQL Retrofit interface), JustWatchPackageMap (technicalName → TMDB provider_id)
 │       ├── locale/     LocaleHelper (LLM language resolution)

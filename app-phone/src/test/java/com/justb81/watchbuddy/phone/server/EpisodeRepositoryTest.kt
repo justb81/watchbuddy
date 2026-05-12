@@ -83,6 +83,30 @@ class EpisodeRepositoryTest {
     }
 
     @Test
+    fun `markEpisodeWatched invalidates per-show cache so next getSeasonsWithEpisodes refetches`() = runTest {
+        coEvery { traktApi.getShowSeasons(any(), "42", any()) } returns sampleSeasons
+        coEvery { traktApi.addToHistory(any(), any()) } returns SyncHistoryResult()
+
+        repository.getSeasonsWithEpisodes("42")
+        repository.markEpisodeWatched(TraktIds(trakt = 42), season = 1, episode = 1)
+        repository.getSeasonsWithEpisodes("42")
+
+        coVerify(exactly = 2) { traktApi.getShowSeasons(any(), "42", any()) }
+    }
+
+    @Test
+    fun `markEpisodeUnwatched invalidates per-show cache so next getSeasonsWithEpisodes refetches`() = runTest {
+        coEvery { traktApi.getShowSeasons(any(), "42", any()) } returns sampleSeasons
+        coEvery { traktApi.removeFromHistory(any(), any()) } returns SyncHistoryResult()
+
+        repository.getSeasonsWithEpisodes("42")
+        repository.markEpisodeUnwatched(TraktIds(trakt = 42), season = 1, episode = 1)
+        repository.getSeasonsWithEpisodes("42")
+
+        coVerify(exactly = 2) { traktApi.getShowSeasons(any(), "42", any()) }
+    }
+
+    @Test
     fun `markEpisodeWatched posts correct SyncHistoryBody`() = runTest {
         val slot = slot<SyncHistoryBody>()
         coEvery { traktApi.addToHistory(any(), capture(slot)) } returns SyncHistoryResult()

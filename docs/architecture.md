@@ -170,7 +170,8 @@ does not block the others. The TV never calls the Trakt API directly for any ope
 Tapping a show on the phone `HomeScreen` opens `ShowDetailScreen`. The detail view
 fetches the full season / episode structure for that show via Trakt
 `GET shows/:id/seasons?extended=episodes`, wrapped in `EpisodeRepository` with a
-10-minute per-show TTL cache. Each episode renders as a checkbox row reflecting its
+10-minute per-show TTL cache backed by the shared `TimedCachedResource` abstraction.
+Each episode renders as a checkbox row reflecting its
 watched state as derived from the user's existing `sync/watched/shows` cache in
 `ShowRepository`.
 
