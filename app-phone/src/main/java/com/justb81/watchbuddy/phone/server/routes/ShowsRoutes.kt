@@ -12,7 +12,6 @@ import com.justb81.watchbuddy.phone.auth.TokenRepository
 import com.justb81.watchbuddy.phone.server.EpisodeRepository
 import com.justb81.watchbuddy.phone.server.ShowRepository
 import io.ktor.http.HttpStatusCode
-import io.ktor.server.request.queryParameters
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
