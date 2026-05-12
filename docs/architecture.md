@@ -80,6 +80,7 @@ The 9-byte primary advertisement payload is the authoritative wire contract — 
 
 All endpoints except `GET /capability` require `Authorization: Bearer <token>` (token
 distributed via BLE scan response; see above). Missing or wrong bearer returns HTTP 401.
+Route handlers live under `phone/server/routes/` as per-feature Ktor extension functions.
 
 | Method | Path | Description |
 |--------|------|-------------|
