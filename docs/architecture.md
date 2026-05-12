@@ -165,6 +165,10 @@ Multi-user: when multiple phones are connected, each user's watch history is rec
 independently — one `/scrobble/*` call per phone, in parallel. A failure for one user
 does not block the others. The TV never calls the Trakt API directly for any operation.
 
+**Episode resolution** is handled by two pure functions in `core/scrobbler/`:
+- `EpisodeMarkerExtractor` — builds pattern lists from an `AppProfile` and extracts `(season, episode)` markers from text fields. No I/O or side effects.
+- `resolveEpisodeFromMetadata()` — given an optional explicit marker, a fetched `TmdbProgressHint`, a confidence score, and tuning constants, returns a sealed `EpisodeResolutionResult` (`Resolved`, `Ambiguous`, or `Unresolved`). No I/O or side effects; `MediaSessionScrobbler` injects `DiagnosticLog` calls at the call boundary.
+
 ## Manual Watched-State Marking (Phone)
 
 Tapping a show on the phone `HomeScreen` opens `ShowDetailScreen`. The detail view

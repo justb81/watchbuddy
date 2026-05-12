@@ -17,7 +17,6 @@ import com.justb81.watchbuddy.core.model.TraktEpisode
 import com.justb81.watchbuddy.core.model.TraktIds
 import com.justb81.watchbuddy.core.model.TraktShow
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
-import com.justb81.watchbuddy.core.progress.ShowProgressCalculator
 import com.justb81.watchbuddy.core.tmdb.TmdbApiService
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
@@ -593,18 +592,14 @@ class MediaSessionScrobbler @Inject constructor(
         tick: PlaybackTick,
         fallthroughIntent: PlaybackIntent? = null,
     ): List<AmbiguousCandidate> {
-        val patterns = buildList {
-            profile?.markerRegexes?.let { addAll(it) }
-            add(Regex("""(?i)S(\d{1,2})E(\d{1,2})"""))
-        }
         // Best score per Trakt ID across all candidate strings.
         val bestByTraktId = mutableMapOf<Int, ScoredEntry>()
         for (field in candidates) {
-            val marker = patterns.firstNotNullOfOrNull { it.find(field) }
-            val showTitle = if (marker != null) field.substringBefore(marker.value).trim() else field.trim()
+            val extracted = EpisodeMarkerExtractor.extractFromText(field, profile)
+            val showTitle = EpisodeMarkerExtractor.normalizeTitle(field, profile).trim()
             if (showTitle.isBlank()) continue
-            val season = marker?.groupValues?.getOrNull(1)?.toIntOrNull()
-            val episode = marker?.groupValues?.getOrNull(2)?.toIntOrNull()
+            val season = extracted?.season
+            val episode = extracted?.episode
             cachedShows.forEach { entry ->
                 val base = fuzzyScore(entry.show.title, showTitle)
                 val weighted = (base * runtimeAffinity(tick.durationMs, entry.show.runtime))
@@ -735,13 +730,8 @@ class MediaSessionScrobbler @Inject constructor(
         title: String,
         profile: AppProfile? = null,
     ): Float {
-        val patterns = buildList {
-            profile?.markerRegexes?.let { addAll(it) }
-            add(Regex("""(?i)S(\d{1,2})E(\d{1,2})"""))
-        }
         return candidates.maxOfOrNull { field ->
-            val m = patterns.firstNotNullOfOrNull { it.find(field) }
-            val showTitle = if (m != null) field.substringBefore(m.value).trim() else field.trim()
+            val showTitle = EpisodeMarkerExtractor.normalizeTitle(field, profile).trim()
             if (showTitle.isBlank()) 0f else fuzzyScore(showTitle, title)
         } ?: 0f
     }
@@ -944,17 +934,9 @@ class MediaSessionScrobbler @Inject constructor(
         candidates: List<String>,
         profile: AppProfile? = null,
     ): Pair<Int?, Int?> {
-        val patterns = buildList {
-            profile?.markerRegexes?.let { addAll(it) }
-            add(Regex("""(?i)S(\d{1,2})E(\d{1,2})"""))
-        }
-        for (pattern in patterns) {
-            val match = candidates.firstNotNullOfOrNull { pattern.find(it) }
-            if (match != null) {
-                val season = match.groupValues.getOrNull(1)?.toIntOrNull()
-                val episode = match.groupValues.getOrNull(2)?.toIntOrNull()
-                if (season != null && episode != null) return season to episode
-            }
+        for (candidate in candidates) {
+            val marker = EpisodeMarkerExtractor.extractFromText(candidate, profile) ?: continue
+            return marker.season to marker.episode
         }
         return null to null
     }
@@ -1045,14 +1027,10 @@ class MediaSessionScrobbler @Inject constructor(
         profile: AppProfile? = null,
         tick: PlaybackTick = PlaybackTick.UNKNOWN,
     ): CheapMatch {
-        val patterns = buildList {
-            profile?.markerRegexes?.let { addAll(it) }
-            add(Regex("""(?i)S(\d{1,2})E(\d{1,2})"""))
-        }
-        val match = patterns.firstNotNullOfOrNull { it.find(field) }
-        val showTitle = if (match != null) field.substringBefore(match.value).trim() else field.trim()
-        val season = match?.groupValues?.getOrNull(1)?.toIntOrNull()
-        val episode = match?.groupValues?.getOrNull(2)?.toIntOrNull()
+        val marker = EpisodeMarkerExtractor.extractFromText(field, profile)
+        val showTitle = EpisodeMarkerExtractor.normalizeTitle(field, profile).trim()
+        val season = marker?.season
+        val episode = marker?.episode
         if (showTitle.isBlank() || cachedShows.isEmpty()) {
             return CheapMatch(field, showTitle, season, episode, 0f, null)
         }
@@ -1109,12 +1087,16 @@ class MediaSessionScrobbler @Inject constructor(
     }
 
     /**
-     * Resolve the episode tuple for a cache-matched show. Prefers the explicit `S##E##`
-     * pair parsed from MediaMetadata when available; otherwise falls back to the progress
-     * hint so scrobbles from Netflix / Prime / Disney+ (which ship only the episode title
-     * in `METADATA_KEY_TITLE`) aren't silently dropped (issue #401). The fallback only
-     * activates when show-match confidence clears [ScrobbleTuning.autoScrobbleThreshold] — below that
-     * the overlay path still asks the user to confirm.
+     * Resolve the episode tuple for a cache-matched show. Delegates to the pure
+     * [resolveEpisodeFromMetadata] function after fetching the progress hint from
+     * [WatchedShowSource]. Logs diagnostics at the call boundary.
+     *
+     * Prefers the explicit `S##E##` pair parsed from MediaMetadata when available;
+     * otherwise falls back to the progress hint so scrobbles from Netflix / Prime /
+     * Disney+ (which ship only the episode title in `METADATA_KEY_TITLE`) aren't
+     * silently dropped (issue #401). The fallback only activates when show-match
+     * confidence clears [ScrobbleTuning.autoScrobbleThreshold] — below that the
+     * overlay path still asks the user to confirm.
      */
     private suspend fun resolveEpisode(
         explicitSeason: Int?,
@@ -1122,20 +1104,33 @@ class MediaSessionScrobbler @Inject constructor(
         cacheEntry: TraktWatchedEntry,
         confidence: Float
     ): TraktEpisode? {
-        if (explicitSeason != null && explicitEpisode != null) {
-            return TraktEpisode(season = explicitSeason, number = explicitEpisode)
+        val explicit = if (explicitSeason != null && explicitEpisode != null) {
+            EpisodeMarkerExtractor.Marker(explicitSeason, explicitEpisode)
+        } else {
+            null
         }
-        if (confidence < tuning.autoScrobbleThreshold) return null
-        val hint = watchedShowSource.getShowHint(cacheEntry.show.ids)
-        if (hint == null) {
-            DiagnosticLog.warn(
-                TAG,
-                "scrobble dropped — no episode in title and no progress hint for '${cacheEntry.show.title}'"
-            )
-            return null
+        val hint = if (confidence >= tuning.autoScrobbleThreshold) {
+            watchedShowSource.getShowHint(cacheEntry.show.ids)
+        } else {
+            null
         }
-        return ShowProgressCalculator.nextEpisodeNumbers(cacheEntry, hint)
-            ?.let { TraktEpisode(season = it.first, number = it.second) }
+        return when (
+            val result = resolveEpisodeFromMetadata(explicit, hint, confidence, tuning, cacheEntry)
+        ) {
+            is EpisodeResolutionResult.Resolved ->
+                TraktEpisode(season = result.season, number = result.episode)
+            EpisodeResolutionResult.Ambiguous ->
+                TraktEpisode(season = explicit!!.season, number = explicit.episode)
+            EpisodeResolutionResult.Unresolved -> {
+                if (explicit == null && confidence >= tuning.autoScrobbleThreshold) {
+                    DiagnosticLog.warn(
+                        TAG,
+                        "scrobble dropped — no episode in title and no progress hint for '${cacheEntry.show.title}'"
+                    )
+                }
+                null
+            }
+        }
     }
 
     internal fun normalize(title: String): String {
