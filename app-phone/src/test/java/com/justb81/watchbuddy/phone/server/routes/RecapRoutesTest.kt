@@ -16,11 +16,11 @@ import com.justb81.watchbuddy.phone.llm.LlmBusyException
 import com.justb81.watchbuddy.phone.llm.RecapGenerator
 import com.justb81.watchbuddy.phone.server.ShowRepository
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
-import io.ktor.client.request.contentType
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.install
@@ -101,9 +101,8 @@ class RecapRoutesTest {
         every { settingsRepository.getTmdbApiKey() } returns flowOf("")
 
         val response = client.post("/recap/1") {
-            contentType(ContentType.Application.Json)
-            setBody("""{"tmdbApiKey":""}""")
-        }
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            setBody("""{"tmdbApiKey":""}""")        }
 
         assertEquals(HttpStatusCode.PreconditionFailed, response.status)
     }
@@ -114,7 +113,7 @@ class RecapRoutesTest {
         coEvery { showRepository.getShows() } returns emptyList()
 
         val response = client.post("/recap/1") {
-            contentType(ContentType.Application.Json)
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
             setBody("""{"tmdbApiKey":"api-key"}""")
         }
 
@@ -131,7 +130,7 @@ class RecapRoutesTest {
         coEvery { recapGenerator.generateRecap(any(), any(), any()) } returns "<div>Recap</div>"
 
         val response = client.post("/recap/1") {
-            contentType(ContentType.Application.Json)
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
             setBody("""{"tmdbApiKey":"api-key"}""")
         }
 
@@ -148,7 +147,7 @@ class RecapRoutesTest {
         coEvery { recapGenerator.generateRecap(any(), any(), any()) } throws LlmBusyException("busy")
 
         val response = client.post("/recap/1") {
-            contentType(ContentType.Application.Json)
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
             setBody("""{"tmdbApiKey":"api-key"}""")
         }
 
@@ -165,7 +164,7 @@ class RecapRoutesTest {
         coEvery { recapGenerator.generateRecap(any(), any(), any()) } throws RuntimeException("internal crash")
 
         val response = client.post("/recap/1") {
-            contentType(ContentType.Application.Json)
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
             setBody("""{"tmdbApiKey":"api-key"}""")
         }
 
@@ -178,7 +177,7 @@ class RecapRoutesTest {
         every { tokenRepository.getAccessToken() } throws SecurityException("Keystore locked")
 
         val response = client.post("/recap/1") {
-            contentType(ContentType.Application.Json)
+            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
             setBody("""{"tmdbApiKey":"api-key"}""")
         }
 

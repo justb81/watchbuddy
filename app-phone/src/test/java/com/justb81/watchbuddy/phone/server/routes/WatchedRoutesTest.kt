@@ -3,12 +3,12 @@ package com.justb81.watchbuddy.phone.server.routes
 import com.justb81.watchbuddy.core.network.WatchBuddyJson
 import com.justb81.watchbuddy.phone.auth.TokenRefreshManager
 import com.justb81.watchbuddy.phone.server.EpisodeRepository
-import io.ktor.client.request.contentType
 import io.ktor.client.request.delete
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.install
@@ -60,7 +60,7 @@ class WatchedRoutesTest {
             coEvery { episodeRepository.markEpisodeWatched(any(), any(), any()) } returns Result.success(Unit)
 
             val response = client.post("/watched") {
-                contentType(ContentType.Application.Json)
+                header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
                 setBody(validBody)
             }
 
@@ -73,7 +73,7 @@ class WatchedRoutesTest {
             coEvery { tokenRefreshManager.getValidAccessToken() } returns null
 
             val response = client.post("/watched") {
-                contentType(ContentType.Application.Json)
+                header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
                 setBody(validBody)
             }
 
@@ -85,7 +85,7 @@ class WatchedRoutesTest {
             coEvery { tokenRefreshManager.getValidAccessToken() } returns "token"
 
             val response = client.post("/watched") {
-                contentType(ContentType.Application.Json)
+                header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
                 setBody("bad-json")
             }
 
@@ -99,7 +99,7 @@ class WatchedRoutesTest {
                 Result.failure(RuntimeException("Trakt error"))
 
             val response = client.post("/watched") {
-                contentType(ContentType.Application.Json)
+                header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
                 setBody(validBody)
             }
 
@@ -116,7 +116,7 @@ class WatchedRoutesTest {
             } returns Result.success(Unit)
 
             client.post("/watched") {
-                contentType(ContentType.Application.Json)
+                header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
                 setBody("""{"showIds":{"trakt":5},"season":3,"episode":7}""")
             }
 
@@ -135,7 +135,7 @@ class WatchedRoutesTest {
             coEvery { episodeRepository.markEpisodeUnwatched(any(), any(), any()) } returns Result.success(Unit)
 
             val response = client.delete("/watched") {
-                contentType(ContentType.Application.Json)
+                header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
                 setBody(validBody)
             }
 
@@ -148,7 +148,7 @@ class WatchedRoutesTest {
             coEvery { tokenRefreshManager.getValidAccessToken() } returns null
 
             val response = client.delete("/watched") {
-                contentType(ContentType.Application.Json)
+                header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
                 setBody(validBody)
             }
 
@@ -160,7 +160,7 @@ class WatchedRoutesTest {
             coEvery { tokenRefreshManager.getValidAccessToken() } returns "token"
 
             val response = client.delete("/watched") {
-                contentType(ContentType.Application.Json)
+                header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
                 setBody("bad")
             }
 
@@ -174,7 +174,7 @@ class WatchedRoutesTest {
                 Result.failure(RuntimeException("Trakt error"))
 
             val response = client.delete("/watched") {
-                contentType(ContentType.Application.Json)
+                header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
                 setBody(validBody)
             }
 
@@ -191,7 +191,7 @@ class WatchedRoutesTest {
             } returns Result.success(Unit)
 
             client.delete("/watched") {
-                contentType(ContentType.Application.Json)
+                header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
                 setBody("""{"showIds":{"trakt":5},"season":4,"episode":9}""")
             }
 

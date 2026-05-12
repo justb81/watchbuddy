@@ -11,12 +11,12 @@ import com.justb81.watchbuddy.phone.auth.TokenRefreshManager
 import com.justb81.watchbuddy.phone.auth.TokenRepository
 import com.justb81.watchbuddy.phone.server.EpisodeRepository
 import com.justb81.watchbuddy.phone.server.ShowRepository
-import io.ktor.client.request.contentType
 import io.ktor.client.request.get
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.install
@@ -221,7 +221,7 @@ class ShowsRoutesTest {
             coEvery { tokenRefreshManager.getValidAccessToken() } returns null
 
             val response = client.post("/shows/add-to-library") {
-                contentType(ContentType.Application.Json)
+                header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
                 setBody(validBody)
             }
 
@@ -233,7 +233,7 @@ class ShowsRoutesTest {
             coEvery { tokenRefreshManager.getValidAccessToken() } returns "token"
 
             val response = client.post("/shows/add-to-library") {
-                contentType(ContentType.Application.Json)
+                header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
                 setBody("not-json")
             }
 
@@ -247,7 +247,7 @@ class ShowsRoutesTest {
             every { showRepository.invalidateCache() } just runs
 
             val response = client.post("/shows/add-to-library") {
-                contentType(ContentType.Application.Json)
+                header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
                 setBody(validBody)
             }
 
@@ -262,7 +262,7 @@ class ShowsRoutesTest {
             every { showRepository.invalidateCache() } just runs
 
             client.post("/shows/add-to-library") {
-                contentType(ContentType.Application.Json)
+                header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
                 setBody(validBody)
             }
 
@@ -275,7 +275,7 @@ class ShowsRoutesTest {
             coEvery { traktApiService.addToHistory(any(), any()) } throws RuntimeException("Network error")
 
             val response = client.post("/shows/add-to-library") {
-                contentType(ContentType.Application.Json)
+                header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
                 setBody(validBody)
             }
 

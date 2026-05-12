@@ -4,7 +4,6 @@ import com.justb81.watchbuddy.core.network.WatchBuddyJson
 import com.justb81.watchbuddy.phone.data.ProviderCatalogRepository
 import io.ktor.client.request.get
 import io.ktor.client.request.header
-import io.ktor.client.statement.contentType
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
@@ -61,7 +60,10 @@ class ProviderCatalogRoutesTest {
         val response = client.get("/provider-catalog")
 
         assertEquals(HttpStatusCode.OK, response.status)
-        assertEquals(ContentType.Application.Json, response.contentType()?.withoutParameters())
+        assertEquals(
+            ContentType.Application.Json,
+            response.headers[HttpHeaders.ContentType]?.let { ContentType.parse(it).withoutParameters() }
+        )
     }
 
     @Test

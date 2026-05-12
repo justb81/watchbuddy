@@ -13,11 +13,11 @@ import com.justb81.watchbuddy.phone.auth.TokenRefreshManager
 import com.justb81.watchbuddy.phone.llm.LlmBusyException
 import com.justb81.watchbuddy.phone.llm.LlmTitleExtractor
 import com.justb81.watchbuddy.service.CompanionStateManager
-import io.ktor.client.request.contentType
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.install
@@ -76,7 +76,7 @@ class ScrobbleRoutesTest {
             coEvery { tokenRefreshManager.getValidAccessToken() } returns null
 
             val response = client.post("/scrobble/start") {
-                contentType(ContentType.Application.Json)
+                header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
                 setBody(scrobbleBody)
             }
 
@@ -88,7 +88,7 @@ class ScrobbleRoutesTest {
             coEvery { tokenRefreshManager.getValidAccessToken() } returns "token"
 
             val response = client.post("/scrobble/start") {
-                contentType(ContentType.Application.Json)
+                header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
                 setBody("not-valid-json")
             }
 
@@ -102,7 +102,7 @@ class ScrobbleRoutesTest {
                 ScrobbleResponse(id = 1L, action = "start", progress = 0f, show = show, episode = episode)
 
             val response = client.post("/scrobble/start") {
-                contentType(ContentType.Application.Json)
+                header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
                 setBody(scrobbleBody)
             }
 
@@ -117,7 +117,7 @@ class ScrobbleRoutesTest {
                 ScrobbleResponse(id = 1L, action = "start", progress = 0f, show = show, episode = episode)
 
             client.post("/scrobble/start") {
-                contentType(ContentType.Application.Json)
+                header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
                 setBody(scrobbleBody)
             }
 
@@ -130,7 +130,7 @@ class ScrobbleRoutesTest {
             coEvery { traktApiService.scrobbleStart(any(), any()) } throws RuntimeException("Network error")
 
             val response = client.post("/scrobble/start") {
-                contentType(ContentType.Application.Json)
+                header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
                 setBody(scrobbleBody)
             }
 
@@ -153,7 +153,7 @@ class ScrobbleRoutesTest {
                 TitleExtractionResponse(showTitle = "Breaking Bad", season = 1, episode = 1, confidence = 0.9f)
 
             val response = client.post("/scrobble/extract") {
-                contentType(ContentType.Application.Json)
+                header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
                 setBody(extractBody)
             }
 
@@ -164,7 +164,7 @@ class ScrobbleRoutesTest {
         @Test
         fun `returns 400 on malformed body`() = testApp {
             val response = client.post("/scrobble/extract") {
-                contentType(ContentType.Application.Json)
+                header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
                 setBody("bad")
             }
 
@@ -178,7 +178,7 @@ class ScrobbleRoutesTest {
                 """{"snapshot":{"packageName":"com.pkg","text":"$oversizedText"},"libraryHints":[]}"""
 
             val response = client.post("/scrobble/extract") {
-                contentType(ContentType.Application.Json)
+                header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
                 setBody(oversizedBody)
             }
 
@@ -191,7 +191,7 @@ class ScrobbleRoutesTest {
                 LlmBusyException("busy")
 
             val response = client.post("/scrobble/extract") {
-                contentType(ContentType.Application.Json)
+                header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
                 setBody(extractBody)
             }
 
@@ -205,8 +205,8 @@ class ScrobbleRoutesTest {
                 RuntimeException("OOM")
 
             val response = client.post("/scrobble/extract") {
-                contentType(ContentType.Application.Json)
-                setBody(oversizedBody)
+                header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                setBody(extractBody)
             }
 
             assertEquals(HttpStatusCode.ServiceUnavailable, response.status)
@@ -224,7 +224,7 @@ class ScrobbleRoutesTest {
         @Test
         fun `returns 204 on valid prompt`() = testApp {
             val response = client.post("/scrobble/prompt") {
-                contentType(ContentType.Application.Json)
+                header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
                 setBody(promptBody)
             }
 
@@ -234,7 +234,7 @@ class ScrobbleRoutesTest {
         @Test
         fun `returns 400 on malformed body`() = testApp {
             val response = client.post("/scrobble/prompt") {
-                contentType(ContentType.Application.Json)
+                header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
                 setBody("bad-json")
             }
 
