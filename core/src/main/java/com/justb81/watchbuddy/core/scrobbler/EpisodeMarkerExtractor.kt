@@ -19,16 +19,16 @@ object EpisodeMarkerExtractor {
      * generic `S##E##` fallback, and returns the first [Marker] found in
      * [text]. Returns null when no pattern matches.
      */
-    fun extractFromText(text: String, profile: AppProfile?): Marker? {
-        val patterns = buildPatterns(profile)
-        for (pattern in patterns) {
-            val match = pattern.find(text) ?: continue
-            val season = match.groupValues.getOrNull(1)?.toIntOrNull() ?: continue
-            val episode = match.groupValues.getOrNull(2)?.toIntOrNull() ?: continue
-            return Marker(season, episode)
-        }
-        return null
-    }
+    fun extractFromText(text: String, profile: AppProfile?): Marker? =
+        buildPatterns(profile)
+            .asSequence()
+            .mapNotNull { it.find(text) }
+            .mapNotNull { match ->
+                val season = match.groupValues.getOrNull(1)?.toIntOrNull()
+                val episode = match.groupValues.getOrNull(2)?.toIntOrNull()
+                if (season != null && episode != null) Marker(season, episode) else null
+            }
+            .firstOrNull()
 
     /**
      * Strips an `S##E##`-style marker suffix (using the profile's patterns plus
