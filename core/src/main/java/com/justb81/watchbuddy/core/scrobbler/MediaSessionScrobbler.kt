@@ -706,7 +706,7 @@ class MediaSessionScrobbler @Inject constructor(
         return (positionMs * 100f / durationMs).coerceIn(0f, 100f)
     }
 
-    // ── Fuzzy Matching ────────────────────────────────────────────────────────
+    // ── Fuzzy Matching ──────────────────────────────────────────────────
 
     /**
      * Convenience adaptor preserved so vanish/stop paths and existing tests can
@@ -1109,7 +1109,7 @@ class MediaSessionScrobbler @Inject constructor(
         } else {
             null
         }
-        val hint = if (confidence >= tuning.autoScrobbleThreshold) {
+        val hint = if (explicit == null && confidence >= tuning.autoScrobbleThreshold) {
             watchedShowSource.getShowHint(cacheEntry.show.ids)
         } else {
             null
@@ -1166,7 +1166,7 @@ class MediaSessionScrobbler @Inject constructor(
         return dp[a.length][b.length]
     }
 
-    // ── Scrobble API ──────────────────────────────────────────────────────────
+    // ── Scrobble API ─────────────────────────────────────────────────────
 
     suspend fun autoScrobble(
         candidate: ScrobbleCandidate,
