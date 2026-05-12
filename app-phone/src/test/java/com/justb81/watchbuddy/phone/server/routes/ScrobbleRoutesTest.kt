@@ -13,8 +13,7 @@ import com.justb81.watchbuddy.phone.auth.TokenRefreshManager
 import com.justb81.watchbuddy.phone.llm.LlmBusyException
 import com.justb81.watchbuddy.phone.llm.LlmTitleExtractor
 import com.justb81.watchbuddy.service.CompanionStateManager
-import io.ktor.client.request.post
-import io.ktor.client.request.setBody
+import io.ktor.client.request.*
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
@@ -175,7 +174,7 @@ class ScrobbleRoutesTest {
         fun `returns 413 when Content-Length exceeds 64 KB`() = testApp {
             val oversizedText = "x".repeat(70_000)
             val oversizedBody =
-                """{"snapshot":{"packageName":"com.pkg","text":"$oversizedText"},"libraryHints":[]}"""
+                """{"snapshot":{"packageName":"com.pkg","text":"${'$'}oversizedText"},"libraryHints":[]}"""
 
             val response = client.post("/scrobble/extract") {
                 header(HttpHeaders.ContentType, ContentType.Application.Json.toString())

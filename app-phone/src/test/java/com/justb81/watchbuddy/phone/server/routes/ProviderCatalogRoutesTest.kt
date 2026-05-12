@@ -2,8 +2,7 @@ package com.justb81.watchbuddy.phone.server.routes
 
 import com.justb81.watchbuddy.core.network.WatchBuddyJson
 import com.justb81.watchbuddy.phone.data.ProviderCatalogRepository
-import io.ktor.client.request.get
-import io.ktor.client.request.header
+import io.ktor.client.request.*
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode

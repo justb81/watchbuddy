@@ -11,9 +11,7 @@ import com.justb81.watchbuddy.phone.auth.TokenRefreshManager
 import com.justb81.watchbuddy.phone.auth.TokenRepository
 import com.justb81.watchbuddy.phone.server.EpisodeRepository
 import com.justb81.watchbuddy.phone.server.ShowRepository
-import io.ktor.client.request.get
-import io.ktor.client.request.post
-import io.ktor.client.request.setBody
+import io.ktor.client.request.*
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
@@ -123,7 +121,7 @@ class ShowsRoutesTest {
         fun `respects limit query parameter`() = testApp {
             every { tokenRepository.getAccessToken() } returns "token"
             val shows = (1..5).map { i ->
-                EnrichedShowEntry(entry = TraktWatchedEntry(TraktShow("Show $i", 2020, TraktIds(trakt = i))))
+                EnrichedShowEntry(entry = TraktWatchedEntry(TraktShow("Show ${'$'}i", 2020, TraktIds(trakt = i))))
             }
             coEvery { showRepository.getShows() } returns shows
 
@@ -139,7 +137,7 @@ class ShowsRoutesTest {
         fun `respects offset and limit query parameters`() = testApp {
             every { tokenRepository.getAccessToken() } returns "token"
             val shows = (1..5).map { i ->
-                EnrichedShowEntry(entry = TraktWatchedEntry(TraktShow("Show $i", 2020, TraktIds(trakt = i))))
+                EnrichedShowEntry(entry = TraktWatchedEntry(TraktShow("Show ${'$'}i", 2020, TraktIds(trakt = i))))
             }
             coEvery { showRepository.getShows() } returns shows
 
