@@ -48,7 +48,7 @@ class ProviderCatalogRegistryTest {
         tmdbProviderIds = ids,
         name = "Test Provider",
         regions = listOf("*"),
-        androidPackages = com.justb81.watchbuddy.core.model.CatalogAndroidPackages(tv = listOf(tvPkg), phone = listOf(phonePkg)),
+        androidPackages = CatalogAndroidPackages(tv = listOf(tvPkg), phone = listOf(phonePkg)),
         justWatchTechnicalNames = justWatch,
     )
 
