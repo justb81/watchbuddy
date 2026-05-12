@@ -34,7 +34,6 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
@@ -146,6 +145,46 @@ sealed interface EpisodeToggleEvent {
     ) : EpisodeToggleEvent
 }
 
+/**
+ * Single sealed UI state for [ShowDetailScreen].
+ *
+ * [Loading] is the initial state before any slice has been populated.
+ * [Ready] holds all six slices; [Ready.watchNow] is a derived property so no separate flow is
+ * needed.
+ */
+sealed interface ShowDetailUiState {
+    data object Loading : ShowDetailUiState
+    data class Ready(
+        val nextEpisode: NextEpisodeUiState,
+        val providers: ProviderListUiState,
+        val deepLinks: Map<Int, DeepLinkState>,
+        val episodeList: EpisodeListUiState,
+        val markWatched: MarkWatchedState,
+        val advancedEntry: EnrichedShowEntry?,
+    ) : ShowDetailUiState {
+        val watchNow: WatchNowState
+            get() = deriveWatchNowState(providers, deepLinks)
+    }
+}
+
+private fun deriveWatchNowState(
+    providerState: ProviderListUiState,
+    deepLinks: Map<Int, DeepLinkState>,
+): WatchNowState = when (providerState) {
+    is ProviderListUiState.Loading -> WatchNowState.Loading
+    is ProviderListUiState.Empty -> WatchNowState.NoProvider
+    is ProviderListUiState.Error -> WatchNowState.NoProvider
+    is ProviderListUiState.Success -> {
+        val topProvider = providerState.providers.firstOrNull()
+            ?: return WatchNowState.NoProvider
+        when (val linkState = deepLinks[topProvider.providerId]) {
+            is DeepLinkState.Loading, null -> WatchNowState.Loading
+            is DeepLinkState.Available -> WatchNowState.Available(linkState.url)
+            is DeepLinkState.Unavailable -> WatchNowState.Unavailable
+        }
+    }
+}
+
 private data class DeepLinkKey(
     val tmdbShowId: Int,
     val season: Int,
@@ -168,33 +207,32 @@ class ShowDetailViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val _nextEpisode = MutableStateFlow(NextEpisodeUiState())
-    val nextEpisode: StateFlow<NextEpisodeUiState> = _nextEpisode.asStateFlow()
-
     private val _providers = MutableStateFlow<ProviderListUiState>(ProviderListUiState.Loading)
-    val providers: StateFlow<ProviderListUiState> = _providers.asStateFlow()
-
     private val _deepLinks = MutableStateFlow<Map<Int, DeepLinkState>>(emptyMap())
-    val deepLinks: StateFlow<Map<Int, DeepLinkState>> = _deepLinks.asStateFlow()
-
     private val _episodeList = MutableStateFlow<EpisodeListUiState>(EpisodeListUiState.Idle)
-    val episodeList: StateFlow<EpisodeListUiState> = _episodeList.asStateFlow()
+    private val _markWatchedState = MutableStateFlow<MarkWatchedState>(MarkWatchedState.Idle)
+    private val _advancedEntry = MutableStateFlow<EnrichedShowEntry?>(null)
 
     private val _episodeToggleEvents = MutableSharedFlow<EpisodeToggleEvent>()
     val episodeToggleEvents: SharedFlow<EpisodeToggleEvent> = _episodeToggleEvents.asSharedFlow()
 
-    private val _markWatchedState = MutableStateFlow<MarkWatchedState>(MarkWatchedState.Idle)
-
-    /** UI state for the one-tap "Mark as watched" button. */
-    val markWatchedState: StateFlow<MarkWatchedState> = _markWatchedState.asStateFlow()
-
-    /**
-     * Optimistically-advanced [EnrichedShowEntry] after at least one successful mark.
-     * The screen uses `advancedEntry ?: enriched` so it transparently switches to the
-     * advanced entry once the first mark-watched write succeeds, without waiting for
-     * the next `/shows` poll.
-     */
-    private val _advancedEntry = MutableStateFlow<EnrichedShowEntry?>(null)
-    val advancedEntry: StateFlow<EnrichedShowEntry?> = _advancedEntry.asStateFlow()
+    val uiState: StateFlow<ShowDetailUiState> = combine(
+        _nextEpisode,
+        _providers,
+        _deepLinks,
+        _episodeList,
+        _markWatchedState,
+        _advancedEntry,
+    ) { arr ->
+        ShowDetailUiState.Ready(
+            nextEpisode = arr[0] as NextEpisodeUiState,
+            providers = arr[1] as ProviderListUiState,
+            deepLinks = @Suppress("UNCHECKED_CAST") (arr[2] as Map<Int, DeepLinkState>),
+            episodeList = arr[3] as EpisodeListUiState,
+            markWatched = arr[4] as MarkWatchedState,
+            advancedEntry = arr[5] as EnrichedShowEntry?,
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ShowDetailUiState.Loading)
 
     /**
      * When true, [toggleEpisodeWatched] skips showing the scope picker and uses
@@ -206,27 +244,6 @@ class ShowDetailViewModel @Inject constructor(
     fun onDontAskAgainSet() {
         skipScopePickerThisSession = true
     }
-
-    /**
-     * Aggregated "Watch Now" button state derived from [providers] and [deepLinks].
-     * Computed reactively — the UI observes this instead of deriving state from nullable fields.
-     */
-    val watchNowState: StateFlow<WatchNowState> = combine(_providers, _deepLinks) { providerState, deepLinks ->
-        when (providerState) {
-            is ProviderListUiState.Loading -> WatchNowState.Loading
-            is ProviderListUiState.Empty -> WatchNowState.NoProvider
-            is ProviderListUiState.Error -> WatchNowState.NoProvider
-            is ProviderListUiState.Success -> {
-                val topProvider = providerState.providers.firstOrNull()
-                    ?: return@combine WatchNowState.NoProvider
-                when (val linkState = deepLinks[topProvider.providerId]) {
-                    is DeepLinkState.Loading, null -> WatchNowState.Loading
-                    is DeepLinkState.Available -> WatchNowState.Available(linkState.url)
-                    is DeepLinkState.Unavailable -> WatchNowState.Unavailable
-                }
-            }
-        }
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, WatchNowState.Loading)
 
     private val inFlight = mutableMapOf<DeepLinkKey, Deferred<String?>>()
 
@@ -277,7 +294,7 @@ class ShowDetailViewModel @Inject constructor(
 
     /**
      * Fetches TMDB watch providers for [enriched], applies installed-app filter and
-     * last-used ordering, then updates [providers]. Safe to call multiple times (retry).
+     * last-used ordering, then updates the providers slice. Safe to call multiple times (retry).
      */
     fun loadProviders(enriched: EnrichedShowEntry) {
         val tmdbId = enriched.entry.show.ids.tmdb ?: run {
@@ -311,7 +328,7 @@ class ShowDetailViewModel @Inject constructor(
     }
 
     /**
-     * Resolves JustWatch deep links for all providers in the current [providers] list.
+     * Resolves JustWatch deep links for all providers in the current providers list.
      *
      * Per-provider resolution is done in parallel. In-flight dedup via [inFlight] prevents
      * duplicate JustWatch calls for the same key across screen recompositions.
@@ -462,7 +479,7 @@ class ShowDetailViewModel @Inject constructor(
     }
 
     /**
-     * Resets [markWatchedState] to [MarkWatchedState.Idle] after the UI has shown the
+     * Resets the mark-watched state to [MarkWatchedState.Idle] after the UI has shown the
      * one-shot [MarkWatchedState.NoPhones] or [MarkWatchedState.Error] toast.
      */
     fun acknowledgeMarkWatchedFeedback() {

@@ -3,6 +3,7 @@ package com.justb81.watchbuddy.phone.auth
 import android.content.Context
 import com.google.crypto.tink.Aead
 import com.google.crypto.tink.KeyTemplates
+import com.google.crypto.tink.RegistryConfiguration
 import com.google.crypto.tink.aead.AeadConfig
 import com.google.crypto.tink.integration.android.AndroidKeysetManager
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
@@ -49,7 +50,7 @@ object TokenAeadModule {
                 .withMasterKeyUri(KEYSTORE_URI)
                 .build()
                 .keysetHandle
-                .getPrimitive(Aead::class.java)
+                .getPrimitive(RegistryConfiguration.get(), Aead::class.java)
         } catch (e: Exception) {
             DiagnosticLog.error(TAG, "Keystore AEAD init failed — auth storage unavailable", e)
             BrokenAead(AuthUnavailableException("Keystore unavailable: ${e.message}", e))

@@ -143,9 +143,9 @@ class TvProviderCatalogRepository @Inject constructor(
                     DiagnosticLog.event(TAG, "catalog up to date (304)")
                 }
                 response.isSuccessful -> {
-                    val body = response.body?.string()
-                    val parsed = if (body != null) parseCatalog(body) else null
-                    if (body == null || parsed == null) return
+                    val body = response.body.string()
+                    val parsed = parseCatalog(body)
+                    if (parsed == null) return
                     val currentVersion = cached?.version ?: 0
                     if (parsed.version < currentVersion) {
                         DiagnosticLog.warn(TAG, "phone version ${parsed.version} < cached $currentVersion, ignoring")
