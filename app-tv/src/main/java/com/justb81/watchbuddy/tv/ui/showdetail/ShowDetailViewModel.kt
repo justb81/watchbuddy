@@ -223,8 +223,15 @@ class ShowDetailViewModel @Inject constructor(
         _episodeList,
         _markWatchedState,
         _advancedEntry,
-    ) { next, prov, dl, ep, mw, adv ->
-        ShowDetailUiState.Ready(next, prov, dl, ep, mw, adv)
+    ) { arr ->
+        ShowDetailUiState.Ready(
+            nextEpisode = arr[0] as NextEpisodeUiState,
+            providers = arr[1] as ProviderListUiState,
+            deepLinks = @Suppress("UNCHECKED_CAST") (arr[2] as Map<Int, DeepLinkState>),
+            episodeList = arr[3] as EpisodeListUiState,
+            markWatched = arr[4] as MarkWatchedState,
+            advancedEntry = arr[5] as EnrichedShowEntry?,
+        )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ShowDetailUiState.Loading)
 
     /**
