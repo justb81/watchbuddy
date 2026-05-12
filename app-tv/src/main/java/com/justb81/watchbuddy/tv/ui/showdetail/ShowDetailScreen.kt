@@ -69,16 +69,19 @@ fun ShowDetailScreen(
     viewModel: ShowDetailViewModel = hiltViewModel()
 ) {
     val context = LocalContext.current
-    val advanced by viewModel.advancedEntry.collectAsState()
+    val uiState by viewModel.uiState.collectAsState()
+    val ready = uiState as? ShowDetailUiState.Ready
+
     // Transparently switch to the optimistically-advanced entry once a mark-watched succeeds.
-    val effectiveEntry = advanced ?: enriched
+    val effectiveEntry = ready?.advancedEntry ?: enriched
     val entry = effectiveEntry.entry
-    val nextEpisodeUi by viewModel.nextEpisode.collectAsState()
-    val providerState by viewModel.providers.collectAsState()
-    val deepLinks by viewModel.deepLinks.collectAsState()
-    val watchNowState by viewModel.watchNowState.collectAsState()
-    val episodeListState by viewModel.episodeList.collectAsState()
-    val markState by viewModel.markWatchedState.collectAsState()
+    val nextEpisodeUi = ready?.nextEpisode ?: NextEpisodeUiState()
+    val providerState = ready?.providers ?: ProviderListUiState.Loading
+    val deepLinks = ready?.deepLinks ?: emptyMap()
+    val watchNowState = ready?.watchNow ?: WatchNowState.Loading
+    val episodeListState = ready?.episodeList ?: EpisodeListUiState.Idle
+    val markState = ready?.markWatched ?: MarkWatchedState.Idle
+
     val watchNowFocus = remember { FocusRequester() }
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -128,11 +131,10 @@ fun ShowDetailScreen(
             watchNowFocus = watchNowFocus,
             actions = ShowDetailActions(
                 onWatchNow = {
-                    val state = watchNowState
-                    if (state is WatchNowState.Available) {
+                    if (watchNowState is WatchNowState.Available) {
                         val firstProvider = (providerState as? ProviderListUiState.Success)
                             ?.providers?.firstOrNull()
-                        launchProvider(context, firstProvider, state.url)
+                        launchProvider(context, firstProvider, watchNowState.url)
                     }
                 },
                 onProviderClick = { provider ->
