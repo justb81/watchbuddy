@@ -6,6 +6,16 @@ import com.justb81.watchbuddy.core.model.CatalogProviderEntry
 import com.justb81.watchbuddy.core.model.ProviderCatalogSnapshot
 
 /**
+ * A single streaming provider entry that pairs a TMDB [providerId] with an Android [packageName].
+ * One [CatalogProviderEntry] can expand to multiple [ProviderEntry] objects when a provider has
+ * multiple TMDB IDs or multiple TV packages.
+ */
+data class ProviderEntry(
+    val providerId: Int,
+    val packageName: String,
+)
+
+/**
  * Single source of truth for provider catalog lookups — owns one snapshot and
  * exposes both TMDB provider_id → package name and JustWatch technicalName → TMDB
  * provider_id lookups.

@@ -4,7 +4,7 @@ import com.justb81.watchbuddy.core.justwatch.JustWatchApiService
 import com.justb81.watchbuddy.core.justwatch.JustWatchGraphQlRequest
 import com.justb81.watchbuddy.core.justwatch.JustWatchGraphQlResponse
 import com.justb81.watchbuddy.core.justwatch.JustWatchOffer
-import com.justb81.watchbuddy.core.justwatch.JustWatchPackageMap
+import com.justb81.watchbuddy.core.deeplink.ProviderCatalogRegistry
 import com.justb81.watchbuddy.core.justwatch.JustWatchTitle
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import kotlinx.coroutines.CancellationException
@@ -494,7 +494,7 @@ class JustWatchDeepLinkRepository @Inject constructor(
             .filter { it.monetizationType in ALLOWED_MONETIZATION }
             .forEach { offer ->
                 val technicalName = offer.`package`?.technicalName ?: return@forEach
-                val resolvedId = JustWatchPackageMap.resolveProviderId(technicalName)
+                val resolvedId = ProviderCatalogRegistry.providerIdByJustWatchName(technicalName)
                 if (resolvedId == null) {
                     DiagnosticLog.warn(TAG, "technicalNameUnmapped: '$technicalName' (tmdbShowId=$tmdbShowId)")
                     recordOutcome(tmdbShowId, -1, countryCode, JustWatchOutcomeEvent.Outcome.TECHNICAL_NAME_UNMAPPED, technicalName)
@@ -508,7 +508,7 @@ class JustWatchDeepLinkRepository @Inject constructor(
         }
         // Cache negatives for known providers confirmed to have no offer for this title
         val covered = providerUrls.keys
-        for (providerId in JustWatchPackageMap.technicalNameToProviderId.values.toSet()) {
+        for (providerId in ProviderCatalogRegistry.technicalNameToProviderId.values.toSet()) {
             if (providerId !in covered) {
                 val existing = dao.get(tmdbShowId, season, episode, providerId, countryCode)
                 if (existing == null) {
