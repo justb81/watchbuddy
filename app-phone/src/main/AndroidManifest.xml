@@ -63,7 +63,12 @@
             </intent-filter>
         </activity>
 
-        <!-- Disable default WorkManager initializer (custom HiltWorkerFactory) -->
+        <!-- Disable the default WorkManager auto-initializer so Hilt can inject
+             HiltWorkerFactory before WorkManager starts. The meta-data entry
+             being removed is declared by the androidx.work:work-runtime-ktx
+             library manifest (via androidx.startup) and merged here at build
+             time; the tools:node="remove" directive prevents the startup
+             library from auto-starting WorkManager with the default factory. -->
         <provider
             android:name="androidx.startup.InitializationProvider"
             android:authorities="${applicationId}.androidx-startup"
