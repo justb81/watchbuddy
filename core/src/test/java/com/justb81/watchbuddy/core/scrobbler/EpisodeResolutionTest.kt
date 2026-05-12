@@ -38,14 +38,11 @@ class EpisodeResolutionTest {
     inner class ExplicitMarkerTest {
 
         @Test
-        fun `explicit marker wins over progress hint`() {
+        fun `explicit marker wins when no hint provided`() {
             val marker = EpisodeMarkerExtractor.Marker(season = 2, episode = 5)
-            val hint = TmdbProgressHint(
-                nextAired = TmdbEpisodeSummary(season_number = 3, episode_number = 1),
-            )
             val result = resolveEpisodeFromMetadata(
                 explicit = marker,
-                hint = hint,
+                hint = null,
                 confidence = 0.98f,
                 tuning = defaultTuning,
                 cacheEntry = watchedEntry(),
@@ -61,13 +58,12 @@ class EpisodeResolutionTest {
         }
 
         @Test
-        fun `ambiguous when explicit marker disagrees with high-confidence hint`() {
+        fun `ambiguous when explicit marker disagrees with non-null hint`() {
             // Explicit says S2E5; nextEpisodeNumbers from hint says S3E1 — they disagree.
             val marker = EpisodeMarkerExtractor.Marker(season = 2, episode = 5)
             val hint = TmdbProgressHint(
                 nextAired = TmdbEpisodeSummary(season_number = 3, episode_number = 1),
             )
-            // confidence >= autoScrobbleThreshold so hint is computed
             val result = resolveEpisodeFromMetadata(
                 explicit = marker,
                 hint = hint,
@@ -97,6 +93,30 @@ class EpisodeResolutionTest {
                 result,
             )
         }
+
+        @Test
+        fun `explicit marker resolves when hint agrees`() {
+            // Explicit says S3E1; hint also points to S3E1 — no ambiguity.
+            val marker = EpisodeMarkerExtractor.Marker(season = 3, episode = 1)
+            val hint = TmdbProgressHint(
+                nextAired = TmdbEpisodeSummary(season_number = 3, episode_number = 1),
+            )
+            val result = resolveEpisodeFromMetadata(
+                explicit = marker,
+                hint = hint,
+                confidence = defaultTuning.autoScrobbleThreshold,
+                tuning = defaultTuning,
+                cacheEntry = watchedEntry(),
+            )
+            assertEquals(
+                EpisodeResolutionResult.Resolved(
+                    season = 3,
+                    episode = 1,
+                    source = ResolveSource.EXPLICIT_MARKER,
+                ),
+                result,
+            )
+        }
     }
 
     // ── progress hint path ────────────────────────────────────────────────────
@@ -107,14 +127,16 @@ class EpisodeResolutionTest {
 
         @Test
         fun `progress hint used when no explicit marker and confidence at threshold`() {
-            // nextEpisodeNumbers will compute S1E4 (latest watched S1E3 + 1)
-            val entry = watchedEntry(season = 1, episode = 3)
+            // hint carries nextAired = S1E4; nextEpisodeNumbers returns S1E4
+            val hint = TmdbProgressHint(
+                nextAired = TmdbEpisodeSummary(season_number = 1, episode_number = 4),
+            )
             val result = resolveEpisodeFromMetadata(
                 explicit = null,
-                hint = null,
+                hint = hint,
                 confidence = defaultTuning.autoScrobbleThreshold,
                 tuning = defaultTuning,
-                cacheEntry = entry,
+                cacheEntry = watchedEntry(),
             )
             assertEquals(
                 EpisodeResolutionResult.Resolved(
@@ -127,10 +149,25 @@ class EpisodeResolutionTest {
         }
 
         @Test
-        fun `unresolved when confidence below hintThreshold and no explicit marker`() {
+        fun `unresolved when hint is null and no explicit marker`() {
             val result = resolveEpisodeFromMetadata(
                 explicit = null,
                 hint = null,
+                confidence = defaultTuning.autoScrobbleThreshold,
+                tuning = defaultTuning,
+                cacheEntry = watchedEntry(),
+            )
+            assertEquals(EpisodeResolutionResult.Unresolved, result)
+        }
+
+        @Test
+        fun `unresolved when confidence below threshold and no explicit marker`() {
+            val hint = TmdbProgressHint(
+                nextAired = TmdbEpisodeSummary(season_number = 1, episode_number = 4),
+            )
+            val result = resolveEpisodeFromMetadata(
+                explicit = null,
+                hint = hint,
                 confidence = defaultTuning.autoScrobbleThreshold - 0.01f,
                 tuning = defaultTuning,
                 cacheEntry = watchedEntry(),

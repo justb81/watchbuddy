@@ -20,16 +20,20 @@ sealed interface EpisodeResolutionResult {
     ) : EpisodeResolutionResult
 
     /**
-     * An explicit marker and a high-confidence progress hint disagree.
-     * The caller should surface a confirmation prompt rather than
-     * auto-scrobbling.
+     * Both an explicit marker and a progress hint were provided and they
+     * disagree. The caller should surface a confirmation prompt rather than
+     * auto-scrobbling. This result is only reachable when the caller passes
+     * a non-null [hint] together with a non-null [explicit] to
+     * [resolveEpisodeFromMetadata] — [MediaSessionScrobbler] never does this
+     * (it passes `hint = null` when [explicit] is non-null), so [Ambiguous]
+     * is reserved for callers that deliberately provide both.
      */
     data object Ambiguous : EpisodeResolutionResult
 
     /**
-     * No episode could be resolved: either the explicit marker was absent
-     * and confidence was too low to trust the progress hint, or the
-     * progress hint itself was unavailable.
+     * No episode could be resolved: either the explicit marker was absent,
+     * the progress hint was null or yielded no episode, or confidence was
+     * too low to trust the hint.
      */
     data object Unresolved : EpisodeResolutionResult
 }
@@ -50,13 +54,25 @@ enum class ResolveSource {
  * Pure function that resolves a `(season, episode)` pair from scrobble metadata.
  *
  * Decision rules (in order):
- * 1. If [explicit] is present, use it ([ResolveSource.EXPLICIT_MARKER]).
- *    When a high-confidence [hint]-derived episode also exists and disagrees,
- *    return [EpisodeResolutionResult.Ambiguous] so the caller can prompt the user.
- * 2. If [confidence] ≥ [tuning.autoScrobbleThreshold] and [hint] yields an episode
- *    via [ShowProgressCalculator.nextEpisodeNumbers], return that episode
- *    ([ResolveSource.PROGRESS_HINT]).
+ * 1. If [explicit] is present:
+ *    - When [hint] is also non-null and `nextEpisodeNumbers` disagrees with
+ *      [explicit], return [EpisodeResolutionResult.Ambiguous].
+ *    - Otherwise return [EpisodeResolutionResult.Resolved] with
+ *      [ResolveSource.EXPLICIT_MARKER].
+ * 2. If [confidence] ≥ [tuning.autoScrobbleThreshold] and [hint] is non-null and
+ *    yields an episode via [ShowProgressCalculator.nextEpisodeNumbers], return that
+ *    episode ([ResolveSource.PROGRESS_HINT]).
  * 3. Otherwise return [EpisodeResolutionResult.Unresolved].
+ *
+ * When [hint] is `null`, the progress-hint path is skipped and the function
+ * returns [EpisodeResolutionResult.Unresolved] unless [explicit] is present.
+ * This preserves the original [MediaSessionScrobbler] contract where a null
+ * hint from [WatchedShowSource.getShowHint] causes a dropped scrobble.
+ *
+ * **Note on [MediaSessionScrobbler] usage:** the scrobbler passes `hint = null`
+ * whenever [explicit] is non-null, so [EpisodeResolutionResult.Ambiguous] is never
+ * returned from the scrobbler's call path. The Ambiguous branch is exposed for
+ * callers that deliberately provide both pieces of evidence.
  *
  * The caller is responsible for fetching [hint] and for logging any diagnostics
  * at the call boundary.
@@ -68,18 +84,14 @@ fun resolveEpisodeFromMetadata(
     tuning: ScrobbleTuning,
     cacheEntry: TraktWatchedEntry,
 ): EpisodeResolutionResult {
-    val hintEpisode: Pair<Int, Int>? =
-        if (confidence >= tuning.autoScrobbleThreshold) {
-            ShowProgressCalculator.nextEpisodeNumbers(cacheEntry, hint)
-        } else {
-            null
-        }
-
     if (explicit != null) {
-        if (hintEpisode != null &&
-            (hintEpisode.first != explicit.season || hintEpisode.second != explicit.episode)
-        ) {
-            return EpisodeResolutionResult.Ambiguous
+        if (hint != null) {
+            val hintEpisode = ShowProgressCalculator.nextEpisodeNumbers(cacheEntry, hint)
+            if (hintEpisode != null &&
+                (hintEpisode.first != explicit.season || hintEpisode.second != explicit.episode)
+            ) {
+                return EpisodeResolutionResult.Ambiguous
+            }
         }
         return EpisodeResolutionResult.Resolved(
             season = explicit.season,
@@ -88,12 +100,15 @@ fun resolveEpisodeFromMetadata(
         )
     }
 
-    if (hintEpisode != null) {
-        return EpisodeResolutionResult.Resolved(
-            season = hintEpisode.first,
-            episode = hintEpisode.second,
-            source = ResolveSource.PROGRESS_HINT,
-        )
+    if (hint != null && confidence >= tuning.autoScrobbleThreshold) {
+        val hintEpisode = ShowProgressCalculator.nextEpisodeNumbers(cacheEntry, hint)
+        if (hintEpisode != null) {
+            return EpisodeResolutionResult.Resolved(
+                season = hintEpisode.first,
+                episode = hintEpisode.second,
+                source = ResolveSource.PROGRESS_HINT,
+            )
+        }
     }
 
     return EpisodeResolutionResult.Unresolved
