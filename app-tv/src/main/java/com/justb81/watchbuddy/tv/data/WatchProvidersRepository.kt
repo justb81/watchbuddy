@@ -1,6 +1,6 @@
 package com.justb81.watchbuddy.tv.data
 
-import com.justb81.watchbuddy.core.deeplink.ProviderCatalog
+import com.justb81.watchbuddy.core.deeplink.ProviderCatalogRegistry
 import com.justb81.watchbuddy.core.model.ResolvedProvider
 import com.justb81.watchbuddy.core.model.WatchProviderEntry
 import com.justb81.watchbuddy.core.tmdb.TmdbApiService
@@ -16,7 +16,7 @@ private const val CACHE_TTL_MS = 24L * 60 * 60 * 1000
  * Fetches and caches TMDB `/tv/{id}/watch/providers` per-show per-region, then
  * composes the final ordered list by merging:
  *   1. Last-used provider for this show (from [LastUsedProviderRepository])
- *   2. Installed providers (from [InstalledAppsProbe] × [ProviderCatalog])
+ *   2. Installed providers (from [InstalledAppsProbe] × [ProviderCatalogRegistry])
  *   3. Remaining providers (only when [showNonInstalled] is true)
  *
  * Providers are deduplicated; the last-used entry is always first when present.
@@ -86,8 +86,7 @@ class WatchProvidersRepository @Inject constructor(
         pageUrl: String?,
     ): List<ResolvedProvider> {
         val resolved = raw.map { entry ->
-            val catalog = ProviderCatalog.byId[entry.providerId]
-            val pkgName = catalog?.packageName
+            val pkgName = ProviderCatalogRegistry.entryById(entry.providerId)?.packageName
             val isInstalled = pkgName != null && pkgName in installed
             ResolvedProvider(
                 providerId = entry.providerId,

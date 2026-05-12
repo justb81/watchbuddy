@@ -1,5 +1,6 @@
 package com.justb81.watchbuddy.core.justwatch
 
+import com.justb81.watchbuddy.core.deeplink.ProviderCatalogRegistry
 import com.justb81.watchbuddy.core.network.WatchBuddyJson
 import com.justb81.watchbuddy.core.tmdb.TmdbApiService
 import kotlinx.coroutines.runBlocking
@@ -14,7 +15,7 @@ import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
 
 /**
- * Integration test that validates the [JustWatchPackageMap] against TMDB's live
+ * Integration test that validates the [ProviderCatalogRegistry] against TMDB's live
  * `/watch/providers/tv` catalogue.
  *
  * The test is CI-skippable: it requires a TMDB API key available via the
@@ -28,7 +29,7 @@ import retrofit2.converter.kotlinx.serialization.asConverterFactory
  *   ./gradlew :core:test -Dtmdb.api.key=<your-key> --tests "*JustWatchProviderMapIntegrationTest*"
  */
 @Tag("integration")
-@DisplayName("JustWatchPackageMap — TMDB provider ID validation (integration)")
+@DisplayName("ProviderCatalogRegistry — TMDB provider ID validation (integration)")
 class JustWatchProviderMapIntegrationTest {
 
     private fun resolveApiKey(): String? =
@@ -45,7 +46,7 @@ class JustWatchProviderMapIntegrationTest {
 
     @Test
     @DisplayName("all mapped TMDB provider IDs exist in the live TMDB provider catalogue")
-    fun `all JustWatchPackageMap provider IDs are present in TMDB catalogue`() {
+    fun `all ProviderCatalogRegistry provider IDs are present in TMDB catalogue`() {
         val apiKey = resolveApiKey()
         assumeTrue(apiKey != null, "TMDB API key not available — skipping integration test")
 
@@ -53,12 +54,12 @@ class JustWatchProviderMapIntegrationTest {
         val response = runBlocking { service.getAllTvWatchProviders(apiKey = apiKey!!) }
 
         val tmdbProviderIds = response.results.map { it.providerId }.toSet()
-        val mappedIds = JustWatchPackageMap.technicalNameToProviderId.values.toSet()
+        val mappedIds = ProviderCatalogRegistry.technicalNameToProviderId.values.toSet()
 
         val missing = mappedIds - tmdbProviderIds
         assertTrue(
             missing.isEmpty(),
-            "The following TMDB provider IDs are in JustWatchPackageMap but not in " +
+            "The following TMDB provider IDs are in ProviderCatalogRegistry but not in " +
                 "TMDB's /watch/providers/tv catalogue — they may have been renumbered: $missing"
         )
     }
