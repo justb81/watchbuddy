@@ -247,7 +247,7 @@ class CompanionHttpServerTest {
             val response = client.get("/avatar")
 
             assertEquals(HttpStatusCode.OK, response.status)
-            assertArrayEquals(avatarBytes, response.readBytes())
+            assertArrayEquals(avatarBytes, response.readRawBytes())
         }
 
         @Test
@@ -291,7 +291,7 @@ class CompanionHttpServerTest {
             val response = client.get("/avatar")
 
             assertEquals(HttpStatusCode.OK, response.status)
-            assertArrayEquals(content, response.readBytes())
+            assertArrayEquals(content, response.readRawBytes())
         }
     }
 

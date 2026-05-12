@@ -644,7 +644,7 @@ private fun CountryOverrideDropdown(selected: String, onSelect: (String) -> Unit
             },
             modifier          = Modifier
                 .fillMaxWidth()
-                .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
         )
         ExposedDropdownMenu(
             expanded         = expanded,
