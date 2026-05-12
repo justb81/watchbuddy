@@ -103,11 +103,11 @@ class TimedCachedResourceTest {
             clock = { fakeTime },
         ) {
             calls++
-            if (calls == 1) throw RuntimeException("fetch failed")
+            if (calls == 1) throw IllegalStateException("fetch failed")
             "ok"
         }
 
-        assertThrows(RuntimeException::class.java) {
+        assertThrows(IllegalStateException::class.java) {
             kotlinx.coroutines.runBlocking { cache.get("key") }
         }
         val second = cache.get("key")
