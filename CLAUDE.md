@@ -61,7 +61,7 @@ watchbuddy/
 │       ├── model/      Data models (Kotlin Serialization)
 │       ├── network/    NetworkModule (Hilt, OkHttp, Retrofit), SharedJson (WatchBuddyJson shared instance)
 │       ├── progress/   ShowProgressCalculator
-│       ├── scrobbler/  MediaSessionScrobbler, ScrobbleContracts
+│       ├── scrobbler/  MediaSessionScrobbler, ScrobbleContracts, EpisodeMarkerExtractor (pure marker extraction), EpisodeResolution (pure episode resolution — `resolveEpisodeFromMetadata`, `EpisodeResolutionResult`, `ResolveSource`)
 │       ├── tmdb/       TmdbApiService (+ `getWatchProviders` endpoint + `TmdbImageHelper.logo`)
 │       └── trakt/      TraktApiService, TokenProxyService
 ├── backend/            Node.js token proxy (Docker)
