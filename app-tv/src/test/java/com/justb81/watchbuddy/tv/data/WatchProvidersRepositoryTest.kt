@@ -1,1 +1,104 @@
-cGFja2FnZSBjb20uanVzdGI4MS53YXRjaGJ1ZGR5LnR2LmRhdGEKCmltcG9ydCBjb20uanVzdGI4MS53YXRjaGJ1ZGR5LmNvcmUubW9kZWwuV2F0Y2hQcm92aWRlckVudHJ5CmltcG9ydCBjb20uanVzdGI4MS53YXRjaGJ1ZGR5LmNvcmUubW9kZWwuV2F0Y2hQcm92aWRlclJlc3BvbnNlCmltcG9ydCBjb20uanVzdGI4MS53YXRjaGJ1ZGR5LmNvcmUubW9kZWwuV2F0Y2hQcm92aWRlclJlc3VsdAppbXBvcnQgY29tLmp1c3RiODEud2F0Y2hidWRkeS5jb3JlLnRtZGIuVG1kYkFwaVNlcnZpY2UKaW1wb3J0IGNvbS5qdXN0YjgxLndhdGNoYnVkZHkudHYuZGlzY292ZXJ5Lkluc3RhbGxlZEFwcHNQcm9iZQppbXBvcnQgaW8ubW9ja2suY29FdmVyeQppbXBvcnQgaW8ubW9ja2suY29WZXJpZnkKaW1wb3J0IGlvLm1vY2trLmV2ZXJ5CmltcG9ydCBpby5tb2Nray5tb2NrawppbXBvcnQga290bGlueC5jb3JvdXRpbmVzLnRlc3QucnVuVGVzdAppbXBvcnQgb3JnLmp1bml0Lmp1cGl0ZXIuYXBpLkFzc2VydGlvbnMuYXNzZXJ0RXF1YWxzCmltcG9ydCBvcmcuanVuaXQuanVwaXRlci5hcGkuQmVmb3JlRWFjaAppbXBvcnQgb3JnLmp1bml0Lmp1cGl0ZXIuYXBpLkRpc3BsYXlOYW1lCmltcG9ydCBvcmcuanVuaXQuanVwaXRlci5hcGkuVGVzdAoKQERpc3BsYXlOYW1lKCJXYXRjaFByb3ZpZGVyc1JlcG9zaXRvcnkiKQpjbGFzcyBXYXRjaFByb3ZpZGVyc1JlcG9zaXRvcnlUZXN0IHsKCiAgICBwcml2YXRlIHZhbCB0bWRiQXBpOiBUbWRiQXBpU2VydmljZSA9IG1vY2trKCkKICAgIHByaXZhdGUgdmFsIGluc3RhbGxlZEFwcHNQcm9iZTogSW5zdGFsbGVkQXBwc1Byb2JlID0gbW9ja2soKQogICAgcHJpdmF0ZSB2YWwgbGFzdFVzZWRSZXBvOiBMYXN0VXNlZFByb3ZpZGVyUmVwb3NpdG9yeSA9IG1vY2trKCkKICAgIHByaXZhdGUgbGF0ZWluaXQgdmFyIHJlcG9zaXRvcnk6IFdhdGNoUHJvdmlkZXJzUmVwb3NpdG9yeQoKICAgIHByaXZhdGUgdmFsIG5ldGZsaXhFbnRyeSA9IFdhdGNoUHJvdmlkZXJFbnRyeSgKICAgICAgICBwcm92aWRlcklkID0gOCwKICAgICAgICBwcm92aWRlck5hbWUgPSAiTmV0ZmxpeCIsCiAgICAgICAgZGlzcGxheVByaW9yaXR5ID0gMSwKICAgICkKICAgIHByaXZhdGUgdmFsIHByb3ZpZGVyUmVzcG9uc2UgPSBXYXRjaFByb3ZpZGVyUmVzcG9uc2UoCiAgICAgICAgaWQgPSA0MiwKICAgICAgICByZXN1bHRzID0gbWFwT2YoCiAgICAgICAgICAgICJERSIgdG8gV2F0Y2hQcm92aWRlclJlc3VsdChmbGF0cmF0ZSA9IGxpc3RPZihuZXRmbGl4RW50cnkpKQogICAgICAgICkKICAgICkKCiAgICBAQmVmb3JlRWFjaAogICAgZnVuIHNldFVwKCkgewogICAgICAgIHJlcG9zaXRvcnkgPSBXYXRjaFByb3ZpZGVyc1JlcG9zaXRvcnkodG1kYkFwaSwgaW5zdGFsbGVkQXBwc1Byb2JlLCBsYXN0VXNlZFJlcG8pCiAgICAgICAgZXZlcnkgeyBpbnN0YWxsZWRBcHBzUHJvYmUuZ2V0SW5zdGFsbGVkUGFja2FnZXMoKSB9IHJldHVybnMgZW1wdHlTZXQoKQogICAgICAgIGNvRXZlcnkgeyBsYXN0VXNlZFJlcG8uZ2V0TGFzdFVzZWRQcm92aWRlcklkKGFueSgpKSB9IHJldHVybnMgbnVsbAogICAgICAgIGNvRXZlcnkgeyB0bWRiQXBpLmdldFdhdGNoUHJvdmlkZXJzKGFueSgpLCBhbnkoKSkgfSByZXR1cm5zIHByb3ZpZGVyUmVzcG9uc2UKICAgIH0KCiAgICBAVGVzdAogICAgZnVuIGBnZXRSZXNvbHZlZFByb3ZpZGVycyBmZXRjaGVzIGZyb20gQVBJIG9uIGZpcnN0IGNhbGxgKCkgPSBydW5UZXN0IHsKICAgICAgICByZXBvc2l0b3J5LmdldFJlc29sdmVkUHJvdmlkZXJzKDQyLCAiREUiLCAiYXBpLWtleSIsIHNob3dOb25JbnN0YWxsZWQgPSB0cnVlKQoKICAgICAgICBjb1ZlcmlmeShleGFjdGx5ID0gMSkgeyB0bWRiQXBpLmdldFdhdGNoUHJvdmlkZXJzKDQyLCAiYXBpLWtleSIpIH0KICAgIH0KCiAgICBAVGVzdAogICAgZnVuIGBnZXRSZXNvbHZlZFByb3ZpZGVycyByZXR1cm5zIGNhY2hlZCByZXNwb25zZSBvbiBzZWNvbmQgY2FsbCB3aXRoaW4gVFRMYCgpID0gcnVuVGVzdCB7CiAgICAgICAgcmVwb3NpdG9yeS5nZXRSZXNvbHZlZFByb3ZpZGVycyg0MiwgIkRFIiwgImFwaS1rZXkiLCBzaG93Tm9uSW5zdGFsbGVkID0gdHJ1ZSkKICAgICAgICByZXBvc2l0b3J5LmdldFJlc29sdmVkUHJvdmlkZXJzKDQyLCAiREUiLCAiYXBpLWtleSIsIHNob3dOb25JbnN0YWxsZWQgPSB0cnVlKQoKICAgICAgICBjb1ZlcmlmeShleGFjdGx5ID0gMSkgeyB0bWRiQXBpLmdldFdhdGNoUHJvdmlkZXJzKGFueSgpLCBhbnkoKSkgfQogICAgfQoKICAgIEBUZXN0CiAgICBmdW4gYGdldFJlc29sdmVkUHJvdmlkZXJzIGZldGNoZXMgc2VwYXJhdGVseSBmb3IgZGlmZmVyZW50IHNob3cgaWRzYCgpID0gcnVuVGVzdCB7CiAgICAgICAgdmFsIHJlc3BvbnNlMiA9IFdhdGNoUHJvdmlkZXJSZXNwb25zZShpZCA9IDk5LCByZXN1bHRzID0gZW1wdHlNYXAoKSkKICAgICAgICBjb0V2ZXJ5IHsgdG1kYkFwaS5nZXRXYXRjaFByb3ZpZGVycyg5OSwgYW55KCkpIH0gcmV0dXJucyByZXNwb25zZTIKCiAgICAgICAgcmVwb3NpdG9yeS5nZXRSZXNvbHZlZFByb3ZpZGVycyg0MiwgIkRFIiwgImFwaS1rZXkiLCBzaG93Tm9uSW5zdGFsbGVkID0gdHJ1ZSkKICAgICAgICByZXBvc2l0b3J5LmdldFJlc29sdmVkUHJvdmlkZXJzKDk5LCAiREUiLCAiYXBpLWtleSIsIHNob3dOb25JbnN0YWxsZWQgPSB0cnVlKQoKICAgICAgICBjb1ZlcmlmeShleGFjdGx5ID0gMSkgeyB0bWRiQXBpLmdldFdhdGNoUHJvdmlkZXJzKDQyLCBhbnkoKSkgfQogICAgICAgIGNvVmVyaWZ5KGV4YWN0bHkgPSAxKSB7IHRtZGJBcGkuZ2V0V2F0Y2hQcm92aWRlcnMoOTksIGFueSgpKSB9CiAgICB9CgogICAgQFRlc3QKICAgIGZ1biBgZ2V0UmVzb2x2ZWRQcm92aWRlcnMgZmV0Y2hlcyBzZXBhcmF0ZWx5IGZvciBkaWZmZXJlbnQgY291bnRyeSBjb2Rlc2AoKSA9IHJ1blRlc3QgewogICAgICAgIHJlcG9zaXRvcnkuZ2V0UmVzb2x2ZWRQcm92aWRlcnMoNDIsICJERSIsICJhcGkta2V5Iiwgc2hvd05vbkluc3RhbGxlZCA9IHRydWUpCiAgICAgICAgcmVwb3NpdG9yeS5nZXRSZXNvbHZlZFByb3ZpZGVycyg0MiwgIlVTIiwgImFwaS1rZXkiLCBzaG93Tm9uSW5zdGFsbGVkID0gdHJ1ZSkKCiAgICAgICAgY29WZXJpZnkoZXhhY3RseSA9IDIpIHsgdG1kYkFwaS5nZXRXYXRjaFByb3ZpZGVycyg0MiwgYW55KCkpIH0KICAgIH0KCiAgICBAVGVzdAogICAgZnVuIGBnZXRSZXNvbHZlZFByb3ZpZGVycyByZXR1cm5zIGVtcHR5IGxpc3Qgd2hlbiBjb3VudHJ5IGhhcyBubyBwcm92aWRlcnNgKCkgPSBydW5UZXN0IHsKICAgICAgICB2YWwgKHByb3ZpZGVycywgcGFnZVVybCkgPSByZXBvc2l0b3J5LmdldFJlc29sdmVkUHJvdmlkZXJzKAogICAgICAgICAgICA0MiwgIlhYIiwgImFwaS1rZXkiLCBzaG93Tm9uSW5zdGFsbGVkID0gdHJ1ZQogICAgICAgICkKCiAgICAgICAgYXNzZXJ0RXF1YWxzKGVtcHR5TGlzdDxBbnk+KCksIHByb3ZpZGVycykKICAgICAgICBhc3NlcnRFcXVhbHMobnVsbCwgcGFnZVVybCkKICAgIH0KCiAgICBAVGVzdAogICAgZnVuIGBnZXRSZXNvbHZlZFByb3ZpZGVycyBwcm9wYWdhdGVzIG5ldHdvcmsgZXhjZXB0aW9uYCgpID0gcnVuVGVzdCB7CiAgICAgICAgY29FdmVyeSB7IHRtZGJBcGkuZ2V0V2F0Y2hQcm92aWRlcnMoYW55KCksIGFueSgpKSB9IHRocm93cyBSdW50aW1lRXhjZXB0aW9uKCJOZXR3b3JrIGVycm9yIikKCiAgICAgICAgdmFyIGNhdWdodDogVGhyb3dhYmxlPyA9IG51bGwKICAgICAgICB0cnkgewogICAgICAgICAgICByZXBvc2l0b3J5LmdldFJlc29sdmVkUHJvdmlkZXJzKDQyLCAiREUiLCAiYXBpLWtleSIsIHNob3dOb25JbnN0YWxsZWQgPSB0cnVlKQogICAgICAgIH0gY2F0Y2ggKGU6IFJ1bnRpbWVFeGNlcHRpb24pIHsKICAgICAgICAgICAgY2F1Z2h0ID0gZQogICAgICAgIH0KCiAgICAgICAgYXNzZXJ0RXF1YWxzKCJOZXR3b3JrIGVycm9yIiwgY2F1Z2h0Py5tZXNzYWdlKQogICAgfQp9Cg==
+package com.justb81.watchbuddy.tv.data
+
+import com.justb81.watchbuddy.core.model.WatchProviderEntry
+import com.justb81.watchbuddy.core.model.WatchProviderResponse
+import com.justb81.watchbuddy.core.model.WatchProviderResult
+import com.justb81.watchbuddy.core.tmdb.TmdbApiService
+import com.justb81.watchbuddy.tv.discovery.InstalledAppsProbe
+import io.mockk.coEvery
+import io.mockk.coVerify
+import io.mockk.every
+import io.mockk.mockk
+import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.DisplayName
+import org.junit.jupiter.api.Test
+
+@DisplayName("WatchProvidersRepository")
+class WatchProvidersRepositoryTest {
+
+    private val tmdbApi: TmdbApiService = mockk()
+    private val installedAppsProbe: InstalledAppsProbe = mockk()
+    private val lastUsedRepo: LastUsedProviderRepository = mockk()
+    private lateinit var repository: WatchProvidersRepository
+
+    private val netflixEntry = WatchProviderEntry(
+        providerId = 8,
+        providerName = "Netflix",
+        displayPriority = 1,
+    )
+    private val providerResponse = WatchProviderResponse(
+        id = 42,
+        results = mapOf(
+            "DE" to WatchProviderResult(flatrate = listOf(netflixEntry))
+        )
+    )
+
+    @BeforeEach
+    fun setUp() {
+        repository = WatchProvidersRepository(tmdbApi, installedAppsProbe, lastUsedRepo)
+        every { installedAppsProbe.getInstalledPackages() } returns emptySet()
+        coEvery { lastUsedRepo.getLastUsedProviderId(any()) } returns null
+        coEvery { tmdbApi.getWatchProviders(any(), any()) } returns providerResponse
+    }
+
+    @Test
+    fun `getResolvedProviders fetches from API on first call`() = runTest {
+        repository.getResolvedProviders(42, "DE", "api-key", showNonInstalled = true)
+
+        coVerify(exactly = 1) { tmdbApi.getWatchProviders(42, "api-key") }
+    }
+
+    @Test
+    fun `getResolvedProviders returns cached response on second call within TTL`() = runTest {
+        repository.getResolvedProviders(42, "DE", "api-key", showNonInstalled = true)
+        repository.getResolvedProviders(42, "DE", "api-key", showNonInstalled = true)
+
+        coVerify(exactly = 1) { tmdbApi.getWatchProviders(any(), any()) }
+    }
+
+    @Test
+    fun `getResolvedProviders fetches separately for different show ids`() = runTest {
+        val response2 = WatchProviderResponse(id = 99, results = emptyMap())
+        coEvery { tmdbApi.getWatchProviders(99, any()) } returns response2
+
+        repository.getResolvedProviders(42, "DE", "api-key", showNonInstalled = true)
+        repository.getResolvedProviders(99, "DE", "api-key", showNonInstalled = true)
+
+        coVerify(exactly = 1) { tmdbApi.getWatchProviders(42, any()) }
+        coVerify(exactly = 1) { tmdbApi.getWatchProviders(99, any()) }
+    }
+
+    @Test
+    fun `getResolvedProviders fetches separately for different country codes`() = runTest {
+        repository.getResolvedProviders(42, "DE", "api-key", showNonInstalled = true)
+        repository.getResolvedProviders(42, "US", "api-key", showNonInstalled = true)
+
+        coVerify(exactly = 2) { tmdbApi.getWatchProviders(42, any()) }
+    }
+
+    @Test
+    fun `getResolvedProviders returns empty list when country has no providers`() = runTest {
+        val (providers, pageUrl) = repository.getResolvedProviders(
+            42, "XX", "api-key", showNonInstalled = true
+        )
+
+        assertEquals(emptyList<Any>(), providers)
+        assertEquals(null, pageUrl)
+    }
+
+    @Test
+    fun `getResolvedProviders propagates network exception`() = runTest {
+        coEvery { tmdbApi.getWatchProviders(any(), any()) } throws RuntimeException("Network error")
+
+        var caught: Throwable? = null
+        try {
+            repository.getResolvedProviders(42, "DE", "api-key", showNonInstalled = true)
+        } catch (e: RuntimeException) {
+            caught = e
+        }
+
+        assertEquals("Network error", caught?.message)
+    }
+}

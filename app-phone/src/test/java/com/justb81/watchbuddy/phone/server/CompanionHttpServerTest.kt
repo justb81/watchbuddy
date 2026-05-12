@@ -485,7 +485,7 @@ class CompanionHttpServerTest {
 
             val response = client.post("/recap/1") {
                 contentType(ContentType.Application.Json)
-                setBody("""{"tmdbApiKey":""}""")
+                setBody("""{"tmdbApiKey":""}""".trimIndent())
             }
 
             assertEquals(HttpStatusCode.PreconditionFailed, response.status)
@@ -1125,7 +1125,7 @@ class CompanionHttpServerTest {
             coEvery { tokenRefreshManager.getValidAccessToken() } returns "test-token"
             coEvery { traktApiService.addToHistory("Bearer test-token", any()) } returns
                 SyncHistoryResult(added = com.justb81.watchbuddy.core.trakt.SyncHistoryCount(episodes = 1))
-            every { showRepository.invalidateCache() } just runs
+            coEvery { showRepository.invalidateCache() } just runs
 
             val response = client.post("/shows/add-to-library") {
                 contentType(ContentType.Application.Json)
@@ -1141,14 +1141,14 @@ class CompanionHttpServerTest {
         fun `invalidates ShowRepository cache after successful add`() = testApp {
             coEvery { tokenRefreshManager.getValidAccessToken() } returns "test-token"
             coEvery { traktApiService.addToHistory(any(), any()) } returns SyncHistoryResult()
-            every { showRepository.invalidateCache() } just runs
+            coEvery { showRepository.invalidateCache() } just runs
 
             client.post("/shows/add-to-library") {
                 contentType(ContentType.Application.Json)
                 setBody(addToLibraryBody)
             }
 
-            verify { showRepository.invalidateCache() }
+            coVerify { showRepository.invalidateCache() }
         }
 
         @Test
@@ -1170,7 +1170,7 @@ class CompanionHttpServerTest {
             coEvery { tokenRefreshManager.getValidAccessToken() } returns "test-token"
             val capturedBodies = mutableListOf<com.justb81.watchbuddy.core.trakt.SyncHistoryBody>()
             coEvery { traktApiService.addToHistory(any(), capture(capturedBodies)) } returns SyncHistoryResult()
-            every { showRepository.invalidateCache() } just runs
+            coEvery { showRepository.invalidateCache() } just runs
 
             client.post("/shows/add-to-library") {
                 contentType(ContentType.Application.Json)
