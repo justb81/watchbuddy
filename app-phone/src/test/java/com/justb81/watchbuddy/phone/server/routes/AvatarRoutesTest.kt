@@ -60,7 +60,7 @@ class AvatarRoutesTest {
         val response = client.get("/avatar")
 
         assertEquals(HttpStatusCode.OK, response.status)
-        assertArrayEquals(avatarBytes, response.readBytes())
+        assertArrayEquals(avatarBytes, response.readRawBytes())
     }
 
     @Test

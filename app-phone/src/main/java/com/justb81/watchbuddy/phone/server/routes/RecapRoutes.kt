@@ -9,16 +9,18 @@ import com.justb81.watchbuddy.phone.llm.LlmBusyException
 import com.justb81.watchbuddy.phone.llm.RecapGenerator
 import com.justb81.watchbuddy.phone.server.ShowRepository
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
-import io.ktor.http.*
-import io.ktor.server.request.*
-import io.ktor.server.response.*
-import io.ktor.server.routing.*
+import io.ktor.http.HttpStatusCode
+import io.ktor.server.request.receive
+import io.ktor.server.response.respond
+import io.ktor.server.routing.Route
+import io.ktor.server.routing.post
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 
 private const val TAG = "RecapRoutes"
+private const val MAX_WATCHED_EPISODES_FOR_RECAP = 8
 
 data class RecapRouteDeps(
     val recapGenerator: RecapGenerator,
@@ -69,7 +71,7 @@ fun Route.recapRoutes(deps: RecapRouteDeps) {
 
             val tmdbEpisodes = coroutineScope {
                 watchedEpisodeRefs
-                    .takeLast(8)
+                    .takeLast(MAX_WATCHED_EPISODES_FOR_RECAP)
                     .map { (season, episode) ->
                         async {
                             try {
@@ -77,7 +79,7 @@ fun Route.recapRoutes(deps: RecapRouteDeps) {
                                     ?: deps.tmdbApiService.getEpisode(tmdbId, season, episode, apiKey, language = tmdbLanguage)
                                         .also { deps.tmdbCache.putEpisode(tmdbId, season, episode, it) }
                             } catch (e: Exception) {
-                                DiagnosticLog.warn(TAG, "Failed to load TMDB episode S${season}E${episode}", e)
+                                DiagnosticLog.warn(TAG, "Failed to load TMDB episode S${season}E$episode", e)
                                 null
                             }
                         }

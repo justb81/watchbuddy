@@ -1,9 +1,14 @@
 package com.justb81.watchbuddy.phone.server.routes
 
 import com.justb81.watchbuddy.phone.data.ProviderCatalogRepository
-import io.ktor.http.*
-import io.ktor.server.response.*
-import io.ktor.server.routing.*
+import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
+import io.ktor.server.response.header
+import io.ktor.server.response.respond
+import io.ktor.server.response.respondText
+import io.ktor.server.routing.Route
+import io.ktor.server.routing.get
 
 private const val ETAG_HEX_CHARS = 16
 

@@ -1,6 +1,7 @@
 package com.justb81.watchbuddy.phone.server.routes
 
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
+import com.justb81.watchbuddy.core.model.PhoneAddToLibraryRequest
 import com.justb81.watchbuddy.core.trakt.SyncHistoryBody
 import com.justb81.watchbuddy.core.trakt.SyncHistoryEpisodeItem
 import com.justb81.watchbuddy.core.trakt.SyncHistorySeasonItem
@@ -10,11 +11,13 @@ import com.justb81.watchbuddy.phone.auth.TokenRefreshManager
 import com.justb81.watchbuddy.phone.auth.TokenRepository
 import com.justb81.watchbuddy.phone.server.EpisodeRepository
 import com.justb81.watchbuddy.phone.server.ShowRepository
-import com.justb81.watchbuddy.core.model.PhoneAddToLibraryRequest
-import io.ktor.http.*
-import io.ktor.server.request.*
-import io.ktor.server.response.*
-import io.ktor.server.routing.*
+import io.ktor.http.HttpStatusCode
+import io.ktor.server.request.queryParameters
+import io.ktor.server.request.receive
+import io.ktor.server.response.respond
+import io.ktor.server.routing.Route
+import io.ktor.server.routing.get
+import io.ktor.server.routing.post
 
 private const val TAG = "ShowsRoutes"
 private const val DEFAULT_PAGE_SIZE = 30

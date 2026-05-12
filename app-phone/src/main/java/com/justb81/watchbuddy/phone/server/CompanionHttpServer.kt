@@ -171,7 +171,7 @@ class CompanionHttpServer @Inject constructor(
  * Route handlers are delegated to per-feature extension functions in
  * [com.justb81.watchbuddy.phone.server.routes].
  */
-@Suppress("LongParameterList")
+@Suppress("LongParameterList", "LongMethod")
 internal fun Application.configureCompanionRoutes(
     recapGenerator: RecapGenerator,
     capabilityProvider: DeviceCapabilityProvider,
