@@ -118,7 +118,11 @@ class ShowDetailViewModelTvTest {
         )
     }
 
-    // ── loadEpisodeList ────────────────────────────────────────────────────────────────
+    /** Returns the current [EpisodeListUiState] from inside the [ShowDetailUiState.Ready] snapshot. */
+    private suspend fun currentEpisodeList(): EpisodeListUiState =
+        (viewModel.uiState.first { it is ShowDetailUiState.Ready } as ShowDetailUiState.Ready).episodeList
+
+    // ── loadEpisodeList ─────────────────────────────────────────────────────────────────────────────────
 
     @Nested
     @DisplayName("loadEpisodeList")
@@ -131,9 +135,12 @@ class ShowDetailViewModelTvTest {
             every { clientFactory.createClient(any(), any()) } returns phoneApiService
             coEvery { phoneApiService.getSeasons("1") } returns seasonFixture
 
+            val job = backgroundScope.launch { viewModel.uiState.collect { } }
             viewModel.loadEpisodeList(makeEntry(watchedSeasons = emptyList()))
+            advanceUntilIdle()
+            job.cancel()
 
-            val state = assertInstanceOf(EpisodeListUiState.Success::class.java, viewModel.episodeList.value)
+            val state = assertInstanceOf(EpisodeListUiState.Success::class.java, currentEpisodeList())
             assertEquals(seasonFixture, state.seasons)
             assertTrue(state.watchedSet.isEmpty())
         }
@@ -145,11 +152,14 @@ class ShowDetailViewModelTvTest {
             every { clientFactory.createClient(any(), any()) } returns phoneApiService
             coEvery { phoneApiService.getSeasons("1") } returns seasonFixture
 
+            val job = backgroundScope.launch { viewModel.uiState.collect { } }
             viewModel.loadEpisodeList(makeEntry(watchedSeasons = listOf(
                 TraktWatchedSeason(1, listOf(TraktWatchedEpisode(1), TraktWatchedEpisode(2)))
             )))
+            advanceUntilIdle()
+            job.cancel()
 
-            val state = assertInstanceOf(EpisodeListUiState.Success::class.java, viewModel.episodeList.value)
+            val state = assertInstanceOf(EpisodeListUiState.Success::class.java, currentEpisodeList())
             assertTrue(state.watchedSet.contains(1 to 1))
             assertTrue(state.watchedSet.contains(1 to 2))
             assertFalse(state.watchedSet.contains(1 to 3))
@@ -159,9 +169,12 @@ class ShowDetailViewModelTvTest {
         fun `emits Error when no phone available`() = runTest {
             every { phoneDiscovery.getBestPhone() } returns null
 
+            val job = backgroundScope.launch { viewModel.uiState.collect { } }
             viewModel.loadEpisodeList(makeEntry())
+            advanceUntilIdle()
+            job.cancel()
 
-            assertInstanceOf(EpisodeListUiState.Error::class.java, viewModel.episodeList.value)
+            assertInstanceOf(EpisodeListUiState.Error::class.java, currentEpisodeList())
         }
 
         @Test
@@ -171,13 +184,16 @@ class ShowDetailViewModelTvTest {
             every { clientFactory.createClient(any(), any()) } returns phoneApiService
             coEvery { phoneApiService.getSeasons(any()) } throws RuntimeException("Network error")
 
+            val job = backgroundScope.launch { viewModel.uiState.collect { } }
             viewModel.loadEpisodeList(makeEntry())
+            advanceUntilIdle()
+            job.cancel()
 
-            assertInstanceOf(EpisodeListUiState.Error::class.java, viewModel.episodeList.value)
+            assertInstanceOf(EpisodeListUiState.Error::class.java, currentEpisodeList())
         }
     }
 
-    // ── toggleEpisodeWatched — success paths ────────────────────────────────────────────
+    // ── toggleEpisodeWatched — success paths ──────────────────────────────────────────────────────
 
     @Nested
     @DisplayName("toggleEpisodeWatched — success")
@@ -196,6 +212,8 @@ class ShowDetailViewModelTvTest {
                 setupWithPhones(listOf(phone))
                 coEvery { phoneApiService.getSeasons("1") } returns seasonFixture
                 coEvery { phoneApiService.markWatched(any()) } returns Response.success(null)
+
+                val job = backgroundScope.launch { viewModel.uiState.collect { } }
                 viewModel.loadEpisodeList(makeEntry(watchedSeasons = emptyList()))
 
                 viewModel.toggleEpisodeWatched(
@@ -206,8 +224,9 @@ class ShowDetailViewModelTvTest {
                     selectedUserIds = setOf(phone.baseUrl),
                 )
                 advanceUntilIdle()
+                job.cancel()
 
-                val state = assertInstanceOf(EpisodeListUiState.Success::class.java, viewModel.episodeList.value)
+                val state = assertInstanceOf(EpisodeListUiState.Success::class.java, currentEpisodeList())
                 assertTrue(state.watchedSet.contains(1 to 3))
             }
 
@@ -218,6 +237,8 @@ class ShowDetailViewModelTvTest {
                 setupWithPhones(listOf(phone))
                 coEvery { phoneApiService.getSeasons("1") } returns seasonFixture
                 coEvery { phoneApiService.markUnwatched(any()) } returns Response.success(null)
+
+                val job = backgroundScope.launch { viewModel.uiState.collect { } }
                 viewModel.loadEpisodeList(makeEntry(watchedSeasons = listOf(
                     TraktWatchedSeason(1, listOf(TraktWatchedEpisode(1)))
                 )))
@@ -230,8 +251,9 @@ class ShowDetailViewModelTvTest {
                     selectedUserIds = setOf(phone.baseUrl),
                 )
                 advanceUntilIdle()
+                job.cancel()
 
-                val state = assertInstanceOf(EpisodeListUiState.Success::class.java, viewModel.episodeList.value)
+                val state = assertInstanceOf(EpisodeListUiState.Success::class.java, currentEpisodeList())
                 assertFalse(state.watchedSet.contains(1 to 1))
             }
 
@@ -246,6 +268,8 @@ class ShowDetailViewModelTvTest {
                 coEvery { phoneApiService.getSeasons("1") } returns seasonFixture
                 coEvery { phoneApiService.markWatched(any()) } returns Response.success(null)
                 coEvery { api2.markWatched(any()) } returns Response.success(null)
+
+                val job = backgroundScope.launch { viewModel.uiState.collect { } }
                 viewModel.loadEpisodeList(makeEntry(watchedSeasons = emptyList()))
 
                 viewModel.toggleEpisodeWatched(
@@ -256,6 +280,7 @@ class ShowDetailViewModelTvTest {
                     selectedUserIds = setOf(phone1.baseUrl, phone2.baseUrl),
                 )
                 advanceUntilIdle()
+                job.cancel()
 
                 io.mockk.coVerify(exactly = 1) { phoneApiService.markWatched(any()) }
                 io.mockk.coVerify(exactly = 1) { api2.markWatched(any()) }
@@ -269,6 +294,8 @@ class ShowDetailViewModelTvTest {
                 setupWithPhones(listOf(phone1, phone2))
                 coEvery { phoneApiService.getSeasons("1") } returns seasonFixture
                 coEvery { phoneApiService.markWatched(any()) } returns Response.success(null)
+
+                val job = backgroundScope.launch { viewModel.uiState.collect { } }
                 viewModel.loadEpisodeList(makeEntry(watchedSeasons = emptyList()))
 
                 viewModel.toggleEpisodeWatched(
@@ -279,13 +306,14 @@ class ShowDetailViewModelTvTest {
                     selectedUserIds = setOf(phone1.baseUrl),
                 )
                 advanceUntilIdle()
+                job.cancel()
 
                 io.mockk.coVerify(exactly = 1) { phoneApiService.markWatched(any()) }
                 io.mockk.verify(exactly = 0) { clientFactory.createClient("http://p2:8765/", "tok2") }
             }
     }
 
-    // ── toggleEpisodeWatched — failure paths ────────────────────────────────────────────
+    // ── toggleEpisodeWatched — failure paths ──────────────────────────────────────────────────
 
     @Nested
     @DisplayName("toggleEpisodeWatched — failures")
@@ -328,10 +356,12 @@ class ShowDetailViewModelTvTest {
                 coEvery { phoneApiService.getSeasons("1") } returns seasonFixture
                 coEvery { phoneApiService.markWatched(any()) } returns Response.success(null)
                 coEvery { api2.markWatched(any()) } throws RuntimeException("timeout")
+
+                val job = backgroundScope.launch { viewModel.uiState.collect { } }
                 viewModel.loadEpisodeList(makeEntry(watchedSeasons = emptyList()))
 
                 val events = mutableListOf<EpisodeToggleEvent>()
-                val job = backgroundScope.launch {
+                val eventsJob = backgroundScope.launch {
                     viewModel.episodeToggleEvents.collect { events.add(it) }
                 }
 
@@ -344,11 +374,13 @@ class ShowDetailViewModelTvTest {
                 )
                 advanceUntilIdle()
 
+                eventsJob.cancel()
                 job.cancel()
+
                 val partialFailed = events.filterIsInstance<EpisodeToggleEvent.PartialFailed>()
                 assertTrue(partialFailed.isNotEmpty())
                 assertTrue(partialFailed.first().failedUserNames.contains("Bob"))
-                val state = viewModel.episodeList.value as? EpisodeListUiState.Success
+                val state = currentEpisodeList() as? EpisodeListUiState.Success
                 if (state != null) assertTrue(state.watchedSet.contains(1 to 1))
             }
 
@@ -361,10 +393,12 @@ class ShowDetailViewModelTvTest {
                 every { clientFactory.createClient(any(), any()) } returns phoneApiService
                 coEvery { phoneApiService.getSeasons("1") } returns seasonFixture
                 coEvery { phoneApiService.markWatched(any()) } returns Response.error(500, "".toResponseBody())
+
+                val job = backgroundScope.launch { viewModel.uiState.collect { } }
                 viewModel.loadEpisodeList(makeEntry(watchedSeasons = emptyList()))
 
                 val events = mutableListOf<EpisodeToggleEvent>()
-                val job = backgroundScope.launch {
+                val eventsJob = backgroundScope.launch {
                     viewModel.episodeToggleEvents.collect { events.add(it) }
                 }
 
@@ -377,14 +411,16 @@ class ShowDetailViewModelTvTest {
                 )
                 advanceUntilIdle()
 
+                eventsJob.cancel()
                 job.cancel()
+
                 assertTrue(events.any { it is EpisodeToggleEvent.AllFailed })
-                val state = viewModel.episodeList.value as? EpisodeListUiState.Success
+                val state = currentEpisodeList() as? EpisodeListUiState.Success
                 if (state != null) assertFalse(state.watchedSet.contains(1 to 3))
             }
     }
 
-    // ── skipScopePickerThisSession ─────────────────────────────────────────────────────────────────────────────────
+    // ── skipScopePickerThisSession ──────────────────────────────────────────────────────────────────────────────────────────
 
     @Nested
     @DisplayName("skipScopePickerThisSession")
@@ -402,7 +438,7 @@ class ShowDetailViewModelTvTest {
         }
     }
 
-    // ── connectedUsers ───────────────────────────────────────────────────────────────────────────────────────
+    // ── connectedUsers ──────────────────────────────────────────────────────────────────────────────────────────────
 
     @Nested
     @DisplayName("connectedUsers")
