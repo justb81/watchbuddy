@@ -212,7 +212,7 @@ class ScrobbleRoutesTest {
     inner class ScrobblePrompt {
 
         private val promptBody = """
-            {"sessionKey":"sess-1","candidates":[{"traktId":1,"title":"Breaking Bad","season":1,"episode":1,"confidence":0.9}]}
+            {"sessionKey":"sess-1","packageName":"com.netflix.mediaclient","candidates":[{"show":{"title":"Breaking Bad","year":2008,"ids":{"trakt":1}},"score":0.9,"sourceLabel":"test"}],"tick":{"state":3,"positionMs":0,"durationMs":0,"capturedAtMs":0},"capturedAtMs":0}
         """.trimIndent()
 
         @Test
