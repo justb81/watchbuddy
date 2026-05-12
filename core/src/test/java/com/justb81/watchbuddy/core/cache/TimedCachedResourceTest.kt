@@ -103,7 +103,7 @@ class TimedCachedResourceTest {
             clock = { fakeTime },
         ) {
             calls++
-            if (calls == 1) throw IllegalStateException("fetch failed")
+            if (calls == 1) error("fetch failed")
             "ok"
         }
 
