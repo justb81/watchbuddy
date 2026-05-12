@@ -7,7 +7,6 @@ import com.justb81.watchbuddy.core.model.ProviderCatalogSnapshot
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
-import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
@@ -49,7 +48,7 @@ class ProviderCatalogRegistryTest {
         tmdbProviderIds = ids,
         name = "Test Provider",
         regions = listOf("*"),
-        androidPackages = CatalogAndroidPackages(tv = listOf(tvPkg), phone = listOf(phonePkg)),
+        androidPackages = com.justb81.watchbuddy.core.model.CatalogAndroidPackages(tv = listOf(tvPkg), phone = listOf(phonePkg)),
         justWatchTechnicalNames = justWatch,
     )
 

@@ -1,10 +1,10 @@
 package com.justb81.watchbuddy.tv.data
 
+import com.justb81.watchbuddy.core.deeplink.ProviderCatalogRegistry
 import com.justb81.watchbuddy.core.justwatch.JustWatchApiService
 import com.justb81.watchbuddy.core.justwatch.JustWatchGraphQlRequest
 import com.justb81.watchbuddy.core.justwatch.JustWatchGraphQlResponse
 import com.justb81.watchbuddy.core.justwatch.JustWatchOffer
-import com.justb81.watchbuddy.core.deeplink.ProviderCatalogRegistry
 import com.justb81.watchbuddy.core.justwatch.JustWatchTitle
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import kotlinx.coroutines.CancellationException
