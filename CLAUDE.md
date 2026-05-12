@@ -37,16 +37,16 @@ watchbuddy/
 │       ├── di/         AppModule (Hilt dependency injection), ApplicationScope qualifier (@ApplicationScope CoroutineScope for goAsync in BootReceiver)
 │       ├── discovery/  PhoneDiscoveryManager, PhoneApiService, PhoneApiClientFactory, PhoneTitleExtractionClient (TitleExtractor → best phone's /scrobble/extract), TvDiscoveryService (foreground service — keeps discovery alive post-boot), InstalledAppsProbe (PackageManager cache, invalidated on install/remove)
 │       ├── scrobbler/  TvScrobbleDispatcher, TvWatchedShowSource, WatchNextMetadataSource, NotificationMetadataSource, WatchBuddyNotificationListener
-│       ├── ui/         TvMainActivity, TvNavGraph
-│       │   ├── components/ InitialsAvatar
-│       │   ├── home/       TvHomeScreen, TvHomeViewModel (active viewers derived from discovered phones)
-│       │   ├── navigation/ TvNavGraph
-│       │   ├── recap/      RecapScreen, RecapViewModel
-│       │   ├── diagnostics/ TvDiagnosticsScreen, TvDiagnosticsViewModel (discovery / BLE / discovered-phones health — view-only, no Share)
-│       │   ├── scrobble/   ScrobbleOverlay, ScrobbleViewModel
-│       │   ├── settings/   TvSettingsScreen + TvSettingsViewModel (settings hub — discovery, autostart, show-non-installed toggle, diagnostics)
-│       │   ├── showdetail/ ShowDetailScreen, ShowDetailViewModel (next-episode still + TMDB watch providers + installed-app filter + last-used ranking + JustWatch deep links; `NextEpisodeUiState`, `ProviderListUiState`, `DeepLinkState` flows; one-tap "Mark as watched" button — `MarkWatchedState` sealed interface, `markCurrentEpisodeWatched` fan-out to all phones via `POST /watched`, `advancedEntry` optimistic-advance flow with `AnimatedContent` slide transition)
-│       │   └── theme/      TV Material theme
+│       └── ui/         TvMainActivity, TvNavGraph
+│           ├── components/ InitialsAvatar
+│           ├── home/       TvHomeScreen, TvHomeViewModel (active viewers derived from discovered phones)
+│           ├── navigation/ TvNavGraph
+│           ├── recap/      RecapScreen, RecapViewModel
+│           ├── diagnostics/ TvDiagnosticsScreen, TvDiagnosticsViewModel (discovery / BLE / discovered-phones health — view-only, no Share)
+│           ├── scrobble/   ScrobbleOverlay, ScrobbleViewModel
+│           ├── settings/   TvSettingsScreen + TvSettingsViewModel (settings hub — discovery, autostart, show-non-installed toggle, diagnostics)
+│           ├── showdetail/ ShowDetailScreen, ShowDetailViewModel (next-episode still + TMDB watch providers + installed-app filter + last-used ranking + JustWatch deep links; `NextEpisodeUiState`, `ProviderListUiState`, `DeepLinkState` flows; one-tap "Mark as watched" button — `MarkWatchedState` sealed interface, `markCurrentEpisodeWatched` fan-out to all phones via `POST /watched`, `advancedEntry` optimistic-advance flow with `AnimatedContent` slide transition)
+│           └── theme/      TV Material theme
 ├── build-logic/        Gradle convention plugins (included build)
 │   └── convention/
 │       └── src/main/kotlin/
@@ -54,8 +54,8 @@ watchbuddy/
 │           └── watchbuddy.android.application.gradle.kts  Everything above + compose-compiler, signing config, NDK debugSymbolLevel, build types, Lint SARIF
 ├── core/               Shared library module
 │   └── src/main/java/com/justb81/watchbuddy/core/
-│       ├── deeplink/   ProviderCatalog (TMDB provider_id → packageName; deep links handled by JustWatch)
-│       ├── justwatch/  JustWatchApiService (GraphQL Retrofit interface), JustWatchPackageMap (technicalName → TMDB provider_id)
+│       ├── deeplink/   ProviderCatalogRegistry (single registry: TMDB provider_id → packageName + JustWatch technicalName → provider_id; deep links handled by JustWatch)
+│       ├── justwatch/  JustWatchApiService (GraphQL Retrofit interface)
 │       ├── locale/     LocaleHelper (LLM language resolution)
 │       ├── logging/    CrashReporter, DiagnosticLog, DiagnosticShare
 │       ├── model/      Data models (Kotlin Serialization)
