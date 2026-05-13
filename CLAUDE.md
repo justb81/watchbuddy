@@ -4,7 +4,7 @@ This file provides context for AI coding agents (Claude, Copilot, Cursor, etc.) 
 
 ## Project Overview
 
-WatchBuddy is a two-app Android/Google TV ecosystem for cross-app series tracking. It scrobbles what the user watches across streaming apps, generates AI-powered “Previously on…” recaps via a local LLM on the phone, and deep-links into the correct streaming app — all backed by Trakt and TMDB.
+WatchBuddy is a two-app Android/Google TV ecosystem for cross-app series tracking. It scrobbles what the user watches across streaming apps, generates AI-powered "Previously on…" recaps via a local LLM on the phone, and deep-links into the correct streaming app — all backed by Trakt and TMDB.
 
 ## Repository Structure
 
@@ -29,7 +29,7 @@ watchbuddy/
 │       │       ├── settings/   SettingsScreen, SettingsViewModel
 │       │       ├── showdetail/ ShowDetailScreen, ShowDetailViewModel (current-season-first layout; per-episode watched/unwatched checkbox)
 │       │       ├── theme/      Material 3 theme
-│       │       └── util/       RelativeDateFormatter (relativeTime / relativeDate — “today/yesterday/tomorrow / 2–7 d relative / >7 d absolute date”)
+│       │       └── util/       RelativeDateFormatter (relativeTime / relativeDate — "today/yesterday/tomorrow / 2–7 d relative / >7 d absolute date")
 │       └── service/    CompanionService, CompanionStateManager, CompanionBleAdvertiser (foreground BLE advertiser + HTTP server + shared state — sibling package, not under phone/)
 ├── app-tv/             Google TV app (Kotlin, Compose for TV)
 │   └── src/main/java/com/justb81/watchbuddy/tv/
@@ -46,7 +46,7 @@ watchbuddy/
 │           ├── diagnostics/ TvDiagnosticsScreen, TvDiagnosticsViewModel (discovery / BLE / discovered-phones health — view-only, no Share)
 │           ├── scrobble/   ScrobbleOverlay, ScrobbleViewModel
 │           ├── settings/   TvSettingsScreen + TvSettingsViewModel (settings hub — discovery, autostart, show-non-installed toggle, diagnostics)
-│           ├── showdetail/ ShowDetailScreen, ShowDetailViewModel (next-episode still + TMDB watch providers + installed-app filter + last-used ranking + JustWatch deep links; `NextEpisodeUiState`, `ProviderListUiState`, `DeepLinkState` flows; one-tap “Mark as watched” button — `MarkWatchedState` sealed interface, `markCurrentEpisodeWatched` fan-out to all phones via `POST /watched`, `advancedEntry` optimistic-advance flow with `AnimatedContent` slide transition)
+│           ├── showdetail/ ShowDetailScreen, ShowDetailViewModel (next-episode still + TMDB watch providers + installed-app filter + last-used ranking + JustWatch deep links; `NextEpisodeUiState`, `ProviderListUiState`, `DeepLinkState` flows; one-tap "Mark as watched" button — `MarkWatchedState` sealed interface, `markCurrentEpisodeWatched` fan-out to all phones via `POST /watched`, `advancedEntry` optimistic-advance flow with `AnimatedContent` slide transition)
 │           └── theme/      TV Material theme
 ├── build-logic/        Gradle convention plugins (included build)
 │   └── convention/

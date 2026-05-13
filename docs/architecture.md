@@ -177,7 +177,7 @@ stateDiagram-v2
 ```
 
 `CompanionService.onStartCommand` calls `startForeground()` immediately (before any
-async work) to satisfy Android 12's foreground-service start rules. The Ktor server
+async work) to satisfy Android 12’s foreground-service start rules. The Ktor server
 and BLE advertiser are both launched in `lifecycleScope` so they are cancelled
 automatically when the service is destroyed.
 
@@ -187,9 +187,9 @@ and exposes a `StateFlow<Boolean>`. `HomeViewModel` collects it and shows a
 not stop when Wi-Fi is lost — it keeps the server alive so the TV can reconnect
 immediately when Wi-Fi returns, without requiring the user to restart the service.
 
-**Handoff on reconnect:** When the TV's BLE scanner finds the phone's advertisement
+**Handoff on reconnect:** When the TV’s BLE scanner finds the phone’s advertisement
 again after a gap, it re-calls `/capability` and gets a fresh `DeviceCapability`
-bundle. Because the phone's `lastResolvedSessionKey` is included in every
+bundle. Because the phone’s `lastResolvedSessionKey` is included in every
 `/capability` response, the TV can discard the pending `AmbiguousScrobbleEvent`
 for that session without an extra round-trip.
 
