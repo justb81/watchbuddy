@@ -242,7 +242,7 @@ class ShowsRoutesTest {
         fun `returns 200 and calls addToHistory`() = testApp {
             coEvery { tokenRefreshManager.getValidAccessToken() } returns "test-token"
             coEvery { traktApiService.addToHistory("Bearer test-token", any()) } returns SyncHistoryResult()
-            every { showRepository.invalidateCache() } just runs
+            coEvery { showRepository.invalidateCache() } just Runs
 
             val response = client.post("/shows/add-to-library") {
                 header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
@@ -257,14 +257,14 @@ class ShowsRoutesTest {
         fun `invalidates cache after successful add`() = testApp {
             coEvery { tokenRefreshManager.getValidAccessToken() } returns "test-token"
             coEvery { traktApiService.addToHistory(any(), any()) } returns SyncHistoryResult()
-            every { showRepository.invalidateCache() } just runs
+            coEvery { showRepository.invalidateCache() } just Runs
 
             client.post("/shows/add-to-library") {
                 header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
                 setBody(validBody)
             }
 
-            verify { showRepository.invalidateCache() }
+            coVerify { showRepository.invalidateCache() }
         }
 
         @Test

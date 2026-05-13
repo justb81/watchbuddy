@@ -1,6 +1,7 @@
 package com.justb81.watchbuddy.phone.server
 
 import android.util.Log
+import com.justb81.watchbuddy.core.cache.TimedCachedResource
 import com.justb81.watchbuddy.core.model.TraktIds
 import com.justb81.watchbuddy.core.model.TraktSeasonWithEpisodes
 import com.justb81.watchbuddy.core.trakt.SyncHistoryBody
@@ -9,10 +10,9 @@ import com.justb81.watchbuddy.core.trakt.SyncHistorySeasonItem
 import com.justb81.watchbuddy.core.trakt.SyncHistoryShowItem
 import com.justb81.watchbuddy.core.trakt.TraktApiService
 import com.justb81.watchbuddy.phone.auth.TokenRefreshManager
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.time.Duration.Companion.minutes
 
 private const val TAG = "EpisodeRepository"
 
@@ -21,40 +21,23 @@ private const val TAG = "EpisodeRepository"
  * `shows/{id}/seasons?extended=episodes`, and forwards per-episode
  * watched/unwatched writes through the `sync/history` add/remove endpoints.
  *
- * Structural data is cached per show id for [CACHE_TTL_MS] (10 minutes) — the
- * list changes only when Trakt ingests a new episode, so a short miss is fine.
- * Writes are not cached; they always hit Trakt.
+ * Structural data is cached per show id for 10 minutes via [TimedCachedResource] —
+ * the list changes only when Trakt ingests a new episode, so a short miss is fine.
+ * Writes are not cached; they always hit Trakt and invalidate the per-show cache
+ * entry on success.
  */
 @Singleton
 class EpisodeRepository @Inject constructor(
     private val traktApi: TraktApiService,
     private val tokenRefreshManager: TokenRefreshManager
 ) {
-    private data class Cached(val fetchedAt: Long, val seasons: List<TraktSeasonWithEpisodes>)
+    private val cache = TimedCachedResource<String, List<TraktSeasonWithEpisodes>>(
+        ttlMillis = 10.minutes.inWholeMilliseconds,
+        fetcher = { showId -> fetchFromTrakt(showId) },
+    )
 
-    // LRU-capped map: evicts the least-recently-accessed entry once MAX_CACHE_SIZE is
-    // exceeded, bounding memory use for users with large Trakt libraries.
-    private val cache: MutableMap<String, Cached> =
-        object : LinkedHashMap<String, Cached>(MAX_CACHE_SIZE + 1, 0.75f, true) {
-            override fun removeEldestEntry(eldest: Map.Entry<String, Cached>) = size > MAX_CACHE_SIZE
-        }
-    private val mutex = Mutex()
-
-    suspend fun getSeasonsWithEpisodes(showId: String): List<TraktSeasonWithEpisodes> {
-        val now = System.currentTimeMillis()
-        mutex.withLock {
-            cache[showId]?.let { hit ->
-                if (now - hit.fetchedAt <= CACHE_TTL_MS) return hit.seasons
-            }
-        }
-        val token = tokenRefreshManager.getValidAccessToken()
-            ?: error("No access token available")
-        val fresh = traktApi.getShowSeasons("Bearer $token", showId)
-        mutex.withLock {
-            cache[showId] = Cached(fetchedAt = now, seasons = fresh)
-        }
-        return fresh
-    }
+    suspend fun getSeasonsWithEpisodes(showId: String): List<TraktSeasonWithEpisodes> =
+        cache.get(showId)
 
     suspend fun markEpisodeWatched(
         ids: TraktIds,
@@ -65,6 +48,7 @@ class EpisodeRepository @Inject constructor(
         val token = tokenRefreshManager.getValidAccessToken()
             ?: error("No access token available")
         traktApi.addToHistory("Bearer $token", body)
+        invalidateShowCache(ids)
         Unit
     }.onFailure { Log.w(TAG, "markEpisodeWatched S${season}E${episode} failed", it) }
 
@@ -77,6 +61,7 @@ class EpisodeRepository @Inject constructor(
         val token = tokenRefreshManager.getValidAccessToken()
             ?: error("No access token available")
         traktApi.removeFromHistory("Bearer $token", body)
+        invalidateShowCache(ids)
         Unit
     }.onFailure { Log.w(TAG, "markEpisodeUnwatched S${season}E${episode} failed", it) }
 
@@ -110,9 +95,21 @@ class EpisodeRepository @Inject constructor(
         val token = tokenRefreshManager.getValidAccessToken()
             ?: error("No access token available")
         traktApi.addToHistory("Bearer $token", body)
+        invalidateShowCache(ids)
         Unit
     }.onFailure {
         Log.w(TAG, "markEpisodesWatchedUpTo S${targetSeason}E$targetEpisode (${candidates.size} eps) failed", it)
+    }
+
+    private suspend fun fetchFromTrakt(showId: String): List<TraktSeasonWithEpisodes> {
+        val token = tokenRefreshManager.getValidAccessToken()
+            ?: error("No access token available")
+        return traktApi.getShowSeasons("Bearer $token", showId)
+    }
+
+    private suspend fun invalidateShowCache(ids: TraktIds) {
+        val key = ids.trakt?.toString() ?: ids.slug ?: return
+        cache.invalidate(key)
     }
 
     private fun buildBody(ids: TraktIds, season: Int, episode: Int): SyncHistoryBody =
@@ -129,9 +126,4 @@ class EpisodeRepository @Inject constructor(
                 )
             )
         )
-
-    private companion object {
-        const val CACHE_TTL_MS = 10 * 60 * 1000L
-        const val MAX_CACHE_SIZE = 50
-    }
 }

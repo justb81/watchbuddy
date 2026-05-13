@@ -1,16 +1,16 @@
 package com.justb81.watchbuddy.tv.data
 
+import com.justb81.watchbuddy.core.cache.TimedCachedResource
 import com.justb81.watchbuddy.core.deeplink.ProviderCatalogRegistry
 import com.justb81.watchbuddy.core.model.ResolvedProvider
 import com.justb81.watchbuddy.core.model.WatchProviderEntry
+import com.justb81.watchbuddy.core.model.WatchProviderResponse
 import com.justb81.watchbuddy.core.tmdb.TmdbApiService
 import com.justb81.watchbuddy.core.tmdb.TmdbImageHelper
 import com.justb81.watchbuddy.tv.discovery.InstalledAppsProbe
-import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
-
-private const val CACHE_TTL_MS = 24L * 60 * 60 * 1000
+import kotlin.time.Duration.Companion.hours
 
 /**
  * Fetches and caches TMDB `/tv/{id}/watch/providers` per-show per-region, then
@@ -21,6 +21,7 @@ private const val CACHE_TTL_MS = 24L * 60 * 60 * 1000
  *
  * Providers are deduplicated; the last-used entry is always first when present.
  * TMDB flatrate + ads + free results are merged and deduplicated by provider_id.
+ * Responses are cached for 24 hours via [TimedCachedResource].
  */
 @Singleton
 class WatchProvidersRepository @Inject constructor(
@@ -28,13 +29,12 @@ class WatchProvidersRepository @Inject constructor(
     private val installedAppsProbe: InstalledAppsProbe,
     private val lastUsedRepo: LastUsedProviderRepository,
 ) {
-    private data class CacheEntry(
-        val providers: List<WatchProviderEntry>,
-        val pageUrl: String?,
-        val fetchedAtMs: Long,
-    )
+    private data class CacheKey(val tmdbId: Int, val countryCode: String, val apiKey: String)
 
-    private val cache = ConcurrentHashMap<String, CacheEntry>()
+    private val cache = TimedCachedResource<CacheKey, WatchProviderResponse>(
+        ttlMillis = 24.hours.inWholeMilliseconds,
+        fetcher = { key -> tmdbApi.getWatchProviders(key.tmdbId, key.apiKey) },
+    )
 
     /**
      * Returns ordered, filtered [ResolvedProvider] list for [tmdbId] in [countryCode].
@@ -47,24 +47,15 @@ class WatchProvidersRepository @Inject constructor(
         apiKey: String,
         showNonInstalled: Boolean,
     ): Pair<List<ResolvedProvider>, String?> {
-        val cacheKey = "$tmdbId:$countryCode"
-        val now = System.currentTimeMillis()
-        val entry = cache[cacheKey]
+        val response = cache.get(CacheKey(tmdbId, countryCode, apiKey))
+        val result = response.results[countryCode]
 
-        val (rawProviders, pageUrl) = if (entry != null && now - entry.fetchedAtMs < CACHE_TTL_MS) {
-            entry.providers to entry.pageUrl
-        } else {
-            val response = tmdbApi.getWatchProviders(tmdbId, apiKey)
-            val result = response.results[countryCode]
-            val merged = mergeAndDedup(
-                result?.flatrate.orEmpty(),
-                result?.ads.orEmpty(),
-                result?.free.orEmpty(),
-            )
-            val url = result?.link
-            cache[cacheKey] = CacheEntry(merged, url, now)
-            merged to url
-        }
+        val rawProviders = mergeAndDedup(
+            result?.flatrate.orEmpty(),
+            result?.ads.orEmpty(),
+            result?.free.orEmpty(),
+        )
+        val pageUrl = result?.link
 
         val lastUsedId = lastUsedRepo.getLastUsedProviderId(tmdbId)
         val installed = installedAppsProbe.getInstalledPackages()

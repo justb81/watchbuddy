@@ -51,7 +51,7 @@ class CompanionHttpServerTest {
     @TempDir
     lateinit var tempDir: File
 
-    // ── Mocked dependencies ───────────────────────────────────────────────────
+    // ── Mocked dependencies ────────────────────────────────────────────
 
     private val recapGenerator: RecapGenerator = mockk()
     private val capabilityProvider: DeviceCapabilityProvider = mockk()
@@ -70,7 +70,7 @@ class CompanionHttpServerTest {
     private val providerCatalogRepository: ProviderCatalogRepository = mockk(relaxed = true)
     private val episodeRepository: EpisodeRepository = mockk(relaxed = true)
 
-    // ── Shared test fixtures ──────────────────────────────────────────────────
+    // ── Shared test fixtures ────────────────────────────────────────────
 
     private val capability = DeviceCapability(
         deviceId = "dev-1",
@@ -106,7 +106,7 @@ class CompanionHttpServerTest {
         every { bearerTokenRepository.token } returns testToken
     }
 
-    // ── Helper: configure test application with all mocked dependencies ───────
+    // ── Helper: configure test application with all mocked dependencies ───
 
     inner class TestScope(builder: ApplicationTestBuilder) {
         val unauthClient: HttpClient = builder.client
@@ -130,7 +130,7 @@ class CompanionHttpServerTest {
         TestScope(this).block()
     }
 
-    // ── GET /capability ───────────────────────────────────────────────────────
+    // ── GET /capability ──────────────────────────────────────────────
 
     @Nested
     @DisplayName("GET /capability")
@@ -149,7 +149,7 @@ class CompanionHttpServerTest {
         }
     }
 
-    // ── GET /provider-catalog ─────────────────────────────────────────────────
+    // ── GET /provider-catalog ─────────────────────────────────────────
 
     @Nested
     @DisplayName("GET /provider-catalog")
@@ -205,7 +205,7 @@ class CompanionHttpServerTest {
         }
     }
 
-    // ── GET /avatar ───────────────────────────────────────────────────────────
+    // ── GET /avatar ────────────────────────────────────────────────
 
     @Nested
     @DisplayName("GET /avatar")
@@ -295,7 +295,7 @@ class CompanionHttpServerTest {
         }
     }
 
-    // ── GET /shows ────────────────────────────────────────────────────────────
+    // ── GET /shows ────────────────────────────────────────────────
 
     @Nested
     @DisplayName("GET /shows")
@@ -452,7 +452,7 @@ class CompanionHttpServerTest {
         }
     }
 
-    // ── POST /recap/{traktShowId} ─────────────────────────────────────────────
+    // ── POST /recap/{traktShowId} ─────────────────────────────────────────
 
     @Nested
     @DisplayName("POST /recap/{traktShowId}")
@@ -485,7 +485,7 @@ class CompanionHttpServerTest {
 
             val response = client.post("/recap/1") {
                 contentType(ContentType.Application.Json)
-                setBody("""{"tmdbApiKey":""}""")
+                setBody("""{"tmdbApiKey":""}""".trimIndent())
             }
 
             assertEquals(HttpStatusCode.PreconditionFailed, response.status)
@@ -753,7 +753,7 @@ class CompanionHttpServerTest {
         }
     }
 
-    // ── POST /scrobble/start, /scrobble/pause, /scrobble/stop ────────────────
+    // ── POST /scrobble/start, /scrobble/pause, /scrobble/stop ──────────────
 
     @Nested
     @DisplayName("POST /scrobble/*")
@@ -967,7 +967,7 @@ class CompanionHttpServerTest {
         }
     }
 
-    // ── POST /scrobble/extract ────────────────────────────────────────────────
+    // ── POST /scrobble/extract ──────────────────────────────────────────
 
     @Nested
     @DisplayName("POST /scrobble/extract")
@@ -1083,7 +1083,7 @@ class CompanionHttpServerTest {
         }
     }
 
-    // ── POST /shows/add-to-library ────────────────────────────────────────────
+    // ── POST /shows/add-to-library ──────────────────────────────────────────
 
     @Nested
     @DisplayName("POST /shows/add-to-library (#468)")
@@ -1125,7 +1125,7 @@ class CompanionHttpServerTest {
             coEvery { tokenRefreshManager.getValidAccessToken() } returns "test-token"
             coEvery { traktApiService.addToHistory("Bearer test-token", any()) } returns
                 SyncHistoryResult(added = com.justb81.watchbuddy.core.trakt.SyncHistoryCount(episodes = 1))
-            every { showRepository.invalidateCache() } just runs
+            coEvery { showRepository.invalidateCache() } just Runs
 
             val response = client.post("/shows/add-to-library") {
                 contentType(ContentType.Application.Json)
@@ -1141,14 +1141,14 @@ class CompanionHttpServerTest {
         fun `invalidates ShowRepository cache after successful add`() = testApp {
             coEvery { tokenRefreshManager.getValidAccessToken() } returns "test-token"
             coEvery { traktApiService.addToHistory(any(), any()) } returns SyncHistoryResult()
-            every { showRepository.invalidateCache() } just runs
+            coEvery { showRepository.invalidateCache() } just Runs
 
             client.post("/shows/add-to-library") {
                 contentType(ContentType.Application.Json)
                 setBody(addToLibraryBody)
             }
 
-            verify { showRepository.invalidateCache() }
+            coVerify { showRepository.invalidateCache() }
         }
 
         @Test
@@ -1170,7 +1170,7 @@ class CompanionHttpServerTest {
             coEvery { tokenRefreshManager.getValidAccessToken() } returns "test-token"
             val capturedBodies = mutableListOf<com.justb81.watchbuddy.core.trakt.SyncHistoryBody>()
             coEvery { traktApiService.addToHistory(any(), capture(capturedBodies)) } returns SyncHistoryResult()
-            every { showRepository.invalidateCache() } just runs
+            coEvery { showRepository.invalidateCache() } just Runs
 
             client.post("/shows/add-to-library") {
                 contentType(ContentType.Application.Json)
@@ -1189,7 +1189,7 @@ class CompanionHttpServerTest {
         }
     }
 
-    // ── Security: rate limiting ───────────────────────────────────────────────
+    // ── Security: rate limiting ────────────────────────────────────────────────
 
     @Nested
     @DisplayName("Rate limiting")
@@ -1278,7 +1278,7 @@ class CompanionHttpServerTest {
         }
     }
 
-    // ── Bearer auth ───────────────────────────────────────────────────────────
+    // ── Bearer auth ──────────────────────────────────────────────────
 
     @Nested
     @DisplayName("Bearer auth")

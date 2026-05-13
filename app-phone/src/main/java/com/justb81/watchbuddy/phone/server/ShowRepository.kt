@@ -1,6 +1,7 @@
 package com.justb81.watchbuddy.phone.server
 
 import android.util.Log
+import com.justb81.watchbuddy.core.cache.TimedCachedResource
 import com.justb81.watchbuddy.core.locale.LocaleHelper
 import com.justb81.watchbuddy.core.model.EnrichedShowEntry
 import com.justb81.watchbuddy.core.model.TmdbProgressHint
@@ -24,6 +25,7 @@ import kotlinx.coroutines.flow.update
 import java.time.Instant
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.time.Duration.Companion.minutes
 
 private const val TAG = "ShowRepository"
 
@@ -51,32 +53,35 @@ class ShowRepository @Inject constructor(
     private val _shows = MutableStateFlow<List<EnrichedShowEntry>>(emptyList())
     val shows: StateFlow<List<EnrichedShowEntry>> = _shows.asStateFlow()
 
-    private var lastFetch: Long = 0L
+    private val cache = TimedCachedResource<Unit, List<EnrichedShowEntry>>(
+        ttlMillis = 5.minutes.inWholeMilliseconds,
+        fetcher = { fetchFromTrakt() },
+    )
 
     private val showComparator = compareByDescending<EnrichedShowEntry> {
         ShowProgressCalculator.latestWatchedInstant(it.entry)
     }.thenBy { it.entry.show.title.lowercase() }
 
-    fun invalidateCache() {
-        lastFetch = 0L
+    suspend fun invalidateCache() {
+        cache.invalidate(Unit)
     }
 
     suspend fun getShows(): List<EnrichedShowEntry> {
-        val now = System.currentTimeMillis()
-        val cached = _shows.value
-        if (now - lastFetch > CACHE_TTL || cached.isEmpty()) {
-            val token = tokenRefreshManager.getValidAccessToken()
-                ?: return cached
-            try {
-                val trakt = traktApi.getWatchedShows("Bearer $token")
-                _shows.value = enrich(trakt).sortedWith(showComparator)
-                lastFetch = now
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to fetch shows from Trakt; serving ${cached.size} cached entries", e)
-                // Do not update lastFetch so the next call retries the API.
-            }
+        return try {
+            val enriched = cache.get(Unit)
+            _shows.value = enriched
+            enriched
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to fetch shows from Trakt; serving ${_shows.value.size} cached entries", e)
+            _shows.value
         }
-        return _shows.value
+    }
+
+    private suspend fun fetchFromTrakt(): List<EnrichedShowEntry> {
+        val token = tokenRefreshManager.getValidAccessToken()
+            ?: error("No access token available")
+        val trakt = traktApi.getWatchedShows("Bearer $token")
+        return enrich(trakt).sortedWith(showComparator)
     }
 
     /**
@@ -174,10 +179,6 @@ class ShowRepository @Inject constructor(
                 }
             }.awaitAll()
         }
-    }
-
-    private companion object {
-        const val CACHE_TTL = 5 * 60 * 1000L // 5 minutes
     }
 }
 
