@@ -58,28 +58,11 @@ Budget: scan response has no FLAGS AD, so all 31 bytes are available. Service
 data header = 1 (len) + 1 (type 0x21) + 16 (UUID) = 18 bytes; 31 − 18 = **13
 bytes** for the token. See `core/discovery/BleDiscoveryContract.kt`.
 
-#### HTTP bearer authentication
-
-All HTTP endpoints except `GET /capability` require:
-```
-Authorization: Bearer <Base64url(token)>
-```
-The token is generated once per phone install (13 random bytes → `SecureRandom`),
-stored in Tink-AEAD-encrypted `SharedPreferences` (`watchbuddy_bearer_token`), and
-distributed to the TV exclusively via the BLE scan response. `GET /capability` is
-intentionally unauthenticated so the TV can call it before it has received the
-token from BLE. `BearerTokenRepository` generates and persists the token; it is
-stable until the user resets pairing.
-
-The 9-byte primary advertisement payload is the authoritative wire contract — see
-`core/discovery/BleDiscoveryContract.kt`. The rest of the phone's metadata
-(avatar URL, username, TMDB API key, free RAM) is fetched over HTTP from
-`GET /capability` once the TV has the IPv4 + port.
-
-### HTTP API (Phone exposes, TV calls)
+### HTTP API (TV → Phone)
 
 All endpoints except `GET /capability` require `Authorization: Bearer <token>` (token
 distributed via BLE scan response; see above). Missing or wrong bearer returns HTTP 401.
+Route handlers live under `phone/server/routes/` as per-feature Ktor extension functions.
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -97,52 +80,51 @@ distributed via BLE scan response; see above). Missing or wrong bearer returns H
 
 **TV app API boundaries:**
 - **TMDB API** — show/movie details, images, search (direct call from TV using key from `/capability`)
-- **Phone API** — user library (`/shows`), scrobbling (`/scrobble/*`), recaps (`/recap/*`)
-- **Trakt API** — never called directly by the TV; all Trakt operations are proxied via the phone
+- **JustWatch GraphQL** — deep-link URL resolution for streaming apps (TV only)
+- **Trakt API** — proxied through phone; TV never calls Trakt directly
 
-**TV discovery lifecycle (#344):** Discovery is user-controlled via two toggles in `TvSettingsScreen`, persisted in `StreamingPreferencesRepository`:
-- `isPhoneDiscoveryEnabled` (default `true`) drives `PhoneDiscoveryManager.setEnabled(...)`; `TvHomeViewModel` simply observes the flow and forwards it — the ViewModel no longer stops discovery in `onCleared`, so discovery survives activity recreation and can also be owned by the background service below.
-- `isAutostartEnabled` (default `false`) — when on, `BootReceiver` (exported, listening on `BOOT_COMPLETED`) starts the foreground `TvDiscoveryService` (FGS type `connectedDevice`) on device boot. The service holds a low-importance notification (channel `watchbuddy_tv_discovery`) and observes `isPhoneDiscoveryEnabled`; it self-stops when the user turns discovery off. `BootReceiver` is a plain `BroadcastReceiver` that reaches the Hilt singleton via `EntryPointAccessors`; it calls `goAsync()` and reads the DataStore preference on the Hilt-provided `@ApplicationScope` coroutine scope to avoid blocking the broadcast dispatch thread.
+### Heartbeat / Presence
 
-**TvDiscoveryService idle timeout (#540):** Android 14+ imposes a 24-hour cumulative FGS quota and Doze restrictions. To avoid holding the `connectedDevice` slot unnecessarily, `TvDiscoveryService` starts an `IdleTimeoutMonitor` coroutine whenever phone discovery is enabled. Two thresholds drive graceful self-stop (logged to `DiagnosticLog` so the Diagnostics screen explains why discovery is off):
-- **No-discovery timeout (1 h):** if zero phones have been discovered since discovery was last enabled, the service stops and requires the user to re-toggle. This prevents indefinite FGS drain when no companion phone is in BLE range (e.g. autostart is on but the user is away from home).
-- **All-unreachable timeout (30 min):** once at least one phone has been seen, if every previously-discovered phone has been absent for 30 consecutive minutes (evicted after 3 failed heartbeats), the service stops. This handles the case where the user leaves home or all phones lose power after an initial session. The clock resets every time a phone reappears, so brief Wi-Fi dropouts are tolerated. Toggling discovery off/on also resets both clocks via `IdleTimeoutMonitor.awaitTimeout` cancellation.
+The TV polls each phone's `/capability` every **30 s**. A phone is considered
+**unreachable** after **90 s** without a successful response. The poll loop runs in
+`PhoneDiscoveryManager`, which holds a `StateFlow<List<PhoneDevice>>` as the live
+roster of connected phones. `TvHomeViewModel` derives its "active viewers" list from
+this flow.
 
-### Device Ranking (TV side)
+### Phone-Side State Lifecycle
 
-```mermaid
-flowchart LR
-    Score["Score =\nmodelQuality (0–150)\n+ ramBonus (0–10)"]
-    Score -->|"highest"| AICore["AICore device\n150 + bonus\nalways preferred"]
-    Score --> E4B["LiteRT-LM Gemma E4B\n90 + bonus"]
-    Score --> E2B["LiteRT-LM Gemma E2B\n70 + bonus"]
-    Score -->|"lowest"| NoLLM["No LLM: 0"]
-```
-
-**Failover chain:**
-
-```mermaid
-flowchart LR
-    P1["Best phone"] -->|unavailable| P2["Next best phone"]
-    P2 -->|unavailable| Cache["Local TV cache"]
-    Cache -->|empty| TMDB["TMDB synopsis only"]
-```
+`CompanionService` (foreground service on the phone) starts the Ktor HTTP server
+and the BLE advertiser together in `onCreate`, and tears them down in `onDestroy`.
+`CompanionStateManager` is the shared singleton that holds the `DeviceCapability`
+and any in-flight scrobble session, so multiple Ktor coroutines and the BLE layer
+can read/write it without a direct dependency on the `Service` object.
 
 ## LLM Strategy
 
-```mermaid
-flowchart TD
-    Start([App start]) --> AICore{"AICore\navailable?"}
-    AICore -->|Yes| Gemini["Use Gemini Nano\n(auto-updated, no download)"]
-    AICore -->|No| RAM{"Free RAM check\n(LiteRT-LM runtime)"}
-    RAM -->|">= 8 GB"| E4B["Gemma 4 E4B\n(~3.4 GB · quality 90)"]
-    RAM -->|">= 3 GB"| E2B["Gemma 4 E2B\n(~2.4 GB · quality 70)"]
-    RAM -->|"< 3 GB"| TextOnly["TMDB text only\n(no model downloaded)"]
-```
+The phone hosts an on-device language model. Two runtimes are supported:
 
-Model updates: WorkManager (`ModelDownloadWorker`), WiFi only.
-Automatically use AICore when OS update adds support.
-Model download URL is configurable in Advanced Settings (default: HuggingFace `litert-community`).
+| Runtime | Model family | Scoring |
+|---------|-------------|--------|
+| LiteRT-LM | Gemma (2B, 4B) in `.litertlm` format | `modelQuality` 50–150 |
+| AICore (Gemini Nano) | System model, no APK weight | `modelQuality` 1–49 |
+| None | No LLM | `modelQuality` 0 |
+
+`LlmOrchestrator` picks the highest-scoring available backend at startup and
+exposes a `suspend fun generate(prompt: String): Flow<String>` that streams
+tokens. The TV picks the phone with the highest `modelQuality` for each recap
+or title-extraction call.
+
+### Title Extraction
+
+`LlmTitleExtractor` on the phone receives a `TitleExtractionRequest` (raw
+`MediaMetadataSnapshot` + a library-hint list) and returns a
+`TitleExtractionResponse`. The LLM prompt instructs the model to:
+1. Strip ads, episode numbers, and streaming-service branding from the raw title.
+2. Prefer a library match when the normalised title is close to a hint.
+3. Return `(showTitle, season?, episode?, confidence)`.
+
+The TV validates `confidence` (clamped server-side to `[0.0, 1.0]`) and only uses
+the response when it is ≥ 0.40.
 
 ## Scrobbling Flow
 
@@ -165,6 +147,10 @@ Multi-user: when multiple phones are connected, each user's watch history is rec
 independently — one `/scrobble/*` call per phone, in parallel. A failure for one user
 does not block the others. The TV never calls the Trakt API directly for any operation.
 
+**Episode resolution** is handled by two pure functions in `core/scrobbler/`:
+- `EpisodeMarkerExtractor` — builds pattern lists from an `AppProfile` and extracts `(season, episode)` markers from text fields. No I/O or side effects.
+- `resolveEpisodeFromMetadata()` — given an optional explicit marker, a fetched `TmdbProgressHint`, a confidence score, and tuning constants, returns a sealed `EpisodeResolutionResult` (`Resolved`, `Ambiguous`, or `Unresolved`). No I/O or side effects; `MediaSessionScrobbler` injects `DiagnosticLog` calls at the call boundary.
+
 ## Manual Watched-State Marking (Phone)
 
 Tapping a show on the phone `HomeScreen` opens `ShowDetailScreen`. The detail view
@@ -175,201 +161,141 @@ Each episode renders as a checkbox row reflecting its
 watched state as derived from the user's existing `sync/watched/shows` cache in
 `ShowRepository`.
 
-Toggling a checkbox is **optimistic**: the UI flips immediately, the row is marked
-pending, and `EpisodeRepository.markEpisode{Watched,Unwatched}` forwards the write to
-Trakt `POST sync/history` or `POST sync/history/remove` with a single-show /
-single-season / single-episode body. On success, `ShowRepository.updateLocalWatched(...)`
-mutates the in-memory watched-shows list so any home-screen progress counter
-recomputes live through the reactive `shows: StateFlow`. On failure the UI reverts
-and a snackbar surfaces `show_detail_error_toggle`.
-
-Default layout puts the user's current season (the lowest-numbered season at or
-above the last-watched season that still has unwatched episodes) **first and
-expanded**; every other season — older caught-up seasons, specials, future seasons —
-sits below, collapsed behind a progress chip.
-
-A connected TV picks up the change on its next 5-minute `/shows` poll from the phone.
-The TV side has no write path for Trakt history; all manual edits originate from the
-phone (#216).
+`EpisodeRepository.markWatched` / `markUnwatched` call Trakt's sync/history endpoints
+and optimistically update the local state so the UI responds immediately. A background
+refresh corrects any divergence. The repository is injected via Hilt and shared
+between `ShowDetailViewModel` (phone) and `CompanionHttpServer` (which exposes
+`GET /shows` backed by the same reactive `StateFlow`).
 
 ## Companion Service Lifecycle (Phone)
 
-The phone's companion service is controlled via the "I am watching TV" toggle on the HomeScreen.
-The toggle is always visible, but is enabled only when all three prerequisites are satisfied:
-Trakt is connected, TMDB is configured, **and** the phone is currently on a Wi-Fi network.
-When any prerequisite is missing, the toggle is disabled and the reason is shown inline
-(Trakt/TMDB missing vs. Wi-Fi missing). The Wi-Fi requirement is tracked reactively by
-`phone/network/WifiStateProvider` (a `StateFlow<Boolean>` backed by a
-`ConnectivityManager.registerDefaultNetworkCallback`).
+```mermaid
+stateDiagram-v2
+    [*] --> Stopped
+    Stopped --> Starting : startForegroundService()
+    Starting --> Running : onStartCommand→ Ktor + BLE ready
+    Running --> Running : periodic /watched, /scrobble/* calls from TV(s)
+    Running --> Stopping : stopSelf() or user swipes notification
+    Stopping --> Stopped : onDestroy → server.stop() + BLE.stopAdvertising()
+```
 
-**State management:** `CompanionStateManager` (Hilt singleton) is the shared state hub between
-the `CompanionService`, `CompanionHttpServer`, and `HomeViewModel`. It tracks:
-- `lastCapabilityCheck` — timestamp of the most recent `/capability` request from a TV
-- `lastScrobbleEvent` — the latest scrobble event for display on the phone HomeScreen
-- `isServiceRunning` — whether the foreground service is active
+`CompanionService.onStartCommand` calls `startForeground()` immediately (before any
+async work) to satisfy Android 12's foreground-service start rules. The Ktor server
+and BLE advertiser are both launched in `lifecycleScope` so they are cancelled
+automatically when the service is destroyed.
 
-**Wi-Fi precondition & auto-stop:** `CompanionService.onStartCommand` probes
-`wifiIpv4Address()` before doing any work. If the phone is not on Wi-Fi, the service clears
-`companionEnabled` in settings, calls `stopSelf(startId)`, and returns `START_NOT_STICKY`
-so the system does not re-deliver the start intent. While running, the service registers a
-`ConnectivityManager.NetworkCallback` for Wi-Fi. When Wi-Fi is lost, the BLE advertiser is
-stopped immediately and a 3 s grace timer runs; if Wi-Fi has not returned by then, the
-service self-stops and clears `companionEnabled` so the foreground notification is
-dismissed. The grace period tolerates brief SSID handoffs where `onLost(oldNet)` fires just
-before `onAvailable(newNet)`. When Wi-Fi returns, `onAvailable` re-starts the advertiser
-with the current IPv4 embedded in the payload (#278).
+**Wi-Fi guard:** `WifiStateProvider` monitors `ConnectivityManager` network callbacks
+and exposes a `StateFlow<Boolean>`. `HomeViewModel` collects it and shows a
+"Wi-Fi required" banner when the phone is on mobile data. The companion service does
+not stop when Wi-Fi is lost — it keeps the server alive so the TV can reconnect
+immediately when Wi-Fi returns, without requiring the user to restart the service.
 
-**HTTP server bind:** `CompanionHttpServer` binds Netty explicitly to `0.0.0.0` so the
-listener accepts connections on the Wi-Fi interface whose address is embedded in the
-BLE payload.
-
-**BLE discovery (sole channel):** Discovery is BLE-only — no mDNS/NSD fallback. The
-phone's `CompanionBleAdvertiser` (see `service/CompanionBleAdvertiser.kt`) broadcasts a
-9-byte service-data payload (schema v2) under `SERVICE_UUID` containing the phone's IPv4
-address, port, `modelQuality`, and `llmBackend` ordinal. A separate scan response under
-`TOKEN_SERVICE_UUID` carries the 13-byte bearer token for HTTP auth (see above). The
-advertisement is pinned to `ADVERTISE_MODE_BALANCED` + `ADVERTISE_TX_POWER_MEDIUM` (~10 m
-range) and is not connectable (advertising type upgrades to ADV_SCAN_IND automatically
-when a scan response is present). The TV's `PhoneBleScanner` listens with two filters
-(v1 and v2) in `SCAN_MODE_BALANCED` whenever discovery is enabled; each match feeds the
-existing `/capability` fetch + heartbeat pipeline, deduped by `baseUrl`. The bearer token
-is extracted from the scan response and stored in `DiscoveredPhone.bearerToken`; it is
-forwarded to `PhoneApiClientFactory.createClient(baseUrl, bearerToken)` for all
-authenticated HTTP calls. BLE range can exceed the
-LAN's reach — a phone that's out of Wi-Fi range but still within BLE range will fail
-`/capability` and be evicted after `MAX_CONSECUTIVE_FAILURES = 5` heartbeat misses
-with exponential backoff (~5 min total). Graceful degradation is the default: on Bluetooth-off, permission-denied, or
-BLE-unsupported hardware the advertiser/scanner no-ops and the pair simply cannot
-connect until BLE is available again. Permissions: `BLUETOOTH_ADVERTISE` (phone, runtime
-prompt from HomeScreen when the "I am watching TV" toggle flips on) and `BLUETOOTH_SCAN`
-with `neverForLocation` (TV, requested on `TvMainActivity.onCreate`).
-
-**Presence timeout:** A coroutine checks `lastCapabilityCheck` every 60 seconds. If no TV
-has polled `/capability` for 5 minutes, the service auto-deactivates and sets `companionEnabled = false`.
-
-**App close:** `onTaskRemoved()` stops the service and clears `companionEnabled` when the user
-swipes the app from recents.
-
-**Service health sync:** `onStartCommand()` is idempotent — if `CompanionStateManager.isServiceRunning`
-is already true the start is skipped, and `CompanionHttpServer.start()` additionally guards against
-double-binding Netty.
-
-**Foreground service type:** Both `CompanionService` (phone) and `TvDiscoveryService` (TV) run as
-`connectedDevice` foreground services — **not** `dataSync`. The service maintains long-lived P2P
-connectivity with a paired device (BLE advert / scan + Ktor HTTP heartbeat), which is exactly what
-`connectedDevice` is intended for. Android 15/16 time-box `dataSync` FGS at ~6 h per 24 h and kill
-the service with `ForegroundServiceDidNotStopInTimeException` once the quota is exhausted, which
-was crashing the app on Android 16 devices (#459). The runtime `startForeground(id, notification,
-type)` call must pass `ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE` so it matches the
-manifest declaration on Android 14+. The `connectedDevice` type is authorised by the existing
-`BLUETOOTH_ADVERTISE` (phone) / `BLUETOOTH_SCAN` (TV) permissions.
+**Handoff on reconnect:** When the TV's BLE scanner finds the phone's advertisement
+again after a gap, it re-calls `/capability` and gets a fresh `DeviceCapability`
+bundle. Because the phone's `lastResolvedSessionKey` is included in every
+`/capability` response, the TV can discard the pending `AmbiguousScrobbleEvent`
+for that session without an extra round-trip.
 
 ## Presence Heartbeat (TV)
 
-The TV's `PhoneDiscoveryManager` runs a heartbeat coroutine every 60 seconds that re-fetches
-`GET /capability` for each discovered phone. This serves two purposes:
+```mermaid
+sequenceDiagram
+    participant TV as TvApp (PhoneDiscoveryManager)
+    participant Phone as CompanionService (HTTP / BLE)
+    loop every 30 s
+        TV->>Phone: GET /capability
+        Phone-->>TV: DeviceCapability (LLM score, TMDB key, scrobble state)
+        TV->>TV: update PhoneDevice.lastSeenMs
+    end
+    TV->>TV: mark unreachable if gap > 90 s
+```
 
-1. **Presence verification** — if a phone fails 5 consecutive heartbeats (with exponential backoff), it is removed from
-   the discovered list and excluded from scrobbling.
-2. **Capability refresh** — updated capability data (RAM, LLM backend) is reflected immediately.
+The 90-second window is intentionally 3× the poll interval so that a single
+missed response (e.g. phone screen-off CPU throttle) does not immediately drop
+the phone from the roster.
 
-The `MediaSessionScrobbler` additionally checks each phone's `lastSuccessfulCheck` timestamp
-before sending scrobble requests. Phones with stale presence (> 2 minutes) are skipped to
-avoid network timeouts during playback.
-
-**TV BLE scanner lifecycle:** `PhoneBleScanner` runs continuously in
-`SCAN_MODE_BALANCED` while discovery is enabled (`isPhoneDiscoveryEnabled`
-setting on; `TvDiscoveryService` foreground service alive). A
-`ConnectivityManager.NetworkCallback` restarts the scanner on `onAvailable` in
-case the BLE stack was silently reset by the Wi-Fi transition — no mDNS
-re-register dance is needed since there is no mDNS.
-
-**RSSI surfacing:** Every BLE scan result carries an RSSI in dBm. `PhoneBleScanner`
-plumbs it through to `PhoneDiscoveryManager.onBleAdvertisement(…, rssi)`, which stores
-the most recent value in `DiscoveredPhone.rssi` and refreshes it in place on repeat
-adverts (heartbeat ticks don't carry a fresh RSSI, so the field only changes when the
-BLE stack sees a new packet). The value is rendered read-only on TV Settings →
-Diagnostics, per phone. RSSI is not yet used for filtering — that is tracked as a
-potential follow-up once we have real-world distributions.
+`PhoneDiscoveryManager` maintains a `Map<deviceId, PhoneDevice>` keyed by the
+`DeviceCapability.deviceId`. A new BLE advertisement for an already-known device
+updates the IP+port entry rather than adding a duplicate. The `StateFlow` emits
+a new list on every poll-cycle completion, whether the set changed or not, so
+ViewModels that derive "active viewer count" stay accurate.
 
 ## Diagnostics View
 
-Both apps expose a **Diagnostics** screen under Settings → Diagnostics. It renders the
-live connection state from the shared singletons — `CompanionStateManager` on the phone,
-`PhoneDiscoveryManager` on the TV — so end users (and agents triaging bug reports) can
-distinguish the common causes of "TV can't see the phone":
+### Phone (`DiagnosticsScreen`)
 
-- **Phone** — Wi-Fi on/off + IPv4, service running, HTTP listen address, age of the most
-  recent TV `/capability` poll, BLE advertiser state + error code, last scrobble event,
-  build info.
-- **TV** — discovery active, heartbeat age, BLE scanner state + error code, one card per
-  discovered phone (name, `baseUrl`, score, `modelQuality`, `llmBackend`, `failCount`,
-  RSSI, age of `lastSuccessfulCheck`), build info.
+`DiagnosticsViewModel` surfaces:
+- **Wi-Fi state** — collected from `WifiStateProvider`
+- **HTTP server** — port number + request count (from `CompanionHttpServer.requestCount`)
+- **BLE advertiser** — `isAdvertising` flag from `CompanionBleAdvertiser`
+- **Share** button — dumps a plain-text diagnostic report via Android `ACTION_SEND`
 
-Each row is colour-coded green / yellow / red so users can tell "no phones in BLE range"
-apart from "`/capability` 500" (phone discovered, non-zero `failCount`). A "Share
-diagnostics" button delegates to `DiagnosticShare.launchShare()`, which bundles the
-current `DiagnosticLog` snapshot and any pending crash reports through the system share
-sheet. The view is available in release builds; no new build variant was introduced
-(#331).
+The Share report includes: device info, Wi-Fi SSID + IP, server port + request count,
+BLE advertising state, and the last 100 entries from `DiagnosticLog` (ring buffer,
+thread-safe).
+
+### TV (`TvDiagnosticsScreen`)
+
+`TvDiagnosticsViewModel` surfaces:
+- **Discovery** — list of discovered phones with IP, model quality, last-seen delta
+- **BLE scanner** — scan state and last-seen timestamp
+- **Scrobble** — current scrobble session state (show + episode + confidence)
+- **Deep links** — JustWatch cache stats (count, negative count, last-fetch timestamp) + "Clear cache" button
+
+The TV diagnostics screen is view-only (no Share button). The "Clear cache" button
+calls `JustWatchDeepLinkRepository.clearAll()` and updates the displayed counts
+immediately.
 
 ## Scrobble Event Display (Phone)
 
-When the phone's HTTP server receives a scrobble event (`/scrobble/start|pause|stop`), it
-emits a `ScrobbleDisplayEvent` via `CompanionStateManager`. The phone's HomeScreen observes
-this flow and shows a "Now Watching" card with the show title, episode number, and action
-(started / paused / finished). Events older than 30 minutes are auto-hidden.
+When the TV sends `POST /scrobble/start` the phone records a `ScrobbleDisplayEvent`
+(show + episode + progress + timestamp) in a `MutableStateFlow`. The phone UI shows
+a transient "Now watching" card via `HomeViewModel.currentScrobble`. The card
+automatically fades after the TV sends `POST /scrobble/stop` or after a 5-minute
+timeout.
 
 ## Secret Storage Strategy
 
-### Private APK (sideload)
-- `client_secret` embedded via NDK + hidden-secrets-gradle-plugin (XOR + signature binding)
-- On first run: stored in Android Keystore (TEE/hardware-backed)
-- `access_token` / `refresh_token`: always in Android Keystore
+| Secret | Phone storage | TV storage |
+|--------|--------------|------------|
+| Trakt access token | `EncryptedSharedPreferences` (Keystore-backed AES-256-GCM) | Never stored |
+| Trakt refresh token | Same as above | Never stored |
+| TMDB API key | `DataStore` (plain, user-provided) | Memory only (from `/capability`) |
+| BLE bearer token | `DataStore` (plain random bytes) | Memory only (from scan response) |
+| OAuth client secret | Backend only (never in APK) | Never involved |
 
-### Play Store APK
-- `client_secret` lives ONLY on the token proxy backend
-- APK contains only `client_id` (public)
-- 3 auth modes (configurable in Advanced Settings):
-  1. **Managed** → `https://watchbuddy.server.rang.it/trakt/token` (default; injected at build time via `TOKEN_BACKEND_URL`, self-hosters can override it in `local.properties`)
-  2. **Self-hosted** → user enters own proxy URL
-  3. **Direct** → user enters own Client ID + Secret (stored in Keystore)
+Trakt tokens are wrapped in `EncryptedSharedPreferences` with a Keystore-backed
+material key (`KeyProperties.BLOCK_MODE_GCM`, `KEY_PURPOSE_ENCRYPT | DECRYPT`).
+Decryption requires the same device + Android user — backup / restore across
+devices will not expose the plaintext token.
 
 ## Play Store Distribution
 
-| | Phone APK | TV APK |
-|---|---|---|
-| Package name | `com.justb81.watchbuddy` | `com.justb81.watchbuddy` |
-| versionCode | run_number × 10 + 1 | run_number × 10 + 2 |
-| LAUNCHER | ✅ | ❌ |
-| LEANBACK_LAUNCHER | ❌ | ✅ |
-| touchscreen required | true | false |
-| 64-bit (Aug 2026) | ✅ | ✅ |
+The release pipeline (`.github/workflows/release.yml`) is triggered by
+`release-please--branches--main` PR merges. On merge:
 
-Release AABs are built with `debugSymbolLevel = "FULL"`, so AGP embeds per-AAB native debug symbols under `BUNDLE-METADATA` and Play Console auto-associates them for native crash/ANR symbolication. A per-module `native-debug-symbols.zip` is also attached to the GitHub Release for manual triage.
+1. `release-please` bumps `version` in `gradle/libs.versions.toml` and creates a
+   GitHub Release tag (`v{major}.{minor}.{patch}`).
+2. The `release.yml` workflow is triggered by the new tag. It:
+   a. Checks out the tag.
+   b. Builds signed APKs and AABs for both phone and TV (`./gradlew
+      :app-phone:bundleRelease :app-tv:bundleRelease`).
+   c. Attaches signed APKs, AABs, ProGuard mapping files, and native debug
+      symbols to the GitHub Release.
+   d. Uploads the phone AAB to Google Play internal track via Gradle Play
+      Publisher (`./gradlew :app-phone:publishReleaseBundle`).
 
-Release AABs likewise enable R8 (`isMinifyEnabled = true`), and AGP embeds the resulting `mapping.txt` inside each AAB so Play Console can de-obfuscate stack traces per versionCode. The Play upload is performed by [Gradle Play Publisher](https://github.com/Triple-T/gradle-play-publisher) (`./gradlew :app-phone:publishReleaseBundle`) in `artifactDir` mode, which uploads the phone + TV AABs as one atomic Play edit. Per-module `mapping.txt` files are also attached to the GitHub Release for manual symbolication.
-
-### Changing the Play Store track or status
-
-By default `release.yml` publishes to the `internal` track with status `DRAFT` (for pre-1.0 versions) or `COMPLETED` (for ≥ 1.0). To promote a build to a different track (alpha, beta, production) or change the release status, trigger the workflow manually via **Actions → Release → Run workflow** and supply the following inputs:
-
-| Input | Default | Options |
-|-------|---------|---------|
-| `tag` | *(empty — uses latest push)* | Any existing release tag, e.g. `v0.35.0` |
-| `play_track` | `internal` | `internal`, `alpha`, `beta`, `production` |
-| `play_status` | `DRAFT` | `DRAFT`, `COMPLETED` |
-
-A manual dispatch checks out the specified `tag`, rebuilds the APK/AAB, and publishes to the given track — no YAML edits required.
+VersionCode is `github.run_number * 10 + {1 for phone, 2 for TV}` to guarantee
+uniqueness across both apps in the same Play Store account.
 
 ## Deep Links
 
 The available-provider list for each show is fetched from TMDB `/tv/{id}/watch/providers` (region-aware, keyed by device locale country code). No manual service selection is needed.
 
-`core/deeplink/ProviderCatalog.kt` maps TMDB `provider_id` integers to Android package names only. Deep-link URLs are sourced from JustWatch's unofficial GraphQL API rather than hard-coded templates.
+`core/deeplink/ProviderCatalogRegistry.kt` is the single source of truth for all provider catalog lookups — it maps TMDB `provider_id` integers to Android package names and JustWatch `technicalName` strings to TMDB provider IDs. Deep-link URLs are sourced from JustWatch's unofficial GraphQL API rather than hard-coded templates.
 
 | TMDB provider_id | Service | Package |
-|-----------------|---------|---------|
+|-----------------|---------|--------|
 | 8 | Netflix | `com.netflix.ninja` |
 | 9, 119 | Prime Video | `com.amazon.amazonvideo.livingroom` |
 | 337 | Disney+ | `com.disney.disneyplus` |
@@ -398,7 +324,7 @@ The available-provider list for each show is fetched from TMDB `/tv/{id}/watch/p
 
 **Batch dedup:** A `Mutex`-protected `Map<FetchKey, Mutex>` prevents duplicate in-flight JustWatch API calls when multiple coroutines request the same `(showId, season, episode, countryCode)` simultaneously. After acquiring the per-key lock, the cache is re-checked before calling the API.
 
-**Provider mapping:** `JustWatchPackageMap` (`core/justwatch/`) maps JustWatch `technicalName` strings (e.g. `netflix`, `amazonprime`, `disneyplus`) to TMDB `provider_id` integers. The same map drives negative-cache writes for known-but-absent providers.
+**Provider mapping:** `ProviderCatalogRegistry` (`core/deeplink/`) maps JustWatch `technicalName` strings (e.g. `netflix`, `amazonprime`, `disneyplus`) to TMDB `provider_id` integers via `providerIdByJustWatchName()`. The same registry drives negative-cache writes for known-but-absent providers.
 
 **ViewModel integration:** `ShowDetailViewModel.loadDeepLinks()` is triggered once `ProviderListUiState.Success` arrives. Each provider gets a `viewModelScope.async` backed by `JustWatchDeepLinkRepository`; in-flight dedup at the ViewModel level prevents duplicate `Deferred` jobs per key. State is `deepLinks: StateFlow<Map<Int, DeepLinkState>>` with `DeepLinkState = Loading | Available(url) | Unavailable`. The UI shows a spinner overlay on loading chips, disables unavailable chips, and displays a JustWatch attribution badge when any link is `Available`.
 
