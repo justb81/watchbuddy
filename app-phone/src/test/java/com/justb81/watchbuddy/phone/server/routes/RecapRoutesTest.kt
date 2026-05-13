@@ -101,7 +101,8 @@ class RecapRoutesTest {
 
         val response = client.post("/recap/1") {
             header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
-            setBody("""{"tmdbApiKey":""}""")        }
+            setBody("""{"tmdbApiKey":""}""".trimIndent())
+        }
 
         assertEquals(HttpStatusCode.PreconditionFailed, response.status)
     }
