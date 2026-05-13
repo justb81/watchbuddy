@@ -8,7 +8,7 @@ import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
-import com.justb81.watchbuddy.core.deeplink.ProviderCatalog
+import com.justb81.watchbuddy.core.deeplink.ProviderCatalogRegistry
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
@@ -58,7 +58,7 @@ class InstalledAppsProbe @Inject constructor(
 
     private fun loadAndCache(): Set<String> {
         val pm = context.packageManager
-        val packages = ProviderCatalog.knownPackageNames.filterTo(mutableSetOf()) { pkg ->
+        val packages = ProviderCatalogRegistry.knownPackageNames.filterTo(mutableSetOf()) { pkg ->
             try {
                 pm.getPackageInfo(pkg, 0)
                 true

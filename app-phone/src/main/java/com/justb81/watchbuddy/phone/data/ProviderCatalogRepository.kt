@@ -14,8 +14,7 @@ import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
-import com.justb81.watchbuddy.core.deeplink.ProviderCatalog
-import com.justb81.watchbuddy.core.justwatch.JustWatchPackageMap
+import com.justb81.watchbuddy.core.deeplink.ProviderCatalogRegistry
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.model.ProviderCatalogSnapshot
 import com.justb81.watchbuddy.core.network.WatchBuddyJson
@@ -106,7 +105,7 @@ class ProviderCatalogRepository @Inject constructor(
                     true
                 }
                 response.isSuccessful -> {
-                    val body = response.body?.string() ?: return false
+                    val body = response.body.string()
                     val etag = response.header("ETag")
                     val parsed = parseCatalog(body) ?: return false
                     persist(body, parsed.version, etag)
@@ -136,8 +135,7 @@ class ProviderCatalogRepository @Inject constructor(
 
     private fun applySnapshot(snapshot: ProviderCatalogSnapshot) {
         _catalog.value = snapshot
-        ProviderCatalog.updateFromSnapshot(snapshot)
-        JustWatchPackageMap.updateFromSnapshot(snapshot)
+        ProviderCatalogRegistry.updateFromSnapshot(snapshot)
     }
 
     private fun parseCatalog(json: String): ProviderCatalogSnapshot? = runCatching {

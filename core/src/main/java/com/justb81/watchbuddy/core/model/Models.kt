@@ -3,7 +3,7 @@ package com.justb81.watchbuddy.core.model
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-// ── Trakt Models ─────────────────────────────────────────────────────────────
+// ── Trakt Models ────────────────────────────────────────────────────────────────────
 
 @Serializable
 data class TraktShow(
@@ -56,7 +56,7 @@ data class TraktSeasonWithEpisodes(
     val episodes: List<TraktEpisode> = emptyList()
 )
 
-// ── TMDB Models ───────────────────────────────────────────────────────────────
+// ── TMDB Models ─────────────────────────────────────────────────────────────────────
 
 @Serializable
 data class TmdbShow(
@@ -284,7 +284,7 @@ data class PhoneAddToLibraryRequest(
     val episode: TraktEpisode,
 )
 
-// ── Scrobble Display ─────────────────────────────────────────────────────────
+// ── Scrobble Display ────────────────────────────────────────────────────────────
 
 @Serializable
 enum class ScrobbleAction { START, PAUSE, STOP }
@@ -334,7 +334,7 @@ data class AmbiguousScrobbleEvent(
     val capturedAtMs: Long,
 )
 
-// ── TMDB Watch Providers ──────────────────────────────────────────────────────
+// ── TMDB Watch Providers ───────────────────────────────────────────────────────
 
 @Serializable
 data class WatchProviderEntry(
@@ -368,7 +368,7 @@ data class AllTvWatchProvidersResponse(
 
 /**
  * A fully resolved streaming provider for a show, ready for the UI.
- * Combines TMDB provider data with the [ProviderCatalog] mapping and
+ * Combines TMDB provider data with the [com.justb81.watchbuddy.core.deeplink.ProviderCatalogRegistry] mapping and
  * TV-local state (installed app, last-used tracking).
  *
  * Deep links are resolved at runtime by JustWatch (see `JustWatchDeepLinkRepository`),

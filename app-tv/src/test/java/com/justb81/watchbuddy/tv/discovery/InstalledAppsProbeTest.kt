@@ -92,7 +92,7 @@ class InstalledAppsProbeTest {
         }
 
         @Test
-        fun `returns false for a package not in ProviderCatalog`() {
+        fun `returns false for a package not in ProviderCatalogRegistry`() {
             assertFalse(probe.isInstalled("com.unknown.app"))
         }
     }
