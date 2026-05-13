@@ -11,8 +11,7 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import com.justb81.watchbuddy.core.deeplink.ProviderCatalog
-import com.justb81.watchbuddy.core.justwatch.JustWatchPackageMap
+import com.justb81.watchbuddy.core.deeplink.ProviderCatalogRegistry
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.model.ProviderCatalogSnapshot
 import com.justb81.watchbuddy.core.network.WatchBuddyJson
@@ -35,7 +34,7 @@ import javax.inject.Singleton
 private const val TAG = "TvProviderCatalogRepo"
 private const val HTTP_NOT_MODIFIED = 304
 
-// ── Room entity ───────────────────────────────────────────────────────────────
+// ── Room entity ─────────────────────────────────────────────────────────────────────────────
 
 @Entity(tableName = "provider_catalog_cache")
 data class ProviderCatalogCacheRow(
@@ -46,7 +45,7 @@ data class ProviderCatalogCacheRow(
     @ColumnInfo(name = "source") val source: String,
 )
 
-// ── DAO ───────────────────────────────────────────────────────────────────────
+// ── DAO ────────────────────────────────────────────────────────────────────────────────
 
 @Dao
 interface ProviderCatalogCacheDao {
@@ -58,7 +57,7 @@ interface ProviderCatalogCacheDao {
     suspend fun upsert(row: ProviderCatalogCacheRow)
 }
 
-// ── Database ──────────────────────────────────────────────────────────────────
+// ── Database ──────────────────────────────────────────────────────────────────────────────
 
 @Database(entities = [ProviderCatalogCacheRow::class], version = 1, exportSchema = true)
 abstract class ProviderCatalogDatabase : RoomDatabase() {
@@ -86,14 +85,13 @@ object ProviderCatalogDatabaseModule {
     ): ProviderCatalogCacheDao = db.dao()
 }
 
-// ── Repository ────────────────────────────────────────────────────────────────
+// ── Repository ──────────────────────────────────────────────────────────────────────────────
 
 /**
  * Source of the active provider catalog on TV.
  *
- * BUNDLED means the in-code fallback maps ([ProviderCatalog.BUNDLED_ENTRIES] /
- * [JustWatchPackageMap.BUNDLED_MAP]) are providing data — no live JSON has been
- * cached in Room yet.
+ * BUNDLED means [ProviderCatalogRegistry] is serving data from its in-code
+ * [ProviderCatalogRegistry.BUNDLED_SNAPSHOT] — no live JSON has been cached in Room yet.
  */
 enum class CatalogSource { LIVE, BUNDLED }
 
@@ -121,8 +119,8 @@ class TvProviderCatalogRepository @Inject constructor(
                     applySnapshot(snapshot, CatalogSource.valueOf(cached.source), cached.fetchedAt)
                 }
             }
-            // When no live catalog is available, ProviderCatalog and JustWatchPackageMap
-            // fall back to their in-code BUNDLED_ENTRIES / BUNDLED_MAP constants.
+            // When no live catalog is available, ProviderCatalogRegistry falls back to
+            // its in-code BUNDLED_SNAPSHOT.
         }
     }
 
@@ -173,8 +171,7 @@ class TvProviderCatalogRepository @Inject constructor(
     }
 
     private fun applySnapshot(snapshot: ProviderCatalogSnapshot, source: CatalogSource, fetchedAtMs: Long) {
-        ProviderCatalog.updateFromSnapshot(snapshot)
-        JustWatchPackageMap.updateFromSnapshot(snapshot)
+        ProviderCatalogRegistry.updateFromSnapshot(snapshot)
         _status.value = CatalogStatus(
             version = snapshot.version,
             fetchedAtMs = fetchedAtMs,

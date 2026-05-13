@@ -101,9 +101,9 @@ abstract class AppModule {
 
         /**
          * TV provider catalog repository — fetches catalog from the best-connected phone,
-         * persists in Room, and applies to the [ProviderCatalog] and [JustWatchPackageMap]
-         * façades. Falls back to in-code BUNDLED_ENTRIES / BUNDLED_MAP constants when no
-         * phone is reachable.
+         * persists in Room, and injects into [com.justb81.watchbuddy.core.deeplink.ProviderCatalogRegistry].
+         * Falls back to [com.justb81.watchbuddy.core.deeplink.ProviderCatalogRegistry.BUNDLED_SNAPSHOT]
+         * when no phone is reachable.
          */
         @Provides
         @Singleton

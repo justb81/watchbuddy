@@ -9,9 +9,8 @@ import kotlinx.serialization.Serializable
  *
  * Served by the backend at GET /provider-catalog, cached by the phone via
  * DataStore (24 h WorkManager refresh), relayed to TV via CompanionHttpServer,
- * and persisted on TV in Room. Both [com.justb81.watchbuddy.core.deeplink.ProviderCatalog]
- * and [com.justb81.watchbuddy.core.justwatch.JustWatchPackageMap]
- * become thin façades that read from this model.
+ * and persisted on TV in Room. [com.justb81.watchbuddy.core.deeplink.ProviderCatalogRegistry]
+ * reads from this model to serve all provider lookups.
  */
 @Serializable
 data class ProviderCatalogSnapshot(

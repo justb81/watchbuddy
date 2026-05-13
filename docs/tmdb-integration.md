@@ -24,7 +24,7 @@ All TMDB calls go through a single Retrofit interface defined in `core/src/main/
 ### Endpoints
 
 | Method | Path | Parameters | Returns | Purpose |
-|--------|------|------------|---------|---------|
+|--------|------|------------|---------|--------|
 | `getShow` | `GET /tv/{series_id}` | `series_id`, `api_key`, `language` | `TmdbShow` | Fetch show metadata (name, overview, poster, backdrop, air date) |
 | `getEpisode` | `GET /tv/{series_id}/season/{season}/episode/{episode}` | `series_id`, `season_number`, `episode_number`, `api_key`, `language` | `TmdbEpisode` | Fetch single episode details (name, overview, still image, air date) |
 | `searchTv` | `GET /search/tv` | `query`, `api_key`, `page` | `TmdbTvSearchResponse` | Search shows by title (used by TV scrobbler as Trakt-search fallback) |
@@ -48,144 +48,120 @@ data class TmdbShow(
 
 data class TmdbEpisode(
     val id: Int,                       // TMDB episode ID
-    val name: String,                  // Localized episode title
-    val overview: String? = null,      // Episode description / synopsis
-    val still_path: String? = null,    // Episode still image path fragment
+    val name: String,                  // Episode title
+    val overview: String? = null,      // Episode synopsis
+    val still_path: String? = null,    // Still image path fragment
     val season_number: Int,
     val episode_number: Int,
-    val air_date: String? = null       // ISO 8601 date
+    val air_date: String? = null
 )
 ```
-
-### Image URL Construction
-
-TMDB returns **path fragments** (e.g. `/abc123.jpg`) for images. `TmdbImageHelper` in `TmdbApiService.kt` constructs full URLs:
-
-```
-https://image.tmdb.org/t/p/w{width}{path}
-```
-
-| Helper method | Default width | Example output |
-|---------------|---------------|----------------|
-| `TmdbImageHelper.still(path)` | 300 px | `https://image.tmdb.org/t/p/w300/abc123.jpg` |
-| `TmdbImageHelper.poster(path)` | 500 px | `https://image.tmdb.org/t/p/w500/abc123.jpg` |
-| `TmdbImageHelper.backdrop(path)` | 1280 px | `https://image.tmdb.org/t/p/w1280/abc123.jpg` |
-
-All methods accept a custom `width` parameter and return `null` when the input path is `null`.
 
 ---
 
-## Trakt-to-TMDB ID Mapping
+## Image Handling
 
-For the recap and deep-link flows, TMDB is always queried by ID (not title) — the Trakt API provides a `tmdb` field inside its `TraktIds` object that serves as the bridge:
+TMDB images are referenced by a path fragment (e.g. `/abc123.jpg`). The full URL is constructed by prepending the TMDB image base URL:
 
-> **Exception:** The TV's `MediaSessionScrobbler` calls `searchTv(query)` by title when the local fuzzy-match cache returns no confident match. This is a title-based search solely for the purpose of identifying which show is being watched, not for metadata enrichment.
-
-```kotlin
-data class TraktIds(
-    val trakt: Int? = null,
-    val slug: String? = null,
-    val tvdb: Int? = null,
-    val imdb: String? = null,
-    val tmdb: Int? = null    // ← used to call TMDB endpoints
-)
+```
+https://image.tmdb.org/t/p/{size}{path_fragment}
 ```
 
-When Trakt's `GET /sync/watched/shows` returns a user's watch history, each show entry includes `ids.tmdb`. This ID is used for all subsequent TMDB API calls. If `ids.tmdb` is `null` for a show, TMDB features (recaps, deep links) are unavailable for that show.
+Common sizes used in WatchBuddy:
+
+| Size | Usage |
+|------|-------|
+| `w185` | Provider logos (small) |
+| `w342` | Show posters (medium) |
+| `w780` | Episode stills (large) |
+| `original` | Full-resolution backdrops |
+
+Image loading uses [Coil](https://coil-kt.github.io/coil/) with a `crossfade(true)` transition. Placeholder and error drawables are set per call site.
+
+`TmdbImageHelper.logo(logoPath: String?)` in `core/tmdb/` constructs the full provider logo URL using `w185`.
 
 ---
 
 ## User Journeys
 
-### 1. Recap Generation (Primary TMDB Journey)
+### 1. Phone Home Screen — Show List with Posters (#248)
 
-This is the main user journey that triggers TMDB API calls. It spans both devices.
+When the phone app opens `HomeScreen`, `HomeViewModel` loads the user's Trakt watchlist and enriches each entry with TMDB poster data.
 
 ```mermaid
 sequenceDiagram
-    participant TV as TV App
-    participant Phone as Phone App
-    participant TMDB as TMDB API
+    participant UI as HomeScreen
+    participant VM as HomeViewModel
+    participant Show as ShowRepository
+    participant TMDB as TmdbApiService
 
-    TV->>Phone: POST /recap/{traktShowId}<br/>(via local WiFi, port 8765)
-    Phone->>Phone: Look up show in Trakt cache<br/>(ShowRepository, 5-min TTL)
-    Phone->>Phone: Extract TMDB ID from TraktIds.tmdb
-
-    alt tmdb == null
-        Phone-->>TV: 404 "No TMDB ID"
-    end
-
-    Phone->>TMDB: getShow(tmdbId, apiKey)
-    TMDB-->>Phone: TmdbShow (name, overview, poster)
-
-    loop Last 8 watched episodes
-        Phone->>TMDB: getEpisode(tmdbId, season, episode, apiKey)
-        TMDB-->>Phone: TmdbEpisode (synopsis + still)
-        Note right of Phone: Individual failures logged,<br/>skipped (partial OK)
-    end
-
-    alt All episodes failed
-        Phone-->>TV: 404 "No episode data"
-    end
-
-    Phone->>Phone: RecapGenerator.generateRecap()<br/>Build LLM prompt from TMDB data
-    Phone->>Phone: LLM cascade:<br/>AICore → LiteRT-LM → FallbackProvider
-    Phone->>Phone: Replace still image placeholders<br/>with real TMDB URLs
-    Phone->>Phone: Sanitize HTML (strip XSS vectors)
-
-    Phone-->>TV: { "html": "..." }
-    TV->>TV: Render HTML recap in WebView
+    UI->>VM: collect shows StateFlow
+    VM->>Show: observe shows
+    Show-->>VM: List<TraktWatchedEntry>
+    VM->>TMDB: getShow(tmdbId, apiKey)
+    TMDB-->>VM: TmdbShow (poster_path)
+    VM-->>UI: List<EnrichedShowEntry>
+    UI->>UI: AsyncImage(posterUrl)
 ```
 
-**Key files involved:**
-- `app-phone/…/server/CompanionHttpServer.kt` — HTTP endpoint, TMDB API calls
-- `app-phone/…/llm/RecapGenerator.kt` — prompt building, image placeholder replacement
-- `app-phone/…/llm/FallbackProvider.kt` — TMDB-only fallback when no LLM is available
-- `app-phone/…/llm/LlmProviderFactory.kt` — cascade logic with TMDB fallback as last resort
+**Error handling:** If `getShow` fails (network error or 404), the entry is shown without a poster. No retry is attempted for individual show failures; the whole list refreshes on the next `HomeViewModel` lifecycle start.
 
-#### TMDB Data in the LLM Prompt
+### 2. TV ShowDetail — Watch Providers (#311)
 
-The `RecapGenerator` builds a prompt containing:
-- Show name (`TmdbShow.name`)
-- Target episode identifier (`S02E04 "Episode Title"`)
-- Last 8 watched episode summaries, each formatted as:
-  ```
-  S01E05 "Episode Name": <TMDB overview text>
-  ```
-- The LLM is instructed to use `<img data-tmdb-still="S01E05">` placeholders in its HTML output
+When the TV user opens a show, `ShowDetailViewModel` fetches streaming providers from TMDB, cross-references them with the installed-app registry, and ranks them by last-used status.
 
-After LLM inference, the regex `data-tmdb-still="S(\d+)E(\d+)"` matches these placeholders and replaces them with real `src="https://image.tmdb.org/t/p/w300/..."` URLs using `TmdbImageHelper.still()`.
+```mermaid
+sequenceDiagram
+    participant UI as ShowDetailScreen
+    participant VM as ShowDetailViewModel
+    participant WP as WatchProvidersRepository
+    participant TMDB as TmdbApiService
+    participant Registry as ProviderCatalogRegistry
+    participant Probe as InstalledAppsProbe
 
-#### TMDB-Only Fallback (No LLM)
+    UI->>VM: LaunchedEffect(show)
+    VM->>WP: getResolvedProviders(tmdbId, countryCode)
+    WP->>TMDB: getWatchProviders(tmdbId, apiKey)
+    TMDB-->>WP: WatchProviderResponse
+    WP->>Registry: entryById(providerId)
+    Registry-->>WP: ProviderEntry(packageName)
+    WP->>Probe: isInstalled(packageName)
+    Probe-->>WP: Boolean
+    WP-->>VM: List<ResolvedProvider>
+    VM-->>UI: ProviderListUiState.Success
+```
 
-When no LLM backend is available (AICore unavailable, insufficient RAM for LiteRT-LM), `FallbackProvider` generates a pure HTML slideshow directly from TMDB data:
-- Takes the last 6 watched episodes
-- Renders each episode's `name` and `overview` as a CSS-animated slide
-- Uses `data-tmdb-still` placeholders (resolved later by `RecapGenerator`)
-- No AI inference — just TMDB synopsis text displayed verbatim
+**Error handling:** If `getWatchProviders` fails, `ProviderListUiState.Error` is emitted and a retry button is shown. The 24-hour in-memory cache is bypassed on retry.
 
-### 2. Deep Link Resolution (TV App)
+### 2b. TV ShowDetail — JustWatch per-episode deep links (#418)
 
-When the user opens a show's detail screen on the TV, `ShowDetailViewModel.loadDeepLinks()` resolves
-per-episode streaming URLs via JustWatch's unofficial GraphQL API. Deep-link URLs are resolved at
-runtime and cached in a Room database on the TV.
+When the provider list is loaded, `ShowDetailViewModel` additionally resolves per-episode streaming URLs from JustWatch.
 
 ```mermaid
 flowchart TD
-    A["User opens show detail\nproviders loaded"] --> B["ShowDetailViewModel.loadDeepLinks()"]
-    B --> C["For each ResolvedProvider:\nviewModelScope.async"]
-    C --> D["JustWatchDeepLinkRepository\n.resolveDeepLink(tmdbShowId, season,\nepisode, providerId, countryCode)"]
-    D --> E{"Episode-level\nRoom cache hit?"}
-    E -->|Yes| F["DeepLinkState.Available(url)"]
-    E -->|No| G["Live JustWatch GraphQL call\n(SEARCH → SEASONS → EPISODES)"]
-    G --> H{"Offer found?"}
-    H -->|Yes| I["Cache permanently → Available(url)"]
-    H -->|No| J["Cache 30-day negative → Unavailable"]
+    A[loadDeepLinks called] --> B{Episode Room cache?}
+    B -->|Hit| C[Return URL]
+    B -->|Miss| D[JustWatch SEARCH_QUERY]
+    D --> E{Node found?}
+    E -->|No| F[SearchMiss → null]
+    E -->|Yes| G[JustWatch SEASONS_QUERY]
+    G --> H[JustWatch EPISODES_QUERY]
+    H --> I{Episode in results?}
+    I -->|Yes| J[Cache positive + negatives → URL]
+    I -->|No| K[Show-level cache?]
+    K -->|Hit| C
+    K -->|Miss| L[JustWatch SEARCH_QUERY show-level]
+    L --> M{Node found?}
+    M -->|Yes| N[Cache show-level offers → URL]
+    M -->|No| O[null → Unavailable]
+    H -->|No offer for this episode| K
+    D -->|HTTP/GraphQL error| P[Error logged → null]
+    H -->|HTTP/GraphQL error| P
 ```
 
-`ProviderCatalog` maps TMDB `provider_id` integers to Android package names so deep links can be
+`ProviderCatalogRegistry` maps TMDB `provider_id` integers to Android package names so deep links can be
 attributed to the correct app. JustWatch `technicalName` strings (e.g. `netflix`, `amazonprime`, `disneyplus`) are
-translated to TMDB `provider_id` integers by `JustWatchPackageMap`.
+translated to TMDB `provider_id` integers via `ProviderCatalogRegistry.providerIdByJustWatchName()`.
 
 Note: This journey calls the JustWatch GraphQL API, not the TMDB API. TMDB data (the TMDB show ID
 and the episode numbers from `ShowProgressCalculator`) is used as input to the JustWatch query.
@@ -197,54 +173,29 @@ When the TV discovers a phone on the network, it calls `GET /capability`. The re
 ```mermaid
 sequenceDiagram
     participant TV as TV App
-    participant Phone as Phone App
+    participant Phone as CompanionHttpServer
 
     TV->>Phone: GET /capability
-    Phone->>Phone: settingsRepository.getTmdbApiKey()
-    Phone->>Phone: tmdbConfigured = key.isNotBlank()<br/>tmdbApiKey = key (null when blank)
-    Phone-->>TV: DeviceCapability { ...,<br/>tmdbConfigured: true,<br/>tmdbApiKey: "..." }
+    Phone-->>TV: DeviceCapability(tmdbApiKey=...)
+    TV->>TV: store apiKey in memory
+    TV->>TMDB: searchTv(query, apiKey)
 ```
 
-The TV uses `tmdbApiKey` for:
-- Title search (`searchTv`) in `MediaSessionScrobbler` when the fuzzy cache match is below threshold
-- Fetching the next-episode still image and title on `ShowDetailScreen` (see journey 4 below)
+The TMDB API key is held in TV process memory only and is never persisted to disk.
 
-### 4. TV ShowDetail — Watch Providers ("Available on") (#354 / #355 / #356 / #367)
+### 4. TV ShowDetail — Watch Providers: Installed App Filter and Ordering
 
-When the user opens a show on `ShowDetailScreen`, `ShowDetailViewModel.loadProviders()` fetches streaming availability directly from TMDB (using the phone's API key), cross-references with installed apps, applies last-used ranking, and surfaces the result as an `Available on` row.
+`WatchProvidersRepository.getResolvedProviders()` applies three layers of filtering and ordering:
 
-```mermaid
-sequenceDiagram
-    participant TV as ShowDetailScreen
-    participant VM as ShowDetailViewModel
-    participant WPR as WatchProvidersRepository
-    participant TMDB as TMDB API
-    participant PM as PackageManager
-    participant LUR as LastUsedProviderRepository
-
-    TV->>VM: loadProviders(EnrichedShowEntry)
-    VM->>VM: phoneDiscovery.getBestPhone()?.tmdbApiKey
-    VM->>WPR: getResolvedProviders(tmdbId, countryCode, apiKey, showNonInstalled)
-    WPR->>TMDB: GET /tv/{id}/watch/providers?api_key=...
-    TMDB-->>WPR: WatchProviderResponse { results: { "DE": { flatrate, ads, free } } }
-    WPR->>PM: getInstalledPackages() via InstalledAppsProbe
-    WPR->>LUR: getLastUsedProviderId(tmdbId)
-    WPR-->>VM: List<ResolvedProvider> [lastUsed?, ...installed, ...notInstalled?]
-    VM-->>TV: ProviderListUiState.Success(providers)
-    TV->>TV: LazyRow of ProviderChip cards
-    Note over TV: First entry has primary border + "Last used" badge
-```
-
-**Empty / error states:**
-- Zero providers for country → `ProviderListUiState.Empty` → "Not available in your region"
-- Network failure → `ProviderListUiState.Error` → retry chip
-- No TMDB ID on show → emit `Empty(null)` immediately (no fetch)
+1. **Package name lookup**: `ProviderCatalogRegistry.entryById(providerId)?.packageName`
+2. **Installed check**: `InstalledAppsProbe.isInstalled(packageName)`
+3. **Last-used ordering**: `LastUsedProviderRepository` provides a per-show `providerId`; the matching entry is sorted first
 
 **Key files:**
 - `app-tv/…/data/WatchProvidersRepository.kt` — fetch, 24 h in-memory cache, ordering
 - `app-tv/…/data/LastUsedProviderRepository.kt` — TV-local DataStore, `Map<tmdbId, providerId>`
 - `app-tv/…/discovery/InstalledAppsProbe.kt` — `PackageManager` cache, invalidated on install/remove
-- `core/…/deeplink/ProviderCatalog.kt` — TMDB `provider_id` → package name (for `InstalledAppsProbe` + `<queries>` manifest)
+- `core/…/deeplink/ProviderCatalogRegistry.kt` — TMDB `provider_id` → package name + JustWatch `technicalName` → provider_id (for `InstalledAppsProbe` + `<queries>` manifest)
 - `app-tv/AndroidManifest.xml` — `<queries>` block for Android 11+ package visibility
 
 ### 5. TV ShowDetail — Next-Episode Still Image and Title (#366)
@@ -253,149 +204,120 @@ When the user opens a show on the TV `ShowDetailScreen`, `ShowDetailViewModel.lo
 
 ```mermaid
 sequenceDiagram
-    participant TV as TV ShowDetailScreen
     participant VM as ShowDetailViewModel
-    participant TMDB as TMDB API
+    participant Phone as PhoneApiService
+    participant TMDB as TmdbApiService
 
-    TV->>VM: loadNextEpisode(EnrichedShowEntry)
-    VM->>VM: nextEpisodeNumbers(entry, hint)<br/>→ prefer hint.nextAired, fallback Trakt +1
-    VM->>VM: phoneDiscovery.getBestPhone()?.capability?.tmdbApiKey
-    alt no API key
-        VM-->>TV: NextEpisodeUiState(isLoading=false, stillUrl=null)
-    end
-    VM->>TMDB: getEpisode(tmdbId, season, episode, apiKey)
-    TMDB-->>VM: TmdbEpisode(name, still_path, …)
-    VM-->>TV: NextEpisodeUiState(stillUrl, episodeName, episodeCode)
+    VM->>Phone: GET /capability (first connection)
+    Phone-->>VM: DeviceCapability(tmdbApiKey)
+    VM->>TMDB: getEpisode(tmdbId, season, episode, tmdbApiKey)
+    TMDB-->>VM: TmdbEpisode(still_path, name)
+    VM-->>UI: NextEpisodeUiState.Success
 ```
 
-**Image fallback chain in the UI:**
-1. `nextEpisodeUi.stillUrl` — episode still at 780 px width
-2. `TmdbImageHelper.poster(enriched.posterPath)` — series poster
-3. Plain `MaterialTheme.colorScheme.surface` box
+**Error handling:** If `getEpisode` fails, `NextEpisodeUiState.Error` is emitted. The UI shows the show title without a still image.
 
-**Key files involved:**
-- `app-tv/…/ui/showdetail/ShowDetailViewModel.kt` — `loadNextEpisode()`, `NextEpisodeUiState`
-- `app-tv/…/ui/showdetail/ShowDetailScreen.kt` — Coil `AsyncImage` in left panel, title + code display
-- `core/…/progress/ShowProgressCalculator.kt` — `nextEpisodeNumbers()` helper
-- `core/…/tmdb/TmdbApiService.kt` — `getEpisode()` Retrofit endpoint
+### 6. TV Scrobbler — Title Search Fallback (#354)
 
----
-
-## Connection and Network Handling
-
-### HTTP Client Configuration
-
-TMDB shares the core `OkHttpClient` with Trakt, configured in `core/…/network/NetworkModule.kt`:
-
-| Setting | Value | Notes |
-|---------|-------|-------|
-| Base URL | `https://api.themoviedb.org/3/` | Dedicated Retrofit instance (`@Named("tmdb")`) |
-| Certificate pinning | Let's Encrypt R3 + ISRG Root X1 for `api.themoviedb.org` | Intermediate CA pins for resilience during leaf cert rotation |
-| JSON parser | kotlinx.serialization with `ignoreUnknownKeys = true`, `isLenient = true`, `coerceInputValues = true` | Graceful handling of API changes and unexpected fields |
-| Logging | `HttpLoggingInterceptor.Level.BODY` in debug, `NONE` in release | |
-| Timeouts | OkHttp defaults (10 s connect, 10 s read, 10 s write) | |
-
-Note: The shared OkHttpClient also adds Trakt-specific headers (`trakt-api-version: 2`, `Content-Type: application/json`). These extra headers are harmless for TMDB requests since TMDB ignores unknown headers.
-
-### API Key Management
-
-TMDB does **not** use a backend proxy. Each user provides their own API key:
-
-1. **Storage:** Android DataStore (Preferences), key `tmdb_api_key`
-   - Managed by `SettingsRepository` in `app-phone/…/settings/SettingsRepository.kt`
-   - Part of the `AppSettings` data class
-2. **Entry point:** User enters the key in Advanced Settings on the phone app
-3. **Injection:** Passed as `@Query("api_key")` on every TMDB request — not stored in headers or interceptors
-4. **Override:** The TV can optionally send a `tmdbApiKey` field in the `POST /recap` request body, which takes priority over the stored key
-
-```kotlin
-// CompanionHttpServer.kt — API key resolution
-val apiKey = body.tmdbApiKey.ifBlank {
-    settingsRepository.getTmdbApiKey().first()
-}
-```
-
-### Error Handling and Fallback Chain
-
-TMDB errors are handled at multiple levels:
-
-#### 1. Individual Episode Fetch Failures
-
-```kotlin
-// CompanionHttpServer.kt — partial failure is acceptable
-tmdbApiService.getEpisode(tmdbId, season, episode, apiKey)
-// catch → Log.w(...), return null
-// mapNotNull filters out failed episodes
-```
-
-If some episodes fail but others succeed, the recap proceeds with the available episodes.
-
-#### 2. Complete TMDB Failure
-
-| Condition | Response |
-|-----------|----------|
-| `TraktIds.tmdb` is `null` | HTTP 404 — "No TMDB ID for show" |
-| All episode fetches fail | HTTP 404 — "No episode data available" |
-| `getShow()` throws | HTTP 503 — "Recap generation failed" (caught by outer try/catch) |
-
-#### 3. LLM Cascade with TMDB Fallback
-
-Even when TMDB data is successfully fetched, the LLM may fail. The cascade:
+When the scrobbler's Phase 1 (library match) fails, Phase 2 calls `TmdbApiService.searchTv()` to find a TMDB match.
 
 ```mermaid
-flowchart TD
-    A["AICore (Gemini Nano)"] -->|fails| B["LiteRT-LM (Gemma 4 E4B or E2B)"]
-    B -->|fails| C["FallbackProvider\n(TMDB synopsis only — always succeeds)"]
-    C -->|"fails (should not happen)"| D["Minimal HTML:\nCould not generate recap."]
+sequenceDiagram
+    participant Scrobbler as MediaSessionScrobbler
+    participant TMDB as TmdbApiService
+    participant Cache as TvShowCache
+
+    Scrobbler->>Cache: fuzzy match (Phase 1)
+    Cache-->>Scrobbler: no match
+    Scrobbler->>TMDB: searchTv(mediaTitle, apiKey)
+    TMDB-->>Scrobbler: List<TmdbShow>
+    Scrobbler->>Scrobbler: re-run fuzzy match against TMDB results
+    Scrobbler->>Cache: cache TMDB result if confidence >= 40%
 ```
 
-The `FallbackProvider` is the safety net: it constructs a slideshow purely from TMDB episode overviews and still images without any LLM inference, guaranteeing that if TMDB data was fetched successfully, the user always gets a recap.
-
-### Caching Strategy
-
-| Layer | What is cached | TTL | Storage |
-|-------|---------------|-----|---------|
-| `ShowRepository` (phone) | `List<TraktWatchedEntry>` from Trakt (contains TMDB IDs) | 5 minutes | In-memory |
-| `TvShowCache` (TV) | Show list for local fuzzy-matching | App lifetime (no TTL) | In-memory (volatile) |
-| `TmdbCache` (phone) | `TmdbShow` and `TmdbEpisode` responses | 15 minutes | In-memory |
-
-`TmdbCache` is a `@Singleton` that caches `getShow` and `getEpisode` responses for 15 minutes. Repeated recap requests for the same show (e.g. after watching another episode) reuse cached data instead of hitting the TMDB API again. This reduces latency and helps stay within TMDB's rate limits.
-
-### Localization
-
-TMDB API calls include a `language` parameter (default `"de-DE"`). This controls the language of returned metadata (show names, episode overviews, etc.).
-
-Separately, `LocaleHelper.getLlmResponseLanguage()` reads the device's system locale and passes its English name (e.g. "German", "French") to the LLM prompt, so the generated recap text matches the user's language — independent of the TMDB response language.
+**Error handling:** If `searchTv` fails, Phase 2 is skipped and Phase 3 (LLM title extraction) is attempted. No error is surfaced to the user.
 
 ---
 
-## Module Responsibility Summary
+## Connection Handling
 
-| Module | File | TMDB Role |
-|--------|------|-----------|
-| **core** | `tmdb/TmdbApiService.kt` | Retrofit interface (`getShow`, `getEpisode`, `searchTv`), response DTOs, `TmdbImageHelper` |
-| **core** | `model/Models.kt` | `TmdbShow`, `TmdbEpisode`, `TmdbTvSearchResponse` data classes; `TraktIds.tmdb` mapping; `WatchProviderEntry`/`WatchProviderResponse` for TMDB watch-provider results |
-| **core** | `network/NetworkModule.kt` | OkHttpClient with cert pinning, TMDB Retrofit instance, Hilt DI |
-| **app-phone** | `server/CompanionHttpServer.kt` | Recap endpoint: calls `getShow()` + `getEpisode()`, passes data to `RecapGenerator` |
-| **app-phone** | `llm/RecapGenerator.kt` | Builds LLM prompt from TMDB data, replaces still image placeholders |
-| **app-phone** | `llm/FallbackProvider.kt` | Generates HTML recap from TMDB synopses alone (no LLM) |
-| **app-phone** | `llm/LlmProviderFactory.kt` | Cascade with `FallbackProvider` (TMDB-only) as last resort |
-| **app-phone** | `server/DeviceCapabilityProvider.kt` | Exposes `tmdbConfigured` flag and `tmdbApiKey` to TV via `/capability` |
-| **app-phone** | `settings/SettingsRepository.kt` | Stores and retrieves user's TMDB API key |
-| **app-phone** | `ui/home/HomeViewModel.kt` | Loads TMDB posters for each show in the library (parallel `getShow()` calls after sync) |
-| **app-phone** | `ui/showdetail/ShowDetailViewModel.kt` | Loads TMDB poster + overview for a single show's detail screen |
+### API Key
+
+The TMDB API key is entered once during phone onboarding and stored encrypted in `EncryptedSharedPreferences` via `AppSettings`. It is included as the `api_key` query parameter in every TMDB request. The TV receives the key via `GET /capability` and holds it in memory.
+
+### Timeouts and Retry
+
+All TMDB calls use a shared `OkHttpClient` configured in `NetworkModule`:
+
+| Timeout type | Value |
+|-------------|-------|
+| Connect | 10 s |
+| Read | 15 s |
+| Write | 10 s |
+
+No automatic retry is configured at the OkHttp layer. Call sites handle failures individually (see Error Handling sections above).
+
+### Rate Limiting
+
+TMDB enforces a rate limit of 40 requests per 10 seconds per IP. WatchBuddy does not implement explicit rate-limiting logic — it relies on the low request volume (one show per card render, one episode per show detail open) staying well within the limit for typical use.
+
+---
+
+## Error Handling Summary
+
+| Journey | Error condition | Handling |
+|---------|----------------|----------|
+| Home: poster | `getShow` fails | No poster shown; entry still displayed |
+| TV ShowDetail: providers | `getWatchProviders` fails | `ProviderListUiState.Error` + retry button |
+| TV ShowDetail: deep links | JustWatch search miss | `DeepLinkState.Unavailable` chip disabled |
+| TV ShowDetail: deep links | Network/HTTP error | No negative cached; next visit retries |
+| TV ShowDetail: next-episode | `getEpisode` fails | `NextEpisodeUiState.Error`; no still shown |
+| TV scrobbler: title search | `searchTv` fails | Phase 2 skipped; proceeds to Phase 3 (LLM) |
+
+---
+
+## Caching
+
+| Data | Cache location | TTL | Invalidation |
+|------|----------------|-----|--------------|
+| Watch providers | In-memory (`WatchProvidersRepository`) | 24 h | App restart |
+| TMDB show metadata | In-memory (`TvShowCache`) | Session | App restart |
+| JustWatch deep links | Room DB (`justwatch_deep_links.db`) | Positive: permanent; Negative: 30 d | Manual clear in Diagnostics |
+| Provider catalog | Room DB (`ProviderCatalogCacheDao`) | Until next phone connection | `TvProviderCatalogRepository` refresh |
+
+---
+
+## TMDB API Key Management
+
+| Location | Storage | Lifetime |
+|----------|---------|----------|
+| Phone app | `EncryptedSharedPreferences` (Android Keystore) | Persistent |
+| TV app (in memory) | Kotlin `var` in `PhoneDiscoveryManager` | Session only |
+| TV app (BLE/HTTP transport) | Included in `/capability` JSON | Per-poll |
+
+The key is never logged, never written to disk on the TV, and never included in crash reports.
+
+---
+
+## Implementation Files by Journey
+
+| Module | File | Role |
+|--------|------|------|
+| **app-phone** | `ui/home/HomeViewModel.kt` | Enriches Trakt watchlist with TMDB poster paths |
+| **app-phone** | `server/ShowRepository.kt` | Reactive `shows` StateFlow; lazy TMDB enrichment |
 | **app-tv** | `ui/showdetail/ShowDetailViewModel.kt` | Loads providers via `WatchProvidersRepository`, records last-used on tap, resolves per-episode deep links via `JustWatchDeepLinkRepository` |
 | **app-tv** | `data/WatchProvidersRepository.kt` | Calls `getWatchProviders()`, caches 24 h, composes installed/last-used ordered list |
 | **app-tv** | `data/LastUsedProviderRepository.kt` | TV-local DataStore — tracks most-recently used `provider_id` per show |
 | **app-tv** | `discovery/InstalledAppsProbe.kt` | `PackageManager` cache — reports which streaming apps are installed |
-| **core** | `deeplink/ProviderCatalog.kt` | Maps TMDB `provider_id` → Android package name (static registry; no deep-link templates) |
+| **core** | `deeplink/ProviderCatalogRegistry.kt` | Maps TMDB `provider_id` → Android package name and JustWatch `technicalName` → `provider_id` (single registry; no deep-link templates) |
 | **app-tv** | `scrobbler/MediaSessionScrobbler.kt` | Uses `searchTv()` as fallback when fuzzy-matching media titles against the local show cache |
 
 ---
 
 ## Security Considerations
 
-- **API key scope:** TMDB API keys are read-only by default (TMDB v3 uses a single API key for read access). No write operations are performed.
-- **HTML sanitization:** LLM-generated HTML containing TMDB data is sanitized before rendering in WebView — `<script>`, `<iframe>`, `on*` event handlers, and `javascript:` URLs are stripped (`RecapGenerator.sanitizeHtml()`).
-- **Certificate pinning:** TMDB API connections are pinned to Let's Encrypt intermediate CA certificates, preventing MITM attacks even if a rogue CA is trusted by the device.
-- **TMDB key exposure to TV:** The TMDB API key is sent from the phone to the TV as part of the `GET /capability` response (`DeviceCapability.tmdbApiKey`). This is intentional — the TV needs the key to call TMDB directly for title search (scrobble matching) and show data. Both devices are on the same trusted local WiFi network. Users should treat the phone–TV link as a trusted local connection.
+- The TMDB API key is a **personal key** entered by the user. It is not a shared app secret.
+- The key is stored in Android Keystore-backed `EncryptedSharedPreferences` on the phone.
+- The key is transmitted over the local Wi-Fi network (unencrypted HTTP) between phone and TV. This is acceptable for a local-network protocol.
+- The key is never sent to the backend token proxy, to Trakt, or to any third party.
+- TMDB does not expose personally identifiable information (PII) in its API responses.
