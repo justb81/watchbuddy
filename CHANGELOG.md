@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.37.0](https://github.com/justb81/watchbuddy/compare/v0.36.0...v0.37.0) (2026-05-13)
+
+
+### Features
+
+* one-tap mark-as-watched button on TV show detail screen ([#671](https://github.com/justb81/watchbuddy/issues/671)) ([0c83628](https://github.com/justb81/watchbuddy/commit/0c83628b560cd5931042e0c18d3a25326b85e24f))
+* **tv:** persist TV home screen cache across restarts ([#547](https://github.com/justb81/watchbuddy/issues/547)) ([b7f9b41](https://github.com/justb81/watchbuddy/commit/b7f9b41700c046397e93734ab46308d87e6f0716))
+
+
+### Bug Fixes
+
+* **phone:** resolve detekt violations and test compilation errors in route modules ([#707](https://github.com/justb81/watchbuddy/issues/707)) ([1257c51](https://github.com/justb81/watchbuddy/commit/1257c51792d7b45bd039f77b9d2e2f365c81f651))
+* resolve build warnings across phone, TV app, and tests ([#706](https://github.com/justb81/watchbuddy/issues/706)) ([0795d60](https://github.com/justb81/watchbuddy/commit/0795d6058822a68f49590b7e8c832dfb0ae9a222)), closes [#683](https://github.com/justb81/watchbuddy/issues/683)
+* **tv:** use array-based combine overload for 6 StateFlows in ShowDetailViewModel ([#710](https://github.com/justb81/watchbuddy/issues/710)) ([f0a9345](https://github.com/justb81/watchbuddy/commit/f0a9345800a8b847d4d574847850963bac5a791c))
+
 ## [0.36.0](https://github.com/justb81/watchbuddy/compare/v0.35.3...v0.36.0) (2026-05-10)
 
 
