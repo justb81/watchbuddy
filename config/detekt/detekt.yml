@@ -65,6 +65,7 @@ style:
       - java.util.*
       - kotlinx.android.synthetic.*
       - io.mockk.*
+      - io.ktor.client.request.*
   NewLineAtEndOfFile:
     active: true
 

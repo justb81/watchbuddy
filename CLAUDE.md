@@ -19,6 +19,7 @@ watchbuddy/
 │       │   ├── network/     WifiStateProvider (Wi-Fi connectivity state for HomeViewModel and CompanionService)
 │       │   ├── permissions/ Runtime-permission helpers (BLE advertise, notifications)
 │       │   ├── server/      CompanionHttpServer (Ktor, port 8765), DeviceCapabilityProvider, ShowRepository (reactive `shows` StateFlow), EpisodeRepository (10-min per-show TTL + sync/history writes)
+│       │   │   └── routes/  Per-feature Ktor route extensions: CapabilityRoutes, ProviderCatalogRoutes, AvatarRoutes, ShowsRoutes, RecapRoutes, ScrobbleRoutes, WatchedRoutes; shared ServerModels
 │       │   ├── settings/    AppSettings, SettingsRepository (DataStore), AvatarImageStore (custom-photo JPEG)
 │       │   └── ui/          MainActivity, PhoneNavGraph
 │       │       ├── diagnostics/ DiagnosticsScreen, DiagnosticsViewModel (Wi-Fi / HTTP / BLE live health + Share diagnostics)
