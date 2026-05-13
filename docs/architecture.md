@@ -10,7 +10,7 @@ graph TB
         TV <-->|"BLE beacon + HTTP (port 8765)"| Phone
     end
 
-    Phone -->|"OAuth · sync · scrobble"| Trakt["Trakt API\ntrakt.tv/api\nRate: 1 000 / 5 min"]
+    Phone -->|“OAuth · sync · scrobble”| Trakt["Trakt API\ntrakt.tv/api\nRate: 1 000 / 5 min"]
     Phone -->|"Token exchange"| Backend["Token Proxy Backend\n(backend/ — Docker)\nInjects client_secret"]
     Phone -->|"Recap: episode metadata\nHome: poster images"| TMDB["TMDB API\napi.tmdb.org\n(per-user key)"]
     TV -->|"Title search\nShow / image data"| TMDB
@@ -187,7 +187,7 @@ and exposes a `StateFlow<Boolean>`. `HomeViewModel` collects it and shows a
 not stop when Wi-Fi is lost — it keeps the server alive so the TV can reconnect
 immediately when Wi-Fi returns, without requiring the user to restart the service.
 
-**Handoff on reconnect:** When the TV’s BLE scanner finds the phone’s advertisement
+**Handoff on reconnect:** When the TV's BLE scanner finds the phone's advertisement
 again after a gap, it re-calls `/capability` and gets a fresh `DeviceCapability`
 bundle. Because the phone’s `lastResolvedSessionKey` is included in every
 `/capability` response, the TV can discard the pending `AmbiguousScrobbleEvent`
