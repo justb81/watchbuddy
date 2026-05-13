@@ -157,9 +157,7 @@ Tapping a show on the phone `HomeScreen` opens `ShowDetailScreen`. The detail vi
 fetches the full season / episode structure for that show via Trakt
 `GET shows/:id/seasons?extended=episodes`, wrapped in `EpisodeRepository` with a
 10-minute per-show TTL cache backed by the shared `TimedCachedResource` abstraction.
-Each episode renders as a checkbox row reflecting its
-watched state as derived from the user's existing `sync/watched/shows` cache in
-`ShowRepository`.
+The user can tap any episode checkbox to toggle its watched state.
 
 `EpisodeRepository.markWatched` / `markUnwatched` call Trakt's sync/history endpoints
 and optimistically update the local state so the UI responds immediately. A background
