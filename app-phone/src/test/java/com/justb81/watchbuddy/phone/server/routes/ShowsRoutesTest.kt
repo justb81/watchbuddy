@@ -121,7 +121,7 @@ class ShowsRoutesTest {
         fun `respects limit query parameter`() = testApp {
             every { tokenRepository.getAccessToken() } returns "token"
             val shows = (1..5).map { i ->
-                EnrichedShowEntry(entry = TraktWatchedEntry(TraktShow("Show ${'$'}i", 2020, TraktIds(trakt = i))))
+                EnrichedShowEntry(entry = TraktWatchedEntry(TraktShow("Show $i", 2020, TraktIds(trakt = i))))
             }
             coEvery { showRepository.getShows() } returns shows
 
@@ -137,7 +137,7 @@ class ShowsRoutesTest {
         fun `respects offset and limit query parameters`() = testApp {
             every { tokenRepository.getAccessToken() } returns "token"
             val shows = (1..5).map { i ->
-                EnrichedShowEntry(entry = TraktWatchedEntry(TraktShow("Show ${'$'}i", 2020, TraktIds(trakt = i))))
+                EnrichedShowEntry(entry = TraktWatchedEntry(TraktShow("Show $i", 2020, TraktIds(trakt = i))))
             }
             coEvery { showRepository.getShows() } returns shows
 

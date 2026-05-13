@@ -174,7 +174,7 @@ class ScrobbleRoutesTest {
         fun `returns 413 when Content-Length exceeds 64 KB`() = testApp {
             val oversizedText = "x".repeat(70_000)
             val oversizedBody =
-                """{"snapshot":{"packageName":"com.pkg","text":"${'$'}oversizedText"},"libraryHints":[]}"""
+                "{\"snapshot\":{\"packageName\":\"com.pkg\",\"text\":\"$oversizedText\"},\"libraryHints\":[]}"
 
             val response = client.post("/scrobble/extract") {
                 header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
