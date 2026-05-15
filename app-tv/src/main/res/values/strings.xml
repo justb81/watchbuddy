@@ -85,6 +85,8 @@
     <string name="tv_provider_no_deep_link">No deep link</string>
     <!-- Shown on a provider chip when JustWatch has no deep link but the app is installed (#620) -->
     <string name="tv_provider_open_app">Open app</string>
+    <!-- Snackbar shown when all launch steps fail and no app can be opened (#720) -->
+    <string name="tv_provider_open_failed">Could not open this streaming app.</string>
     <string name="tv_watch_now_unavailable">Deep link unavailable</string>
     <string name="tv_watch_now_no_provider">No provider available</string>
     <string name="tv_justwatch_attribution">Streaming data by JustWatch</string>
