@@ -325,6 +325,8 @@ The available-provider list for each show is fetched from TMDB `/tv/{id}/watch/p
 
 **ViewModel integration:** `ShowDetailViewModel.loadDeepLinks()` is triggered once `ProviderListUiState.Success` arrives. Each provider gets a `viewModelScope.async` backed by `JustWatchDeepLinkRepository`; in-flight dedup at the ViewModel level prevents duplicate `Deferred` jobs per key. State is `deepLinks: StateFlow<Map<Int, DeepLinkState>>` with `DeepLinkState = Loading | Available(url) | Unavailable`. The UI shows a spinner overlay on loading chips, disables unavailable chips, and displays a JustWatch attribution badge when any link is `Available`.
 
+**Launch cascade (`launchProvider` in `ShowDetailScreen.kt`):** When the user taps a provider chip or the "Watch Now" button, a four-stage cascade fires in order: (1) targeted `ACTION_VIEW` with the JustWatch deep-link URL pinned to the provider's package; (2) untargeted `ACTION_VIEW` with the same URL; (3) `PackageManager.getLaunchIntentForPackage` — attempted whenever the package is actually present on the device, regardless of whether `ResolvedProvider.isInstalled` is true (guards against stale `InstalledAppsProbe` caches and region-variant APK package names not in `ProviderCatalogRegistry`); (4) open `ResolvedProvider.tmdbPageUrl` in the system browser. If every stage fails the caller's `onFailure` callback fires and a WatchBuddy snackbar is shown; the system "no app for that" dialog is never surfaced.
+
 **Diagnostics:** `TvDiagnosticsScreen` shows a "Streaming Links" section with cached URL count, negative entry count, last-fetch timestamp, and a "Clear cache" button.
 
 ### Provider ordering on ShowDetail

@@ -44,6 +44,7 @@ import com.justb81.watchbuddy.core.tmdb.TmdbImageHelper
 import com.justb81.watchbuddy.tv.ui.components.SeasonEpisodeListPicker
 import com.justb81.watchbuddy.tv.ui.components.UserScopePickerDialog
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 private const val TMDB_POSTER_WIDTH = 500
 private const val MARK_WATCHED_TOAST_DELAY_MS = 3_000L
@@ -82,6 +83,7 @@ fun ShowDetailScreen(
     val episodeListState = ready?.episodeList ?: EpisodeListUiState.Idle
     val markState = ready?.markWatched ?: MarkWatchedState.Idle
 
+    val scope = rememberCoroutineScope()
     val watchNowFocus = remember { FocusRequester() }
     val snackbarHostState = remember { SnackbarHostState() }
 
@@ -92,6 +94,7 @@ fun ShowDetailScreen(
     val partialFailedMsg = stringResource(R.string.tv_detail_toggle_failed_partial)
     val markWatchedNoPhonesMsg = stringResource(R.string.tv_mark_watched_no_phones)
     val markWatchedErrorMsg = stringResource(R.string.tv_mark_watched_error)
+    val openFailedMsg = stringResource(R.string.tv_provider_open_failed)
 
     ShowDetailEffects(
         viewModel = viewModel,
@@ -134,12 +137,16 @@ fun ShowDetailScreen(
                     if (watchNowState is WatchNowState.Available) {
                         val firstProvider = (providerState as? ProviderListUiState.Success)
                             ?.providers?.firstOrNull()
-                        launchProvider(context, firstProvider, watchNowState.url)
+                        launchProvider(context, firstProvider, watchNowState.url) {
+                            scope.launch { snackbarHostState.showSnackbar(openFailedMsg) }
+                        }
                     }
                 },
                 onProviderClick = { provider ->
                     val link = viewModel.onProviderSelected(provider, effectiveEntry)
-                    launchProvider(context, provider, link)
+                    launchProvider(context, provider, link) {
+                        scope.launch { snackbarHostState.showSnackbar(openFailedMsg) }
+                    }
                 },
                 onRetryProviders = { viewModel.loadProviders(effectiveEntry) },
                 onRecapClick = onRecapClick,
@@ -182,13 +189,29 @@ fun ShowDetailScreen(
 }
 
 /**
- * Three-stage launch cascade for a streaming provider:
- *   1. Deep-link intent (with [ResolvedProvider.packageName] targeted when known).
- *   2. If the provider is detected as installed, fall through to the app's main
- *      activity via [android.content.pm.PackageManager.getLaunchIntentForPackage].
- *   3. Otherwise open [ResolvedProvider.tmdbPageUrl] in the system browser.
+ * Four-stage launch cascade for a streaming provider.
+ *
+ * Stages are tried in order; the function returns as soon as one succeeds:
+ *   1. Targeted [Intent.ACTION_VIEW] with the JustWatch deep-link URL pinned to
+ *      [ResolvedProvider.packageName] (when known).
+ *   2. Untargeted [Intent.ACTION_VIEW] with the same URL (lets the OS route to any
+ *      app that handles the scheme, e.g. a regional variant of the streaming app).
+ *   3. [android.content.pm.PackageManager.getLaunchIntentForPackage] for
+ *      [ResolvedProvider.packageName] — tried unconditionally, regardless of
+ *      [ResolvedProvider.isInstalled], because the catalog entry may carry a stale or
+ *      mismatched package name while the real app is present on the device.
+ *   4. Open [ResolvedProvider.tmdbPageUrl] in the system browser.
+ *
+ * If every stage fails (no activity resolves) [onFailure] is invoked so the caller can
+ * show a user-facing error message. The function never lets the system "you don't have
+ * an app for that" dialog surface to the user.
  */
-private fun launchProvider(context: Context, provider: ResolvedProvider?, deepLink: String?) {
+internal fun launchProvider(
+    context: Context,
+    provider: ResolvedProvider?,
+    deepLink: String?,
+    onFailure: () -> Unit = {},
+) {
     val pm = context.packageManager
 
     if (deepLink != null && deepLink.isNotBlank()) {
@@ -210,9 +233,12 @@ private fun launchProvider(context: Context, provider: ResolvedProvider?, deepLi
         }
     }
 
-    val installedPackage = provider?.takeIf { it.isInstalled }?.packageName
-    if (installedPackage != null) {
-        pm.getLaunchIntentForPackage(installedPackage)?.let { launchIntent ->
+    // Stage 3: try getLaunchIntentForPackage regardless of isInstalled — the catalog
+    // entry may be stale or carry a region-variant package name, but the app may still
+    // be present. getLaunchIntentForPackage returns null when the package is absent, so
+    // there is no risk of surfacing a system "no app" dialog here.
+    provider?.packageName?.let { pkg ->
+        pm.getLaunchIntentForPackage(pkg)?.let { launchIntent ->
             context.startActivity(launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             return
         }
@@ -223,8 +249,11 @@ private fun launchProvider(context: Context, provider: ResolvedProvider?, deepLi
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         if (fallback.resolveActivity(pm) != null) {
             context.startActivity(fallback)
+            return
         }
     }
+
+    onFailure()
 }
 
 @Composable
