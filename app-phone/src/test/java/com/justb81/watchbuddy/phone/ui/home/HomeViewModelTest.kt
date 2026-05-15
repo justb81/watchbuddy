@@ -586,8 +586,9 @@ class HomeViewModelTest {
 
         @Test
         fun `uiState continueWatching and allShows are populated after loadShows`() = runTest {
-            val recentTs = now.minus(5, ChronoUnit.DAYS).toString()
-            val oldTs = now.minus(40, ChronoUnit.DAYS).toString()
+            val systemNow = Instant.now()
+            val recentTs = systemNow.minus(5, ChronoUnit.DAYS).toString()
+            val oldTs = systemNow.minus(40, ChronoUnit.DAYS).toString()
             val recentShow = enrichedWatched("Recent", recentTs)
             val oldShow = enrichedWatched("Old", oldTs)
             val neverShow = enriched("Never")
