@@ -219,14 +219,16 @@ internal fun launchProvider(
         val targetedIntent = Intent(Intent.ACTION_VIEW, uri)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         provider?.packageName?.let { targetedIntent.setPackage(it) }
-        if (targetedIntent.resolveActivity(pm) != null) {
+        @Suppress("DEPRECATION")
+        if (pm.resolveActivity(targetedIntent, 0) != null) {
             context.startActivity(targetedIntent)
             return
         }
         if (provider?.packageName != null) {
             val untargetedIntent = Intent(Intent.ACTION_VIEW, uri)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            if (untargetedIntent.resolveActivity(pm) != null) {
+            @Suppress("DEPRECATION")
+            if (pm.resolveActivity(untargetedIntent, 0) != null) {
                 context.startActivity(untargetedIntent)
                 return
             }
@@ -247,7 +249,8 @@ internal fun launchProvider(
     provider?.tmdbPageUrl?.let { pageUrl ->
         val fallback = Intent(Intent.ACTION_VIEW, pageUrl.toUri())
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        if (fallback.resolveActivity(pm) != null) {
+        @Suppress("DEPRECATION")
+        if (pm.resolveActivity(fallback, 0) != null) {
             context.startActivity(fallback)
             return
         }

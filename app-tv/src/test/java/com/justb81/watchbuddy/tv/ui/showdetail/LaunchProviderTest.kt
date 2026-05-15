@@ -5,17 +5,15 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import com.justb81.watchbuddy.core.model.ResolvedProvider
 import io.mockk.every
-import io.mockk.justRun
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
-
-import org.junit.jupiter.api.Assertions.assertFalse
-import org.junit.jupiter.api.Assertions.assertTrue
 
 /**
  * Unit tests for [launchProvider] — the four-stage provider launch cascade in
@@ -23,9 +21,13 @@ import org.junit.jupiter.api.Assertions.assertTrue
  *
  * Test strategy: mock [Context] and [PackageManager] with MockK; stub
  * [PackageManager.resolveActivity] and [PackageManager.getLaunchIntentForPackage]
- * to control which stage fires. Verify that [Context.startActivity] is called with
- * the expected intent, or not called at all when every stage fails. Also verifies
+ * to control which stage fires. Verify that [Context.startActivity] is called the
+ * expected number of times, or not at all when every stage fails. Also verifies
  * the [onFailure] callback fires only when the entire cascade is exhausted.
+ *
+ * Note: Intent property accessors (`.package`, `.action`) are Android SDK stubs and
+ * throw NullPointerException on the pure JVM. Tests use [any()] and call-count
+ * assertions instead.
  */
 @DisplayName("launchProvider — four-stage launch cascade (#720)")
 class LaunchProviderTest {
@@ -38,7 +40,6 @@ class LaunchProviderTest {
     fun setUp() {
         every { context.packageManager } returns pm
         val intentSlot = slot<Intent>()
-        justRun { context.startActivity(capture(intentSlot)) }
         every { context.startActivity(capture(intentSlot)) } answers {
             startedIntents.add(intentSlot.captured)
         }
@@ -71,7 +72,8 @@ class LaunchProviderTest {
 
         @Test
         fun `fires targeted intent when resolveActivity returns non-null`() {
-            every { pm.resolveActivity(match { it.`package` != null }, any<Int>()) } returns mockk()
+            // First resolveActivity call (targeted) returns a result → stage 1 fires.
+            every { pm.resolveActivity(any(), any<Int>()) } returns mockk()
 
             launchProvider(context, makeProvider(), deepLink)
 
@@ -80,13 +82,15 @@ class LaunchProviderTest {
 
         @Test
         fun `skips to next stage when targeted resolveActivity returns null`() {
-            every { pm.resolveActivity(match { it.`package` != null }, any<Int>()) } returns null
-            every { pm.resolveActivity(match { it.`package` == null }, any<Int>()) } returns null
+            // Both deep-link calls return null → cascade continues to stage 3.
+            every { pm.resolveActivity(any(), any<Int>()) } returns null
+            every { pm.getLaunchIntentForPackage(any()) } returns launchIntent
 
             launchProvider(context, makeProvider(), deepLink)
 
-            // No startActivity for deep-link intents; falls through to launch-intent stage
-            verify(exactly = 0) { context.startActivity(match { it.action == Intent.ACTION_VIEW && it.`package` != null }) }
+            // Exactly one startActivity call from stage 3, not from a deep-link intent.
+            verify(exactly = 1) { context.startActivity(any()) }
+            verify(exactly = 1) { pm.getLaunchIntentForPackage("com.amazon.avod.thirdpartyclient") }
         }
     }
 
@@ -96,8 +100,8 @@ class LaunchProviderTest {
 
         @Test
         fun `fires untargeted intent when targeted fails but untargeted resolves`() {
-            every { pm.resolveActivity(match { it.`package` != null }, any<Int>()) } returns null
-            every { pm.resolveActivity(match { it.`package` == null }, any<Int>()) } returns mockk()
+            // First call (targeted) returns null; second call (untargeted) resolves.
+            every { pm.resolveActivity(any(), any<Int>()) } returnsMany listOf(null, mockk())
 
             launchProvider(context, makeProvider(), deepLink)
 
@@ -105,12 +109,17 @@ class LaunchProviderTest {
         }
 
         @Test
-        fun `does not fire untargeted intent when provider has no package name`() {
+        fun `does not attempt untargeted intent when provider has no package name`() {
+            // Without a package name there is no targeted attempt, so stage 2 is skipped
+            // entirely. resolveActivity should be called at most once (for stage 1 targeted,
+            // which becomes untargeted when packageName is null), then cascade moves to stage 3.
             every { pm.resolveActivity(any(), any<Int>()) } returns null
+            every { pm.getLaunchIntentForPackage(any()) } returns null
 
             launchProvider(context, makeProvider(packageName = null), deepLink)
 
-            verify(exactly = 0) { context.startActivity(match { it.action == Intent.ACTION_VIEW }) }
+            // No stage 3 call when packageName is null.
+            verify(exactly = 0) { pm.getLaunchIntentForPackage(any()) }
         }
     }
 
@@ -130,11 +139,13 @@ class LaunchProviderTest {
 
         @Test
         fun `uses getLaunchIntentForPackage even when isInstalled is false`() {
+            // PRIMARY REGRESSION TEST FOR #720 — isInstalled=false must not block stage 3.
             every { pm.resolveActivity(any(), any<Int>()) } returns null
             every { pm.getLaunchIntentForPackage("com.amazon.avod.thirdpartyclient") } returns launchIntent
 
             launchProvider(context, makeProvider(isInstalled = false), deepLink)
 
+            verify { pm.getLaunchIntentForPackage("com.amazon.avod.thirdpartyclient") }
             verify(exactly = 1) { context.startActivity(any()) }
         }
 
@@ -163,6 +174,7 @@ class LaunchProviderTest {
 
         @Test
         fun `opens TMDB page when all other stages fail`() {
+            // resolveActivity returns null for deep-link intents and non-null for the TMDB URL.
             every { pm.resolveActivity(any(), any<Int>()) } returnsMany listOf(null, null, mockk())
             every { pm.getLaunchIntentForPackage(any()) } returns null
 
@@ -216,7 +228,7 @@ class LaunchProviderTest {
 
             launchProvider(context, makeProvider(isInstalled = false), deepLink)
 
-            // Only one startActivity call — from stage 3, not stage 4
+            // Exactly one startActivity call — from stage 3, not from stage 4.
             verify(exactly = 1) { context.startActivity(any()) }
         }
 
