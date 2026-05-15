@@ -183,6 +183,8 @@
         <item quantity="other">%d épisodes marqués comme vus</item>
     </plurals>
     <string name="show_detail_error_bulk_toggle">Impossible de marquer les épisodes — veuillez réessayer</string>
+    <string name="show_detail_cd_open_tmdb">Ouvrir la série sur TMDB</string>
+    <string name="show_detail_cd_open_imdb">Ouvrir la série sur IMDb</string>
 
     <!-- Common -->
     <string name="no_description">Aucune description disponible.</string>

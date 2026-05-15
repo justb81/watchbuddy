@@ -55,7 +55,7 @@ class ShowDetailViewModelTest {
     private val show = TraktShow(
         title = "Test Show",
         year = 2020,
-        ids = TraktIds(trakt = TRAKT_SHOW_ID, tmdb = TMDB_SHOW_ID)
+        ids = TraktIds(trakt = TRAKT_SHOW_ID, tmdb = TMDB_SHOW_ID, imdb = "tt1234567")
     )
 
     @BeforeEach
@@ -95,6 +95,20 @@ class ShowDetailViewModelTest {
         tmdbApiService = tmdbApiService,
         settingsRepository = settingsRepository
     )
+
+    @Test
+    fun `uiState exposes ids imdb and tmdb from show repository`() = runTest {
+        seedLibrary()
+        coEvery { episodeRepository.getSeasonsWithEpisodes(any()) } returns seasonsPayload(
+            mapOf(1 to 1)
+        )
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+
+        assertEquals("tt1234567", vm.uiState.value.show?.ids?.imdb)
+        assertEquals(TMDB_SHOW_ID, vm.uiState.value.show?.ids?.tmdb)
+    }
 
     @Nested
     @DisplayName("default expansion")
