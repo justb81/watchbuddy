@@ -1,0 +1,32 @@
+<!-- IMDb logo vector drawable. Used under IMDb brand guidelines for attribution. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="40dp"
+    android:height="20dp"
+    android:viewportWidth="64"
+    android:viewportHeight="32">
+
+    <!-- Yellow rounded-rectangle background -->
+    <path
+        android:fillColor="#F5C518"
+        android:pathData="M4,0 L60,0 Q64,0 64,4 L64,28 Q64,32 60,32 L4,32 Q0,32 0,28 L0,4 Q0,0 4,0 Z" />
+
+    <!-- 'I' glyph -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M8,8 L13,8 L13,24 L8,24 Z" />
+
+    <!-- 'M' glyph -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M15,8 L20,8 L23,15 L26,8 L31,8 L31,24 L26,24 L26,14 L23,21 L20,14 L20,24 L15,24 Z" />
+
+    <!-- 'D' glyph -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M33,8 L38,8 Q44,8 44,16 Q44,24 38,24 L33,24 Z M38,12 L38,20 Q40,20 40,16 Q40,12 38,12 Z" />
+
+    <!-- 'b' glyph -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M46,8 L51,8 L51,12 Q52,10 54,10 Q58,10 58,16 Q58,22 54,22 Q52,22 51,20 L51,24 L46,24 Z M53,13.5 Q51,13.5 51,16 Q51,18.5 53,18.5 Q55,18.5 55,16 Q55,13.5 53,13.5 Z" />
+</vector>

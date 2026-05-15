@@ -180,6 +180,8 @@
         <item quantity="other">%d Folgen als gesehen markiert</item>
     </plurals>
     <string name="show_detail_error_bulk_toggle">Folgen konnten nicht markiert werden — bitte erneut versuchen</string>
+    <string name="show_detail_cd_open_tmdb">Serie auf TMDB öffnen</string>
+    <string name="show_detail_cd_open_imdb">Serie auf IMDb öffnen</string>
 
     <!-- Common -->
     <string name="no_description">Keine Beschreibung verfügbar.</string>

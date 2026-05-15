@@ -189,6 +189,8 @@
         <item quantity="other">%d episodes marked watched</item>
     </plurals>
     <string name="show_detail_error_bulk_toggle">Could not mark episodes — try again</string>
+    <string name="show_detail_cd_open_tmdb">Open show on TMDB</string>
+    <string name="show_detail_cd_open_imdb">Open show on IMDb</string>
 
     <!-- Common -->
     <string name="no_description">No description available.</string>

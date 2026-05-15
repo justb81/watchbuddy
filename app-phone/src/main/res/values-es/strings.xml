@@ -183,6 +183,8 @@
         <item quantity="other">%d episodios marcados como vistos</item>
     </plurals>
     <string name="show_detail_error_bulk_toggle">No se pudieron marcar los episodios — inténtalo de nuevo</string>
+    <string name="show_detail_cd_open_tmdb">Abrir serie en TMDB</string>
+    <string name="show_detail_cd_open_imdb">Abrir serie en IMDb</string>
 
     <!-- Common -->
     <string name="no_description">No hay descripción disponible.</string>

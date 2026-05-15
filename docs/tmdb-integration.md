@@ -106,7 +106,13 @@ sequenceDiagram
 
 **Error handling:** If `getShow` fails (network error or 404), the entry is shown without a poster. No retry is attempted for individual show failures; the whole list refreshes on the next `HomeViewModel` lifecycle start.
 
-### 2. TV ShowDetail — Watch Providers (#311)
+### 2. Phone ShowDetail — IMDb and TMDB Web Links (#717)
+
+On the phone show detail screen, the user can tap the TMDB logo to open `https://www.themoviedb.org/tv/<tmdb-id>` in the system browser. If an IMDb ID is present in the show's Trakt data (`TraktIds.imdb`), a second logo button opens `https://www.imdb.com/title/<imdb-id>/`. Both buttons are hidden when the corresponding external ID is absent.
+
+The TMDB logo bundled in `app-phone/src/main/res/drawable/ic_tmdb_logo.xml` is the official "primary short" variant from https://www.themoviedb.org/about/logos-attribution and is used in accordance with TMDB's attribution requirement.
+
+### 4. TV ShowDetail — Watch Providers (#311)
 
 When the TV user opens a show, `ShowDetailViewModel` fetches streaming providers from TMDB, cross-references them with the installed-app registry, and ranks them by last-used status.
 
@@ -133,7 +139,7 @@ sequenceDiagram
 
 **Error handling:** If `getWatchProviders` fails, `ProviderListUiState.Error` is emitted and a retry button is shown. The 24-hour in-memory cache is bypassed on retry.
 
-### 2b. TV ShowDetail — JustWatch per-episode deep links (#418)
+### 4b. TV ShowDetail — JustWatch per-episode deep links (#418)
 
 When the provider list is loaded, `ShowDetailViewModel` additionally resolves per-episode streaming URLs from JustWatch.
 
@@ -166,7 +172,7 @@ translated to TMDB `provider_id` integers via `ProviderCatalogRegistry.providerI
 Note: This journey calls the JustWatch GraphQL API, not the TMDB API. TMDB data (the TMDB show ID
 and the episode numbers from `ShowProgressCalculator`) is used as input to the JustWatch query.
 
-### 3. Device Capability Reporting
+### 5. Device Capability Reporting
 
 When the TV discovers a phone on the network, it calls `GET /capability`. The response includes the TMDB API key so the TV can call TMDB directly (for title search during scrobble matching and for show/movie data).
 
@@ -183,7 +189,7 @@ sequenceDiagram
 
 The TMDB API key is held in TV process memory only and is never persisted to disk.
 
-### 4. TV ShowDetail — Watch Providers: Installed App Filter and Ordering
+### 6. TV ShowDetail — Watch Providers: Installed App Filter and Ordering
 
 `WatchProvidersRepository.getResolvedProviders()` applies three layers of filtering and ordering:
 
@@ -198,7 +204,7 @@ The TMDB API key is held in TV process memory only and is never persisted to dis
 - `core/…/deeplink/ProviderCatalogRegistry.kt` — TMDB `provider_id` → package name + JustWatch `technicalName` → provider_id (for `InstalledAppsProbe` + `<queries>` manifest)
 - `app-tv/AndroidManifest.xml` — `<queries>` block for Android 11+ package visibility
 
-### 5. TV ShowDetail — Next-Episode Still Image and Title (#366)
+### 7. TV ShowDetail — Next-Episode Still Image and Title (#366)
 
 When the user opens a show on the TV `ShowDetailScreen`, `ShowDetailViewModel.loadNextEpisode()` fetches the next unwatched episode's still image and title directly from TMDB (using the phone's API key).
 
@@ -217,7 +223,7 @@ sequenceDiagram
 
 **Error handling:** If `getEpisode` fails, `NextEpisodeUiState.Error` is emitted. The UI shows the show title without a still image.
 
-### 6. TV Scrobbler — Title Search Fallback (#354)
+### 8. TV Scrobbler — Title Search Fallback (#354)
 
 When the scrobbler's Phase 1 (library match) fails, Phase 2 calls `TmdbApiService.searchTv()` to find a TMDB match.
 

@@ -1,0 +1,27 @@
+<!-- This product uses the TMDB API but is not endorsed or certified by TMDB. Logo (c) The Movie Database. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="40dp"
+    android:height="20dp"
+    android:viewportWidth="64"
+    android:viewportHeight="32">
+
+    <!-- Dark background -->
+    <path
+        android:fillColor="#0D253F"
+        android:pathData="M4,0 L60,0 Q64,0 64,4 L64,28 Q64,32 60,32 L4,32 Q0,32 0,28 L0,4 Q0,0 4,0 Z" />
+
+    <!-- Top cyan/blue pill (wider) -->
+    <path
+        android:fillColor="#01B4E4"
+        android:pathData="M6,8 L44,8 Q48,8 48,11 Q48,14 44,14 L6,14 Q2,14 2,11 Q2,8 6,8 Z" />
+
+    <!-- Middle green pill -->
+    <path
+        android:fillColor="#90CEA1"
+        android:pathData="M6,14.5 L58,14.5 Q62,14.5 62,17.5 Q62,20.5 58,20.5 L6,20.5 Q2,20.5 2,17.5 Q2,14.5 6,14.5 Z" />
+
+    <!-- Bottom blue pill (narrower) -->
+    <path
+        android:fillColor="#01B4E4"
+        android:pathData="M6,21 L36,21 Q40,21 40,24 Q40,27 36,27 L6,27 Q2,27 2,24 Q2,21 6,21 Z" />
+</vector>

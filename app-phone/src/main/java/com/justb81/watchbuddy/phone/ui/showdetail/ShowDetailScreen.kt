@@ -2,6 +2,7 @@ package com.justb81.watchbuddy.phone.ui.showdetail
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -21,6 +22,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -131,7 +134,9 @@ fun ShowDetailScreen(
                                 posterUrl = uiState.posterUrl,
                                 title = uiState.show?.title ?: "",
                                 year = uiState.show?.year,
-                                overview = uiState.overview
+                                overview = uiState.overview,
+                                tmdbId = uiState.show?.ids?.tmdb,
+                                imdbId = uiState.show?.ids?.imdb,
                             )
                         }
 
@@ -176,7 +181,9 @@ private fun ShowHeader(
     posterUrl: String?,
     title: String,
     year: Int?,
-    overview: String?
+    overview: String?,
+    tmdbId: Int?,
+    imdbId: String?,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -228,6 +235,40 @@ private fun ShowHeader(
                     maxLines = 6
                 )
             }
+            if (tmdbId != null || !imdbId.isNullOrBlank()) {
+                ExternalLinksRow(tmdbId = tmdbId, imdbId = imdbId)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ExternalLinksRow(tmdbId: Int?, imdbId: String?) {
+    val uriHandler = LocalUriHandler.current
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        if (tmdbId != null) {
+            val cd = stringResource(R.string.show_detail_cd_open_tmdb)
+            Image(
+                painter = painterResource(R.drawable.ic_tmdb_logo),
+                contentDescription = cd,
+                modifier = Modifier
+                    .height(24.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .clickable { uriHandler.openUri("https://www.themoviedb.org/tv/$tmdbId") }
+                    .semantics { contentDescription = cd }
+            )
+        }
+        if (!imdbId.isNullOrBlank()) {
+            val cd = stringResource(R.string.show_detail_cd_open_imdb)
+            Image(
+                painter = painterResource(R.drawable.ic_imdb_logo),
+                contentDescription = cd,
+                modifier = Modifier
+                    .height(24.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .clickable { uriHandler.openUri("https://www.imdb.com/title/$imdbId/") }
+                    .semantics { contentDescription = cd }
+            )
         }
     }
 }
