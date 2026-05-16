@@ -56,6 +56,7 @@
     <string name="home_sync_failed">Synchronisierung fehlgeschlagen: %1$s</string>
     <string name="home_sync_failed_auth">Deine Trakt-Sitzung ist abgelaufen. Bitte authentifiziere dich erneut in den Einstellungen.</string>
     <string name="home_cd_sync">Synchronisieren</string>
+    <string name="home_cd_search">Serien suchen</string>
     <string name="home_cd_settings">Einstellungen</string>
     <string name="home_watching_tv_toggle">Ich schaue fern</string>
     <string name="home_watching_tv_description">Mit deinem TV verbinden für Scrobbling</string>
@@ -263,6 +264,19 @@
     <string name="settings_country_label">Land / Region</string>
     <string name="settings_country_auto">Automatisch (Gerätesprache)</string>
     <string name="settings_country_helper">Wird auf dem TV zur Suche nach Streaming-Anbietern verwendet. Nur ändern, wenn das Geräte-Gebietsschema nicht deinem Abonnementland entspricht.</string>
+
+    <!-- Search -->
+    <string name="search_title">Serien suchen</string>
+    <string name="search_hint">Auf Trakt suchen…</string>
+    <string name="search_empty_prompt">Gib einen Serientitel ein, um auf Trakt zu suchen.</string>
+    <string name="search_no_results">Keine Ergebnisse für „%1$s".</string>
+    <string name="search_show_added">„%1$s" zur Merkliste hinzugefügt.</string>
+    <string name="search_error_no_token">Nicht angemeldet. Bitte zuerst mit Trakt verbinden.</string>
+    <string name="search_error_failed">Suche fehlgeschlagen: %1$s</string>
+    <string name="search_error_add_failed">„%1$s" konnte nicht hinzugefügt werden. Bitte erneut versuchen.</string>
+    <string name="search_cd_back">Zurück</string>
+    <string name="search_cd_add_show">%1$s zur Merkliste hinzufügen</string>
+    <string name="search_cd_already_tracked">Bereits verfolgt</string>
 
     <!-- Version footer -->
     <string name="settings_version_footer">WatchBuddy v%1$s (Build %2$d)</string>

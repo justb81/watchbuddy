@@ -62,8 +62,16 @@ interface TraktApiService {
     suspend fun searchShow(
         @Header("Authorization") bearer: String,
         @Query("query") query: String,
-        @Query("limit") limit: Int = 5
+        @Query("limit") limit: Int = 20
     ): List<TraktSearchResult>
+
+    // ── Watchlist ─────────────────────────────────────────────────────────────
+
+    @POST("sync/watchlist")
+    suspend fun addToWatchlist(
+        @Header("Authorization") bearer: String,
+        @Body body: SyncWatchlistBody
+    ): SyncWatchlistResult
 
     // ── Shows ─────────────────────────────────────────────────────────────────
 
@@ -184,3 +192,19 @@ interface TraktApiService {
 @Serializable data class SyncHistoryCount(val episodes: Int = 0)
 
 @Serializable data class SyncHistoryNotFound(val shows: List<String> = emptyList())
+
+@Serializable data class SyncWatchlistBody(
+    val shows: List<SyncWatchlistShowItem>
+)
+
+@Serializable data class SyncWatchlistShowItem(
+    val ids: com.justb81.watchbuddy.core.model.TraktIds
+)
+
+@Serializable data class SyncWatchlistResult(
+    val added: SyncWatchlistCount? = null,
+    val existing: SyncWatchlistCount? = null,
+    val not_found: SyncHistoryNotFound? = null
+)
+
+@Serializable data class SyncWatchlistCount(val shows: Int = 0)

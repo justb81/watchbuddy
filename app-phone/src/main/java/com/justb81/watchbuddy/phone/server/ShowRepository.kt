@@ -6,12 +6,16 @@ import com.justb81.watchbuddy.core.locale.LocaleHelper
 import com.justb81.watchbuddy.core.model.EnrichedShowEntry
 import com.justb81.watchbuddy.core.model.TmdbProgressHint
 import com.justb81.watchbuddy.core.model.TmdbShow
+import com.justb81.watchbuddy.core.model.TraktShow
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
 import com.justb81.watchbuddy.core.model.TraktWatchedEpisode
 import com.justb81.watchbuddy.core.model.TraktWatchedSeason
 import com.justb81.watchbuddy.core.progress.ShowProgressCalculator
 import com.justb81.watchbuddy.core.tmdb.TmdbApiService
+import com.justb81.watchbuddy.core.trakt.SyncWatchlistBody
+import com.justb81.watchbuddy.core.trakt.SyncWatchlistShowItem
 import com.justb81.watchbuddy.core.trakt.TraktApiService
+import com.justb81.watchbuddy.core.trakt.TraktSearchResult
 import com.justb81.watchbuddy.phone.auth.TokenRefreshManager
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import kotlinx.coroutines.async
@@ -75,6 +79,19 @@ class ShowRepository @Inject constructor(
             Log.e(TAG, "Failed to fetch shows from Trakt; serving ${_shows.value.size} cached entries", e)
             _shows.value
         }
+    }
+
+    suspend fun searchShows(bearer: String, query: String): List<TraktSearchResult> {
+        return traktApi.searchShow(bearer, query)
+    }
+
+    suspend fun addShowToWatchlist(bearer: String, show: TraktShow) {
+        traktApi.addToWatchlist(
+            bearer,
+            SyncWatchlistBody(shows = listOf(SyncWatchlistShowItem(ids = show.ids)))
+        )
+        // Invalidate the cache so the next getShows() fetch picks up the new show.
+        cache.invalidate(Unit)
     }
 
     private suspend fun fetchFromTrakt(): List<EnrichedShowEntry> {

@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
@@ -68,6 +69,7 @@ fun HomeScreen(
     onSettingsClick: () -> Unit,
     onConnectClick: () -> Unit,
     onShowClick: (traktShowId: Int) -> Unit = {},
+    onSearchClick: () -> Unit = {},
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -154,6 +156,9 @@ fun HomeScreen(
                         IconButton(onClick = { viewModel.sync() }) {
                             Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.home_cd_sync))
                         }
+                    }
+                    IconButton(onClick = onSearchClick) {
+                        Icon(Icons.Default.Search, contentDescription = stringResource(R.string.home_cd_search))
                     }
                     IconButton(onClick = onSettingsClick) {
                         Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.home_cd_settings))

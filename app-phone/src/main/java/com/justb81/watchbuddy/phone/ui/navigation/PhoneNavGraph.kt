@@ -10,6 +10,7 @@ import com.justb81.watchbuddy.phone.ui.diagnostics.DiagnosticsScreen
 import com.justb81.watchbuddy.phone.ui.diagnostics.LlmEventDetailScreen
 import com.justb81.watchbuddy.phone.ui.home.HomeScreen
 import com.justb81.watchbuddy.phone.ui.onboarding.OnboardingScreen
+import com.justb81.watchbuddy.phone.ui.search.SearchScreen
 import com.justb81.watchbuddy.phone.ui.settings.SettingsScreen
 import com.justb81.watchbuddy.phone.ui.showdetail.ShowDetailScreen
 
@@ -45,7 +46,8 @@ fun PhoneNavGraph(
                 onConnectClick  = { navController.navigate(PhoneRoute.Connect.route) },
                 onShowClick     = { traktShowId ->
                     navController.navigate(PhoneRoute.ShowDetail.route(traktShowId))
-                }
+                },
+                onSearchClick   = { navController.navigate(PhoneRoute.Search.route) }
             )
         }
 
@@ -96,6 +98,12 @@ fun PhoneNavGraph(
             arguments = listOf(navArgument("traktShowId") { type = NavType.IntType })
         ) {
             ShowDetailScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(PhoneRoute.Search.route) {
+            SearchScreen(
                 onBack = { navController.popBackStack() }
             )
         }

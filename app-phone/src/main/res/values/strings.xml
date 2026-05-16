@@ -56,6 +56,7 @@
     <string name="home_sync_failed">Sync failed: %1$s</string>
     <string name="home_sync_failed_auth">Your Trakt session has expired. Please re-authenticate in Settings.</string>
     <string name="home_cd_sync">Sync</string>
+    <string name="home_cd_search">Search shows</string>
     <string name="home_cd_settings">Settings</string>
     <!-- Diagnostics -->
     <string name="diagnostics_banner_title">Diagnostic report available</string>
@@ -263,6 +264,19 @@
     <string name="settings_country_label">Country / Region</string>
     <string name="settings_country_auto">Auto (use device locale)</string>
     <string name="settings_country_helper">Used to look up streaming providers on the TV. Leave on Auto unless your phone locale differs from where you subscribe.</string>
+
+    <!-- Search -->
+    <string name="search_title">Search Shows</string>
+    <string name="search_hint">Search Trakt…</string>
+    <string name="search_empty_prompt">Type a show title to search Trakt.</string>
+    <string name="search_no_results">No results for "%1$s".</string>
+    <string name="search_show_added">"%1$s" added to your tracking list.</string>
+    <string name="search_error_no_token">Not signed in. Please connect to Trakt first.</string>
+    <string name="search_error_failed">Search failed: %1$s</string>
+    <string name="search_error_add_failed">Could not add "%1$s". Please try again.</string>
+    <string name="search_cd_back">Back</string>
+    <string name="search_cd_add_show">Add %1$s to tracking list</string>
+    <string name="search_cd_already_tracked">Already tracked</string>
 
     <!-- Version footer -->
     <string name="settings_version_footer">WatchBuddy v%1$s (build %2$d)</string>

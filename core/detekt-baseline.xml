@@ -43,6 +43,7 @@
     <ID>ConstructorParameterNaming:TraktApiService.kt$RefreshTokenRequest$val grant_type: String = "refresh_token"</ID>
     <ID>ConstructorParameterNaming:TraktApiService.kt$RefreshTokenRequest$val refresh_token: String</ID>
     <ID>ConstructorParameterNaming:TraktApiService.kt$SyncHistoryResult$val not_found: SyncHistoryNotFound? = null</ID>
+    <ID>ConstructorParameterNaming:TraktApiService.kt$SyncWatchlistResult$val not_found: SyncHistoryNotFound? = null</ID>
     <ID>MagicNumber:BleDiscoveryContract.kt$BleDiscoveryContract$0xFF</ID>
     <ID>MagicNumber:BleDiscoveryContract.kt$BleDiscoveryContract$4</ID>
     <ID>MagicNumber:BleDiscoveryContract.kt$BleDiscoveryContract$5</ID>

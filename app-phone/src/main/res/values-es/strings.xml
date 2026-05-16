@@ -57,6 +57,7 @@
     <string name="home_sync_failed">Error de sincronización: %1$s</string>
     <string name="home_sync_failed_auth">Tu sesión de Trakt ha expirado. Por favor, vuelve a autenticarte en los ajustes.</string>
     <string name="home_cd_sync">Sincronizar</string>
+    <string name="home_cd_search">Buscar series</string>
     <string name="home_cd_settings">Ajustes</string>
     <string name="home_watching_tv_toggle">Estoy viendo la tele</string>
     <string name="home_watching_tv_description">Conectar con tu TV para scrobbling</string>
@@ -269,6 +270,19 @@
     <string name="settings_country_label">País / Región</string>
     <string name="settings_country_auto">Automático (usar configuración regional)</string>
     <string name="settings_country_helper">Se usa para buscar proveedores de streaming en la TV. Déjalo en Automático salvo que la configuración regional de tu teléfono difiera de tu país de suscripción.</string>
+
+    <!-- Search -->
+    <string name="search_title">Buscar series</string>
+    <string name="search_hint">Buscar en Trakt…</string>
+    <string name="search_empty_prompt">Escribe el título de una serie para buscar en Trakt.</string>
+    <string name="search_no_results">Sin resultados para «%1$s».</string>
+    <string name="search_show_added">«%1$s» añadida a tu lista de seguimiento.</string>
+    <string name="search_error_no_token">No has iniciado sesión. Conéctate primero a Trakt.</string>
+    <string name="search_error_failed">Búsqueda fallida: %1$s</string>
+    <string name="search_error_add_failed">No se pudo añadir «%1$s». Inténtalo de nuevo.</string>
+    <string name="search_cd_back">Atrás</string>
+    <string name="search_cd_add_show">Añadir %1$s a la lista de seguimiento</string>
+    <string name="search_cd_already_tracked">Ya en seguimiento</string>
 
     <!-- Version footer -->
     <string name="settings_version_footer">WatchBuddy v%1$s (build %2$d)</string>
