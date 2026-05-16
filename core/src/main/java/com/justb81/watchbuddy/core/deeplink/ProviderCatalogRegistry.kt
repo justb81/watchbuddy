@@ -179,7 +179,7 @@ object ProviderCatalogRegistry {
                 name = "ARD Mediathek",
                 regions = listOf("DE", "AT", "CH"),
                 androidPackages = CatalogAndroidPackages(
-                    tv = listOf("de.swr.avp.ard.tv"),
+                    tv = listOf("de.swr.avp.ard.tv", "de.swr.avp.ard"),
                     phone = listOf("de.swr.avp.ard"),
                 ),
                 justWatchTechnicalNames = listOf("daserstemediathek", "ardplus"),
