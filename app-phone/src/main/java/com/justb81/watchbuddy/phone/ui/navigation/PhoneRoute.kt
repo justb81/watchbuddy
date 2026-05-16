@@ -12,4 +12,5 @@ sealed class PhoneRoute(val route: String) {
     object LlmEventDetail : PhoneRoute("llm_event/{eventId}") {
         fun route(eventId: Long) = "llm_event/$eventId"
     }
+    object Search : PhoneRoute("search")
 }
