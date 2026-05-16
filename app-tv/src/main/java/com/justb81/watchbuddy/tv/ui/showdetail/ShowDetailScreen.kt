@@ -2,6 +2,8 @@ package com.justb81.watchbuddy.tv.ui.showdetail
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
 import android.widget.Toast
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
@@ -190,7 +192,37 @@ fun ShowDetailScreen(
 }
 
 /**
- * Four-stage launch cascade for a streaming provider.
+ * Tries to launch a targeted then untargeted [Intent.ACTION_VIEW] for [candidateUri].
+ * Returns `true` and calls [Context.startActivity] on the first intent that resolves;
+ * returns `false` when neither resolves.
+ */
+@Suppress("DEPRECATION")
+private fun tryCandidateUri(
+    context: Context,
+    pm: PackageManager,
+    candidateUri: Uri,
+    packageName: String?,
+): Boolean {
+    val targeted = Intent(Intent.ACTION_VIEW, candidateUri)
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    packageName?.let { targeted.setPackage(it) }
+    if (pm.resolveActivity(targeted, 0) != null) {
+        context.startActivity(targeted)
+        return true
+    }
+    if (packageName != null) {
+        val untargeted = Intent(Intent.ACTION_VIEW, candidateUri)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        if (pm.resolveActivity(untargeted, 0) != null) {
+            context.startActivity(untargeted)
+            return true
+        }
+    }
+    return false
+}
+
+/**
+ * Provider launch cascade: tries URI candidates first, then app home, then browser.
  *
  * Stages are tried in order; the function returns as soon as one succeeds:
  *   1. For each URI candidate produced by [ProviderDeepLinkRewriter] (provider-specific
@@ -225,24 +257,7 @@ internal fun launchProvider(
             listOf(deepLink)
         }
         for (candidate in candidates) {
-            val uri = candidate.toUri()
-            val targetedIntent = Intent(Intent.ACTION_VIEW, uri)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            provider?.packageName?.let { targetedIntent.setPackage(it) }
-            @Suppress("DEPRECATION")
-            if (pm.resolveActivity(targetedIntent, 0) != null) {
-                context.startActivity(targetedIntent)
-                return
-            }
-            if (provider?.packageName != null) {
-                val untargetedIntent = Intent(Intent.ACTION_VIEW, uri)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                @Suppress("DEPRECATION")
-                if (pm.resolveActivity(untargetedIntent, 0) != null) {
-                    context.startActivity(untargetedIntent)
-                    return
-                }
-            }
+            if (tryCandidateUri(context, pm, candidate.toUri(), provider?.packageName)) return
         }
     }
 

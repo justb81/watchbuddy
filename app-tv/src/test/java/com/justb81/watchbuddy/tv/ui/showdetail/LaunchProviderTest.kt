@@ -268,7 +268,6 @@ class LaunchProviderTest {
         private val netflixTitleId = "80057281"
         private val netflixWatchUrl = "https://www.netflix.com/watch/$netflixTitleId"
         private val netflixTitleUrl = "https://www.netflix.com/title/$netflixTitleId"
-        private val netflixNflxUrl = "nflx://www.netflix.com/title/$netflixTitleId"
 
         private fun makeNetflixProvider() = ResolvedProvider(
             providerId = 8,
@@ -282,14 +281,9 @@ class LaunchProviderTest {
 
         @Test
         fun `nflx scheme candidate is tried before raw watch URL`() {
-            // Only the nflx:// targeted intent resolves — the raw watch URL never fires.
-            every { pm.resolveActivity(any(), any<Int>()) } answers {
-                val intent = firstArg<Intent>()
-                // MockK intercepts Intent construction; check the data URI set on it.
-                // The first resolveActivity call for the nflx:// targeted intent returns
-                // a result, so startActivity fires immediately.
-                mockk()
-            }
+            // The first resolveActivity call for the nflx:// targeted intent returns
+            // a result, so startActivity fires immediately without trying the raw watch URL.
+            every { pm.resolveActivity(any(), any<Int>()) } returns mockk()
 
             launchProvider(context, makeNetflixProvider(), netflixWatchUrl)
 
