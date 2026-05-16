@@ -19,8 +19,7 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 
 /**
- * Unit tests for [launchProvider] — the four-stage provider launch cascade in
- * [ShowDetailScreen].
+ * Unit tests for [launchProvider] — the provider launch cascade in [ShowDetailScreen].
  *
  * Test strategy:
  * - Mock [Context] and [PackageManager] with MockK.
@@ -32,8 +31,12 @@ import org.junit.jupiter.api.Test
  * - Verify that [Context.startActivity] is called the expected number of times, or not at
  *   all when every stage fails. Also verifies the [onFailure] callback fires only when the
  *   entire cascade is exhausted.
+ * - Netflix-specific tests (#713) verify that [com.justb81.watchbuddy.core.deeplink.ProviderDeepLinkRewriter]
+ *   is consulted so that the `nflx://` scheme is tried before the raw JustWatch URL,
+ *   allowing the Netflix TV app to open the correct episode instead of falling back to
+ *   its home screen.
  */
-@DisplayName("launchProvider — four-stage launch cascade (#720)")
+@DisplayName("launchProvider — provider launch cascade (#720, #713)")
 class LaunchProviderTest {
 
     private val pm: PackageManager = mockk(relaxed = true)
@@ -254,6 +257,81 @@ class LaunchProviderTest {
 
             verify { pm.getLaunchIntentForPackage("com.amazon.avod.thirdpartyclient") }
             verify(exactly = 1) { context.startActivity(any()) }
+        }
+    }
+
+    @Nested
+    @DisplayName("Netflix deep-link rewriting (#713)")
+    inner class NetflixRewriteTests {
+
+        private val netflixPackage = "com.netflix.ninja"
+        private val netflixTitleId = "80057281"
+        private val netflixWatchUrl = "https://www.netflix.com/watch/$netflixTitleId"
+        private val netflixTitleUrl = "https://www.netflix.com/title/$netflixTitleId"
+
+        private fun makeNetflixProvider() = ResolvedProvider(
+            providerId = 8,
+            name = "Netflix",
+            logoPath = null,
+            packageName = netflixPackage,
+            isInstalled = true,
+            isLastUsed = false,
+            tmdbPageUrl = "https://www.themoviedb.org/tv/1396",
+        )
+
+        @Test
+        fun `nflx scheme candidate is tried before raw watch URL`() {
+            // The first resolveActivity call for the nflx:// targeted intent returns
+            // a result, so startActivity fires immediately without trying the raw watch URL.
+            every { pm.resolveActivity(any(), any<Int>()) } returns mockk()
+
+            launchProvider(context, makeNetflixProvider(), netflixWatchUrl)
+
+            verify(exactly = 1) { context.startActivity(any()) }
+        }
+
+        @Test
+        fun `falls through to getLaunchIntentForPackage when all rewritten Netflix candidates fail`() {
+            // All resolveActivity calls return null — all rewritten candidates fail.
+            every { pm.resolveActivity(any(), any<Int>()) } returns null
+            every { pm.getLaunchIntentForPackage(netflixPackage) } returns launchIntent
+
+            launchProvider(context, makeNetflixProvider(), netflixWatchUrl)
+
+            verify { pm.getLaunchIntentForPackage(netflixPackage) }
+            verify(exactly = 1) { context.startActivity(any()) }
+        }
+
+        @Test
+        fun `title URL also produces nflx scheme candidate for Netflix`() {
+            // resolveActivity succeeds on first call (targeted nflx:// intent).
+            every { pm.resolveActivity(any(), any<Int>()) } returns mockk()
+
+            launchProvider(context, makeNetflixProvider(), netflixTitleUrl)
+
+            verify(exactly = 1) { context.startActivity(any()) }
+        }
+
+        @Test
+        fun `raw watch URL is reached as last deep-link candidate when nflx and title fail`() {
+            // nflx:// targeted + untargeted fail, title URL targeted + untargeted fail,
+            // raw watch URL targeted resolves.
+            every { pm.resolveActivity(any(), any<Int>()) } returnsMany
+                listOf(null, null, null, null, mockk())
+
+            launchProvider(context, makeNetflixProvider(), netflixWatchUrl)
+
+            verify(exactly = 1) { context.startActivity(any()) }
+        }
+
+        @Test
+        fun `onFailure not invoked when nflx scheme resolves`() {
+            every { pm.resolveActivity(any(), any<Int>()) } returns mockk()
+
+            var failed = false
+            launchProvider(context, makeNetflixProvider(), netflixWatchUrl) { failed = true }
+
+            assertFalse(failed)
         }
     }
 }

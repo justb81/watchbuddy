@@ -2,6 +2,8 @@ package com.justb81.watchbuddy.tv.ui.showdetail
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
 import android.widget.Toast
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
@@ -38,6 +40,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.tv.material3.*
 import coil3.compose.AsyncImage
 import com.justb81.watchbuddy.R
+import com.justb81.watchbuddy.core.deeplink.ProviderDeepLinkRewriter
 import com.justb81.watchbuddy.core.model.EnrichedShowEntry
 import com.justb81.watchbuddy.core.model.ResolvedProvider
 import com.justb81.watchbuddy.core.tmdb.TmdbImageHelper
@@ -189,18 +192,51 @@ fun ShowDetailScreen(
 }
 
 /**
- * Four-stage launch cascade for a streaming provider.
+ * Tries to launch a targeted then untargeted [Intent.ACTION_VIEW] for [candidateUri].
+ * Returns `true` and calls [Context.startActivity] on the first intent that resolves;
+ * returns `false` when neither resolves.
+ */
+@Suppress("DEPRECATION")
+private fun tryCandidateUri(
+    context: Context,
+    pm: PackageManager,
+    candidateUri: Uri,
+    packageName: String?,
+): Boolean {
+    val targeted = Intent(Intent.ACTION_VIEW, candidateUri)
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    packageName?.let { targeted.setPackage(it) }
+    if (pm.resolveActivity(targeted, 0) != null) {
+        context.startActivity(targeted)
+        return true
+    }
+    if (packageName != null) {
+        val untargeted = Intent(Intent.ACTION_VIEW, candidateUri)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        if (pm.resolveActivity(untargeted, 0) != null) {
+            context.startActivity(untargeted)
+            return true
+        }
+    }
+    return false
+}
+
+/**
+ * Provider launch cascade: tries URI candidates first, then app home, then browser.
  *
  * Stages are tried in order; the function returns as soon as one succeeds:
- *   1. Targeted [Intent.ACTION_VIEW] with the JustWatch deep-link URL pinned to
- *      [ResolvedProvider.packageName] (when known).
- *   2. Untargeted [Intent.ACTION_VIEW] with the same URL (lets the OS route to any
- *      app that handles the scheme, e.g. a regional variant of the streaming app).
- *   3. [android.content.pm.PackageManager.getLaunchIntentForPackage] for
+ *   1. For each URI candidate produced by [ProviderDeepLinkRewriter] (provider-specific
+ *      rewrites, e.g. `nflx://` scheme for Netflix), try a targeted
+ *      [Intent.ACTION_VIEW] pinned to [ResolvedProvider.packageName] (when known),
+ *      then an untargeted [Intent.ACTION_VIEW]. This ensures apps like Netflix that
+ *      do not register intent filters for the raw JustWatch `standardWebURL` (e.g.
+ *      `https://www.netflix.com/watch/<id>`) are still opened on the correct episode
+ *      via the native scheme (`nflx://www.netflix.com/title/<id>`).
+ *   2. [android.content.pm.PackageManager.getLaunchIntentForPackage] for
  *      [ResolvedProvider.packageName] — tried unconditionally, regardless of
  *      [ResolvedProvider.isInstalled], because the catalog entry may carry a stale or
  *      mismatched package name while the real app is present on the device.
- *   4. Open [ResolvedProvider.tmdbPageUrl] in the system browser.
+ *   3. Open [ResolvedProvider.tmdbPageUrl] in the system browser.
  *
  * If every stage fails (no activity resolves) [onFailure] is invoked so the caller can
  * show a user-facing error message. The function never lets the system "you don't have
@@ -215,27 +251,17 @@ internal fun launchProvider(
     val pm = context.packageManager
 
     if (deepLink != null && deepLink.isNotBlank()) {
-        val uri = deepLink.toUri()
-        val targetedIntent = Intent(Intent.ACTION_VIEW, uri)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        provider?.packageName?.let { targetedIntent.setPackage(it) }
-        @Suppress("DEPRECATION")
-        if (pm.resolveActivity(targetedIntent, 0) != null) {
-            context.startActivity(targetedIntent)
-            return
+        val candidates = if (provider != null) {
+            ProviderDeepLinkRewriter.rewrite(provider.providerId, deepLink)
+        } else {
+            listOf(deepLink)
         }
-        if (provider?.packageName != null) {
-            val untargetedIntent = Intent(Intent.ACTION_VIEW, uri)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            @Suppress("DEPRECATION")
-            if (pm.resolveActivity(untargetedIntent, 0) != null) {
-                context.startActivity(untargetedIntent)
-                return
-            }
+        for (candidate in candidates) {
+            if (tryCandidateUri(context, pm, candidate.toUri(), provider?.packageName)) return
         }
     }
 
-    // Stage 3: try getLaunchIntentForPackage regardless of isInstalled — the catalog
+    // Stage 2: try getLaunchIntentForPackage regardless of isInstalled — the catalog
     // entry may be stale or carry a region-variant package name, but the app may still
     // be present. getLaunchIntentForPackage returns null when the package is absent, so
     // there is no risk of surfacing a system "no app" dialog here.
