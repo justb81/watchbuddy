@@ -369,19 +369,19 @@ class AppProfilesTest {
     // ── Joyn fixture ─────────────────────────────────────────────────────────
 
     @Nested
-    @DisplayName("Joyn (de.prosiebensat1digital.seventv)")
+    @DisplayName("Joyn (de.prosiebensat1.joyn.tv)")
     inner class JoynFixture {
 
         @Test
         fun `forPackage returns profile for joyn`() {
-            val profile = AppProfiles.forPackage("de.prosiebensat1digital.seventv")
+            val profile = AppProfiles.forPackage("de.prosiebensat1.joyn.tv")
             assertNotNull(profile)
-            assertEquals("de.prosiebensat1digital.seventv", profile!!.packageName)
+            assertEquals("de.prosiebensat1.joyn.tv", profile!!.packageName)
         }
 
         @Test
         fun `Staffel Y Folge X marker regex extracts season and episode`() {
-            val profile = AppProfiles.forPackage("de.prosiebensat1digital.seventv")!!
+            val profile = AppProfiles.forPackage("de.prosiebensat1.joyn.tv")!!
             val regex = profile.markerRegexes.first()
 
             val match1 = regex.find("Staffel 2, Folge 3")
@@ -397,7 +397,7 @@ class AppProfilesTest {
 
         @Test
         fun `Staffel Folge marker regex is case-insensitive`() {
-            val profile = AppProfiles.forPackage("de.prosiebensat1digital.seventv")!!
+            val profile = AppProfiles.forPackage("de.prosiebensat1.joyn.tv")!!
             val regex = profile.markerRegexes.first()
             val match = regex.find("staffel 3, folge 5")
             assertNotNull(match)
@@ -407,7 +407,7 @@ class AppProfilesTest {
 
         @Test
         fun `joyn profile has llmHint`() {
-            val profile = AppProfiles.forPackage("de.prosiebensat1digital.seventv")!!
+            val profile = AppProfiles.forPackage("de.prosiebensat1.joyn.tv")!!
             assertNotNull(profile.llmHint)
         }
     }

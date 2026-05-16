@@ -26,7 +26,7 @@ class EpisodeMarkerExtractorTest {
             // Standard S##E## pattern still matches "S01E02" embedded with a dot separator
             // via profile-specific Joyn regex: "Staffel 1, Folge 2"
             val joynProfile = AppProfile(
-                packageName = "de.prosiebensat1digital.seventv",
+                packageName = "de.prosiebensat1.joyn.tv",
                 markerRegexes = listOf(
                     Regex("""Staffel\s*(\d+)[,\s]+Folge\s*(\d+)""", RegexOption.IGNORE_CASE),
                 ),

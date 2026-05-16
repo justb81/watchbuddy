@@ -97,7 +97,7 @@ object AppProfiles {
         ),
         // Joyn (German free streaming, ProSiebenSat.1) — episode marker uses "Staffel Y, Folge X"
         AppProfile(
-            packageName = "de.prosiebensat1digital.seventv",
+            packageName = "de.prosiebensat1.joyn.tv",
             preferredSourceTags = listOf("watchNext.contentId", "watchNext.episodeNumber", "mediaSession.subtitle"),
             markerRegexes = listOf(
                 // "Staffel 2, Folge 3" or "Staffel 2 Folge 3"
