@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.38.0](https://github.com/justb81/watchbuddy/compare/v0.37.0...v0.38.0) (2026-05-16)
+
+
+### Features
+
+* IMDb and TMDB link buttons on phone show detail screen ([#723](https://github.com/justb81/watchbuddy/issues/723)) ([b8366ac](https://github.com/justb81/watchbuddy/commit/b8366ac9d8de2d91c07a3492350c74fd375b12ff)), closes [#717](https://github.com/justb81/watchbuddy/issues/717)
+* search and add shows from Trakt on phone app ([#727](https://github.com/justb81/watchbuddy/issues/727)) ([23dcb89](https://github.com/justb81/watchbuddy/commit/23dcb893b34ecfe1c104e8fbca10e4eddd55685a))
+
+
+### Bug Fixes
+
+* correct Joyn scrobbler profile package name to current TV app ([08d4f5e](https://github.com/justb81/watchbuddy/commit/08d4f5e76c11d6680990c7f84beac1fd702db633)), closes [#715](https://github.com/justb81/watchbuddy/issues/715)
+* deep-link Netflix TV app to specific episode ([#726](https://github.com/justb81/watchbuddy/issues/726)) ([239fbf6](https://github.com/justb81/watchbuddy/commit/239fbf627b1c8c5f524560371368e3084e4aa2d0))
+* detect ARD and ZDF Mediathek as installed on TV ([#729](https://github.com/justb81/watchbuddy/issues/729)) ([be6cdc4](https://github.com/justb81/watchbuddy/commit/be6cdc473d81dde007d61d84289e38efb5625023)), closes [#718](https://github.com/justb81/watchbuddy/issues/718)
+* map JustWatch technicalName amazonhbomax to TMDB provider 1825 ([#722](https://github.com/justb81/watchbuddy/issues/722)) ([c2cf5a1](https://github.com/justb81/watchbuddy/commit/c2cf5a18b626ac6a95ee166e0f12e4051939a92c))
+* **tv:** fall back to launch intent when streaming app is present ([#724](https://github.com/justb81/watchbuddy/issues/724)) ([5d5be02](https://github.com/justb81/watchbuddy/commit/5d5be02d86d79bb257a1258d02a05813935c3090)), closes [#720](https://github.com/justb81/watchbuddy/issues/720)
+
 ## [0.37.0](https://github.com/justb81/watchbuddy/compare/v0.36.0...v0.37.0) (2026-05-13)
 
 
