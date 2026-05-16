@@ -145,6 +145,16 @@ object ProviderCatalogRegistry {
                 justWatchTechnicalNames = listOf("max"),
             ),
             CatalogProviderEntry(
+                tmdbProviderIds = listOf(1825),
+                name = "Max Amazon Channel",
+                regions = listOf("*"),
+                androidPackages = CatalogAndroidPackages(
+                    tv = listOf("com.amazon.amazonvideo.livingroom"),
+                    phone = listOf("com.amazon.avod.thirdpartyclient"),
+                ),
+                justWatchTechnicalNames = listOf("amazonhbomax"),
+            ),
+            CatalogProviderEntry(
                 tmdbProviderIds = listOf(2187),
                 name = "WaipuTV",
                 regions = listOf("DE", "AT"),

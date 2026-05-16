@@ -107,6 +107,16 @@ class ProviderCatalogRegistryTest {
     }
 
     @Test
+    fun `bundled snapshot maps amazonhbomax to TMDB provider 1825`() {
+        val providerId = ProviderCatalogRegistry.providerIdByJustWatchName("amazonhbomax")
+        assertEquals(1825, providerId, "amazonhbomax must resolve to TMDB provider_id 1825 (Max Amazon Channel)")
+        val warnings = DiagnosticLog.snapshot().filter {
+            it.level == DiagnosticLog.Level.WARN && it.message.contains("amazonhbomax")
+        }
+        assertTrue(warnings.isEmpty(), "No warning should be logged for a mapped technicalName")
+    }
+
+    @Test
     fun `entries returns one ProviderEntry per providerId-packageName pair`() {
         val snapshot = makeSnapshot(
             makeEntry(ids = listOf(119, 9), tvPkg = "com.amazon.amazonvideo.livingroom"),
