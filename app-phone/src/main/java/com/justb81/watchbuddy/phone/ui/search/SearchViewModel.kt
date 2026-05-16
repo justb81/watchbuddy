@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.justb81.watchbuddy.R
+import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.model.TraktShow
 import com.justb81.watchbuddy.core.trakt.TraktSearchResult
 import com.justb81.watchbuddy.phone.auth.TokenRefreshManager
@@ -39,8 +40,11 @@ class SearchViewModel @Inject constructor(
 ) : AndroidViewModel(application) {
 
     companion object {
+        private const val TAG = "SearchViewModel"
         private const val DEBOUNCE_MS = 300L
         private const val MIN_QUERY_LENGTH = 2
+        private const val HTTP_UNAUTHORIZED = 401
+        private const val HTTP_FORBIDDEN = 403
     }
 
     private val _uiState = MutableStateFlow(SearchUiState())
@@ -82,8 +86,9 @@ class SearchViewModel @Inject constructor(
             val results = showRepository.searchShows("Bearer $token", query)
             _uiState.update { it.copy(results = results, isLoading = false) }
         } catch (e: Exception) {
+            DiagnosticLog.warn(TAG, "show search failed for query='$query'", e)
             val httpCode = (e as? retrofit2.HttpException)?.code()
-            val errorMsg = if (httpCode == 401 || httpCode == 403) {
+            val errorMsg = if (httpCode == HTTP_UNAUTHORIZED || httpCode == HTTP_FORBIDDEN) {
                 getApplication<Application>().getString(R.string.home_sync_failed_auth)
             } else {
                 getApplication<Application>().getString(R.string.search_error_failed, e.message)
@@ -109,6 +114,7 @@ class SearchViewModel @Inject constructor(
                     )
                 }
             } catch (e: Exception) {
+                DiagnosticLog.warn(TAG, "addShow failed for '${show.title}'", e)
                 _uiState.update {
                     it.copy(
                         addingShowId = null,

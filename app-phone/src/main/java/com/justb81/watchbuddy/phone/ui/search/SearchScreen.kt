@@ -35,10 +35,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -51,9 +48,11 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import coil3.compose.AsyncImage
 import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.core.model.TraktShow
-import com.justb81.watchbuddy.core.trakt.TraktSearchResult
 import com.justb81.watchbuddy.core.tmdb.TmdbImageHelper
+import com.justb81.watchbuddy.core.trakt.TraktSearchResult
 import com.justb81.watchbuddy.phone.ui.theme.watchBuddyShapes
+
+private const val POSTER_WIDTH = 300
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -124,56 +123,58 @@ fun SearchScreen(
 
             Box(modifier = Modifier.fillMaxSize()) {
                 when {
-                    uiState.isLoading -> {
-                        CircularProgressIndicator(
-                            modifier = Modifier.align(Alignment.Center),
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-
-                    uiState.error != null -> {
-                        Text(
-                            text = uiState.error!!,
-                            color = MaterialTheme.colorScheme.error,
-                            modifier = Modifier
-                                .align(Alignment.Center)
-                                .padding(32.dp)
-                        )
-                    }
-
-                    uiState.query.length >= 2 && uiState.results.isEmpty() -> {
-                        Text(
-                            text = stringResource(R.string.search_no_results, uiState.query),
-                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
-                            style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier
-                                .align(Alignment.Center)
-                                .padding(32.dp)
-                        )
-                    }
-
-                    uiState.query.length < 2 && uiState.results.isEmpty() -> {
-                        Text(
-                            text = stringResource(R.string.search_empty_prompt),
-                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
-                            style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier
-                                .align(Alignment.Center)
-                                .padding(32.dp)
-                        )
-                    }
-
-                    else -> {
-                        SearchResultsList(
-                            results = uiState.results,
-                            trackedShowIds = uiState.trackedShowIds,
-                            addingShowId = uiState.addingShowId,
-                            onAddShow = viewModel::addShow
-                        )
-                    }
+                    uiState.isLoading -> LoadingIndicator()
+                    uiState.error != null -> ErrorText(uiState.error!!)
+                    uiState.query.length >= 2 && uiState.results.isEmpty() ->
+                        EmptyText(stringResource(R.string.search_no_results, uiState.query))
+                    uiState.query.length < 2 ->
+                        EmptyText(stringResource(R.string.search_empty_prompt))
+                    else -> SearchResultsList(
+                        results = uiState.results,
+                        trackedShowIds = uiState.trackedShowIds,
+                        addingShowId = uiState.addingShowId,
+                        onAddShow = viewModel::addShow
+                    )
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun LoadingIndicator() {
+    Box(modifier = Modifier.fillMaxSize()) {
+        CircularProgressIndicator(
+            modifier = Modifier.align(Alignment.Center),
+            color = MaterialTheme.colorScheme.primary
+        )
+    }
+}
+
+@Composable
+private fun ErrorText(message: String) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Text(
+            text = message,
+            color = MaterialTheme.colorScheme.error,
+            modifier = Modifier
+                .align(Alignment.Center)
+                .padding(32.dp)
+        )
+    }
+}
+
+@Composable
+private fun EmptyText(message: String) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Text(
+            text = message,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier
+                .align(Alignment.Center)
+                .padding(32.dp)
+        )
     }
 }
 
@@ -274,7 +275,7 @@ private fun SearchResultCard(
 
 @Composable
 private fun PosterThumbnail(posterPath: String?, title: String) {
-    val url = TmdbImageHelper.poster(posterPath, 300)
+    val url = TmdbImageHelper.poster(posterPath, POSTER_WIDTH)
     if (url != null) {
         AsyncImage(
             model = url,
