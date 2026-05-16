@@ -87,8 +87,8 @@
       "name": "ARD Mediathek",
       "regions": ["DE", "AT", "CH"],
       "androidPackages": {
-        "tv": ["de.swr.avp.ard.tv"],
-        "phone": ["de.swr.avp.ard.tv"]
+        "tv": ["de.swr.avp.ard.tv", "de.swr.avp.ard"],
+        "phone": ["de.swr.avp.ard"]
       },
       "justWatchTechnicalNames": ["daserstemediathek", "ardplus"]
     },

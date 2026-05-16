@@ -93,6 +93,7 @@
         <package android:name="de.exaring.waipu" />
         <package android:name="de.prosiebensat1.joyn.tv" />
         <package android:name="de.swr.avp.ard.tv" />
+        <package android:name="de.swr.avp.ard" />
         <package android:name="com.zdf.android.mediathek" />
         <package android:name="com.google.android.youtube.tv" />
         <package android:name="tv.wuaki.apptv" />

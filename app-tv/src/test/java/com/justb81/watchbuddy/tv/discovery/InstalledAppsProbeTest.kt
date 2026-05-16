@@ -95,6 +95,42 @@ class InstalledAppsProbeTest {
         fun `returns false for a package not in ProviderCatalogRegistry`() {
             assertFalse(probe.isInstalled("com.unknown.app"))
         }
+
+        @Test
+        fun `returns true for ARD dedicated TV package when installed`() {
+            every { packageManager.getPackageInfo(eq("de.swr.avp.ard.tv"), 0) } returns mockk()
+
+            assertTrue(probe.isInstalled("de.swr.avp.ard.tv"))
+        }
+
+        @Test
+        fun `returns true for ARD universal package when installed on TV`() {
+            every { packageManager.getPackageInfo(eq("de.swr.avp.ard"), 0) } returns mockk()
+
+            assertTrue(probe.isInstalled("de.swr.avp.ard"))
+        }
+
+        @Test
+        fun `returns true for ZDF Mediathek when installed`() {
+            every { packageManager.getPackageInfo(eq("com.zdf.android.mediathek"), 0) } returns mockk()
+
+            assertTrue(probe.isInstalled("com.zdf.android.mediathek"))
+        }
+
+        @Test
+        fun `returns false for ARD dedicated TV package when not installed`() {
+            assertFalse(probe.isInstalled("de.swr.avp.ard.tv"))
+        }
+
+        @Test
+        fun `returns false for ARD universal package when not installed`() {
+            assertFalse(probe.isInstalled("de.swr.avp.ard"))
+        }
+
+        @Test
+        fun `returns false for ZDF Mediathek when not installed`() {
+            assertFalse(probe.isInstalled("com.zdf.android.mediathek"))
+        }
     }
 
     @Nested

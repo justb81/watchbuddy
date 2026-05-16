@@ -117,6 +117,39 @@ class ProviderCatalogRegistryTest {
     }
 
     @Test
+    fun `bundled snapshot includes both ARD TV package names`() {
+        val packages = ProviderCatalogRegistry.packagesByProviderId(195)
+        assertTrue(
+            "de.swr.avp.ard.tv" in packages,
+            "de.swr.avp.ard.tv must be a known TV package for ARD Mediathek",
+        )
+        assertTrue(
+            "de.swr.avp.ard" in packages,
+            "de.swr.avp.ard must be a known TV package for ARD Mediathek (universal app)",
+        )
+    }
+
+    @Test
+    fun `bundled snapshot lists both ARD packages in knownPackageNames`() {
+        val knownPackages = ProviderCatalogRegistry.knownPackageNames
+        assertTrue("de.swr.avp.ard.tv" in knownPackages)
+        assertTrue("de.swr.avp.ard" in knownPackages)
+    }
+
+    @Test
+    fun `bundled snapshot resolves ZDF Mediathek package name and provider id`() {
+        val entry = ProviderCatalogRegistry.entryById(231)
+        assertNotNull(entry)
+        assertEquals("com.zdf.android.mediathek", entry!!.packageName)
+        assertEquals(231, entry.providerId)
+    }
+
+    @Test
+    fun `bundled snapshot lists ZDF Mediathek package in knownPackageNames`() {
+        assertTrue("com.zdf.android.mediathek" in ProviderCatalogRegistry.knownPackageNames)
+    }
+
+    @Test
     fun `entries returns one ProviderEntry per providerId-packageName pair`() {
         val snapshot = makeSnapshot(
             makeEntry(ids = listOf(119, 9), tvPkg = "com.amazon.amazonvideo.livingroom"),
