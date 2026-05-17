@@ -24,6 +24,7 @@ class CompanionStateManager @Inject constructor() {
     val lastCapabilityCheck: StateFlow<Long> = _lastCapabilityCheck.asStateFlow()
 
     private val _isConnectedToTv = MutableStateFlow(false)
+
     /**
      * True while at least one TV client has polled `/capability` within the
      * [CompanionService.TV_CONNECTED_WINDOW_MS] window.  Updated immediately on
