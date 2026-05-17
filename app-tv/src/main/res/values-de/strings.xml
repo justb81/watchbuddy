@@ -62,6 +62,9 @@
     <string name="tv_mark_watched_no_phones">Kein verbundenes Telefon — bitte ein Telefon verbinden, um Folgen zu markieren.</string>
     <string name="tv_mark_watched_error">Folge konnte nicht als gesehen markiert werden.</string>
 
+    <!-- Show detail — All Episodes screen (#712) -->
+    <string name="tv_all_episodes">Alle Folgen</string>
+
     <!-- Show detail — manually mark episodes watched (#217) -->
     <string name="tv_detail_episodes">Folgen</string>
     <string name="tv_detail_season_header">Staffel %1$d</string>
