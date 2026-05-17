@@ -31,13 +31,12 @@ import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
 import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.core.model.EnrichedShowEntry
-import com.justb81.watchbuddy.core.model.TraktIds
+import com.justb81.watchbuddy.core.model.TraktWatchedEntry
 import com.justb81.watchbuddy.tv.ui.components.SeasonEpisodeListPicker
 import com.justb81.watchbuddy.tv.ui.components.UserScopePickerDialog
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
-@Suppress("LongMethod")
 fun AllEpisodesScreen(
     enriched: EnrichedShowEntry,
     onBack: () -> Unit,
@@ -76,20 +75,13 @@ fun AllEpisodesScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 64.dp, vertical = 48.dp)
-        ) {
-            AllEpisodesHeader(showTitle = entry.show.title)
-            Spacer(Modifier.height(24.dp))
-            AllEpisodesBody(
-                state = episodeListState,
-                showIds = entry.show.ids,
-                viewModel = viewModel,
-                onToggleRequest = { pendingToggle = it },
-            )
-        }
+        AllEpisodesContent(
+            title = entry.show.title,
+            episodeListState = episodeListState,
+            entry = entry,
+            viewModel = viewModel,
+            onPendingToggle = { pendingToggle = it },
+        )
 
         OutlinedButton(
             onClick = onBack,
@@ -109,12 +101,21 @@ fun AllEpisodesScreen(
     }
 
     pendingToggle?.let { (season, episode, markAsWatched) ->
-        AllEpisodesScopePicker(
-            viewModel = viewModel,
-            showIds = entry.show.ids,
-            season = season,
-            episode = episode,
-            markAsWatched = markAsWatched,
+        val users = viewModel.connectedUsers()
+        UserScopePickerDialog(
+            connectedUsers = users,
+            initialSelection = users.map { it.id }.toSet(),
+            onConfirm = { selectedIds, dontAskAgain ->
+                if (dontAskAgain) viewModel.onDontAskAgainSet()
+                viewModel.toggleEpisodeWatched(
+                    showIds = entry.show.ids,
+                    season = season,
+                    episode = episode,
+                    markAsWatched = markAsWatched,
+                    selectedUserIds = selectedIds,
+                )
+                pendingToggle = null
+            },
             onDismiss = { pendingToggle = null },
         )
     }
@@ -122,100 +123,76 @@ fun AllEpisodesScreen(
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
-private fun AllEpisodesHeader(showTitle: String) {
-    Text(
-        text = showTitle,
-        fontSize = 28.sp,
-        fontWeight = FontWeight.Bold,
-        color = Color.White,
-    )
-    Spacer(Modifier.height(4.dp))
-    Text(
-        text = stringResource(R.string.tv_all_episodes),
-        fontSize = 16.sp,
-        color = Color.White.copy(alpha = 0.5f),
-    )
-}
-
-@OptIn(ExperimentalTvMaterial3Api::class)
-@Composable
-private fun AllEpisodesBody(
-    state: EpisodeListUiState,
-    showIds: TraktIds,
+private fun AllEpisodesContent(
+    title: String,
+    episodeListState: EpisodeListUiState,
+    entry: TraktWatchedEntry,
     viewModel: ShowDetailViewModel,
-    onToggleRequest: (Triple<Int, Int, Boolean>) -> Unit,
+    onPendingToggle: (Triple<Int, Int, Boolean>) -> Unit,
 ) {
-    when (state) {
-        is EpisodeListUiState.Idle, is EpisodeListUiState.Loading -> {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center,
-            ) {
-                CircularProgressIndicator(color = Color.White)
-            }
-        }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 64.dp, vertical = 48.dp)
+    ) {
+        Text(
+            text = title,
+            fontSize = 28.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.White,
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = stringResource(R.string.tv_all_episodes),
+            fontSize = 16.sp,
+            color = Color.White.copy(alpha = 0.5f),
+        )
+        Spacer(Modifier.height(24.dp))
 
-        is EpisodeListUiState.Error -> {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = stringResource(R.string.tv_error_phone_unreachable),
-                    color = Color.White.copy(alpha = 0.6f),
+        when (episodeListState) {
+            is EpisodeListUiState.Idle, is EpisodeListUiState.Loading -> {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    CircularProgressIndicator(color = Color.White)
+                }
+            }
+
+            is EpisodeListUiState.Error -> {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = stringResource(R.string.tv_error_phone_unreachable),
+                        color = Color.White.copy(alpha = 0.6f),
+                    )
+                }
+            }
+
+            is EpisodeListUiState.Success -> {
+                SeasonEpisodeListPicker(
+                    seasons = episodeListState.seasons,
+                    watchedSet = episodeListState.watchedSet,
+                    highlightSeason = null,
+                    onToggle = { season, episode, currentlyWatched ->
+                        if (viewModel.skipScopePickerThisSession) {
+                            val allIds = viewModel.connectedUsers().map { it.id }.toSet()
+                            viewModel.toggleEpisodeWatched(
+                                showIds = entry.show.ids,
+                                season = season,
+                                episode = episode,
+                                markAsWatched = !currentlyWatched,
+                                selectedUserIds = allIds,
+                            )
+                        } else {
+                            onPendingToggle(Triple(season, episode, !currentlyWatched))
+                        }
+                    },
+                    modifier = Modifier.weight(1f),
                 )
             }
         }
-
-        is EpisodeListUiState.Success -> {
-            SeasonEpisodeListPicker(
-                seasons = state.seasons,
-                watchedSet = state.watchedSet,
-                highlightSeason = null,
-                onToggle = { season, episode, currentlyWatched ->
-                    if (viewModel.skipScopePickerThisSession) {
-                        val allIds = viewModel.connectedUsers().map { it.id }.toSet()
-                        viewModel.toggleEpisodeWatched(
-                            showIds = showIds,
-                            season = season,
-                            episode = episode,
-                            markAsWatched = !currentlyWatched,
-                            selectedUserIds = allIds,
-                        )
-                    } else {
-                        onToggleRequest(Triple(season, episode, !currentlyWatched))
-                    }
-                },
-                modifier = Modifier.fillMaxSize(),
-            )
-        }
     }
-}
-
-@Composable
-private fun AllEpisodesScopePicker(
-    viewModel: ShowDetailViewModel,
-    showIds: TraktIds,
-    season: Int,
-    episode: Int,
-    markAsWatched: Boolean,
-    onDismiss: () -> Unit,
-) {
-    val users = viewModel.connectedUsers()
-    UserScopePickerDialog(
-        connectedUsers = users,
-        initialSelection = users.map { it.id }.toSet(),
-        onConfirm = { selectedIds, dontAskAgain ->
-            if (dontAskAgain) viewModel.onDontAskAgainSet()
-            viewModel.toggleEpisodeWatched(
-                showIds = showIds,
-                season = season,
-                episode = episode,
-                markAsWatched = markAsWatched,
-                selectedUserIds = selectedIds,
-            )
-            onDismiss()
-        },
-        onDismiss = onDismiss,
-    )
 }
