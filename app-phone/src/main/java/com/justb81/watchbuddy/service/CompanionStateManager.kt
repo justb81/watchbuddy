@@ -23,6 +23,17 @@ class CompanionStateManager @Inject constructor() {
     /** Epoch millis of the most recent `/capability` request from a TV. */
     val lastCapabilityCheck: StateFlow<Long> = _lastCapabilityCheck.asStateFlow()
 
+    private val _isConnectedToTv = MutableStateFlow(false)
+
+    /**
+     * True while at least one TV client has polled `/capability` within the
+     * [CompanionService.TV_CONNECTED_WINDOW_MS] window.  Updated immediately on
+     * each capability check and cleared by the presence monitor when the window
+     * expires, so the status-bar notification reflects the live connection state
+     * without the 60-second polling delay.
+     */
+    val isConnectedToTv: StateFlow<Boolean> = _isConnectedToTv.asStateFlow()
+
     private val _lastScrobbleEvent = MutableStateFlow<ScrobbleDisplayEvent?>(null)
     /** Most recent scrobble event received via the companion HTTP server. */
     val lastScrobbleEvent: StateFlow<ScrobbleDisplayEvent?> = _lastScrobbleEvent.asStateFlow()
@@ -65,11 +76,18 @@ class CompanionStateManager @Inject constructor() {
 
     fun onCapabilityChecked() {
         _lastCapabilityCheck.value = System.currentTimeMillis()
+        _isConnectedToTv.value = true
     }
 
     /** Test-only overload — production always goes through [onCapabilityChecked]. */
     internal fun onCapabilityCheckedAt(now: Long) {
         _lastCapabilityCheck.value = now
+        _isConnectedToTv.value = true
+    }
+
+    /** Marks the TV as disconnected. Called by the presence monitor when the connection window expires. */
+    internal fun setConnectedToTv(connected: Boolean) {
+        _isConnectedToTv.value = connected
     }
 
     fun onScrobbleEvent(event: ScrobbleDisplayEvent) {
@@ -102,6 +120,7 @@ class CompanionStateManager @Inject constructor() {
             _wifiIpv4.value = null
             _lastCapabilityCheck.value = 0L
             _pendingPrompt.value = null
+            _isConnectedToTv.value = false
         }
     }
 
