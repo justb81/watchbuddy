@@ -46,7 +46,7 @@ watchbuddy/
 │           ├── diagnostics/ TvDiagnosticsScreen, TvDiagnosticsViewModel (discovery / BLE / discovered-phones health — view-only, no Share)
 │           ├── scrobble/   ScrobbleOverlay, ScrobbleViewModel
 │           ├── settings/   TvSettingsScreen + TvSettingsViewModel (settings hub — discovery, autostart, show-non-installed toggle, diagnostics)
-│           ├── showdetail/ ShowDetailScreen, ShowDetailViewModel (next-episode still + TMDB watch providers + installed-app filter + last-used ranking + JustWatch deep links; `NextEpisodeUiState`, `ProviderListUiState`, `DeepLinkState` flows; one-tap "Mark as watched" button — `MarkWatchedState` sealed interface, `markCurrentEpisodeWatched` fan-out to all phones via `POST /watched`, `advancedEntry` optimistic-advance flow with `AnimatedContent` slide transition)
+│           ├── showdetail/ ShowDetailScreen, AllEpisodesScreen, ShowDetailViewModel (next-episode still + TMDB watch providers + installed-app filter + last-used ranking + JustWatch deep links; `NextEpisodeUiState`, `ProviderListUiState`, `DeepLinkState` flows; one-tap "Mark as watched" button — `MarkWatchedState` sealed interface, `markCurrentEpisodeWatched` fan-out to all phones via `POST /watched`, `advancedEntry` optimistic-advance flow with `AnimatedContent` slide transition; "All Episodes" button navigates to AllEpisodesScreen — full-screen D-pad-navigable episode list with per-episode watched toggle)
 │           └── theme/      TV Material theme
 ├── build-logic/        Gradle convention plugins (included build)
 │   └── convention/

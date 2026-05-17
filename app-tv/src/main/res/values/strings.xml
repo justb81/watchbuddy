@@ -62,6 +62,9 @@
     <string name="tv_mark_watched_no_phones">No connected phone — connect a phone to mark episodes.</string>
     <string name="tv_mark_watched_error">Could not mark episode as watched.</string>
 
+    <!-- Show detail — All Episodes screen (#712) -->
+    <string name="tv_all_episodes">All Episodes</string>
+
     <!-- Show detail — manually mark episodes watched (#217) -->
     <string name="tv_detail_episodes">Episodes</string>
     <string name="tv_detail_season_header">Season %1$d</string>

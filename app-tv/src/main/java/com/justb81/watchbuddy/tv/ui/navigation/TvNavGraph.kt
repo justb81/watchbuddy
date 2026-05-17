@@ -14,13 +14,14 @@ import com.justb81.watchbuddy.tv.ui.recap.RecapScreen
 import com.justb81.watchbuddy.tv.ui.scrobble.ScrobbleOverlay
 import com.justb81.watchbuddy.tv.ui.scrobble.ScrobbleViewModel
 import com.justb81.watchbuddy.tv.ui.settings.TvSettingsScreen
+import com.justb81.watchbuddy.tv.ui.showdetail.AllEpisodesScreen
 import com.justb81.watchbuddy.tv.ui.showdetail.ShowDetailScreen
 
 @Composable
 fun TvNavGraph() {
     val navController = rememberNavController()
 
-    // Shared state: currently selected show (passed between Home → Detail → Recap)
+    // Shared state: currently selected show (passed between Home → Detail → Recap → AllEpisodes)
     var selectedEntry by remember { mutableStateOf<EnrichedShowEntry?>(null) }
 
     NavHost(
@@ -52,9 +53,20 @@ fun TvNavGraph() {
             val enriched = selectedEntry
             if (enriched != null) {
                 ShowDetailScreen(
-                    enriched     = enriched,
-                    onRecapClick = { navController.navigate(TvRoute.Recap.route) },
-                    onBack       = { navController.popBackStack() }
+                    enriched          = enriched,
+                    onRecapClick      = { navController.navigate(TvRoute.Recap.route) },
+                    onAllEpisodesClick = { navController.navigate(TvRoute.AllEpisodes.route) },
+                    onBack            = { navController.popBackStack() }
+                )
+            }
+        }
+
+        composable(TvRoute.AllEpisodes.route) {
+            val enriched = selectedEntry
+            if (enriched != null) {
+                AllEpisodesScreen(
+                    enriched = enriched,
+                    onBack   = { navController.popBackStack() }
                 )
             }
         }

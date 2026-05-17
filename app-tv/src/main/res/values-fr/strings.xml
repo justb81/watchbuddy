@@ -65,6 +65,9 @@
     <string name="tv_mark_watched_no_phones">Aucun téléphone connecté — connectez un téléphone pour marquer les épisodes.</string>
     <string name="tv_mark_watched_error">Impossible de marquer l\'episode comme vu.</string>
 
+    <!-- Show detail — All Episodes screen (#712) -->
+    <string name="tv_all_episodes">Tous les épisodes</string>
+
     <!-- Show detail — manually mark episodes watched (#217) -->
     <string name="tv_detail_episodes">Épisodes</string>
     <string name="tv_detail_season_header">Saison %1$d</string>
