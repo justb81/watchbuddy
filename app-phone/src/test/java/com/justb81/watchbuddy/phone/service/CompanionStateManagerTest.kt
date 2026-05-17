@@ -41,7 +41,26 @@ class CompanionStateManagerTest {
     }
 
     @Test
-    fun `setServiceRunning false resets transient state`() {
+    fun `onCapabilityChecked sets isConnectedToTv true immediately`() {
+        val mgr = CompanionStateManager()
+        assertFalse(mgr.isConnectedToTv.value)
+
+        mgr.onCapabilityCheckedAt(1_000_000_000L)
+        assertTrue(mgr.isConnectedToTv.value)
+    }
+
+    @Test
+    fun `setConnectedToTv false clears isConnectedToTv`() {
+        val mgr = CompanionStateManager()
+        mgr.onCapabilityCheckedAt(1_000_000_000L)
+        assertTrue(mgr.isConnectedToTv.value)
+
+        mgr.setConnectedToTv(false)
+        assertFalse(mgr.isConnectedToTv.value)
+    }
+
+    @Test
+    fun `setServiceRunning false resets transient state including isConnectedToTv`() {
         val mgr = CompanionStateManager()
         val t0 = 1_000_000_000L
         mgr.setHttpServerBinding("0.0.0.0:8765")
@@ -53,6 +72,7 @@ class CompanionStateManagerTest {
         assertTrue(mgr.isServiceRunning.value)
         assertEquals("0.0.0.0:8765", mgr.httpServerBinding.value)
         assertEquals(CompanionStateManager.BleAdvertiseState.ADVERTISING, mgr.bleAdvertiseState.value)
+        assertTrue(mgr.isConnectedToTv.value)
 
         mgr.setServiceRunning(false)
 
@@ -61,5 +81,6 @@ class CompanionStateManagerTest {
         assertEquals(CompanionStateManager.BleAdvertiseState.IDLE, mgr.bleAdvertiseState.value)
         assertNull(mgr.wifiIpv4.value)
         assertEquals(0L, mgr.lastCapabilityCheck.value)
+        assertFalse(mgr.isConnectedToTv.value)
     }
 }

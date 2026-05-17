@@ -150,6 +150,7 @@ class CompanionService : Service() {
             stateManager.setServiceRunning(true)
             registerNetworkCallback()
             startPresenceMonitor()
+            observeConnectionState()
             ensureScrobblePromptChannel()
             observeAmbiguousPrompts()
             // Pre-load the on-device LLM so the user's first recap hits a warm
@@ -197,7 +198,6 @@ class CompanionService : Service() {
     private fun startPresenceMonitor() {
         // Reset the timestamp so the first check doesn't immediately time out
         stateManager.onCapabilityChecked()
-        var lastNotifiedConnected = false
         presenceJob = serviceScope.launch {
             while (true) {
                 delay(PRESENCE_CHECK_INTERVAL_MS)
@@ -208,12 +208,29 @@ class CompanionService : Service() {
                     stopSelf()
                     break
                 }
-                val connected = elapsed < TV_CONNECTED_WINDOW_MS
-                if (connected != lastNotifiedConnected) {
-                    lastNotifiedConnected = connected
-                    val nm = getSystemService(NotificationManager::class.java)
-                    nm.notify(NOTIFICATION_ID, buildNotification(connected))
+                // Clear the connected flag once the TV's polling window has expired.
+                // The flag is set immediately in onCapabilityChecked(), so this is
+                // the only place it needs to be cleared.
+                if (elapsed >= TV_CONNECTED_WINDOW_MS) {
+                    stateManager.setConnectedToTv(false)
                 }
+            }
+        }
+    }
+
+    // ── Connection state → notification ──────────────────────────────────────
+
+    /**
+     * Observes [CompanionStateManager.isConnectedToTv] and updates the foreground
+     * service notification immediately whenever the connection state changes.
+     * This ensures the "TV connected" message appears as soon as the TV polls
+     * `/capability`, without waiting for the 60-second presence-monitor tick.
+     */
+    private fun observeConnectionState() {
+        serviceScope.launch {
+            stateManager.isConnectedToTv.collect { connected ->
+                val nm = getSystemService(NotificationManager::class.java)
+                nm.notify(NOTIFICATION_ID, buildNotification(connected))
             }
         }
     }
