@@ -95,7 +95,6 @@ fun ShowDetailScreen(
         enriched = enriched,
         providerState = providerState,
         watchNowFocus = watchNowFocus,
-        snackbarHostState = snackbarHostState,
     )
 
     // One-shot toast for mark-watched feedback, then acknowledge to reset to Idle.
@@ -664,7 +663,6 @@ private fun ShowDetailEffects(
     enriched: EnrichedShowEntry,
     providerState: ProviderListUiState,
     watchNowFocus: FocusRequester,
-    snackbarHostState: SnackbarHostState,
 ) {
     LaunchedEffect(enriched.entry.show.ids.trakt) {
         viewModel.loadNextEpisode(enriched)
