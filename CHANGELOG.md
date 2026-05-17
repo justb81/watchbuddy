@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.39.0](https://github.com/justb81/watchbuddy/compare/v0.38.0...v0.39.0) (2026-05-17)
+
+
+### Features
+
+* move episode list to dedicated All Episodes screen on TV ([#733](https://github.com/justb81/watchbuddy/issues/733)) ([ce8e2d6](https://github.com/justb81/watchbuddy/commit/ce8e2d6d8e1e2520b254dd079fe62f376c1ed079)), closes [#712](https://github.com/justb81/watchbuddy/issues/712)
+* show notification when phone is actively connected to TV ([#732](https://github.com/justb81/watchbuddy/issues/732)) ([bab185c](https://github.com/justb81/watchbuddy/commit/bab185c29476000563a7263a8bb3b07ab9f6b29c)), closes [#721](https://github.com/justb81/watchbuddy/issues/721)
+
 ## [0.38.0](https://github.com/justb81/watchbuddy/compare/v0.37.0...v0.38.0) (2026-05-16)
 
 
