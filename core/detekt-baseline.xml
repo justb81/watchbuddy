@@ -17,6 +17,7 @@
     <ID>ConstructorParameterNaming:Models.kt$TmdbSeasonSummary$val season_number: Int</ID>
     <ID>ConstructorParameterNaming:Models.kt$TmdbShow$val backdrop_path: String? = null</ID>
     <ID>ConstructorParameterNaming:Models.kt$TmdbShow$val first_air_date: String? = null</ID>
+    <ID>ConstructorParameterNaming:Models.kt$TmdbShow$val last_air_date: String? = null</ID>
     <ID>ConstructorParameterNaming:Models.kt$TmdbShow$val last_episode_to_air: TmdbEpisodeSummary? = null</ID>
     <ID>ConstructorParameterNaming:Models.kt$TmdbShow$val next_episode_to_air: TmdbEpisodeSummary? = null</ID>
     <ID>ConstructorParameterNaming:Models.kt$TmdbShow$val number_of_episodes: Int? = null</ID>

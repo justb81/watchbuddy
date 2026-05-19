@@ -6,22 +6,37 @@ import androidx.lifecycle.viewModelScope
 import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.model.TraktShow
+import com.justb81.watchbuddy.core.tmdb.TmdbApiService
+import com.justb81.watchbuddy.core.tmdb.TmdbImageHelper
 import com.justb81.watchbuddy.core.trakt.TraktSearchResult
 import com.justb81.watchbuddy.phone.auth.TokenRefreshManager
 import com.justb81.watchbuddy.phone.server.ShowRepository
+import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+data class SearchResultItem(
+    val result: TraktSearchResult,
+    val posterUrl: String? = null,
+    val firstAirYear: Int? = null,
+    val lastAirYear: Int? = null,
+    val status: String? = null,
+)
+
 data class SearchUiState(
     val query: String = "",
-    val results: List<TraktSearchResult> = emptyList(),
+    val results: List<SearchResultItem> = emptyList(),
     val isLoading: Boolean = false,
     val error: String? = null,
     val trackedShowIds: Set<Int> = emptySet(),
@@ -37,6 +52,8 @@ class SearchViewModel @Inject constructor(
     application: Application,
     private val showRepository: ShowRepository,
     private val tokenRefreshManager: TokenRefreshManager,
+    private val tmdbApiService: TmdbApiService,
+    private val settingsRepository: SettingsRepository,
 ) : AndroidViewModel(application) {
 
     companion object {
@@ -45,6 +62,8 @@ class SearchViewModel @Inject constructor(
         private const val MIN_QUERY_LENGTH = 2
         private const val HTTP_UNAUTHORIZED = 401
         private const val HTTP_FORBIDDEN = 403
+        private const val POSTER_WIDTH = 300
+        private const val YEAR_PREFIX_LENGTH = 4
     }
 
     private val _uiState = MutableStateFlow(SearchUiState())
@@ -83,8 +102,10 @@ class SearchViewModel @Inject constructor(
         try {
             val token = tokenRefreshManager.getValidAccessToken()
                 ?: error(getApplication<Application>().getString(R.string.search_error_no_token))
-            val results = showRepository.searchShows("Bearer $token", query)
-            _uiState.update { it.copy(results = results, isLoading = false) }
+            val traktResults = showRepository.searchShows("Bearer $token", query)
+            val items = traktResults.map { SearchResultItem(result = it) }
+            _uiState.update { it.copy(results = items, isLoading = false) }
+            enrichWithTmdb(traktResults)
         } catch (e: Exception) {
             DiagnosticLog.warn(TAG, "show search failed for query='$query'", e)
             val httpCode = (e as? retrofit2.HttpException)?.code()
@@ -94,6 +115,40 @@ class SearchViewModel @Inject constructor(
                 getApplication<Application>().getString(R.string.search_error_failed, e.message)
             }
             _uiState.update { it.copy(isLoading = false, error = errorMsg) }
+        }
+    }
+
+    private suspend fun enrichWithTmdb(traktResults: List<TraktSearchResult>) {
+        val apiKey = runCatching { settingsRepository.getTmdbApiKey().first() }.getOrDefault("")
+        if (apiKey.isBlank()) return
+        coroutineScope {
+            traktResults.mapIndexed { index, result ->
+                async {
+                    val tmdbId = result.show?.ids?.tmdb ?: return@async
+                    val tmdb = runCatching {
+                        tmdbApiService.getShow(tmdbId, apiKey)
+                    }.onFailure {
+                        DiagnosticLog.warn(TAG, "TMDB enrichment failed for '${result.show?.title}'", it)
+                    }.getOrNull() ?: return@async
+
+                    val firstYear = tmdb.first_air_date?.take(YEAR_PREFIX_LENGTH)?.toIntOrNull()
+                    val lastYear = tmdb.last_air_date?.take(YEAR_PREFIX_LENGTH)?.toIntOrNull()
+                    val posterUrl = TmdbImageHelper.poster(tmdb.poster_path, POSTER_WIDTH)
+
+                    _uiState.update { state ->
+                        val updated = state.results.toMutableList()
+                        if (index < updated.size && updated[index].result === result) {
+                            updated[index] = updated[index].copy(
+                                posterUrl = posterUrl,
+                                firstAirYear = firstYear,
+                                lastAirYear = lastYear,
+                                status = tmdb.status,
+                            )
+                        }
+                        state.copy(results = updated)
+                    }
+                }
+            }.awaitAll()
         }
     }
 

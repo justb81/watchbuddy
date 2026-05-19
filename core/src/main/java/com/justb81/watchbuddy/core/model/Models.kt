@@ -66,6 +66,7 @@ data class TmdbShow(
     val poster_path: String? = null,
     val backdrop_path: String? = null,
     val first_air_date: String? = null,
+    val last_air_date: String? = null,
     val status: String? = null,
     val number_of_episodes: Int? = null,
     val last_episode_to_air: TmdbEpisodeSummary? = null,
