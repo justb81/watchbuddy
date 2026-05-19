@@ -44,3 +44,6 @@ Thumbs.db
 /.claude/settings.local.json
 /hs_err_*.log
 /replay_*.log
+
+# Git worktrees created by agents
+/wt/
