@@ -28,6 +28,8 @@ import androidx.compose.material3.SearchBar
 import androidx.compose.material3.SearchBarDefaults
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SuggestionChip
+import androidx.compose.material3.SuggestionChipDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -48,11 +50,10 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import coil3.compose.AsyncImage
 import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.core.model.TraktShow
-import com.justb81.watchbuddy.core.tmdb.TmdbImageHelper
-import com.justb81.watchbuddy.core.trakt.TraktSearchResult
 import com.justb81.watchbuddy.phone.ui.theme.watchBuddyShapes
 
-private const val POSTER_WIDTH = 300
+private const val POSTER_WIDTH_DP = 42
+private const val POSTER_HEIGHT_DP = 60
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -180,7 +181,7 @@ private fun EmptyText(message: String) {
 
 @Composable
 private fun SearchResultsList(
-    results: List<TraktSearchResult>,
+    results: List<SearchResultItem>,
     trackedShowIds: Set<Int>,
     addingShowId: Int?,
     onAddShow: (TraktShow) -> Unit
@@ -189,9 +190,10 @@ private fun SearchResultsList(
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        items(results, key = { it.show?.ids?.trakt ?: it.show?.title ?: "" }) { result ->
-            val show = result.show ?: return@items
+        items(results, key = { it.result.show?.ids?.trakt ?: it.result.show?.title ?: "" }) { item ->
+            val show = item.result.show ?: return@items
             SearchResultCard(
+                item = item,
                 show = show,
                 isTracked = show.ids.trakt != null && show.ids.trakt in trackedShowIds,
                 isAdding = show.ids.trakt != null && show.ids.trakt == addingShowId,
@@ -203,6 +205,7 @@ private fun SearchResultsList(
 
 @Composable
 private fun SearchResultCard(
+    item: SearchResultItem,
     show: TraktShow,
     isTracked: Boolean,
     isAdding: Boolean,
@@ -220,7 +223,7 @@ private fun SearchResultCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            PosterThumbnail(posterPath = null, title = show.title)
+            PosterThumbnail(posterUrl = item.posterUrl, title = show.title)
 
             Column(
                 modifier = Modifier.weight(1f),
@@ -234,13 +237,7 @@ private fun SearchResultCard(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
-                show.year?.let { year ->
-                    Text(
-                        text = year.toString(),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                    )
-                }
+                SeasonRangeAndStatus(item = item)
             }
 
             when {
@@ -274,23 +271,99 @@ private fun SearchResultCard(
 }
 
 @Composable
-private fun PosterThumbnail(posterPath: String?, title: String) {
-    val url = TmdbImageHelper.poster(posterPath, POSTER_WIDTH)
-    if (url != null) {
+private fun SeasonRangeAndStatus(item: SearchResultItem) {
+    val seasonRangeText = buildSeasonRangeText(
+        firstAirYear = item.firstAirYear,
+        lastAirYear = item.lastAirYear,
+        status = item.status,
+    )
+    val statusLabel = item.status?.let { resolveStatusLabel(it) }
+
+    if (seasonRangeText != null || statusLabel != null) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (seasonRangeText != null) {
+                Text(
+                    text = seasonRangeText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+            }
+            if (statusLabel != null) {
+                SuggestionChip(
+                    onClick = {},
+                    label = {
+                        Text(
+                            text = statusLabel,
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                    },
+                    colors = SuggestionChipDefaults.suggestionChipColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        labelColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    ),
+                    border = null,
+                    modifier = Modifier.padding(vertical = 0.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun buildSeasonRangeText(firstAirYear: Int?, lastAirYear: Int?, status: String?): String? {
+    val first = firstAirYear ?: return null
+    val isOngoing = status != null && status.equals("Ended", ignoreCase = true).not() &&
+        status.equals("Canceled", ignoreCase = true).not() &&
+        status.equals("Cancelled", ignoreCase = true).not()
+    return if (isOngoing || lastAirYear == null || lastAirYear == first) {
+        stringResource(R.string.search_season_range_ongoing, first)
+    } else {
+        stringResource(R.string.search_season_range_ended, first, lastAirYear)
+    }
+}
+
+@Composable
+private fun resolveStatusLabel(status: String): String? = when {
+    status.equals("Returning Series", ignoreCase = true) ||
+        status.equals("In Production", ignoreCase = true) ||
+        status.equals("Planned", ignoreCase = true) ||
+        status.equals("Pilot", ignoreCase = true) ->
+        stringResource(R.string.search_status_ongoing)
+    status.equals("Ended", ignoreCase = true) ->
+        stringResource(R.string.search_status_ended)
+    status.equals("Canceled", ignoreCase = true) ||
+        status.equals("Cancelled", ignoreCase = true) ->
+        stringResource(R.string.search_status_cancelled)
+    else -> null
+}
+
+@Composable
+private fun PosterThumbnail(posterUrl: String?, title: String) {
+    if (posterUrl != null) {
         AsyncImage(
-            model = url,
-            contentDescription = title,
+            model = posterUrl,
+            contentDescription = stringResource(R.string.search_cd_cover_art, title),
             contentScale = ContentScale.Crop,
             modifier = Modifier
-                .size(42.dp, 60.dp)
+                .size(POSTER_WIDTH_DP.dp, POSTER_HEIGHT_DP.dp)
                 .clip(MaterialTheme.watchBuddyShapes.thumbnail)
         )
     } else {
         Box(
             modifier = Modifier
-                .size(42.dp, 60.dp)
+                .size(POSTER_WIDTH_DP.dp, POSTER_HEIGHT_DP.dp)
                 .clip(MaterialTheme.watchBuddyShapes.thumbnail)
-                .background(MaterialTheme.colorScheme.outline)
-        )
+                .background(MaterialTheme.colorScheme.outline),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = title.take(1).uppercase(),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+            )
+        }
     }
 }

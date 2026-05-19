@@ -277,6 +277,13 @@
     <string name="search_cd_back">Zurück</string>
     <string name="search_cd_add_show">%1$s zur Merkliste hinzufügen</string>
     <string name="search_cd_already_tracked">Bereits verfolgt</string>
+    <string name="search_cd_cover_art">Coverbild für %1$s</string>
+    <string name="search_cd_cover_art_placeholder">Kein Coverbild verfügbar</string>
+    <string name="search_season_range_ongoing">%1$d –</string>
+    <string name="search_season_range_ended">%1$d – %2$d</string>
+    <string name="search_status_ongoing">Laufend</string>
+    <string name="search_status_ended">Beendet</string>
+    <string name="search_status_cancelled">Abgesetzt</string>
 
     <!-- Version footer -->
     <string name="settings_version_footer">WatchBuddy v%1$s (Build %2$d)</string>

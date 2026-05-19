@@ -283,6 +283,13 @@
     <string name="search_cd_back">Retour</string>
     <string name="search_cd_add_show">Ajouter %1$s à la liste de suivi</string>
     <string name="search_cd_already_tracked">Déjà suivi</string>
+    <string name="search_cd_cover_art">Pochette de %1$s</string>
+    <string name="search_cd_cover_art_placeholder">Aucune pochette disponible</string>
+    <string name="search_season_range_ongoing">%1$d –</string>
+    <string name="search_season_range_ended">%1$d – %2$d</string>
+    <string name="search_status_ongoing">En cours</string>
+    <string name="search_status_ended">Terminé</string>
+    <string name="search_status_cancelled">Annulé</string>
 
     <!-- Version footer -->
     <string name="settings_version_footer">WatchBuddy v%1$s (build %2$d)</string>
