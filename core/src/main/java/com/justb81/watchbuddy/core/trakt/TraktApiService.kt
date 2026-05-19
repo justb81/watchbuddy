@@ -73,6 +73,11 @@ interface TraktApiService {
         @Body body: SyncWatchlistBody
     ): SyncWatchlistResult
 
+    @GET("sync/watchlist/shows")
+    suspend fun getWatchlistShows(
+        @Header("Authorization") bearer: String
+    ): List<TraktWatchlistEntry>
+
     // ── Shows ─────────────────────────────────────────────────────────────────
 
     @GET("shows/{id}/seasons")
@@ -208,3 +213,10 @@ interface TraktApiService {
 )
 
 @Serializable data class SyncWatchlistCount(val shows: Int = 0)
+
+@Serializable data class TraktWatchlistEntry(
+    val rank: Int? = null,
+    val listed_at: String? = null,
+    val type: String? = null,
+    val show: TraktShow,
+)

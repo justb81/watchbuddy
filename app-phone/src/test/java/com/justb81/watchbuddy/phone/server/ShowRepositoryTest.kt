@@ -8,7 +8,10 @@ import com.justb81.watchbuddy.core.model.TraktWatchedEntry
 import com.justb81.watchbuddy.core.model.TraktWatchedEpisode
 import com.justb81.watchbuddy.core.model.TraktWatchedSeason
 import com.justb81.watchbuddy.core.tmdb.TmdbApiService
+import com.justb81.watchbuddy.core.trakt.SyncWatchlistCount
+import com.justb81.watchbuddy.core.trakt.SyncWatchlistResult
 import com.justb81.watchbuddy.core.trakt.TraktApiService
+import com.justb81.watchbuddy.core.trakt.TraktWatchlistEntry
 import com.justb81.watchbuddy.phone.auth.TokenRefreshManager
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import io.mockk.*
@@ -39,6 +42,7 @@ class ShowRepositoryTest {
     @BeforeEach
     fun setUp() {
         every { settingsRepository.getTmdbApiKey() } returns flowOf("")
+        coEvery { traktApi.getWatchlistShows(any()) } returns emptyList()
         repository = ShowRepository(traktApi, tokenRefreshManager, tmdbApiService, settingsRepository)
     }
 
@@ -360,6 +364,73 @@ class ShowRepositoryTest {
             val seasons = state.first().entry.seasons
             val s1episodes = seasons.find { it.number == 1 }?.episodes ?: emptyList()
             assertEquals(10, s1episodes.size, "All 10 episodes must be toggled on")
+        }
+    }
+
+    @Nested
+    @DisplayName("addShowToWatchlist — shows StateFlow update (#731)")
+    inner class AddShowToWatchlistTest {
+
+        @Test
+        fun `addShowToWatchlist updates shows StateFlow immediately without waiting for next fetch`() = runTest {
+            coEvery { tokenRefreshManager.getValidAccessToken() } returns "test-token"
+            coEvery { traktApi.getWatchedShows(any()) } returns testShows
+            coEvery { traktApi.addToWatchlist(any(), any()) } returns SyncWatchlistResult()
+            repository.getShows()
+
+            val newShow = TraktShow("New Show", 2025, TraktIds(trakt = 99, tmdb = 999))
+
+            repository.shows.test {
+                awaitItem() // consume the initial seeded emission
+
+                repository.addShowToWatchlist("Bearer test-token", newShow)
+
+                val afterAdd = awaitItem()
+                assertTrue(
+                    afterAdd.any { it.entry.show.ids.trakt == 99 },
+                    "New show must appear in the StateFlow immediately after addShowToWatchlist"
+                )
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+
+        @Test
+        fun `addShowToWatchlist does not add duplicate when show is already tracked`() = runTest {
+            coEvery { tokenRefreshManager.getValidAccessToken() } returns "test-token"
+            coEvery { traktApi.getWatchedShows(any()) } returns testShows
+            coEvery { traktApi.addToWatchlist(any(), any()) } returns SyncWatchlistResult()
+            repository.getShows()
+
+            val existingShow = testShows.first().show
+
+            repository.addShowToWatchlist("Bearer test-token", existingShow)
+
+            val shows = repository.shows.value
+            assertEquals(2, shows.size, "No duplicate must be added for an already-tracked show")
+        }
+
+        @Test
+        fun `addShowToWatchlist appended show appears at correct sort position`() = runTest {
+            val entries = listOf(
+                watchedEntry(trakt = 1, title = "Alpha", lastWatchedAt = "2026-04-15T10:00:00Z"),
+                watchedEntry(trakt = 2, title = "Beta", lastWatchedAt = "2026-04-10T10:00:00Z")
+            )
+            coEvery { tokenRefreshManager.getValidAccessToken() } returns "test-token"
+            coEvery { traktApi.getWatchedShows(any()) } returns entries
+            coEvery { traktApi.addToWatchlist(any(), any()) } returns SyncWatchlistResult()
+            repository.getShows()
+
+            val newShow = TraktShow("Zeta", 2025, TraktIds(trakt = 99, tmdb = 999))
+            repository.addShowToWatchlist("Bearer test-token", newShow)
+
+            val ids = repository.shows.value.map { it.entry.show.ids.trakt }
+            // The new show has no watch history so latestWatchedInstant == null,
+            // meaning it sorts last (after all shows with a last-watched timestamp).
+            assertEquals(
+                listOf(1, 2, 99),
+                ids,
+                "Unwatched newly added show must sort after shows with watch history"
+            )
         }
     }
 
