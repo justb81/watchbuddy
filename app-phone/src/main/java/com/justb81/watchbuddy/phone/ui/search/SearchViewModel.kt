@@ -63,6 +63,7 @@ class SearchViewModel @Inject constructor(
         private const val HTTP_UNAUTHORIZED = 401
         private const val HTTP_FORBIDDEN = 403
         private const val POSTER_WIDTH = 300
+        private const val YEAR_PREFIX_LENGTH = 4
     }
 
     private val _uiState = MutableStateFlow(SearchUiState())
@@ -130,8 +131,8 @@ class SearchViewModel @Inject constructor(
                         DiagnosticLog.warn(TAG, "TMDB enrichment failed for '${result.show?.title}'", it)
                     }.getOrNull() ?: return@async
 
-                    val firstYear = tmdb.first_air_date?.take(4)?.toIntOrNull()
-                    val lastYear = tmdb.last_air_date?.take(4)?.toIntOrNull()
+                    val firstYear = tmdb.first_air_date?.take(YEAR_PREFIX_LENGTH)?.toIntOrNull()
+                    val lastYear = tmdb.last_air_date?.take(YEAR_PREFIX_LENGTH)?.toIntOrNull()
                     val posterUrl = TmdbImageHelper.poster(tmdb.poster_path, POSTER_WIDTH)
 
                     _uiState.update { state ->
