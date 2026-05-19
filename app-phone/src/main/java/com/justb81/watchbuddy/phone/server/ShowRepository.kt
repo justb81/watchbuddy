@@ -90,15 +90,39 @@ class ShowRepository @Inject constructor(
             bearer,
             SyncWatchlistBody(shows = listOf(SyncWatchlistShowItem(ids = show.ids)))
         )
-        // Invalidate the cache so the next getShows() fetch picks up the new show.
+        val traktId = show.ids.trakt
+        if (traktId != null) {
+            _shows.update { current ->
+                if (current.any { it.entry.show.ids.trakt == traktId }) {
+                    current
+                } else {
+                    (current + EnrichedShowEntry(entry = TraktWatchedEntry(show = show)))
+                        .sortedWith(showComparator)
+                }
+            }
+        }
         cache.invalidate(Unit)
     }
 
     private suspend fun fetchFromTrakt(): List<EnrichedShowEntry> {
         val token = tokenRefreshManager.getValidAccessToken()
             ?: error("No access token available")
-        val trakt = traktApi.getWatchedShows("Bearer $token")
-        return enrich(trakt).sortedWith(showComparator)
+        val bearer = "Bearer $token"
+        return coroutineScope {
+            val watchedDeferred = async { traktApi.getWatchedShows(bearer) }
+            val watchlistDeferred = async {
+                runCatching { traktApi.getWatchlistShows(bearer) }
+                    .onFailure { Log.w(TAG, "watchlist fetch failed; continuing with watched only", it) }
+                    .getOrDefault(emptyList())
+            }
+            val watched = watchedDeferred.await()
+            val watchlist = watchlistDeferred.await()
+            val watchedIds = watched.mapNotNull { it.show.ids.trakt }.toSet()
+            val watchlistOnly = watchlist
+                .filter { it.show.ids.trakt == null || it.show.ids.trakt !in watchedIds }
+                .map { TraktWatchedEntry(show = it.show, seasons = emptyList()) }
+            enrich(watched + watchlistOnly).sortedWith(showComparator)
+        }
     }
 
     /**

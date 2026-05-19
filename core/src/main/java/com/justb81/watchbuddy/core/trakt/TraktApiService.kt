@@ -4,6 +4,7 @@ import com.justb81.watchbuddy.core.model.TraktEpisode
 import com.justb81.watchbuddy.core.model.TraktSeasonWithEpisodes
 import com.justb81.watchbuddy.core.model.TraktShow
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import retrofit2.http.*
 
@@ -72,6 +73,11 @@ interface TraktApiService {
         @Header("Authorization") bearer: String,
         @Body body: SyncWatchlistBody
     ): SyncWatchlistResult
+
+    @GET("sync/watchlist/shows")
+    suspend fun getWatchlistShows(
+        @Header("Authorization") bearer: String
+    ): List<TraktWatchlistEntry>
 
     // ── Shows ─────────────────────────────────────────────────────────────────
 
@@ -208,3 +214,10 @@ interface TraktApiService {
 )
 
 @Serializable data class SyncWatchlistCount(val shows: Int = 0)
+
+@Serializable data class TraktWatchlistEntry(
+    val rank: Int? = null,
+    @SerialName("listed_at") val listedAt: String? = null,
+    val type: String? = null,
+    val show: TraktShow,
+)
