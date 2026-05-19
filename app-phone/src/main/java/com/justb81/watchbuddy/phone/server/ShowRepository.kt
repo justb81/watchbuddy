@@ -16,7 +16,6 @@ import com.justb81.watchbuddy.core.trakt.SyncWatchlistBody
 import com.justb81.watchbuddy.core.trakt.SyncWatchlistShowItem
 import com.justb81.watchbuddy.core.trakt.TraktApiService
 import com.justb81.watchbuddy.core.trakt.TraktSearchResult
-import com.justb81.watchbuddy.core.trakt.TraktWatchlistEntry
 import com.justb81.watchbuddy.phone.auth.TokenRefreshManager
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import kotlinx.coroutines.async

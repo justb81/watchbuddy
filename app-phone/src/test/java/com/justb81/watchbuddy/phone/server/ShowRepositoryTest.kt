@@ -8,10 +8,8 @@ import com.justb81.watchbuddy.core.model.TraktWatchedEntry
 import com.justb81.watchbuddy.core.model.TraktWatchedEpisode
 import com.justb81.watchbuddy.core.model.TraktWatchedSeason
 import com.justb81.watchbuddy.core.tmdb.TmdbApiService
-import com.justb81.watchbuddy.core.trakt.SyncWatchlistCount
 import com.justb81.watchbuddy.core.trakt.SyncWatchlistResult
 import com.justb81.watchbuddy.core.trakt.TraktApiService
-import com.justb81.watchbuddy.core.trakt.TraktWatchlistEntry
 import com.justb81.watchbuddy.phone.auth.TokenRefreshManager
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import io.mockk.*

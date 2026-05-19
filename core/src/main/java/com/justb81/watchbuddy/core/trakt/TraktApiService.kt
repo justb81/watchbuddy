@@ -4,6 +4,7 @@ import com.justb81.watchbuddy.core.model.TraktEpisode
 import com.justb81.watchbuddy.core.model.TraktSeasonWithEpisodes
 import com.justb81.watchbuddy.core.model.TraktShow
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import retrofit2.http.*
 
@@ -216,7 +217,7 @@ interface TraktApiService {
 
 @Serializable data class TraktWatchlistEntry(
     val rank: Int? = null,
-    val listed_at: String? = null,
+    @SerialName("listed_at") val listedAt: String? = null,
     val type: String? = null,
     val show: TraktShow,
 )
