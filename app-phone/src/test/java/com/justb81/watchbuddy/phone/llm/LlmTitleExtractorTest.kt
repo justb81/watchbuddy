@@ -208,9 +208,9 @@ class LlmTitleExtractorTest {
         assertEquals(0f, extractor.normalizedLevenshtein("", ""))
     }
 
-    private fun sampleSnapshot(): MediaMetadataSnapshot {
-        val builder = com.justb81.watchbuddy.core.scrobbler.MediaSnapshotBuilder("com.netflix.ninja")
-        builder.add("mediaSession.title", "Pilot")
-        return builder.build()
-    }
+    private fun sampleSnapshot(): MediaMetadataSnapshot =
+        MediaMetadataSnapshot(
+            packageName = "com.netflix.ninja",
+            text = "mediaSession.title: Pilot",
+        )
 }
