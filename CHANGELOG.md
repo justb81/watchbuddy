@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.40.0](https://github.com/justb81/watchbuddy/compare/v0.39.0...v0.40.0) (2026-05-20)
+
+
+### Features
+
+* add cover art, season range and status to search results ([#742](https://github.com/justb81/watchbuddy/issues/742)) ([954522e](https://github.com/justb81/watchbuddy/commit/954522ee1db809ef774cf8fbef2e855857a2c111)), closes [#730](https://github.com/justb81/watchbuddy/issues/730)
+
+
+### Bug Fixes
+
+* show added via search appears in list immediately ([#744](https://github.com/justb81/watchbuddy/issues/744)) ([5435e1b](https://github.com/justb81/watchbuddy/commit/5435e1b0ecf23b35f705f678ae61392564c914b6)), closes [#731](https://github.com/justb81/watchbuddy/issues/731)
+
 ## [0.39.0](https://github.com/justb81/watchbuddy/compare/v0.38.0...v0.39.0) (2026-05-17)
 
 
