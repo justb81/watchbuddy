@@ -593,4 +593,3 @@ private fun ProviderCatalogSection(
         ),
     )
 }
-
