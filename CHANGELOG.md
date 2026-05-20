@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.41.0](https://github.com/justb81/watchbuddy/compare/v0.40.0...v0.41.0) (2026-05-20)
+
+
+### Features
+
+* **tv:** remove scrobbling subsystem from TV app and core ([#749](https://github.com/justb81/watchbuddy/issues/749)) ([0205743](https://github.com/justb81/watchbuddy/commit/0205743df8349e66529c2ff13c3ea5589697372d)), closes [#741](https://github.com/justb81/watchbuddy/issues/741)
+
+
+### Bug Fixes
+
+* remove redundant TV connection badge below connection toggle ([#746](https://github.com/justb81/watchbuddy/issues/746)) ([6bda17b](https://github.com/justb81/watchbuddy/commit/6bda17b11fa25d2840e03ea03fb7312c3806e551)), closes [#740](https://github.com/justb81/watchbuddy/issues/740)
+* show connected phone user on TV home screen immediately after discovery ([#747](https://github.com/justb81/watchbuddy/issues/747)) ([6171388](https://github.com/justb81/watchbuddy/commit/617138817b061514fe0effba96d9e585330d17a8)), closes [#739](https://github.com/justb81/watchbuddy/issues/739)
+
 ## [0.40.0](https://github.com/justb81/watchbuddy/compare/v0.39.0...v0.40.0) (2026-05-20)
 
 
