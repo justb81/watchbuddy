@@ -70,9 +70,6 @@
     <string name="home_watching_tv_description">Connect with your TV for scrobbling</string>
     <string name="home_watching_tv_disabled_reason">Connect to Trakt and configure TMDB first</string>
     <string name="home_watching_tv_disabled_reason_no_wifi">Connect to a Wi-Fi network to watch with your TV</string>
-    <string name="home_tv_connected">TV connected</string>
-    <string name="home_tv_waiting">Waiting for TV…</string>
-
     <!-- Settings -->
     <string name="settings_title">Settings</string>
     <string name="settings_account">Account</string>
