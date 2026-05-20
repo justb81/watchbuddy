@@ -71,48 +71,7 @@ fun TvHomeScreen(
             .background(MaterialTheme.colorScheme.background)
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 48.dp, vertical = 24.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text       = stringResource(R.string.tv_home_title),
-                    fontSize   = 32.sp,
-                    fontWeight = FontWeight.Bold,
-                    color      = MaterialTheme.colorScheme.primary
-                )
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    when {
-                        uiState.activeViewers.isNotEmpty() -> {
-                            ActiveViewersRow(viewers = uiState.activeViewers)
-                        }
-                        uiState.isDiscoveryPending -> {
-                            DiscoveryPendingIndicator()
-                        }
-                        else -> {
-                            Text(
-                                text = stringResource(R.string.tv_no_phone),
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f)
-                            )
-                        }
-                    }
-
-                    OutlinedButton(
-                        onClick = onSettingsClick,
-                        scale = ButtonDefaults.scale(scale = 1f)
-                    ) { Text(stringResource(R.string.tv_settings_title)) }
-                }
-            }
-
+            TvHomeHeader(uiState = uiState, onSettingsClick = onSettingsClick)
             when {
                 uiState.isLoading -> {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -150,6 +109,43 @@ fun TvHomeScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+private fun TvHomeHeader(uiState: TvHomeUiState, onSettingsClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 48.dp, vertical = 24.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            text       = stringResource(R.string.tv_home_title),
+            fontSize   = 32.sp,
+            fontWeight = FontWeight.Bold,
+            color      = MaterialTheme.colorScheme.primary
+        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            when {
+                uiState.activeViewers.isNotEmpty() -> ActiveViewersRow(viewers = uiState.activeViewers)
+                uiState.isDiscoveryPending -> DiscoveryPendingIndicator()
+                else -> Text(
+                    text = stringResource(R.string.tv_no_phone),
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.4f)
+                )
+            }
+            OutlinedButton(
+                onClick = onSettingsClick,
+                scale = ButtonDefaults.scale(scale = 1f)
+            ) { Text(stringResource(R.string.tv_settings_title)) }
         }
     }
 }
