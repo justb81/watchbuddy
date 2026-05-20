@@ -4,7 +4,7 @@ This file provides context for AI coding agents (Claude, Copilot, Cursor, etc.) 
 
 ## Project Overview
 
-WatchBuddy is a two-app Android/Google TV ecosystem for cross-app series tracking. It scrobbles what the user watches across streaming apps, generates AI-powered "Previously on…" recaps via a local LLM on the phone, and deep-links into the correct streaming app — all backed by Trakt and TMDB.
+WatchBuddy is a two-app Android/Google TV ecosystem for cross-app series tracking. It tracks watched episodes via manual mark-as-watched, generates AI-powered "Previously on…" recaps via a local LLM on the phone, and deep-links into the correct streaming app — all backed by Trakt and TMDB.
 
 ## Repository Structure
 
@@ -19,7 +19,7 @@ watchbuddy/
 │       │   ├── network/     WifiStateProvider (Wi-Fi connectivity state for HomeViewModel and CompanionService)
 │       │   ├── permissions/ Runtime-permission helpers (BLE advertise, notifications)
 │       │   ├── server/      CompanionHttpServer (Ktor, port 8765), DeviceCapabilityProvider, ShowRepository (reactive `shows` StateFlow), EpisodeRepository (10-min per-show TTL + sync/history writes)
-│       │   │   └── routes/  Per-feature Ktor route extensions: CapabilityRoutes, ProviderCatalogRoutes, AvatarRoutes, ShowsRoutes, RecapRoutes, ScrobbleRoutes, WatchedRoutes; shared ServerModels
+│       │   │   └── routes/  Per-feature Ktor route extensions: CapabilityRoutes, ProviderCatalogRoutes, AvatarRoutes, ShowsRoutes, RecapRoutes, WatchedRoutes; shared ServerModels
 │       │   ├── settings/    AppSettings, SettingsRepository (DataStore), AvatarImageStore (custom-photo JPEG)
 │       │   └── ui/          MainActivity, PhoneNavGraph
 │       │       ├── diagnostics/ DiagnosticsScreen, DiagnosticsViewModel (Wi-Fi / HTTP / BLE live health + Share diagnostics)
@@ -36,15 +36,13 @@ watchbuddy/
 │       ├── boot/       BootReceiver (starts TvDiscoveryService on BOOT_COMPLETED when autostart is enabled)
 │       ├── data/       StreamingPreferencesRepository (phone-discovery / autostart / showNonInstalledProviders), TvShowCache, WatchProvidersRepository (TMDB watch providers, 24 h cache), LastUsedProviderRepository (TV-local per-show last-used provider), JustWatchDeepLinkRepository + JustWatchDeepLinkDao + JustWatchDeepLinkDatabase (Room-backed per-episode deep link cache)
 │       ├── di/         AppModule (Hilt dependency injection), ApplicationScope qualifier (@ApplicationScope CoroutineScope for goAsync in BootReceiver)
-│       ├── discovery/  PhoneDiscoveryManager, PhoneApiService, PhoneApiClientFactory, PhoneTitleExtractionClient (TitleExtractor → best phone's /scrobble/extract), TvDiscoveryService (foreground service — keeps discovery alive post-boot), InstalledAppsProbe (PackageManager cache, invalidated on install/remove)
-│       ├── scrobbler/  TvScrobbleDispatcher, TvWatchedShowSource, WatchNextMetadataSource, NotificationMetadataSource, WatchBuddyNotificationListener
+│       ├── discovery/  PhoneDiscoveryManager, PhoneApiService, PhoneApiClientFactory, TvDiscoveryService (foreground service — keeps discovery alive post-boot), InstalledAppsProbe (PackageManager cache, invalidated on install/remove)
 │       └── ui/         TvMainActivity, TvNavGraph
 │           ├── components/ InitialsAvatar
 │           ├── home/       TvHomeScreen, TvHomeViewModel (active viewers derived from discovered phones)
 │           ├── navigation/ TvNavGraph
 │           ├── recap/      RecapScreen, RecapViewModel
 │           ├── diagnostics/ TvDiagnosticsScreen, TvDiagnosticsViewModel (discovery / BLE / discovered-phones health — view-only, no Share)
-│           ├── scrobble/   ScrobbleOverlay, ScrobbleViewModel
 │           ├── settings/   TvSettingsScreen + TvSettingsViewModel (settings hub — discovery, autostart, show-non-installed toggle, diagnostics)
 │           ├── showdetail/ ShowDetailScreen, AllEpisodesScreen, ShowDetailViewModel (next-episode still + TMDB watch providers + installed-app filter + last-used ranking + JustWatch deep links; `NextEpisodeUiState`, `ProviderListUiState`, `DeepLinkState` flows; one-tap "Mark as watched" button — `MarkWatchedState` sealed interface, `markCurrentEpisodeWatched` fan-out to all phones via `POST /watched`, `advancedEntry` optimistic-advance flow with `AnimatedContent` slide transition; "All Episodes" button navigates to AllEpisodesScreen — full-screen D-pad-navigable episode list with per-episode watched toggle)
 │           └── theme/      TV Material theme
@@ -62,7 +60,7 @@ watchbuddy/
 │       ├── model/      Data models (Kotlin Serialization)
 │       ├── network/    NetworkModule (Hilt, OkHttp, Retrofit), SharedJson (WatchBuddyJson shared instance)
 │       ├── progress/   ShowProgressCalculator
-│       ├── scrobbler/  MediaSessionScrobbler, ScrobbleContracts, EpisodeMarkerExtractor (pure marker extraction), EpisodeResolution (pure episode resolution — `resolveEpisodeFromMetadata`, `EpisodeResolutionResult`, `ResolveSource`)
+│       ├── scrobbler/  AppProfiles (per-streaming-app metadata hints used by the phone's LlmTitleExtractor)
 │       ├── tmdb/       TmdbApiService (+ `getWatchProviders` endpoint + `TmdbImageHelper.logo`)
 │       └── trakt/      TraktApiService, TokenProxyService
 ├── backend/            Node.js token proxy (Docker)
@@ -234,7 +232,7 @@ If you change either workflow's `paths-filter`, update `scripts/precommit.sh` in
 | Purpose | Prefix | Example |
 |---------|--------|---------|
 | New feature | `feature/` | `feature/add-watchlist-filter` |
-| Bug fix | `fix/` | `fix/scrobble-confidence-threshold` |
+| Bug fix | `fix/` | `fix/deep-link-resolution` |
 | Documentation | `docs/` | `docs/update-architecture` |
 | Chore / maintenance | `chore/` | `chore/upgrade-litertlm` |
 | Release (automated) | `release-please--` | `release-please--branches--main` |

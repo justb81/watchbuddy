@@ -6,12 +6,11 @@ import com.justb81.watchbuddy.core.model.LibraryHint
 import com.justb81.watchbuddy.core.model.MediaMetadataSnapshot
 import com.justb81.watchbuddy.core.model.TitleExtractionResponse
 import com.justb81.watchbuddy.core.network.WatchBuddyJson
-import com.justb81.watchbuddy.core.scrobbler.AppProfiles
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Phone-side last-resort fallback for [MediaSessionScrobbler][com.justb81.watchbuddy.core.scrobbler.MediaSessionScrobbler].
+ * Phone-side LLM-based title extractor.
  *
  * Receives a raw `MediaMetadataSnapshot` (every field the streaming app shipped)
  * plus a list of library hints (shows the user already watches), asks the
@@ -21,9 +20,6 @@ import javax.inject.Singleton
  *   - If the LLM claims a `libraryTraktId`, that ID must appear in the hint
  *     list — otherwise the field is cleared (blocks hallucinated IDs).
  *   - Confidence is clamped to `[0, 1]`.
- *
- * The scrobbler does its own cache match against the normalized title, so even
- * a successful LLM result never bypasses library membership checks.
  */
 @Singleton
 class LlmTitleExtractor @Inject constructor(
@@ -166,9 +162,6 @@ class LlmTitleExtractor @Inject constructor(
             }
             "{${parts.joinToString(",")}}"
         }
-        val appNote = AppProfiles.forPackage(snapshot.packageName)?.llmHint
-            ?.let { "\nApp-specific note: $it" }
-            .orEmpty()
         return """
 You extract TV-show metadata from Android MediaSession fields published by
 streaming apps (Netflix, Prime Video, Disney+, Plex, Jellyfin, YouTube, etc.).
@@ -181,7 +174,7 @@ ${snapshot.text}
 Shows the user already watches (prefer matching one of these if plausible):
 [
 $hintsJson
-]$appNote
+]
 
 Return ONLY a single JSON object — no prose, no markdown, no code fences.
 

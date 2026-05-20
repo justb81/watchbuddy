@@ -2,7 +2,6 @@ package com.justb81.watchbuddy.tv.ui.navigation
 
 import androidx.compose.runtime.*
 import androidx.compose.ui.res.stringResource
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -11,8 +10,6 @@ import com.justb81.watchbuddy.core.model.EnrichedShowEntry
 import com.justb81.watchbuddy.tv.ui.diagnostics.TvDiagnosticsScreen
 import com.justb81.watchbuddy.tv.ui.home.TvHomeScreen
 import com.justb81.watchbuddy.tv.ui.recap.RecapScreen
-import com.justb81.watchbuddy.tv.ui.scrobble.ScrobbleOverlay
-import com.justb81.watchbuddy.tv.ui.scrobble.ScrobbleViewModel
 import com.justb81.watchbuddy.tv.ui.settings.TvSettingsScreen
 import com.justb81.watchbuddy.tv.ui.showdetail.AllEpisodesScreen
 import com.justb81.watchbuddy.tv.ui.showdetail.ShowDetailScreen
@@ -91,26 +88,5 @@ fun TvNavGraph() {
         composable(TvRoute.Diagnostics.route) {
             TvDiagnosticsScreen(onBack = { navController.popBackStack() })
         }
-    }
-
-    // Scrobble overlay — isolated in its own host so ScrobbleViewModel (and its
-    // transitive singletons: MediaSessionScrobbler → PhoneDiscoveryManager) are
-    // only instantiated once the Nav tree is up and running. Previously this
-    // viewModel was requested at the top of TvNavGraph, which meant any
-    // exception inside those singletons' constructors would throw during the
-    // very first composition and prevent the app from ever drawing a frame.
-    ScrobbleOverlayHost()
-}
-
-@Composable
-private fun ScrobbleOverlayHost() {
-    val vm: ScrobbleViewModel = hiltViewModel()
-    val pending by vm.pendingCandidate.collectAsState()
-    pending?.let { candidate ->
-        ScrobbleOverlay(
-            candidate = candidate,
-            onConfirm = { vm.confirmScrobble() },
-            onDismiss = { vm.dismissScrobble() }
-        )
     }
 }

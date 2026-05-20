@@ -5,12 +5,12 @@
 ```mermaid
 graph TB
     subgraph WIFI["LOCAL WIFI NETWORK"]
-        TV["Google TV (app-tv)\n─────────────\nUI · Display\nBLE Scanner\nWebView\nMediaSession Scrobbler"]
+        TV["Google TV (app-tv)\n─────────────\nUI · Display\nBLE Scanner\nWebView"]
         Phone["Android Phone(s) (app-phone)\n─────────────\nLLM (Gemma / AICore)\nBLE Advertiser · HTTP API\nTrakt Auth"]
         TV <-->|"BLE beacon + HTTP (port 8765)"| Phone
     end
 
-    Phone -->|“OAuth · sync · scrobble”| Trakt["Trakt API\ntrakt.tv/api\nRate: 1 000 / 5 min"]
+    Phone -->|”OAuth · sync · watched history”| Trakt[“Trakt API\ntrakt.tv/api\nRate: 1 000 / 5 min”]
     Phone -->|"Token exchange"| Backend["Token Proxy Backend\n(backend/ — Docker)\nInjects client_secret"]
     Phone -->|"Recap: episode metadata\nHome: poster images"| TMDB["TMDB API\napi.tmdb.org\n(per-user key)"]
     TV -->|"Title search\nShow / image data"| TMDB
@@ -71,12 +71,7 @@ Route handlers live under `phone/server/routes/` as per-feature Ktor extension f
 | GET | `/avatar` | Custom avatar JPEG (200 bytes, ETag-revalidated; 404 when `avatarSource != CUSTOM`) |
 | GET | `/shows` | User's Trakt watched shows (cached), paginated via `offset` + `limit` query params |
 | POST | `/recap/{traktShowId}` | Generate HTML recap for a show |
-| POST | `/scrobble/start` | Forward scrobble start to this user's Trakt account |
-| POST | `/scrobble/pause` | Forward scrobble pause to this user's Trakt account |
-| POST | `/scrobble/stop` | Forward scrobble stop to this user's Trakt account |
-| POST | `/scrobble/extract` | LLM fallback — accepts a `MediaMetadataSnapshot` + library hints, returns normalized `(showTitle, season?, episode?, confidence)`. TV calls this only when the deterministic multi-field + fuzzy-match cascade misses (< 0.70 cache confidence). 90 s client / 75 s server budget absorbs cold LiteRT-LM inference; per-raw-title in-flight dedup on the TV side prevents the 30 s `MediaSession` poll cycle from stacking duplicate inferences. |
-| POST | `/scrobble/prompt` | Delivers an `AmbiguousScrobbleEvent` (top-3 candidates) to the phone; the phone presents a notification and/or in-app card so the user can pick the correct show. Returns HTTP 204 No Content. (#474) |
-| POST | `/shows/add-to-library` | Adds a `PhoneAddToLibraryRequest` episode to the user's Trakt history. Called after the TV overlay confirmation for an unknown show. Invalidates the local show cache on success. |
+| POST | `/watched` | Marks an episode as watched on this user's Trakt account; invalidates the local show cache |
 
 **TV app API boundaries:**
 - **TMDB API** — show/movie details, images, search (direct call from TV using key from `/capability`)
@@ -96,7 +91,7 @@ this flow.
 `CompanionService` (foreground service on the phone) starts the Ktor HTTP server
 and the BLE advertiser together in `onCreate`, and tears them down in `onDestroy`.
 `CompanionStateManager` is the shared singleton that holds the `DeviceCapability`
-and any in-flight scrobble session, so multiple Ktor coroutines and the BLE layer
+and the current device state, so multiple Ktor coroutines and the BLE layer
 can read/write it without a direct dependency on the `Service` object.
 
 ## LLM Strategy
@@ -126,32 +121,7 @@ or title-extraction call.
 The TV validates `confidence` (clamped server-side to `[0.0, 1.0]`) and only uses
 the response when it is ≥ 0.40.
 
-## Scrobbling Flow
-
-```mermaid
-flowchart TD
-    Poll["MediaSession on TV\n(polled every 30 s)"] --> Extract["Extract: package name + media title"]
-    Extract --> Cache["Fuzzy match against local show cache\n(Levenshtein distance)"]
-    Cache -->|"No confident match"| TMDBSearch["TMDB searchTv() fallback\n(key from best phone's /capability)"]
-    Cache --> Conf{"Confidence?"}
-    TMDBSearch --> Conf
-    Conf -->|">= 95%"| Auto["Auto-scrobble"]
-    Conf -->|"70 – 95%"| Overlay["ScrobbleOverlay:\nuser confirms or rejects"]
-    Conf -->|"< 70%"| Ignore["Ignored"]
-    Overlay -->|"Confirmed or 15 s timeout"| Auto
-    Overlay -->|"Rejected"| Ignore
-    Auto --> Parallel["For each connected phone (in parallel):\nPOST /scrobble/start\nphone forwards to Trakt internally\nfailures isolated per user"]
-```
-
-Multi-user: when multiple phones are connected, each user's watch history is recorded
-independently — one `/scrobble/*` call per phone, in parallel. A failure for one user
-does not block the others. The TV never calls the Trakt API directly for any operation.
-
-**Episode resolution** is handled by two pure functions in `core/scrobbler/`:
-- `EpisodeMarkerExtractor` — builds pattern lists from an `AppProfile` and extracts `(season, episode)` markers from text fields. No I/O or side effects.
-- `resolveEpisodeFromMetadata()` — given an optional explicit marker, a fetched `TmdbProgressHint`, a confidence score, and tuning constants, returns a sealed `EpisodeResolutionResult` (`Resolved`, `Ambiguous`, or `Unresolved`). No I/O or side effects; `MediaSessionScrobbler` injects `DiagnosticLog` calls at the call boundary.
-
-## Manual Watched-State Marking (Phone)
+## Watched-State Marking
 
 Tapping a show on the phone `HomeScreen` opens `ShowDetailScreen`. The detail view
 fetches the full season / episode structure for that show via Trakt
@@ -171,7 +141,7 @@ stateDiagram-v2
     [*] --> Stopped
     Stopped --> Starting : startForegroundService()
     Starting --> Running : onStartCommand→ Ktor + BLE ready
-    Running --> Running : periodic /watched, /scrobble/* calls from TV(s)
+    Running --> Running : periodic /capability + /watched calls from TV(s)
     Running --> Stopping : stopSelf() or user swipes notification
     Stopping --> Stopped : onDestroy → server.stop() + BLE.stopAdvertising()
 ```
@@ -187,11 +157,9 @@ and exposes a `StateFlow<Boolean>`. `HomeViewModel` collects it and shows a
 not stop when Wi-Fi is lost — it keeps the server alive so the TV can reconnect
 immediately when Wi-Fi returns, without requiring the user to restart the service.
 
-**Handoff on reconnect:** When the TV's BLE scanner finds the phone's advertisement
+**Handoff on reconnect:** When the TV’s BLE scanner finds the phone’s advertisement
 again after a gap, it re-calls `/capability` and gets a fresh `DeviceCapability`
-bundle. Because the phone’s `lastResolvedSessionKey` is included in every
-`/capability` response, the TV can discard the pending `AmbiguousScrobbleEvent`
-for that session without an extra round-trip.
+bundle.
 
 ## Presence Heartbeat (TV)
 
@@ -201,7 +169,7 @@ sequenceDiagram
     participant Phone as CompanionService (HTTP / BLE)
     loop every 30 s
         TV->>Phone: GET /capability
-        Phone-->>TV: DeviceCapability (LLM score, TMDB key, scrobble state)
+        Phone-->>TV: DeviceCapability (LLM score, TMDB key, country code)
         TV->>TV: update PhoneDevice.lastSeenMs
     end
     TV->>TV: mark unreachable if gap > 90 s
@@ -236,20 +204,11 @@ thread-safe).
 `TvDiagnosticsViewModel` surfaces:
 - **Discovery** — list of discovered phones with IP, model quality, last-seen delta
 - **BLE scanner** — scan state and last-seen timestamp
-- **Scrobble** — current scrobble session state (show + episode + confidence)
 - **Deep links** — JustWatch cache stats (count, negative count, last-fetch timestamp) + "Clear cache" button
 
 The TV diagnostics screen is view-only (no Share button). The "Clear cache" button
 calls `JustWatchDeepLinkRepository.clearAll()` and updates the displayed counts
 immediately.
-
-## Scrobble Event Display (Phone)
-
-When the TV sends `POST /scrobble/start` the phone records a `ScrobbleDisplayEvent`
-(show + episode + progress + timestamp) in a `MutableStateFlow`. The phone UI shows
-a transient "Now watching" card via `HomeViewModel.currentScrobble`. The card
-automatically fades after the TV sends `POST /scrobble/stop` or after a 5-minute
-timeout.
 
 ## Secret Storage Strategy
 
@@ -336,6 +295,6 @@ The available-provider list for each show is fetched from TMDB `/tv/{id}/watch/p
 2. **Installed** providers (cross-referenced with `InstalledAppsProbe` via `PackageManager`)
 3. **Not-installed** providers (only when "Show unavailable services" setting is on)
 
-The last-used entry is recorded when the user taps a provider chip or a confirmed scrobble is attributed to a known package. `InstalledAppsProbe` caches installed packages and invalidates on `ACTION_PACKAGE_ADDED`/`ACTION_PACKAGE_REMOVED`.
+The last-used entry is recorded when the user taps a provider chip. `InstalledAppsProbe` caches installed packages and invalidates on `ACTION_PACKAGE_ADDED`/`ACTION_PACKAGE_REMOVED`.
 
 All known streaming package names are declared in a `<queries>` block in `app-tv/AndroidManifest.xml` so PackageManager reports them on Android 11+.

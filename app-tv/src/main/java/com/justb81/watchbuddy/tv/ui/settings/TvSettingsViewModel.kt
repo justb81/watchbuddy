@@ -1,7 +1,5 @@
 package com.justb81.watchbuddy.tv.ui.settings
 
-import android.app.Application
-import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
@@ -22,14 +20,11 @@ import javax.inject.Inject
 data class TvSettingsUiState(
     val isPhoneDiscoveryEnabled: Boolean = true,
     val isAutostartEnabled: Boolean = false,
-    val isNotificationAccessGranted: Boolean = false,
     val showNonInstalledProviders: Boolean = false,
-    val debugLogMediaSession: Boolean = false,
 )
 
 @HiltViewModel
 class TvSettingsViewModel @Inject constructor(
-    private val application: Application,
     private val repository: StreamingPreferencesRepository,
 ) : ViewModel() {
 
@@ -44,15 +39,13 @@ class TvSettingsViewModel @Inject constructor(
         viewModelScope.launch(exceptionHandler, block = block)
 
     init {
-        refreshNotificationAccess()
         launchSafe {
             combine(
                 repository.isPhoneDiscoveryEnabled,
                 repository.isAutostartEnabled,
                 repository.showNonInstalledProviders,
-                repository.debugLogMediaSession,
-            ) { discovery, autostart, nonInstalled, debugLog ->
-                Snapshot(discovery, autostart, nonInstalled, debugLog)
+            ) { discovery, autostart, nonInstalled ->
+                Snapshot(discovery, autostart, nonInstalled)
             }
                 .catch { e -> DiagnosticLog.error(TAG, "tv settings observation failed", e) }
                 .collect { snapshot ->
@@ -61,7 +54,6 @@ class TvSettingsViewModel @Inject constructor(
                             isPhoneDiscoveryEnabled = snapshot.discovery,
                             isAutostartEnabled = snapshot.autostart,
                             showNonInstalledProviders = snapshot.nonInstalled,
-                            debugLogMediaSession = snapshot.debugLog,
                         )
                     }
                 }
@@ -72,7 +64,6 @@ class TvSettingsViewModel @Inject constructor(
         val discovery: Boolean,
         val autostart: Boolean,
         val nonInstalled: Boolean,
-        val debugLog: Boolean,
     )
 
     fun setPhoneDiscoveryEnabled(enabled: Boolean) {
@@ -88,27 +79,6 @@ class TvSettingsViewModel @Inject constructor(
     fun setShowNonInstalledProviders(show: Boolean) {
         _uiState.update { it.copy(showNonInstalledProviders = show) }
         launchSafe { repository.setShowNonInstalledProviders(show) }
-    }
-
-    fun setDebugLogMediaSession(enabled: Boolean) {
-        _uiState.update { it.copy(debugLogMediaSession = enabled) }
-        launchSafe { repository.setDebugLogMediaSession(enabled) }
-    }
-
-    /**
-     * Re-read the system notification-access allowlist. Called from the UI
-     * on every ON_RESUME because there is no broadcast to observe — the user
-     * flips the toggle in system Settings and we only learn about it on
-     * return to our own screen. Wrapped in runCatching so unit tests (which
-     * run against a stubbed Android JAR) don't throw on the static
-     * android.provider.Settings.Secure lookup inside NotificationManagerCompat.
-     */
-    fun refreshNotificationAccess() {
-        val granted = runCatching {
-            NotificationManagerCompat.getEnabledListenerPackages(application)
-                .contains(application.packageName)
-        }.getOrDefault(false)
-        _uiState.update { it.copy(isNotificationAccessGranted = granted) }
     }
 
     companion object {

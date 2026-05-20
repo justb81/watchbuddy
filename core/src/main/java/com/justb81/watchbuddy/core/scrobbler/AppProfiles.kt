@@ -5,25 +5,17 @@ package com.justb81.watchbuddy.core.scrobbler
  *
  * Captures stable, well-known behaviour differences between streaming apps: which
  * source-tag lines carry the show title, what S/E marker format they use, and
- * whether Phase 1 cache-match should be skipped entirely.
+ * any app-specific hints for the LLM title extractor.
  *
  * Adding a profile is a one-line PR + a unit-test fixture. There is no remote
  * config — profiles ship in the APK and are version-controlled.
- *
- * **How to add a new profile** (when a streaming app shows up in TV Diagnostics
- * without a profile):
- * 1. Capture a MediaSession dump: `adb shell dumpsys media_session` while playing.
- * 2. Capture a notification dump: `adb shell dumpsys notification --noredact`.
- * 3. Identify which source tag holds the show title and how the S/E marker is encoded.
- * 4. Add an `AppProfile(...)` entry + an `AppProfilesTest` fixture. Ship.
  */
 data class AppProfile(
     val packageName: String,
     /**
      * Source-tag prefixes to hoist before the default line order. Lines whose tag
      * starts with any prefix here are scored first; within this group the registry
-     * order is preserved. Uses the same tag namespace as [MediaSnapshotBuilder]:
-     * `mediaSession.*`, `notification.*`, `watchNext.*`.
+     * order is preserved.
      */
     val preferredSourceTags: List<String> = emptyList(),
     /**

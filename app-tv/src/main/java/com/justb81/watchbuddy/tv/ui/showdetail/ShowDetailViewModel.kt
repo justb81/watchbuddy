@@ -10,8 +10,6 @@ import com.justb81.watchbuddy.core.model.TraktSeasonWithEpisodes
 import com.justb81.watchbuddy.core.model.TraktWatchedEpisode
 import com.justb81.watchbuddy.core.model.TraktWatchedSeason
 import com.justb81.watchbuddy.core.progress.ShowProgressCalculator
-import com.justb81.watchbuddy.core.scrobbler.PlaybackIntent
-import com.justb81.watchbuddy.core.scrobbler.PlaybackIntentProvider
 import com.justb81.watchbuddy.core.tmdb.TmdbApiService
 import com.justb81.watchbuddy.core.tmdb.TmdbImageHelper
 import com.justb81.watchbuddy.tv.data.JustWatchDeepLinkRepository
@@ -202,7 +200,6 @@ class ShowDetailViewModel @Inject constructor(
     private val phoneDiscovery: PhoneDiscoveryManager,
     private val tmdbApi: TmdbApiService,
     private val justWatchRepo: JustWatchDeepLinkRepository,
-    private val intentProvider: PlaybackIntentProvider,
     private val clientFactory: PhoneApiClientFactory,
 ) : ViewModel() {
 
@@ -375,30 +372,13 @@ class ShowDetailViewModel @Inject constructor(
     }
 
     /**
-     * Records [provider] as last-used for this show and captures a [PlaybackIntent] for Phase 0
-     * scrobble hinting. Returns the JustWatch URL if already resolved, falling back to
-     * [ResolvedProvider.tmdbPageUrl].
+     * Records [provider] as last-used for this show and returns the JustWatch URL
+     * if already resolved, falling back to [ResolvedProvider.tmdbPageUrl].
      */
     fun onProviderSelected(provider: ResolvedProvider, enriched: EnrichedShowEntry): String? {
         val tmdbId = enriched.entry.show.ids.tmdb
         if (tmdbId != null) {
             viewModelScope.launch { lastUsedRepo.recordUsed(tmdbId, provider.providerId) }
-        }
-        // Capture Watch-Now intent before launching the streaming app so Phase 0 can short-circuit
-        // the scrobble cascade when the media session appears on the matching package.
-        val pkgName = provider.packageName
-        val nextEp = ShowProgressCalculator.nextUnwatchedEpisodeNumbers(enriched.entry, enriched.tmdb)
-        if (pkgName != null && nextEp != null) {
-            intentProvider.record(
-                PlaybackIntent(
-                    showIds = enriched.entry.show.ids,
-                    showTitle = enriched.entry.show.title,
-                    season = nextEp.first,
-                    episode = nextEp.second,
-                    providerPackageName = pkgName,
-                    capturedAtMs = System.currentTimeMillis(),
-                ),
-            )
         }
         return when (val linkState = _deepLinks.value[provider.providerId]) {
             is DeepLinkState.Available -> linkState.url
@@ -440,12 +420,10 @@ class ShowDetailViewModel @Inject constructor(
             }
             _markWatchedState.value = MarkWatchedState.Loading
 
-            val pendingKey = phones.firstNotNullOfOrNull { it.capability?.lastResolvedSessionKey }
             val request = WatchedToggleRequest(
                 showIds = enriched.entry.show.ids,
                 season = season,
                 episode = episode,
-                resolvesSessionKey = pendingKey,
             )
 
             data class PhoneResult(val success: Boolean)

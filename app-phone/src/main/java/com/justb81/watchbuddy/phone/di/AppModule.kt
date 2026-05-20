@@ -9,12 +9,6 @@ import androidx.datastore.preferences.preferencesDataStore
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.work.WorkManager
 import com.justb81.watchbuddy.BuildConfig
-import com.justb81.watchbuddy.core.scrobbler.MetadataEnricher
-import com.justb81.watchbuddy.core.scrobbler.NoOpPlaybackIntentProvider
-import com.justb81.watchbuddy.core.scrobbler.NoOpTitleExtractor
-import com.justb81.watchbuddy.core.scrobbler.PlaybackIntentProvider
-import com.justb81.watchbuddy.core.scrobbler.ScrobbleTuning
-import com.justb81.watchbuddy.core.scrobbler.TitleExtractor
 import com.justb81.watchbuddy.phone.data.ProviderCatalogRepository
 import com.justb81.watchbuddy.phone.network.WifiStateProvider
 import dagger.Module
@@ -92,39 +86,6 @@ object AppModule {
     @Singleton
     fun provideWorkManager(@ApplicationContext context: Context): WorkManager =
         WorkManager.getInstance(context)
-
-    /**
-     * The phone doesn't run [com.justb81.watchbuddy.core.scrobbler.MediaSessionScrobbler]
-     * today, but the core module binds the scrobbler as `@Singleton @Inject`, so the
-     * graph still has to resolve its [TitleExtractor] dependency. The phone binds
-     * [NoOpTitleExtractor] — if phone-side scrobbling is ever enabled, the phone
-     * has the Trakt library in-process and can match without the HTTP detour.
-     */
-    @Provides
-    @Singleton
-    fun provideTitleExtractor(): TitleExtractor = NoOpTitleExtractor
-
-    /** No enrichers registered in the phone app yet; populated per-app via Hilt. */
-    @Provides
-    @Singleton
-    fun provideMetadataEnrichers(): List<MetadataEnricher> = emptyList()
-
-    /**
-     * The phone has no Watch-Now UI surface today, so there is nothing to capture
-     * for Phase 0. Bind the no-op to keep the Hilt graph consistent with the TV app.
-     */
-    @Provides
-    @Singleton
-    fun providePlaybackIntentProvider(): PlaybackIntentProvider = NoOpPlaybackIntentProvider()
-
-    /**
-     * Production scrobble-tuning constants. Inject [ScrobbleTuning] rather than
-     * reading [ScrobbleTuning.DEFAULT] directly so tests can substitute a custom
-     * instance without subclassing [MediaSessionScrobbler].
-     */
-    @Provides
-    @Singleton
-    fun provideScrobbleTuning(): ScrobbleTuning = ScrobbleTuning.DEFAULT
 
     /**
      * Singleton [WifiStateProvider] wired to the process lifecycle so its

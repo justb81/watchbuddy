@@ -207,27 +207,14 @@ data class PlaybackTick(
     }
 }
 
-@Serializable
-data class ScrobbleCandidate(
-    val packageName: String,
-    val mediaTitle: String,
-    val confidence: Float,              // 0.0–1.0
-    val matchedShow: TraktShow? = null,
-    val matchedEpisode: TraktEpisode? = null
-) {
-    /** True when the cascade matched via TMDB but the show has no Trakt ID — not yet in the user's library. */
-    fun isUnknownShow(): Boolean = matchedShow?.ids?.trakt == null && matchedShow?.ids?.tmdb != null
-}
-
 /**
  * One stable string of evidence per session tick, plus the package name.
  *
  * [text] is a newline-joined sequence of `"<sourceTag>: <value>"` lines written
- * in priority order by [com.justb81.watchbuddy.core.scrobbler.MediaSnapshotBuilder].
- * For the MediaSession-only case the tag prefix is `mediaSession.*`. Additional
- * enrichers (#471, #472) append their own prefixed lines without changing the schema.
+ * in priority order by the snapshot builder. The tag prefix is `mediaSession.*`
+ * for core fields.
  *
- * [sources] records which enrichers contributed; used for diagnostics only.
+ * [sources] records which sources contributed; used for diagnostics only.
  */
 @Serializable
 data class MediaMetadataSnapshot(
@@ -315,15 +302,15 @@ data class AmbiguousCandidate(
 )
 
 /**
- * Emitted by [MediaSessionScrobbler] when Phase 1/2/3 all fail to clear the
- * [OVERLAY_THRESHOLD] but at least one candidate scores ≥ [AMBIGUOUS_THRESHOLD].
+ * Emitted when title-matching fails to produce a high-confidence result but at
+ * least one candidate scores above the ambiguous threshold.
  *
- * The TV fans this to every connected phone via `POST /scrobble/prompt`. The phone
- * presents a notification and/or in-app card so the user can pick the correct show.
+ * The phone presents a notification and/or in-app card so the user can pick the
+ * correct show.
  *
  * [sessionKey] identifies the MediaSession that triggered this prompt; it is used
- * for dedup (the TV won't re-dispatch the same session) and for clearing the prompt
- * after resolution (the phone reports back via [DeviceCapability.lastResolvedSessionKey]).
+ * for dedup and for clearing the prompt after resolution (the phone reports back
+ * via [DeviceCapability.lastResolvedSessionKey]).
  */
 @Serializable
 data class AmbiguousScrobbleEvent(
