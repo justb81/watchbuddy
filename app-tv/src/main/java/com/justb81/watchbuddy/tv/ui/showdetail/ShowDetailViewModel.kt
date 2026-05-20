@@ -420,12 +420,10 @@ class ShowDetailViewModel @Inject constructor(
             }
             _markWatchedState.value = MarkWatchedState.Loading
 
-            val pendingKey = phones.firstNotNullOfOrNull { it.capability?.lastResolvedSessionKey }
             val request = WatchedToggleRequest(
                 showIds = enriched.entry.show.ids,
                 season = season,
                 episode = episode,
-                resolvesSessionKey = pendingKey,
             )
 
             data class PhoneResult(val success: Boolean)
