@@ -125,5 +125,4 @@ class TvSettingsViewModelTest {
         val errors = DiagnosticLog.snapshot().filter { it.level == DiagnosticLog.Level.ERROR }
         assertTrue(errors.any { it.message.contains("tv settings write failed") })
     }
-
 }

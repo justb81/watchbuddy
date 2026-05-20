@@ -1,6 +1,5 @@
 package com.justb81.watchbuddy.tv.ui.diagnostics
 
-import android.app.Application
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.tv.MainDispatcherRule
 import com.justb81.watchbuddy.tv.data.CatalogSource
@@ -33,7 +32,6 @@ class TvDiagnosticsViewModelTest {
         val mainDispatcherRule = MainDispatcherRule()
     }
 
-    private val application: Application = mockk(relaxed = true)
     private val phoneDiscovery: PhoneDiscoveryManager = mockk(relaxed = true)
     private val justWatchRepo: JustWatchDeepLinkRepository = mockk(relaxed = true)
     private val catalogRepository: TvProviderCatalogRepository = mockk(relaxed = true)
@@ -67,7 +65,7 @@ class TvDiagnosticsViewModelTest {
     @Test
     fun `recentEvents is empty on fresh VM`() = runTest {
         val vm = TvDiagnosticsViewModel(
-            application, phoneDiscovery, justWatchRepo, catalogRepository,
+            phoneDiscovery, justWatchRepo, catalogRepository,
         )
         advanceUntilIdle()
 
@@ -77,7 +75,7 @@ class TvDiagnosticsViewModelTest {
     @Test
     fun `single event is projected with correct level and newest-first order`() = runTest {
         val vm = TvDiagnosticsViewModel(
-            application, phoneDiscovery, justWatchRepo, catalogRepository,
+            phoneDiscovery, justWatchRepo, catalogRepository,
         )
         advanceUntilIdle()
 
@@ -94,7 +92,7 @@ class TvDiagnosticsViewModelTest {
     @Test
     fun `recentEvents is truncated to 100 entries newest first`() = runTest {
         val vm = TvDiagnosticsViewModel(
-            application, phoneDiscovery, justWatchRepo, catalogRepository,
+            phoneDiscovery, justWatchRepo, catalogRepository,
         )
         advanceUntilIdle()
 
@@ -112,7 +110,7 @@ class TvDiagnosticsViewModelTest {
         coEvery { justWatchRepo.count() } returnsMany listOf(5, 0)
         coEvery { justWatchRepo.negativeCount() } returnsMany listOf(3, 0)
         val vm = TvDiagnosticsViewModel(
-            application, phoneDiscovery, justWatchRepo, catalogRepository,
+            phoneDiscovery, justWatchRepo, catalogRepository,
         )
         advanceUntilIdle()
 

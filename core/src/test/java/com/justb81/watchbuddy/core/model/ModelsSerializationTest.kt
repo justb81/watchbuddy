@@ -204,5 +204,4 @@ class ModelsSerializationTest {
             assertEquals(3, LlmBackend.entries.size)
         }
     }
-
 }

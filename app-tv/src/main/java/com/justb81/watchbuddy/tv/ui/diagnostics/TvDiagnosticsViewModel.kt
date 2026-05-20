@@ -1,6 +1,5 @@
 package com.justb81.watchbuddy.tv.ui.diagnostics
 
-import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.justb81.watchbuddy.BuildConfig
@@ -51,7 +50,6 @@ data class TvDiagnosticsUiState(
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class TvDiagnosticsViewModel @Inject constructor(
-    private val application: Application,
     phoneDiscovery: PhoneDiscoveryManager,
     private val justWatchRepo: JustWatchDeepLinkRepository,
     private val catalogRepository: TvProviderCatalogRepository,

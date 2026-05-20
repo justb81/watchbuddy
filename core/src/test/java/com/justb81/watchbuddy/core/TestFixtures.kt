@@ -84,5 +84,4 @@ object TestFixtures {
         freeRamMb = freeRamMb, isAvailable = isAvailable,
         tmdbConfigured = tmdbConfigured
     )
-
 }
