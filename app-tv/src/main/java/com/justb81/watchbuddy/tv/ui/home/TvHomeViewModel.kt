@@ -56,6 +56,12 @@ data class TvHomeUiState(
     val canLoadMore: Boolean = false,
     /** True when the displayed show list comes from the on-device persistent cache while the phone is offline. */
     val isShowingStaleCache: Boolean = false,
+    /**
+     * True while BLE discovery is running but no phone has been found yet.
+     * The connected-user section shows a pending indicator instead of the
+     * "no phone connected" label so the user knows a refresh is coming.
+     */
+    val isDiscoveryPending: Boolean = false,
 )
 
 private sealed interface FailureReason {
@@ -95,7 +101,11 @@ class TvHomeViewModel @Inject constructor(
     init {
         observeDiscoveryPreference()
         observePhones()
+        observeDiscoveryActive()
         // Initial load — re-triggered whenever the best phone changes.
+        // If discovery is already active and no phone has been found, the
+        // pending indicator is shown immediately and the first real load is
+        // deferred to when observePhones detects the first phone.
         loadShows()
     }
 
@@ -124,16 +134,37 @@ class TvHomeViewModel @Inject constructor(
                 _uiState.update {
                     it.copy(
                         connectedPhones = phones.size,
-                        activeViewers = viewers
+                        activeViewers = viewers,
+                        // Clear the pending indicator as soon as a phone is found.
+                        isDiscoveryPending = it.isDiscoveryPending && phones.isEmpty(),
                     )
                 }
-                // When the best phone changes (new primary discovered or the
-                // previous one was evicted), refresh the show list from the
-                // new source so the TV never displays another user's shows.
+                // Refresh the show list whenever the best phone changes — this
+                // includes the transition from null → first phone (discovery
+                // finds a phone for the first time) so the stale-cache view is
+                // replaced promptly without waiting for the heartbeat.
                 if (bestDeviceId != previousBestDeviceId) {
                     previousBestDeviceId = bestDeviceId
                     loadedOffset = 0
                     doLoadShows(append = false)
+                }
+            }
+        }
+    }
+
+    /**
+     * Mirrors [PhoneDiscoveryManager.discoveryActive] into [TvHomeUiState.isDiscoveryPending].
+     * While discovery is running and no phone has been found yet we show a pending indicator
+     * rather than the "no phone connected" label so the user knows discovery is in progress.
+     * Once a phone is found [observePhones] clears the flag; once discovery stops without
+     * finding any phone the flag is cleared here so the permanent "no phone" state appears.
+     */
+    private fun observeDiscoveryActive() {
+        viewModelScope.launch {
+            phoneDiscovery.discoveryActive.collect { active ->
+                _uiState.update { state ->
+                    val hasPendingDiscovery = active && state.connectedPhones == 0
+                    state.copy(isDiscoveryPending = hasPendingDiscovery)
                 }
             }
         }
@@ -215,29 +246,34 @@ class TvHomeViewModel @Inject constructor(
         val cached = getFallbackCache()
         _uiState.update {
             when (reason) {
-                is FailureReason.NoPhone -> when {
-                    cached != null -> {
-                        val (cw, others) = partitionShows(cached)
-                        it.copy(
+                is FailureReason.NoPhone -> {
+                    // If discovery is still running we defer the "no phone" state — the
+                    // pending indicator already signals that a phone may appear soon.
+                    val discoveryStillPending = it.isDiscoveryPending
+                    when {
+                        cached != null -> {
+                            val (cw, others) = partitionShows(cached)
+                            it.copy(
+                                isLoading = false,
+                                isLoadingMore = false,
+                                shows = cached,
+                                continueWatching = cw,
+                                allShows = others,
+                                progress = computeProgress(cached),
+                                hasNewSeason = computeHasNewSeason(cached),
+                                noPhoneConnected = !discoveryStillPending,
+                                canLoadMore = false,
+                                isShowingStaleCache = true,
+                            )
+                        }
+                        else -> it.copy(
                             isLoading = false,
                             isLoadingMore = false,
-                            shows = cached,
-                            continueWatching = cw,
-                            allShows = others,
-                            progress = computeProgress(cached),
-                            hasNewSeason = computeHasNewSeason(cached),
-                            noPhoneConnected = true,
+                            noPhoneConnected = !discoveryStillPending,
                             canLoadMore = false,
-                            isShowingStaleCache = true,
+                            isShowingStaleCache = false,
                         )
                     }
-                    else -> it.copy(
-                        isLoading = false,
-                        isLoadingMore = false,
-                        noPhoneConnected = true,
-                        canLoadMore = false,
-                        isShowingStaleCache = false,
-                    )
                 }
                 is FailureReason.ApiError -> when {
                     cached != null -> {

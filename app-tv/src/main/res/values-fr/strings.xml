@@ -8,6 +8,7 @@
     <string name="tv_all_shows">Toutes les séries</string>
     <string name="tv_no_shows">Aucune série trouvée.\nConnectez l\'application WatchBuddy sur votre téléphone avec Trakt.</string>
     <string name="tv_no_phone">Aucun téléphone connecté.\nDémarrez l\'application WatchBuddy sur votre smartphone.\nSi votre Wi-Fi bloque la détection d\'appareils, activez le Bluetooth sur les deux appareils.</string>
+    <string name="tv_discovering_phone">Recherche du téléphone…</string>
     <string name="tv_retry">Réessayer</string>
     <string name="tv_last_watched">Dernier : %1$s, %2$s</string>
     <string name="tv_last_aired_episode">Diffusé : %1$s, %2$s</string>

@@ -8,6 +8,7 @@
     <string name="tv_all_shows">Alle Serien</string>
     <string name="tv_no_shows">Keine Serien gefunden.\nVerbinde die WatchBuddy-App auf deinem Handy mit Trakt.</string>
     <string name="tv_no_phone">Kein Handy verbunden.\nStarte die WatchBuddy-App auf deinem Smartphone.\nFalls dein WLAN die Geräteerkennung blockiert, aktiviere Bluetooth auf beiden Geräten.</string>
+    <string name="tv_discovering_phone">Suche nach Handy…</string>
     <string name="tv_retry">Erneut versuchen</string>
     <string name="tv_last_watched">Zuletzt: %1$s, %2$s</string>
     <string name="tv_last_aired_episode">Ausgestrahlt: %1$s, %2$s</string>
