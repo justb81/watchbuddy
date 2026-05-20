@@ -205,25 +205,4 @@ class ModelsSerializationTest {
         }
     }
 
-    @Nested
-    @DisplayName("ScrobbleCandidate")
-    inner class ScrobbleCandidateTest {
-        @Test
-        fun `round-trip with all fields`() {
-            val candidate = ScrobbleCandidate(
-                "com.netflix", "Show S01E01", 0.95f,
-                TraktShow("Show", 2024, TraktIds()), TraktEpisode(1, 1)
-            )
-            val decoded = json.decodeFromString<ScrobbleCandidate>(json.encodeToString(candidate))
-            assertEquals(candidate, decoded)
-        }
-
-        @Test
-        fun `deserializes with null optional fields`() {
-            val jsonStr = """{"packageName":"com.test","mediaTitle":"Test","confidence":0.5}"""
-            val candidate = json.decodeFromString<ScrobbleCandidate>(jsonStr)
-            assertNull(candidate.matchedShow)
-            assertNull(candidate.matchedEpisode)
-        }
-    }
 }

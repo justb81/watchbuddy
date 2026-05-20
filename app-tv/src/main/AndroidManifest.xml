@@ -28,29 +28,6 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- Watch Next TV provider — used by WatchNextMetadataSource to harvest
-         currently-playing program metadata (title, season, episode, contentId)
-         from the system TV provider that streaming apps populate for the
-         Android TV launcher's "Continue Watching" row.
-         Auto-granted on most Android TV firmwares but a growing number of
-         Google TV / 3rd-party builds require an explicit runtime grant. The
-         permission has protection level signature|privileged|appop, so
-         TvMainActivity.maybeRequestReadTvListingsPermission() requests it at
-         runtime; the system suppresses the dialog when already granted.
-         WatchNextMetadataSource caches a SecurityException once and surfaces a
-         "tap to open settings" CTA in TV Diagnostics for manual recovery. -->
-    <uses-permission android:name="android.permission.READ_TV_LISTINGS" />
-
-    <!-- Scrobble detection — WatchBuddyNotificationListener is declared as a
-         NotificationListenerService so that MediaSessionManager.getActiveSessions()
-         returns the TV's active media controllers. Without this the scrobbler
-         silently sees an empty session list. The user must still toggle
-         WatchBuddy on under Settings → Notification access.
-         tools:ignore — this permission is protected (only granted to system
-         apps) but Android requires declaring it here so the platform binds
-         WatchBuddyNotificationListener with it as its service permission. -->
-    <uses-permission android:name="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
-        tools:ignore="ProtectedPermissions" />
 
     <!-- Play Store: TV app — no touchscreen, leanback required for correct
          multi-APK device targeting (prevents phone devices from receiving the
@@ -150,19 +127,6 @@
             </intent-filter>
         </receiver>
 
-        <!-- NotificationListenerService used purely to unlock
-             MediaSessionManager.getActiveSessions(). The service does no
-             notification processing — it exists so the user can grant
-             "Notification access" to WatchBuddy, which is the only way the
-             platform lets a non-system app read active MediaSession state. -->
-        <service
-            android:name=".tv.scrobbler.WatchBuddyNotificationListener"
-            android:exported="true"
-            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
-            <intent-filter>
-                <action android:name="android.service.notification.NotificationListenerService" />
-            </intent-filter>
-        </service>
 
     </application>
 </manifest>

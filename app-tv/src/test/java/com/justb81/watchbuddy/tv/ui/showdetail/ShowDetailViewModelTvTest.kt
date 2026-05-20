@@ -113,7 +113,6 @@ class ShowDetailViewModelTvTest {
         every { phoneDiscovery.discoveredPhones } returns MutableStateFlow(emptyList())
         viewModel = ShowDetailViewModel(
             watchProviders, lastUsedRepo, streamingPrefs, phoneDiscovery, tmdbApi, justWatchRepo,
-            com.justb81.watchbuddy.core.scrobbler.NoOpPlaybackIntentProvider(),
             clientFactory,
         )
     }
@@ -451,7 +450,6 @@ class ShowDetailViewModelTvTest {
             every { phoneDiscovery.discoveredPhones } returns MutableStateFlow(listOf(phone1, phone2))
             viewModel = ShowDetailViewModel(
                 watchProviders, lastUsedRepo, streamingPrefs, phoneDiscovery, tmdbApi, justWatchRepo,
-                com.justb81.watchbuddy.core.scrobbler.NoOpPlaybackIntentProvider(),
                 clientFactory,
             )
 

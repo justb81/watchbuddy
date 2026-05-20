@@ -1,7 +1,5 @@
 package com.justb81.watchbuddy.tv.ui.settings
 
-import android.content.Intent
-import android.provider.Settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -18,21 +16,16 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.tv.material3.Card
 import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.ExperimentalTvMaterial3Api
@@ -69,22 +62,6 @@ fun TvSettingsScreen(
     viewModel: TvSettingsViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
-
-    // Re-read notification-access state every time the screen resumes — the
-    // user flipped it in the system list and there's no broadcast we can
-    // observe, so we must poll on resume to catch the change.
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) viewModel.refreshNotificationAccess()
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
-
-    val grantedLabel = stringResource(R.string.tv_settings_status_granted)
-    val notGrantedLabel = stringResource(R.string.tv_settings_status_not_granted)
 
     val rows: List<SettingsRow> = listOf(
         SettingsRow.Toggle(
@@ -101,20 +78,6 @@ fun TvSettingsScreen(
             enabled = uiState.isAutostartEnabled,
             onChange = viewModel::setAutostartEnabled,
         ),
-        SettingsRow.Navigate(
-            key = "notification_access",
-            title = stringResource(R.string.tv_settings_notification_access_title),
-            subtitle = stringResource(R.string.tv_settings_notification_access_subtitle),
-            onClick = {
-                context.startActivity(
-                    Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).apply {
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    }
-                )
-            },
-            statusLabel = if (uiState.isNotificationAccessGranted) grantedLabel else notGrantedLabel,
-            statusOk = uiState.isNotificationAccessGranted,
-        ),
         SettingsRow.Toggle(
             key = "show_non_installed",
             title = stringResource(R.string.tv_settings_show_non_installed_title),
@@ -127,13 +90,6 @@ fun TvSettingsScreen(
             title = stringResource(R.string.tv_settings_diagnostics),
             subtitle = stringResource(R.string.tv_diagnostics_title),
             onClick = onDiagnosticsClick,
-        ),
-        SettingsRow.Toggle(
-            key = "debug_log_media_session",
-            title = stringResource(R.string.tv_settings_debug_log_media_session_title),
-            subtitle = stringResource(R.string.tv_settings_debug_log_media_session_subtitle),
-            enabled = uiState.debugLogMediaSession,
-            onChange = viewModel::setDebugLogMediaSession,
         ),
     )
 
@@ -266,7 +222,7 @@ private fun NavigateRow(row: SettingsRow.Navigate) {
                 Spacer(Modifier.size(12.dp))
             }
             Text(
-                text = "\u203A",
+                text = "›",
                 fontSize = 22.sp,
                 color = Color.White.copy(alpha = 0.6f),
             )

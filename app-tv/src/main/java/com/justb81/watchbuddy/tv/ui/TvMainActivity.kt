@@ -8,44 +8,24 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.justb81.watchbuddy.tv.discovery.TvDiscoveryService
-import com.justb81.watchbuddy.tv.scrobbler.WatchNextMetadataSource
 import com.justb81.watchbuddy.tv.ui.navigation.TvNavGraph
 import com.justb81.watchbuddy.tv.ui.theme.WatchBuddyTvTheme
 import dagger.hilt.android.AndroidEntryPoint
-import javax.inject.Inject
 
 @AndroidEntryPoint
 class TvMainActivity : ComponentActivity() {
 
-    @Inject
-    lateinit var watchNextSource: WatchNextMetadataSource
-
     private val requestBluetoothScanPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted ->
-        // Denial is fine — BLE is a fallback discovery channel. NSD still
-        // works on most networks; we log and keep going.
         Log.i(TAG, "BLUETOOTH_SCAN granted=$granted")
-    }
-
-    private val requestReadTvListingsPermission = registerForActivityResult(
-        ActivityResultContracts.RequestPermission(),
-    ) { granted ->
-        Log.i(TAG, "READ_TV_LISTINGS granted=$granted")
-        if (granted) {
-            // Clear the cached denial so WatchNextMetadataSource retries the
-            // provider query on the next scrobble tick instead of short-circuiting.
-            watchNextSource.resetPermissionState()
-        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         maybeRequestBluetoothScanPermission()
-        maybeRequestReadTvListingsPermission()
         setContent {
             WatchBuddyTvTheme {
                 TvNavGraph()
@@ -55,23 +35,11 @@ class TvMainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        // When the user has granted Notification Access, start the foreground
-        // discovery service so scrobbling survives the WatchBuddy TV app being
-        // backgrounded while the user watches Netflix / Disney+ etc.
-        // Without the grant, scrobbling can't work anyway — skip starting the
-        // service so we don't impose a persistent notification on users who
-        // haven't opted into scrobble. Discovery still runs in-process via
-        // TvHomeViewModel for the phone pairing flow.
-        if (isNotificationAccessGranted()) {
-            ContextCompat.startForegroundService(
-                this,
-                Intent(this, TvDiscoveryService::class.java),
-            )
-        }
+        ContextCompat.startForegroundService(
+            this,
+            Intent(this, TvDiscoveryService::class.java),
+        )
     }
-
-    private fun isNotificationAccessGranted(): Boolean =
-        NotificationManagerCompat.getEnabledListenerPackages(this).contains(packageName)
 
     /**
      * Request BLUETOOTH_SCAN so [com.justb81.watchbuddy.tv.discovery.PhoneBleScanner]
@@ -89,34 +57,7 @@ class TvMainActivity : ComponentActivity() {
         }
     }
 
-    /**
-     * Request READ_TV_LISTINGS so [WatchNextMetadataSource] can read the system
-     * WatchNext content provider — the primary evidence channel for Netflix /
-     * Disney+ / Prime / Apple TV+ / YouTube TV scrobbling. The permission is
-     * auto-granted on most Android TV firmwares but not on all Google TV /
-     * 3rd-party builds, where the system shows a runtime dialog. The system
-     * suppresses the dialog when already granted or after the user has answered.
-     */
-    private fun maybeRequestReadTvListingsPermission() {
-        if (ContextCompat.checkSelfPermission(
-                this,
-                READ_TV_LISTINGS
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            requestReadTvListingsPermission.launch(READ_TV_LISTINGS)
-        }
-    }
-
     companion object {
         private const val TAG = "TvMainActivity"
-
-        /**
-         * `android.permission.READ_TV_LISTINGS` is referenced as a string literal because
-         * `android.Manifest.permission.READ_TV_LISTINGS` is annotated `@hide` /
-         * `@SystemApi` in the public Android SDK stubs and therefore not resolvable at
-         * compile time. The string value is stable platform contract and matches the
-         * `<uses-permission>` entry declared in the manifest.
-         */
-        private const val READ_TV_LISTINGS = "android.permission.READ_TV_LISTINGS"
     }
 }

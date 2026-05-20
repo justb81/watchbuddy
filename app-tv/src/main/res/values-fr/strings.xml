@@ -121,43 +121,22 @@
     <string name="tv_settings_show_non_installed_title">Afficher les services non installés</string>
     <string name="tv_settings_show_non_installed_subtitle">Afficher aussi les services de streaming non installés sur ce téléviseur</string>
     <string name="tv_settings_diagnostics">Diagnostics</string>
-    <string name="tv_settings_debug_log_media_session_title">Débogage : consigner chaque session média</string>
-    <string name="tv_settings_debug_log_media_session_subtitle">Consigne chaque session média détectée dans le journal d\'vénements</string>
-    <string name="tv_settings_notification_access_title">Accès aux notifications</string>
-    <string name="tv_settings_notification_access_subtitle">Requis pour le scrobble — WatchBuddy lit les notifications multimédias et les sessions actives pour identifier ce qui est en cours de lecture sur votre téléviseur</string>
-    <string name="tv_settings_status_granted">Accordé</string>
-    <string name="tv_settings_status_not_granted">Non accordé</string>
     <string name="tv_discovery_notification_channel_name">Recherche de téléphones</string>
     <string name="tv_discovery_notification_text">Recherche de téléphones WatchBuddy sur le réseau</string>
 
-    <!-- Scrobble overlay -->
-    <string name="tv_scrobble_question">Regardez-vous %1$s ?</string>
-    <string name="tv_scrobble_episode">S%1$02dE%2$02d</string>
-    <string name="tv_scrobble_yes">Oui, suivre</string>
-    <string name="tv_scrobble_no">Non</string>
 
     <!-- Phone status -->
     <string name="tv_default_device_name">Téléphone</string>
 
     <!-- LLM labels -->
 
-    <!-- Accessibilité -->
-    <plurals name="cd_scrobble_countdown">
-        <item quantity="one">Confirmation automatique dans %1$d seconde</item>
-        <item quantity="many">Confirmation automatique dans %1$d secondes</item>
-        <item quantity="other">Confirmation automatique dans %1$d secondes</item>
-    </plurals>
 
     <!-- Diagnostics -->
     <string name="tv_diagnostics_title">Diagnostic</string>
     <string name="tv_diagnostics_section_discovery">Découverte</string>
     <string name="tv_diagnostics_section_ble">Scanner BLE</string>
-    <string name="tv_diagnostics_section_scrobble">Scrobble</string>
     <string name="tv_diagnostics_section_phones">Téléphones détectés</string>
     <string name="tv_diagnostics_section_build">Infos build</string>
-    <string name="tv_diagnostics_row_notification_access">Accès aux notifications</string>
-    <string name="tv_diagnostics_row_scrobbler_listening">Scrobbler actif</string>
-    <string name="tv_diagnostics_row_last_candidate">Dernier candidat</string>
     <string name="tv_diagnostics_row_discovery_active">Découverte active</string>
     <string name="tv_diagnostics_row_last_heartbeat">Dernier heartbeat</string>
     <string name="tv_diagnostics_row_ble_state">État du scanner</string>
@@ -175,60 +154,6 @@
     <string name="tv_diagnostics_value_no_phones">Aucun téléphone détecté.</string>
     <string name="tv_diagnostics_section_recent_events">Événements récents</string>
     <string name="tv_diagnostics_value_no_events">Aucun événement</string>
-    <string name="tv_diagnostics_section_now_playing">En lecture</string>
-    <string name="tv_diagnostics_row_now_playing_package">App</string>
-    <string name="tv_diagnostics_row_now_playing_title">Titre</string>
-    <string name="tv_diagnostics_row_now_playing_state">État</string>
-    <string name="tv_diagnostics_row_now_playing_progress">Progression</string>
-    <string name="tv_diagnostics_section_media_session">Dernière session média</string>
-    <string name="tv_diagnostics_row_media_session_package">Paquet</string>
-    <string name="tv_diagnostics_row_media_session_title">Titre</string>
-    <string name="tv_diagnostics_row_media_session_display_title">Titre affiché</string>
-    <string name="tv_diagnostics_row_media_session_display_subtitle">Sous-titre affiché</string>
-    <string name="tv_diagnostics_row_media_session_display_description">Description affichée</string>
-    <string name="tv_diagnostics_row_media_session_artist">Artiste</string>
-    <string name="tv_diagnostics_row_media_session_album_artist">Artiste de l\'album</string>
-    <string name="tv_diagnostics_row_media_session_album">Album</string>
-    <string name="tv_diagnostics_row_media_session_playback_state">État de lecture</string>
-    <string name="tv_diagnostics_row_media_session_position">Position</string>
-    <string name="tv_diagnostics_row_media_session_duration">Durée</string>
-    <string name="tv_diagnostics_row_media_session_observed_age">Observé</string>
-    <string name="tv_diagnostics_value_null">(null)</string>
-    <string name="tv_diagnostics_section_watch_next">Fournisseur Watch Next</string>
-    <string name="tv_diagnostics_row_watch_next_publishing">Applications publiant</string>
-    <plurals name="tv_diagnostics_value_watch_next_count">
-        <item quantity="one">%d appli</item>
-        <item quantity="many">%d applis</item>
-        <item quantity="other">%d applis</item>
-    </plurals>
-    <string name="tv_diagnostics_value_watch_next_permission_denied">Permission refusée — appuyez pour ouvrir les paramètres</string>
-    <string name="tv_diagnostics_action_open_permissions">Ouvrir les autorisations de l\'application</string>
-
-    <!-- Diagnostics — media notifications (#472) -->
-    <string name="tv_diagnostics_section_media_notifications">Notifications multimédias</string>
-    <string name="tv_diagnostics_row_notification_tracked">Applications suivies</string>
-    <string name="tv_diagnostics_value_notification_listener_not_connected">Écouteur non connecté</string>
-    <string name="tv_diagnostics_value_notification_no_data">Connecté, aucune donnée</string>
-    <plurals name="tv_diagnostics_value_notification_tracked_count">
-        <item quantity="one">%d appli suivie</item>
-        <item quantity="many">%d applis suivies</item>
-        <item quantity="other">%d applis suivies</item>
-    </plurals>
-
-    <!-- Diagnostics — app profiles (#473) -->
-    <string name="tv_diagnostics_section_app_profiles">Profils d\'applications</string>
-    <string name="tv_diagnostics_row_app_profiles_matched">Applications avec profil</string>
-
-    <!-- Diagnostics — match quality (#474) -->
-    <string name="tv_diagnostics_section_match_quality">Qualité de correspondance</string>
-    <string name="tv_diagnostics_row_ambiguous_emitted">Demandes ambiguës envoyées</string>
-    <string name="tv_diagnostics_row_ambiguous_resolved">Demandes résolues</string>
-    <string name="tv_diagnostics_row_ambiguous_dismissed">Demandes ignorées</string>
-    <string name="tv_diagnostics_section_watch_now_intent">Intention « Regarder maintenant »</string>
-    <string name="tv_diagnostics_row_intent_hits">Scrobbles automatiques Phase 0</string>
-    <string name="tv_diagnostics_row_intent_fallthroughs">Replis Phase 0</string>
-    <string name="tv_diagnostics_row_intent_overridden">Remplacé par marque manuelle</string>
-
     <!-- Version footer -->
     <string name="settings_version_footer">WatchBuddy v%1$s (build %2$d)</string>
 </resources>

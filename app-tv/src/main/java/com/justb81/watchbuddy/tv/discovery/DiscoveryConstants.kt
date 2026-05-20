@@ -20,7 +20,7 @@ package com.justb81.watchbuddy.tv.discovery
  *
  * Invariants enforced by tests:
  *  - `POLL_BASE_INTERVAL_MS < PRESENCE_STALENESS_MS` so a steady-state poll
- *    keeps a healthy phone fresh enough for `TvScrobbleDispatcher`.
+ *    keeps a healthy phone fresh.
  *  - `POLL_BACKOFF_INITIAL_MS < POLL_BACKOFF_MAX_MS`.
  *  - `HEARTBEAT_TICK_MS <= POLL_BACKOFF_INITIAL_MS` so the driver wakes up
  *    at least once per backoff interval.
@@ -33,10 +33,10 @@ internal object DiscoveryConstants {
     const val POLL_BASE_INTERVAL_MS = 60_000L
 
     /**
-     * Backwards-compatible alias used by `TvScrobbleDispatcher` to filter stale
-     * phones out of scrobble dispatch. Set to 2× the steady-state poll cadence
-     * so exactly one missed poll is tolerated before a phone is treated as
-     * unreachable for scrobbling (independent of the eviction decision).
+     * A phone is considered stale once two consecutive poll intervals have elapsed without
+     * a successful `/capability` response. Set to 2× the steady-state poll cadence so
+     * exactly one missed poll is tolerated before the phone is treated as unreachable
+     * (independent of the eviction decision).
      */
     const val PRESENCE_STALENESS_MS = 2 * POLL_BASE_INTERVAL_MS
 

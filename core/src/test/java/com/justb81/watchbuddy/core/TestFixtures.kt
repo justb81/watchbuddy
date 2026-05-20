@@ -85,15 +85,4 @@ object TestFixtures {
         tmdbConfigured = tmdbConfigured
     )
 
-    fun scrobbleCandidate(
-        packageName: String = "com.netflix.ninja",
-        mediaTitle: String = "Breaking Bad S01E01",
-        confidence: Float = 0.95f,
-        matchedShow: TraktShow? = traktShow(title = "Breaking Bad"),
-        matchedEpisode: TraktEpisode? = traktEpisode(season = 1, number = 1)
-    ) = ScrobbleCandidate(
-        packageName = packageName, mediaTitle = mediaTitle,
-        confidence = confidence, matchedShow = matchedShow,
-        matchedEpisode = matchedEpisode
-    )
 }

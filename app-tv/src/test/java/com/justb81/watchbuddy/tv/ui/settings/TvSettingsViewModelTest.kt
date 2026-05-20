@@ -44,11 +44,9 @@ class TvSettingsViewModelTest {
         every { repository.isPhoneDiscoveryEnabled } returns flowOf(true)
         every { repository.isAutostartEnabled } returns flowOf(false)
         every { repository.showNonInstalledProviders } returns flowOf(false)
-        every { repository.debugLogMediaSession } returns flowOf(false)
         coEvery { repository.setPhoneDiscoveryEnabled(any()) } just runs
         coEvery { repository.setAutostartEnabled(any()) } just runs
         coEvery { repository.setShowNonInstalledProviders(any()) } just runs
-        coEvery { repository.setDebugLogMediaSession(any()) } just runs
     }
 
     @AfterEach
@@ -138,17 +136,5 @@ class TvSettingsViewModelTest {
         vm.refreshNotificationAccess()
 
         assertFalse(vm.uiState.value.isNotificationAccessGranted)
-    }
-
-    @Test
-    fun `setDebugLogMediaSession writes through and optimistically updates state`() = runTest {
-        val vm = TvSettingsViewModel(application, repository)
-        advanceUntilIdle()
-
-        vm.setDebugLogMediaSession(true)
-        advanceUntilIdle()
-
-        coVerify { repository.setDebugLogMediaSession(true) }
-        assertTrue(vm.uiState.value.debugLogMediaSession)
     }
 }

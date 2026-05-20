@@ -223,26 +223,6 @@ sequenceDiagram
 
 **Error handling:** If `getEpisode` fails, `NextEpisodeUiState.Error` is emitted. The UI shows the show title without a still image.
 
-### 8. TV Scrobbler — Title Search Fallback (#354)
-
-When the scrobbler's Phase 1 (library match) fails, Phase 2 calls `TmdbApiService.searchTv()` to find a TMDB match.
-
-```mermaid
-sequenceDiagram
-    participant Scrobbler as MediaSessionScrobbler
-    participant TMDB as TmdbApiService
-    participant Cache as TvShowCache
-
-    Scrobbler->>Cache: fuzzy match (Phase 1)
-    Cache-->>Scrobbler: no match
-    Scrobbler->>TMDB: searchTv(mediaTitle, apiKey)
-    TMDB-->>Scrobbler: List<TmdbShow>
-    Scrobbler->>Scrobbler: re-run fuzzy match against TMDB results
-    Scrobbler->>Cache: cache TMDB result if confidence >= 40%
-```
-
-**Error handling:** If `searchTv` fails, Phase 2 is skipped and Phase 3 (LLM title extraction) is attempted. No error is surfaced to the user.
-
 ---
 
 ## Connection Handling
@@ -278,7 +258,6 @@ TMDB enforces a rate limit of 40 requests per 10 seconds per IP. WatchBuddy does
 | TV ShowDetail: deep links | JustWatch search miss | `DeepLinkState.Unavailable` chip disabled |
 | TV ShowDetail: deep links | Network/HTTP error | No negative cached; next visit retries |
 | TV ShowDetail: next-episode | `getEpisode` fails | `NextEpisodeUiState.Error`; no still shown |
-| TV scrobbler: title search | `searchTv` fails | Phase 2 skipped; proceeds to Phase 3 (LLM) |
 
 ---
 
@@ -316,7 +295,6 @@ The key is never logged, never written to disk on the TV, and never included in 
 | **app-tv** | `data/LastUsedProviderRepository.kt` | TV-local DataStore — tracks most-recently used `provider_id` per show |
 | **app-tv** | `discovery/InstalledAppsProbe.kt` | `PackageManager` cache — reports which streaming apps are installed |
 | **core** | `deeplink/ProviderCatalogRegistry.kt` | Maps TMDB `provider_id` → Android package name and JustWatch `technicalName` → `provider_id` (single registry; no deep-link templates) |
-| **app-tv** | `scrobbler/MediaSessionScrobbler.kt` | Uses `searchTv()` as fallback when fuzzy-matching media titles against the local show cache |
 
 ---
 

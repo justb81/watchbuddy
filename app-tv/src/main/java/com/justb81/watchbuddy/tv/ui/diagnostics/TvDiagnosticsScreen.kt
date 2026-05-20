@@ -1,8 +1,5 @@
 package com.justb81.watchbuddy.tv.ui.diagnostics
 
-import android.content.Intent
-import android.net.Uri
-import android.provider.Settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
@@ -16,27 +13,18 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.tv.material3.*
 import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
-import com.justb81.watchbuddy.core.model.PlaybackTick
-import com.justb81.watchbuddy.core.scrobbler.MediaSessionScrobbler
-import com.justb81.watchbuddy.core.scrobbler.PlaybackIntentStats
 import com.justb81.watchbuddy.tv.data.CatalogSource
 import com.justb81.watchbuddy.tv.data.JustWatchOutcomeEvent
 import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
-import com.justb81.watchbuddy.tv.scrobbler.WatchNextMetadataSource
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
@@ -45,22 +33,6 @@ fun TvDiagnosticsScreen(
     viewModel: TvDiagnosticsViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val lifecycleOwner = LocalLifecycleOwner.current
-
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                viewModel.refreshNotificationAccess()
-                viewModel.refreshWatchNextStats()
-                viewModel.refreshNotificationStats()
-                viewModel.refreshAppProfileStats()
-                viewModel.refreshAmbiguousPromptStats()
-                viewModel.refreshIntentStats()
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
 
     Box(
         modifier = Modifier
@@ -126,37 +98,6 @@ fun TvDiagnosticsScreen(
             }
 
             item {
-                DiagnosticsSection(
-                    title = stringResource(R.string.tv_diagnostics_section_scrobble),
-                    rows = listOf(
-                        DiagRow(
-                            stringResource(R.string.tv_diagnostics_row_notification_access),
-                            yesNoStr(uiState.notificationAccessGranted),
-                            if (uiState.notificationAccessGranted) Status.OK else Status.FAIL,
-                        ),
-                        DiagRow(
-                            stringResource(R.string.tv_diagnostics_row_scrobbler_listening),
-                            yesNoStr(uiState.scrobblerListening),
-                            if (uiState.scrobblerListening) Status.OK else Status.FAIL,
-                        ),
-                        DiagRow(
-                            stringResource(R.string.tv_diagnostics_row_last_candidate),
-                            formatLastCandidate(uiState.lastCandidate),
-                            if (uiState.lastCandidate != null) Status.OK else Status.NEUTRAL,
-                        ),
-                    ),
-                )
-            }
-
-            item {
-                NowPlayingSection(uiState.lastObservedSession)
-            }
-
-            item {
-                MediaSessionSection(uiState.lastObservedSession)
-            }
-
-            item {
                 Text(
                     text = stringResource(R.string.tv_diagnostics_section_phones).uppercase(),
                     fontSize = 14.sp,
@@ -206,29 +147,6 @@ fun TvDiagnosticsScreen(
                         ),
                     ),
                 )
-            }
-
-            item {
-                WatchNextSection(uiState.watchNextCountResult)
-            }
-
-            item {
-                MediaNotificationsSection(
-                    notificationAccessGranted = uiState.notificationAccessGranted,
-                    trackedCount = uiState.notificationTrackedCount,
-                )
-            }
-
-            item {
-                AppProfilesSection(stats = uiState.appProfileStats)
-            }
-
-            item {
-                AmbiguousPromptStatsSection(stats = uiState.ambiguousPromptStats)
-            }
-
-            item {
-                IntentStatsSection(stats = uiState.intentStats)
             }
 
             item {
@@ -510,88 +428,6 @@ private fun formatAge(timestampMs: Long): String {
     }
 }
 
-@Composable
-private fun AppProfilesSection(stats: MediaSessionScrobbler.ObservedPackageStats?) {
-    val valueStr = when {
-        stats == null -> "—"
-        stats.totalCount == 0 -> "—"
-        else -> "${stats.profiledCount} / ${stats.totalCount}"
-    }
-    val status = when {
-        stats == null || stats.totalCount == 0 -> Status.NEUTRAL
-        stats.profiledCount > 0 -> Status.OK
-        else -> Status.WARN
-    }
-    DiagnosticsSection(
-        title = stringResource(R.string.tv_diagnostics_section_app_profiles),
-        rows = listOf(
-            DiagRow(
-                label = stringResource(R.string.tv_diagnostics_row_app_profiles_matched),
-                value = valueStr,
-                status = status,
-            ),
-        ),
-    )
-}
-
-@Composable
-private fun IntentStatsSection(stats: PlaybackIntentStats?) {
-    val rows = if (stats == null) {
-        listOf(DiagRow(label = "—", value = "—", status = Status.NEUTRAL))
-    } else {
-        listOf(
-            DiagRow(
-                label = stringResource(R.string.tv_diagnostics_row_intent_hits),
-                value = stats.hits.toString(),
-                status = if (stats.hits > 0) Status.OK else Status.NEUTRAL,
-            ),
-            DiagRow(
-                label = stringResource(R.string.tv_diagnostics_row_intent_fallthroughs),
-                value = stats.fallthroughs.toString(),
-                status = Status.NEUTRAL,
-            ),
-            DiagRow(
-                label = stringResource(R.string.tv_diagnostics_row_intent_overridden),
-                value = stats.overriddenByManualMark.toString(),
-                status = Status.NEUTRAL,
-            ),
-        )
-    }
-    DiagnosticsSection(
-        title = stringResource(R.string.tv_diagnostics_section_watch_now_intent),
-        rows = rows,
-    )
-}
-
-@Composable
-private fun AmbiguousPromptStatsSection(stats: MediaSessionScrobbler.AmbiguousPromptStats?) {
-    val rows = if (stats == null) {
-        listOf(DiagRow(label = "—", value = "—", status = Status.NEUTRAL))
-    } else {
-        listOf(
-            DiagRow(
-                label = stringResource(R.string.tv_diagnostics_row_ambiguous_emitted),
-                value = stats.emitted.toString(),
-                status = if (stats.emitted > 0) Status.OK else Status.NEUTRAL,
-            ),
-            DiagRow(
-                label = stringResource(R.string.tv_diagnostics_row_ambiguous_resolved),
-                value = stats.resolved.toString(),
-                status = if (stats.resolved > 0) Status.OK else Status.NEUTRAL,
-            ),
-            DiagRow(
-                label = stringResource(R.string.tv_diagnostics_row_ambiguous_dismissed),
-                value = stats.dismissed.toString(),
-                status = Status.NEUTRAL,
-            ),
-        )
-    }
-    DiagnosticsSection(
-        title = stringResource(R.string.tv_diagnostics_section_match_quality),
-        rows = rows,
-    )
-}
-
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun StreamingDeepLinksSection(
@@ -723,114 +559,6 @@ private fun RecentOutcomesBlock(recentOutcomes: List<JustWatchOutcomeEvent>) {
 }
 
 @Composable
-private fun MediaNotificationsSection(
-    notificationAccessGranted: Boolean,
-    trackedCount: Int?,
-) {
-    val (valueStr, status) = when {
-        !notificationAccessGranted -> stringResource(R.string.tv_diagnostics_value_notification_listener_not_connected) to Status.FAIL
-        trackedCount == null -> "—" to Status.NEUTRAL
-        trackedCount > 0 -> pluralStringResource(
-            R.plurals.tv_diagnostics_value_notification_tracked_count,
-            trackedCount,
-            trackedCount,
-        ) to Status.OK
-        else -> stringResource(R.string.tv_diagnostics_value_notification_no_data) to Status.WARN
-    }
-    DiagnosticsSection(
-        title = stringResource(R.string.tv_diagnostics_section_media_notifications),
-        rows = listOf(
-            DiagRow(
-                label = stringResource(R.string.tv_diagnostics_row_notification_tracked),
-                value = valueStr,
-                status = status,
-            ),
-        ),
-    )
-}
-
-@OptIn(ExperimentalTvMaterial3Api::class)
-@Composable
-private fun WatchNextSection(countResult: WatchNextMetadataSource.CountResult?) {
-    val context = LocalContext.current
-    val (valueStr, status) = when (countResult) {
-        null -> "—" to Status.NEUTRAL
-        is WatchNextMetadataSource.CountResult.PermissionDenied ->
-            stringResource(R.string.tv_diagnostics_value_watch_next_permission_denied) to Status.FAIL
-        is WatchNextMetadataSource.CountResult.Success ->
-            pluralStringResource(R.plurals.tv_diagnostics_value_watch_next_count, countResult.count, countResult.count) to
-                if (countResult.count > 0) Status.OK else Status.WARN
-    }
-    val isPermissionDenied = countResult is WatchNextMetadataSource.CountResult.PermissionDenied
-    Text(
-        text = stringResource(R.string.tv_diagnostics_section_watch_next).uppercase(),
-        fontSize = 14.sp,
-        fontWeight = FontWeight.Bold,
-        color = Color.White.copy(alpha = 0.7f),
-        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp, start = 4.dp),
-    )
-    val cardModifier = Modifier.fillMaxWidth()
-    val cardShape = RoundedCornerShape(12.dp)
-    val cardContent: @Composable () -> Unit = {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(10.dp)
-                            .background(statusColor(status), RoundedCornerShape(2.dp)),
-                    )
-                    Spacer(Modifier.width(12.dp))
-                    Text(
-                        stringResource(R.string.tv_diagnostics_row_watch_next_publishing),
-                        fontSize = 14.sp,
-                        color = Color.White,
-                    )
-                }
-                Text(valueStr, fontSize = 13.sp, color = Color.White.copy(alpha = 0.7f))
-            }
-            if (isPermissionDenied) {
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    text = stringResource(R.string.tv_diagnostics_action_open_permissions),
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = ActionHintColor,
-                )
-            }
-        }
-    }
-    if (isPermissionDenied) {
-        Card(
-            modifier = cardModifier,
-            shape = CardDefaults.shape(cardShape),
-            scale = CardDefaults.scale(focusedScale = 1.02f),
-            onClick = {
-                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                    data = Uri.fromParts("package", context.packageName, null)
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                runCatching { context.startActivity(intent) }
-            },
-        ) { cardContent() }
-    } else {
-        Surface(
-            modifier = cardModifier.diagnosticsFocusable(),
-            shape = cardShape,
-            colors = SurfaceDefaults.colors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            ),
-        ) { cardContent() }
-    }
-}
-
-@Composable
 private fun ProviderCatalogSection(
     version: Int,
     fetchedAtMs: Long,
@@ -866,109 +594,3 @@ private fun ProviderCatalogSection(
     )
 }
 
-private fun formatLastCandidate(last: MediaSessionScrobbler.LastCandidate?): String {
-    if (last == null) return "—"
-    val title = last.candidate.matchedShow?.title ?: last.candidate.mediaTitle
-    val pct = (last.candidate.confidence * 100).toInt()
-    val marker = if (last.autoScrobbled) "auto" else "overlay"
-    return "$title @ ${pct}% · $marker · ${formatAge(last.observedAtMs)}"
-}
-
-private fun tickStateName(state: Int): String = when (state) {
-    PlaybackTick.STATE_PLAYING -> "Playing"
-    PlaybackTick.STATE_PAUSED -> "Paused"
-    PlaybackTick.STATE_STOPPED -> "Stopped"
-    PlaybackTick.STATE_NONE -> "None"
-    -1 -> "—"
-    else -> state.toString()
-}
-
-@Composable
-private fun NowPlayingSection(last: MediaSessionScrobbler.LastObservedSession?) {
-    val tick = last?.tick
-    val isActive = tick != null && tick.isPlaying
-    val headerStatus = when {
-        last == null -> Status.NEUTRAL
-        isActive -> Status.OK
-        else -> Status.WARN
-    }
-    val firstTitle = last?.snapshot?.text?.lines()
-        ?.firstOrNull { it.isNotBlank() }
-        ?.substringAfter(": ", "")
-        ?.trim()
-        ?.takeIf { it.isNotBlank() }
-    val progressStr = if (tick != null && tick.durationMs > 0) {
-        "${(tick.progress * 100).toInt()}%"
-    } else {
-        "—"
-    }
-    val rows = listOf(
-        DiagRow(
-            stringResource(R.string.tv_diagnostics_row_now_playing_package),
-            last?.snapshot?.packageName ?: "—",
-            headerStatus,
-        ),
-        DiagRow(
-            stringResource(R.string.tv_diagnostics_row_now_playing_title),
-            firstTitle ?: "—",
-            if (firstTitle != null) Status.OK else Status.NEUTRAL,
-        ),
-        DiagRow(
-            stringResource(R.string.tv_diagnostics_row_now_playing_state),
-            tickStateName(tick?.state ?: -1),
-            if (isActive) Status.OK else Status.NEUTRAL,
-        ),
-        DiagRow(
-            stringResource(R.string.tv_diagnostics_row_now_playing_progress),
-            progressStr,
-            Status.NEUTRAL,
-        ),
-    )
-    DiagnosticsSection(title = stringResource(R.string.tv_diagnostics_section_now_playing), rows = rows)
-}
-
-@Composable
-private fun MediaSessionSection(last: MediaSessionScrobbler.LastObservedSession?) {
-    val snapshot = last?.snapshot
-    val hasEvidence = snapshot != null && snapshot.text.isNotBlank()
-    val headerStatus = when {
-        last == null -> Status.NEUTRAL
-        hasEvidence -> Status.OK
-        else -> Status.WARN
-    }
-    val rows = buildList {
-        add(DiagRow(
-            stringResource(R.string.tv_diagnostics_row_media_session_package),
-            snapshot?.packageName ?: "—",
-            headerStatus,
-        ))
-        if (snapshot != null && snapshot.text.isNotBlank()) {
-            snapshot.text.lines().filter { it.isNotBlank() }.forEach { line ->
-                val tag = line.substringBefore(": ", "")
-                val value = line.substringAfter(": ", line)
-                add(DiagRow(tag, value, Status.OK))
-            }
-        }
-        add(DiagRow(
-            stringResource(R.string.tv_diagnostics_row_media_session_playback_state),
-            last?.tick?.state?.toString() ?: "—",
-            Status.NEUTRAL,
-        ))
-        add(DiagRow(
-            stringResource(R.string.tv_diagnostics_row_media_session_position),
-            last?.tick?.positionMs?.let { "${it}ms" } ?: "—",
-            Status.NEUTRAL,
-        ))
-        add(DiagRow(
-            stringResource(R.string.tv_diagnostics_row_media_session_duration),
-            last?.tick?.durationMs?.let { "${it}ms" } ?: "—",
-            Status.NEUTRAL,
-        ))
-        add(DiagRow(
-            stringResource(R.string.tv_diagnostics_row_media_session_observed_age),
-            formatAge(last?.observedAtMs ?: 0L),
-            Status.NEUTRAL,
-        ))
-    }
-    DiagnosticsSection(title = stringResource(R.string.tv_diagnostics_section_media_session), rows = rows)
-}
