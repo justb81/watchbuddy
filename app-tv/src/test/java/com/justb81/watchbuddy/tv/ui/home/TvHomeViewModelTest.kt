@@ -47,6 +47,7 @@ class TvHomeViewModelTest {
     private val preferencesRepository: StreamingPreferencesRepository = mockk()
     private val persistedShowCacheRepository: PersistedShowCacheRepository = mockk()
     private val phonesFlow = MutableStateFlow<List<PhoneDiscoveryManager.DiscoveredPhone>>(emptyList())
+    private val discoveryActiveFlow = MutableStateFlow(false)
     private val phoneApiService: PhoneApiService = mockk()
 
     private val testTraktShows = listOf(
@@ -58,6 +59,7 @@ class TvHomeViewModelTest {
     @BeforeEach
     fun setUp() {
         every { phoneDiscovery.discoveredPhones } returns phonesFlow
+        every { phoneDiscovery.discoveryActive } returns discoveryActiveFlow
         every { phoneDiscovery.startDiscovery() } just runs
         every { phoneDiscovery.stopDiscovery() } just runs
         every { phoneDiscovery.setEnabled(any()) } just runs
