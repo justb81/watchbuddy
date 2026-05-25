@@ -22,10 +22,10 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.tv.material3.*
 import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
-import com.justb81.watchbuddy.tv.ui.theme.TvSpacing
 import com.justb81.watchbuddy.tv.data.CatalogSource
 import com.justb81.watchbuddy.tv.data.JustWatchOutcomeEvent
 import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
+import com.justb81.watchbuddy.tv.ui.theme.TvSpacing
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
