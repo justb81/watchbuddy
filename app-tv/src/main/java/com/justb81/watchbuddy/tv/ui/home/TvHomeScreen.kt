@@ -46,6 +46,7 @@ import com.justb81.watchbuddy.core.model.EnrichedShowEntry
 import com.justb81.watchbuddy.core.progress.ShowProgress
 import com.justb81.watchbuddy.core.tmdb.TmdbImageHelper
 import com.justb81.watchbuddy.tv.ui.components.InitialsAvatar
+import com.justb81.watchbuddy.tv.ui.theme.TvSpacing
 import com.justb81.watchbuddy.tv.ui.theme.extendedColors
 import java.time.Instant
 import java.time.LocalDate
@@ -119,7 +120,7 @@ private fun TvHomeHeader(uiState: TvHomeUiState, onSettingsClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 48.dp, vertical = 24.dp),
+            .padding(horizontal = TvSpacing.screenHorizontal, vertical = TvSpacing.sectionGap),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
@@ -172,7 +173,7 @@ private fun TvHomeShelves(
     RestoreShelfFocusEffect(focusedShowKey, cwShelf, allShelf, allShowsExpanded)
 
     LazyColumn(
-        contentPadding = PaddingValues(horizontal = 48.dp, vertical = 16.dp),
+        contentPadding = PaddingValues(horizontal = TvSpacing.screenHorizontal, vertical = TvSpacing.itemGap),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
         if (continueWatching.isNotEmpty()) {
@@ -392,7 +393,7 @@ private fun PhoneUnreachableBanner() {
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.errorContainer)
-            .padding(horizontal = 48.dp, vertical = 8.dp)
+            .padding(horizontal = TvSpacing.screenHorizontal, vertical = 8.dp)
     ) {
         Text(
             text = stringResource(R.string.tv_error_phone_unreachable),
@@ -408,7 +409,7 @@ private fun StaleCacheBanner() {
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.secondaryContainer)
-            .padding(horizontal = 48.dp, vertical = 8.dp)
+            .padding(horizontal = TvSpacing.screenHorizontal, vertical = 8.dp)
     ) {
         Text(
             text = stringResource(R.string.tv_stale_cache_banner),

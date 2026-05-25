@@ -5,9 +5,11 @@ import android.webkit.WebViewClient
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -16,11 +18,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import androidx.compose.ui.graphics.Color
 import androidx.tv.material3.*
 import com.justb81.watchbuddy.R
+import com.justb81.watchbuddy.tv.ui.theme.TvSpacing
 import com.justb81.watchbuddy.tv.ui.theme.extendedColors
 import com.justb81.watchbuddy.tv.ui.theme.toCssHex
 
@@ -58,7 +59,7 @@ fun RecapScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 48.dp, vertical = 24.dp),
+                    .padding(horizontal = TvSpacing.screenHorizontal, vertical = TvSpacing.sectionGap),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
@@ -94,7 +95,7 @@ fun RecapScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .padding(horizontal = 48.dp, vertical = 0.dp),
+                    .padding(horizontal = TvSpacing.screenHorizontal, vertical = 0.dp),
                 contentAlignment = Alignment.Center
             ) {
                 when (val s = state) {

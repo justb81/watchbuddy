@@ -34,6 +34,7 @@ import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
 import com.justb81.watchbuddy.BuildConfig
 import com.justb81.watchbuddy.R
+import com.justb81.watchbuddy.tv.ui.theme.TvSpacing
 
 private sealed interface SettingsRow {
     data class Toggle(
@@ -110,7 +111,7 @@ private fun TvSettingsBodyContent(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 48.dp, vertical = 32.dp)
+                .padding(horizontal = TvSpacing.screenHorizontal, vertical = TvSpacing.screenVertical)
         ) {
             Text(
                 text = stringResource(R.string.tv_settings_title),
@@ -119,7 +120,7 @@ private fun TvSettingsBodyContent(
                 color = Color.White,
             )
 
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(TvSpacing.sectionGap))
 
             LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -133,7 +134,7 @@ private fun TvSettingsBodyContent(
                 }
             }
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(TvSpacing.itemGap))
 
             Text(
                 text = stringResource(

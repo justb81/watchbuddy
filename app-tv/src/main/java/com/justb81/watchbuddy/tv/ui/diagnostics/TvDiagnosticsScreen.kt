@@ -25,6 +25,7 @@ import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.tv.data.CatalogSource
 import com.justb81.watchbuddy.tv.data.JustWatchOutcomeEvent
 import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
+import com.justb81.watchbuddy.tv.ui.theme.TvSpacing
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
@@ -42,7 +43,7 @@ fun TvDiagnosticsScreen(
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 48.dp, vertical = 32.dp),
+                .padding(horizontal = TvSpacing.screenHorizontal, vertical = TvSpacing.screenVertical),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
