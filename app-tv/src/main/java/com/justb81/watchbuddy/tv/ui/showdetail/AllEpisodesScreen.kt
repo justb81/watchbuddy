@@ -34,6 +34,7 @@ import com.justb81.watchbuddy.core.model.EnrichedShowEntry
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
 import com.justb81.watchbuddy.tv.ui.components.SeasonEpisodeListPicker
 import com.justb81.watchbuddy.tv.ui.components.UserScopePickerDialog
+import com.justb81.watchbuddy.tv.ui.theme.TvSpacing
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
@@ -87,7 +88,7 @@ fun AllEpisodesScreen(
             onClick = onBack,
             modifier = Modifier
                 .align(Alignment.TopStart)
-                .padding(32.dp),
+                .padding(TvSpacing.backButtonInset),
         ) {
             Text(stringResource(R.string.tv_back_arrow))
         }
@@ -133,7 +134,7 @@ private fun AllEpisodesContent(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 64.dp, vertical = 48.dp)
+            .padding(horizontal = TvSpacing.screenHorizontal, vertical = TvSpacing.screenVertical)
     ) {
         Text(
             text = title,

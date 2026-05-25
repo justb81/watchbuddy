@@ -44,6 +44,7 @@ import com.justb81.watchbuddy.core.deeplink.ProviderDeepLinkRewriter
 import com.justb81.watchbuddy.core.model.EnrichedShowEntry
 import com.justb81.watchbuddy.core.model.ResolvedProvider
 import com.justb81.watchbuddy.core.tmdb.TmdbImageHelper
+import com.justb81.watchbuddy.tv.ui.theme.TvSpacing
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -147,7 +148,7 @@ fun ShowDetailScreen(
         )
         OutlinedButton(
             onClick = onBack,
-            modifier = Modifier.align(Alignment.TopStart).padding(32.dp)
+            modifier = Modifier.align(Alignment.TopStart).padding(TvSpacing.backButtonInset)
         ) {
             Text(stringResource(R.string.tv_back_arrow))
         }

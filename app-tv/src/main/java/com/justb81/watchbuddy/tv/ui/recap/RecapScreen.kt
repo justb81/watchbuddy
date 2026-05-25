@@ -21,6 +21,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.compose.ui.graphics.Color
 import androidx.tv.material3.*
 import com.justb81.watchbuddy.R
+import com.justb81.watchbuddy.tv.ui.theme.TvSpacing
 import com.justb81.watchbuddy.tv.ui.theme.extendedColors
 import com.justb81.watchbuddy.tv.ui.theme.toCssHex
 
@@ -58,7 +59,7 @@ fun RecapScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 48.dp, vertical = 24.dp),
+                    .padding(horizontal = TvSpacing.screenHorizontal, vertical = TvSpacing.sectionGap),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
@@ -94,7 +95,7 @@ fun RecapScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .padding(horizontal = 48.dp, vertical = 0.dp),
+                    .padding(horizontal = TvSpacing.screenHorizontal, vertical = 0.dp),
                 contentAlignment = Alignment.Center
             ) {
                 when (val s = state) {

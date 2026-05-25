@@ -22,6 +22,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.tv.material3.*
 import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
+import com.justb81.watchbuddy.tv.ui.theme.TvSpacing
 import com.justb81.watchbuddy.tv.data.CatalogSource
 import com.justb81.watchbuddy.tv.data.JustWatchOutcomeEvent
 import com.justb81.watchbuddy.tv.discovery.PhoneDiscoveryManager
@@ -42,7 +43,7 @@ fun TvDiagnosticsScreen(
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 48.dp, vertical = 32.dp),
+                .padding(horizontal = TvSpacing.screenHorizontal, vertical = TvSpacing.screenVertical),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
