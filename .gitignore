@@ -47,3 +47,4 @@ Thumbs.db
 
 # Git worktrees created by agents
 /wt/
+/.claude/worktrees/
