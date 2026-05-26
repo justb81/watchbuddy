@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.42.0](https://github.com/justb81/watchbuddy/compare/v0.41.0...v0.42.0) (2026-05-26)
+
+
+### Features
+
+* **tv:** standardise screen layout spacing with TvSpacing tokens ([#752](https://github.com/justb81/watchbuddy/issues/752)) ([e739edf](https://github.com/justb81/watchbuddy/commit/e739edfac3f84e326c86b28e3ba0f3fa801973ed)), closes [#687](https://github.com/justb81/watchbuddy/issues/687)
+
 ## [0.41.0](https://github.com/justb81/watchbuddy/compare/v0.40.0...v0.41.0) (2026-05-20)
 
 
