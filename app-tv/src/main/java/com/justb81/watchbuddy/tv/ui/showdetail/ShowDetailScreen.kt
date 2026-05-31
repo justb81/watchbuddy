@@ -308,7 +308,7 @@ private fun ShowDetailContent(
     val episodeTitle = nextEpisode.episodeName
     Column(
         modifier = modifier.fillMaxWidth(0.55f).padding(end = 64.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(TvSpacing.itemGap)
     ) {
         Text(
             text = entry.show.title,
@@ -319,52 +319,21 @@ private fun ShowDetailContent(
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(TvSpacing.tightGap)) {
             entry.show.year?.let { MetaChip(it.toString()) }
             val watchedCount = entry.seasons.sumOf { it.episodes.size }
             MetaChip(pluralStringResource(R.plurals.tv_watched_episodes, watchedCount, watchedCount))
         }
-        Spacer(Modifier.height(8.dp))
-        Text(text = stringResource(R.string.tv_next_episode), fontSize = 14.sp, color = Color.White.copy(alpha = 0.5f))
-        // AnimatedContent slides the episode info out left and slides new episode in from the right
-        // whenever the episodeCode changes (driven by advancedEntry optimistic update).
-        AnimatedContent(
-            targetState = episodeCode,
-            transitionSpec = {
-                (slideInHorizontally { it } + fadeIn()) togetherWith
-                    (slideOutHorizontally { -it } + fadeOut())
-            },
-            label = "next-episode",
-        ) { code ->
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    text = episodeTitle ?: stringResource(R.string.tv_next_episode),
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color.White,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(text = code, fontSize = 14.sp, color = Color.White.copy(alpha = 0.6f))
-            }
-        }
-        Spacer(Modifier.height(8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            WatchNowButton(
-                state = watchNowState,
-                onClick = actions.onWatchNow,
-                focusRequester = watchNowFocus,
-            )
-            MarkWatchedButton(
-                state = markState,
-                hasNextEpisode = nextEpisode.episodeCode != null,
-                onClick = actions.onMarkWatched,
-            )
-            OutlinedButton(onClick = actions.onRecapClick) { Text(stringResource(R.string.tv_recap)) }
-            OutlinedButton(onClick = actions.onAllEpisodesClick) {
-                Text(stringResource(R.string.tv_all_episodes))
-            }
-        }
+        Spacer(Modifier.height(TvSpacing.tightGap))
+        NextEpisodeSection(episodeCode = episodeCode, episodeTitle = episodeTitle)
+        Spacer(Modifier.height(TvSpacing.tightGap))
+        ActionButtons(
+            watchNowState = watchNowState,
+            markState = markState,
+            hasNextEpisode = nextEpisode.episodeCode != null,
+            watchNowFocus = watchNowFocus,
+            actions = actions,
+        )
 
         AvailableOnSection(
             state = providerState,
@@ -372,6 +341,81 @@ private fun ShowDetailContent(
             onProviderClick = actions.onProviderClick,
             onRetry = actions.onRetryProviders,
         )
+    }
+}
+
+@Composable
+private fun NextEpisodeSection(episodeCode: String, episodeTitle: String?) {
+    Text(
+        text = stringResource(R.string.tv_next_episode),
+        fontSize = 14.sp,
+        color = Color.White.copy(alpha = 0.6f),
+    )
+    // AnimatedContent slides the episode info out left and slides new episode in from the right
+    // whenever the episodeCode changes (driven by advancedEntry optimistic update).
+    AnimatedContent(
+        targetState = episodeCode,
+        transitionSpec = {
+            (slideInHorizontally { it } + fadeIn()) togetherWith
+                (slideOutHorizontally { -it } + fadeOut())
+        },
+        label = "next-episode",
+    ) { code ->
+        // When the episode name is known, show it as the title with the code beneath.
+        // Otherwise promote the code to the title — never repeat the "Next episode" label.
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            if (episodeTitle != null) {
+                Text(
+                    text = episodeTitle,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(text = code, fontSize = 14.sp, color = Color.White.copy(alpha = 0.6f))
+            } else {
+                Text(
+                    text = code,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White,
+                    maxLines = 1,
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+private fun ActionButtons(
+    watchNowState: WatchNowState,
+    markState: MarkWatchedState,
+    hasNextEpisode: Boolean,
+    watchNowFocus: FocusRequester,
+    actions: ShowDetailActions,
+) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(TvSpacing.itemGap),
+        verticalArrangement = Arrangement.spacedBy(TvSpacing.tightGap),
+    ) {
+        WatchNowButton(
+            state = watchNowState,
+            onClick = actions.onWatchNow,
+            focusRequester = watchNowFocus,
+        )
+        MarkWatchedButton(
+            state = markState,
+            hasNextEpisode = hasNextEpisode,
+            onClick = actions.onMarkWatched,
+        )
+        OutlinedButton(onClick = actions.onRecapClick) {
+            Text(stringResource(R.string.tv_recap), maxLines = 1, softWrap = false)
+        }
+        OutlinedButton(onClick = actions.onAllEpisodesClick) {
+            Text(stringResource(R.string.tv_all_episodes), maxLines = 1, softWrap = false)
+        }
     }
 }
 
@@ -396,7 +440,12 @@ private fun WatchNowButton(
                     strokeWidth = 2.dp,
                 )
                 Spacer(Modifier.width(8.dp))
-                Text(text = stringResource(R.string.tv_watch_now), fontWeight = FontWeight.Bold)
+                Text(
+                    text = stringResource(R.string.tv_watch_now),
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    softWrap = false,
+                )
             }
         }
         is WatchNowState.Available -> {
@@ -405,7 +454,12 @@ private fun WatchNowButton(
                 modifier = Modifier.focusRequester(focusRequester),
                 colors = ButtonDefaults.colors(containerColor = MaterialTheme.colorScheme.primary),
             ) {
-                Text(text = stringResource(R.string.tv_watch_now), fontWeight = FontWeight.Bold)
+                Text(
+                    text = stringResource(R.string.tv_watch_now),
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    softWrap = false,
+                )
             }
         }
         is WatchNowState.Unavailable -> {
@@ -415,7 +469,12 @@ private fun WatchNowButton(
                 modifier = Modifier.focusRequester(focusRequester),
                 colors = ButtonDefaults.colors(containerColor = MaterialTheme.colorScheme.primary),
             ) {
-                Text(text = stringResource(R.string.tv_watch_now_unavailable), fontWeight = FontWeight.Bold)
+                Text(
+                    text = stringResource(R.string.tv_watch_now_unavailable),
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    softWrap = false,
+                )
             }
         }
         is WatchNowState.NoProvider -> {
@@ -425,7 +484,12 @@ private fun WatchNowButton(
                 modifier = Modifier.focusRequester(focusRequester),
                 colors = ButtonDefaults.colors(containerColor = MaterialTheme.colorScheme.primary),
             ) {
-                Text(text = stringResource(R.string.tv_watch_now_no_provider), fontWeight = FontWeight.Bold)
+                Text(
+                    text = stringResource(R.string.tv_watch_now_no_provider),
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    softWrap = false,
+                )
             }
         }
     }
@@ -459,7 +523,7 @@ private fun MarkWatchedButton(
             )
             Spacer(Modifier.width(8.dp))
         }
-        Text(stringResource(R.string.tv_mark_watched))
+        Text(stringResource(R.string.tv_mark_watched), maxLines = 1, softWrap = false)
     }
 }
 
@@ -473,20 +537,12 @@ private fun AvailableOnSection(
 ) {
     when (state) {
         is ProviderListUiState.Loading -> {
-            Text(
-                text = stringResource(R.string.tv_available_at),
-                fontSize = 12.sp,
-                color = Color.White.copy(alpha = 0.4f),
-            )
+            ProviderSectionLabel()
         }
 
         is ProviderListUiState.Success -> {
-            Text(
-                text = stringResource(R.string.tv_available_at),
-                fontSize = 12.sp,
-                color = Color.White.copy(alpha = 0.4f),
-            )
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ProviderSectionLabel()
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(TvSpacing.tightGap)) {
                 items(state.providers, key = { it.providerId }) { provider ->
                     val linkState = deepLinks[provider.providerId]
                     ProviderChip(
@@ -505,20 +561,34 @@ private fun AvailableOnSection(
         is ProviderListUiState.Empty -> {
             Text(
                 text = stringResource(R.string.tv_not_available_region),
-                fontSize = 12.sp,
-                color = Color.White.copy(alpha = 0.4f),
+                fontSize = 14.sp,
+                color = Color.White.copy(alpha = 0.6f),
             )
         }
 
         is ProviderListUiState.Error -> {
-            OutlinedButton(onClick = onRetry) {
-                Text(
-                    text = stringResource(R.string.tv_providers_retry),
-                    fontSize = 12.sp,
-                )
+            // Compact, focusable retry control rather than a full-width banner.
+            Column(verticalArrangement = Arrangement.spacedBy(TvSpacing.tightGap)) {
+                ProviderSectionLabel()
+                OutlinedButton(onClick = onRetry) {
+                    Text(
+                        text = stringResource(R.string.tv_providers_retry),
+                        fontSize = 14.sp,
+                        maxLines = 2,
+                    )
+                }
             }
         }
     }
+}
+
+@Composable
+private fun ProviderSectionLabel() {
+    Text(
+        text = stringResource(R.string.tv_available_at),
+        fontSize = 14.sp,
+        color = Color.White.copy(alpha = 0.6f),
+    )
 }
 
 @Composable
@@ -529,19 +599,19 @@ private fun ProviderLogo(provider: ResolvedProvider) {
             contentDescription = provider.name,
             contentScale = ContentScale.Fit,
             modifier = Modifier
-                .size(48.dp)
+                .size(56.dp)
                 .clip(RoundedCornerShape(4.dp))
         )
     } else {
         Box(
             modifier = Modifier
-                .size(48.dp)
+                .size(56.dp)
                 .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(4.dp)),
             contentAlignment = Alignment.Center,
         ) {
             Text(
                 text = provider.name.take(2).uppercase(),
-                fontSize = 14.sp,
+                fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.White,
             )
@@ -573,7 +643,7 @@ private fun ProviderChip(
     Card(
         onClick = if (isEnabled) onClick else ({}),
         modifier = Modifier
-            .width(88.dp)
+            .width(96.dp)
             .border(borderWidth, borderColor, RoundedCornerShape(8.dp)),
         shape = CardDefaults.shape(RoundedCornerShape(8.dp)),
         colors = CardDefaults.colors(
@@ -598,7 +668,7 @@ private fun ProviderChip(
                 }
                 Text(
                     text = labelText,
-                    fontSize = 10.sp,
+                    fontSize = 12.sp,
                     color = if (isEnabled) Color.White.copy(alpha = 0.8f) else Color.White.copy(alpha = 0.4f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -606,7 +676,7 @@ private fun ProviderChip(
                 if (provider.isLastUsed) {
                     Text(
                         text = stringResource(R.string.tv_provider_last_used_label),
-                        fontSize = 9.sp,
+                        fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Medium,
                         maxLines = 1,
@@ -636,7 +706,7 @@ private fun ProviderChip(
 private fun JustWatchAttributionBadge() {
     Text(
         text = stringResource(R.string.tv_justwatch_attribution),
-        fontSize = 10.sp,
+        fontSize = 11.sp,
         color = Color.White.copy(alpha = 0.4f),
         modifier = Modifier.padding(top = 4.dp),
     )
@@ -651,9 +721,9 @@ private fun MetaChip(text: String, color: Color = MaterialTheme.colorScheme.surf
     ) {
         Text(
             text = text,
-            fontSize = 12.sp,
+            fontSize = 14.sp,
             color = Color.White.copy(alpha = 0.8f),
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
         )
     }
 }
