@@ -325,67 +325,15 @@ private fun ShowDetailContent(
             MetaChip(pluralStringResource(R.plurals.tv_watched_episodes, watchedCount, watchedCount))
         }
         Spacer(Modifier.height(TvSpacing.tightGap))
-        Text(
-            text = stringResource(R.string.tv_next_episode),
-            fontSize = 14.sp,
-            color = Color.White.copy(alpha = 0.6f),
-        )
-        // AnimatedContent slides the episode info out left and slides new episode in from the right
-        // whenever the episodeCode changes (driven by advancedEntry optimistic update).
-        AnimatedContent(
-            targetState = episodeCode,
-            transitionSpec = {
-                (slideInHorizontally { it } + fadeIn()) togetherWith
-                    (slideOutHorizontally { -it } + fadeOut())
-            },
-            label = "next-episode",
-        ) { code ->
-            // When the episode name is known, show it as the title with the code beneath.
-            // Otherwise promote the code to the title — never repeat the "Next episode" label.
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                if (episodeTitle != null) {
-                    Text(
-                        text = episodeTitle,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color.White,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    Text(text = code, fontSize = 14.sp, color = Color.White.copy(alpha = 0.6f))
-                } else {
-                    Text(
-                        text = code,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color.White,
-                        maxLines = 1,
-                    )
-                }
-            }
-        }
+        NextEpisodeSection(episodeCode = episodeCode, episodeTitle = episodeTitle)
         Spacer(Modifier.height(TvSpacing.tightGap))
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(TvSpacing.itemGap),
-            verticalArrangement = Arrangement.spacedBy(TvSpacing.tightGap),
-        ) {
-            WatchNowButton(
-                state = watchNowState,
-                onClick = actions.onWatchNow,
-                focusRequester = watchNowFocus,
-            )
-            MarkWatchedButton(
-                state = markState,
-                hasNextEpisode = nextEpisode.episodeCode != null,
-                onClick = actions.onMarkWatched,
-            )
-            OutlinedButton(onClick = actions.onRecapClick) {
-                Text(stringResource(R.string.tv_recap), maxLines = 1, softWrap = false)
-            }
-            OutlinedButton(onClick = actions.onAllEpisodesClick) {
-                Text(stringResource(R.string.tv_all_episodes), maxLines = 1, softWrap = false)
-            }
-        }
+        ActionButtons(
+            watchNowState = watchNowState,
+            markState = markState,
+            hasNextEpisode = nextEpisode.episodeCode != null,
+            watchNowFocus = watchNowFocus,
+            actions = actions,
+        )
 
         AvailableOnSection(
             state = providerState,
@@ -393,6 +341,81 @@ private fun ShowDetailContent(
             onProviderClick = actions.onProviderClick,
             onRetry = actions.onRetryProviders,
         )
+    }
+}
+
+@Composable
+private fun NextEpisodeSection(episodeCode: String, episodeTitle: String?) {
+    Text(
+        text = stringResource(R.string.tv_next_episode),
+        fontSize = 14.sp,
+        color = Color.White.copy(alpha = 0.6f),
+    )
+    // AnimatedContent slides the episode info out left and slides new episode in from the right
+    // whenever the episodeCode changes (driven by advancedEntry optimistic update).
+    AnimatedContent(
+        targetState = episodeCode,
+        transitionSpec = {
+            (slideInHorizontally { it } + fadeIn()) togetherWith
+                (slideOutHorizontally { -it } + fadeOut())
+        },
+        label = "next-episode",
+    ) { code ->
+        // When the episode name is known, show it as the title with the code beneath.
+        // Otherwise promote the code to the title — never repeat the "Next episode" label.
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            if (episodeTitle != null) {
+                Text(
+                    text = episodeTitle,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(text = code, fontSize = 14.sp, color = Color.White.copy(alpha = 0.6f))
+            } else {
+                Text(
+                    text = code,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White,
+                    maxLines = 1,
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+private fun ActionButtons(
+    watchNowState: WatchNowState,
+    markState: MarkWatchedState,
+    hasNextEpisode: Boolean,
+    watchNowFocus: FocusRequester,
+    actions: ShowDetailActions,
+) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(TvSpacing.itemGap),
+        verticalArrangement = Arrangement.spacedBy(TvSpacing.tightGap),
+    ) {
+        WatchNowButton(
+            state = watchNowState,
+            onClick = actions.onWatchNow,
+            focusRequester = watchNowFocus,
+        )
+        MarkWatchedButton(
+            state = markState,
+            hasNextEpisode = hasNextEpisode,
+            onClick = actions.onMarkWatched,
+        )
+        OutlinedButton(onClick = actions.onRecapClick) {
+            Text(stringResource(R.string.tv_recap), maxLines = 1, softWrap = false)
+        }
+        OutlinedButton(onClick = actions.onAllEpisodesClick) {
+            Text(stringResource(R.string.tv_all_episodes), maxLines = 1, softWrap = false)
+        }
     }
 }
 
