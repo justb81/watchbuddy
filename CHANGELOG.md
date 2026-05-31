@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.43.0](https://github.com/justb81/watchbuddy/compare/v0.42.0...v0.43.0) (2026-05-31)
+
+
+### Features
+
+* **tv:** improve show detail screen layout and usability ([#758](https://github.com/justb81/watchbuddy/issues/758)) ([b1be1ff](https://github.com/justb81/watchbuddy/commit/b1be1ffaee6513a443182b0804892bc7e8b5e521))
+
 ## [0.42.0](https://github.com/justb81/watchbuddy/compare/v0.41.0...v0.42.0) (2026-05-26)
 
 
