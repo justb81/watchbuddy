@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.43.1](https://github.com/justb81/watchbuddy/compare/v0.43.0...v0.43.1) (2026-06-03)
+
+
+### Bug Fixes
+
+* restore last-focused show on TV home re-enter; default to first show ([#760](https://github.com/justb81/watchbuddy/issues/760)) ([bcd57a0](https://github.com/justb81/watchbuddy/commit/bcd57a0f2a69928cfbcfdd6fb5d6ff5e17a7ddb6)), closes [#757](https://github.com/justb81/watchbuddy/issues/757)
+
 ## [0.43.0](https://github.com/justb81/watchbuddy/compare/v0.42.0...v0.43.0) (2026-05-31)
 
 
