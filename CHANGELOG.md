@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.43.2](https://github.com/justb81/watchbuddy/compare/v0.43.1...v0.43.2) (2026-06-03)
+
+
+### Bug Fixes
+
+* pin KSP to 2.3.8 to resolve CI build failure ([#768](https://github.com/justb81/watchbuddy/issues/768)) ([19e8555](https://github.com/justb81/watchbuddy/commit/19e85558aa4a0863a0335605c27c79f589ec564d)), closes [#767](https://github.com/justb81/watchbuddy/issues/767)
+
 ## [0.43.1](https://github.com/justb81/watchbuddy/compare/v0.43.0...v0.43.1) (2026-06-03)
 
 
