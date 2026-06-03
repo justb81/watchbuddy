@@ -26,6 +26,11 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    # Wait 3 days after a new version is published before opening a PR.
+    # Prevents racing Maven Central CDN propagation for freshly-published
+    # plugin-marker artifacts (see #767).
+    cooldown:
+      default-days: 3
     commit-message:
       prefix: "chore(deps)"
     labels:
