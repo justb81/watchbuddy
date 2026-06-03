@@ -253,18 +253,33 @@ private fun RestoreShelfFocusEffect(
     allShowsExpanded: Boolean
 ) {
     LaunchedEffect(continueWatching.shows, allShows.shows, allShowsExpanded) {
-        val key = focusedShowKey ?: return@LaunchedEffect
-        val cwIndex = continueWatching.shows.indexOfFirst { it.focusKey() == key }
+        if (focusedShowKey == null) {
+            val firstCwKey = continueWatching.shows.firstOrNull()?.focusKey()
+            if (firstCwKey != null) {
+                continueWatching.listState.scrollToItem(0)
+                continueWatching.requesters[firstCwKey]?.requestFocus()
+                return@LaunchedEffect
+            }
+            if (allShowsExpanded) {
+                val firstAllKey = allShows.shows.firstOrNull()?.focusKey()
+                if (firstAllKey != null) {
+                    allShows.listState.scrollToItem(0)
+                    allShows.requesters[firstAllKey]?.requestFocus()
+                }
+            }
+            return@LaunchedEffect
+        }
+        val cwIndex = continueWatching.shows.indexOfFirst { it.focusKey() == focusedShowKey }
         if (cwIndex >= 0) {
             continueWatching.listState.scrollToItem(cwIndex)
-            continueWatching.requesters[key]?.requestFocus()
+            continueWatching.requesters[focusedShowKey]?.requestFocus()
             return@LaunchedEffect
         }
         if (allShowsExpanded) {
-            val allIndex = allShows.shows.indexOfFirst { it.focusKey() == key }
+            val allIndex = allShows.shows.indexOfFirst { it.focusKey() == focusedShowKey }
             if (allIndex >= 0) {
                 allShows.listState.scrollToItem(allIndex)
-                allShows.requesters[key]?.requestFocus()
+                allShows.requesters[focusedShowKey]?.requestFocus()
             }
         }
     }
