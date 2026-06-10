@@ -273,7 +273,7 @@ class ShowDetailViewModelTest {
             assertNull(vm.uiState.value.togglingEpisode)
             assertNull(vm.uiState.value.toggleError)
             coVerify(exactly = 1) {
-                showRepository.updateLocalWatched(TRAKT_SHOW_ID, 1, 1, true)
+                showRepository.updateLocalWatched(show.ids, 1, 1, true)
             }
         }
 
@@ -323,7 +323,7 @@ class ShowDetailViewModelTest {
 
             coVerify(exactly = 1) { episodeRepository.markEpisodeUnwatched(any(), 1, 1) }
             coVerify(exactly = 1) {
-                showRepository.updateLocalWatched(TRAKT_SHOW_ID, 1, 1, false)
+                showRepository.updateLocalWatched(show.ids, 1, 1, false)
             }
         }
     }
@@ -472,9 +472,9 @@ class ShowDetailViewModelTest {
             assertTrue(eps.first { it.number == 2 }.watched)
             assertFalse(eps.first { it.number == 3 }.watched) // not a candidate
 
-            coVerify(exactly = 1) { showRepository.updateLocalWatched(TRAKT_SHOW_ID, 1, 1, true) }
-            coVerify(exactly = 1) { showRepository.updateLocalWatched(TRAKT_SHOW_ID, 1, 2, true) }
-            coVerify(exactly = 0) { showRepository.updateLocalWatched(TRAKT_SHOW_ID, 1, 3, any()) }
+            coVerify(exactly = 1) { showRepository.updateLocalWatched(show.ids, 1, 1, true) }
+            coVerify(exactly = 1) { showRepository.updateLocalWatched(show.ids, 1, 2, true) }
+            coVerify(exactly = 0) { showRepository.updateLocalWatched(show.ids, 1, 3, any()) }
         }
 
         @Test
