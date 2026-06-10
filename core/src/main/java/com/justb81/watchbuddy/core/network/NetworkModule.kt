@@ -202,7 +202,7 @@ object NetworkModule {
     @Singleton
     fun provideSimklTrackingProvider(
         simklApi: SimklApiService,
-        @Named("simklClientIdProvider") clientIdProvider: @JvmSuppressWildcards () -> String
+        @SimklClientIdProvider clientIdProvider: @JvmSuppressWildcards () -> String
     ): SimklTrackingProvider = SimklTrackingProvider(simklApi, clientIdProvider)
 
     /**

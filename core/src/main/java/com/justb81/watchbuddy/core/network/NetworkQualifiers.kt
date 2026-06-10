@@ -21,3 +21,8 @@ annotation class JustWatchClient
 @Qualifier
 @Retention(AnnotationRetention.BINARY)
 annotation class SimklClient
+
+/** Qualifies the SIMKL client-ID provider lambda injected into [com.justb81.watchbuddy.core.tracking.SimklTrackingProvider]. */
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class SimklClientIdProvider

@@ -18,6 +18,7 @@ import com.justb81.watchbuddy.phone.network.WifiStateProvider
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import dagger.Module
 import dagger.Provides
+import com.justb81.watchbuddy.core.network.SimklClientIdProvider
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
@@ -140,7 +141,7 @@ object AppModule {
      */
     @Provides
     @Singleton
-    @Named("simklClientIdProvider")
+    @SimklClientIdProvider
     fun provideSimklClientIdProvider(
         settingsRepository: SettingsRepository
     ): @JvmSuppressWildcards () -> String = {
