@@ -9,13 +9,20 @@ import androidx.datastore.preferences.preferencesDataStore
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.work.WorkManager
 import com.justb81.watchbuddy.BuildConfig
+import com.justb81.watchbuddy.core.tracking.SimklTrackingProvider
+import com.justb81.watchbuddy.core.tracking.TrackingBackend
+import com.justb81.watchbuddy.core.tracking.TrackingProvider
+import com.justb81.watchbuddy.core.tracking.TraktTrackingProvider
 import com.justb81.watchbuddy.phone.data.ProviderCatalogRepository
 import com.justb81.watchbuddy.phone.network.WifiStateProvider
+import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import javax.inject.Named
 import javax.inject.Singleton
 
@@ -120,4 +127,66 @@ object AppModule {
         workManager = workManager,
         backendUrl = BuildConfig.TOKEN_BACKEND_URL,
     )
+
+    /**
+     * Provides the user-supplied SIMKL Client ID as a lambda so that
+     * [SimklTrackingProvider] always reads the latest value from [SettingsRepository]
+     * without requiring a singleton re-creation when the user updates the setting.
+     *
+     * The lambda is called on a coroutine-dispatched background thread inside
+     * [SimklTrackingProvider]; calling [runBlocking] here would deadlock the main
+     * thread, so the lambda is kept lazy and only evaluated by the provider during
+     * an API call where a coroutine context is already available.
+     */
+    @Provides
+    @Singleton
+    @Named("simklClientIdProvider")
+    fun provideSimklClientIdProvider(
+        settingsRepository: SettingsRepository
+    ): @JvmSuppressWildcards () -> String = {
+        runBlocking { settingsRepository.settings.first().simklClientId }
+    }
+
+    /**
+     * Provides the active [TrackingProvider] based on the user's configured
+     * tracking backend. Reads [SettingsRepository] each time to pick the correct
+     * implementation so that a backend switch (Trakt ↔ SIMKL) takes effect on
+     * the next API call without any singleton restart.
+     */
+    @Provides
+    @Singleton
+    fun provideTrackingProvider(
+        traktProvider: TraktTrackingProvider,
+        simklProvider: SimklTrackingProvider,
+        settingsRepository: SettingsRepository,
+    ): TrackingProvider = object : TrackingProvider {
+
+        private fun delegate(): TrackingProvider {
+            val backend = runBlocking { settingsRepository.settings.first().trackingBackend }
+            return if (backend == TrackingBackend.SIMKL) simklProvider else traktProvider
+        }
+
+        override val backend get() = delegate().backend
+
+        override suspend fun getWatchedAndWatchlistShows(bearer: String) =
+            delegate().getWatchedAndWatchlistShows(bearer)
+
+        override suspend fun getSeasonsWithEpisodes(bearer: String, showId: String) =
+            delegate().getSeasonsWithEpisodes(bearer, showId)
+
+        override suspend fun markWatched(bearer: String, ids: com.justb81.watchbuddy.core.model.TraktIds, seasons: List<com.justb81.watchbuddy.core.trakt.SyncHistorySeasonItem>) =
+            delegate().markWatched(bearer, ids, seasons)
+
+        override suspend fun markUnwatched(bearer: String, ids: com.justb81.watchbuddy.core.model.TraktIds, season: Int, episode: Int) =
+            delegate().markUnwatched(bearer, ids, season, episode)
+
+        override suspend fun search(bearer: String, query: String) =
+            delegate().search(bearer, query)
+
+        override suspend fun addToWatchlist(bearer: String, show: com.justb81.watchbuddy.core.model.TraktShow) =
+            delegate().addToWatchlist(bearer, show)
+
+        override suspend fun getProfile(bearer: String) =
+            delegate().getProfile(bearer)
+    }
 }

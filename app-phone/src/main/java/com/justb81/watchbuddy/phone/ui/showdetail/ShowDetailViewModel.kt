@@ -111,14 +111,18 @@ class ShowDetailViewModel @Inject constructor(
 
     private suspend fun findWatchedEntry(): TraktWatchedEntry {
         val existing = showRepository.shows.value
-            .firstOrNull { it.entry.show.ids.trakt == traktShowId }
+            .firstOrNull { showStableKey(it.entry.show.ids) == traktShowId }
         if (existing != null) return existing.entry
         // Cold cache — prime it via a normal fetch.
         showRepository.getShows()
         return showRepository.shows.value
-            .firstOrNull { it.entry.show.ids.trakt == traktShowId }?.entry
+            .firstOrNull { showStableKey(it.entry.show.ids) == traktShowId }?.entry
             ?: error("Show not found in library")
     }
+
+    /** Stable key matching [ShowRepository]'s own stable-key helper. */
+    private fun showStableKey(ids: com.justb81.watchbuddy.core.model.TraktIds): Int? =
+        ids.trakt ?: ids.simkl ?: ids.tmdb
 
     private fun buildSeasonUis(
         seasons: List<TraktSeasonWithEpisodes>,
@@ -218,12 +222,14 @@ class ShowDetailViewModel @Inject constructor(
 
             result.fold(
                 onSuccess = {
-                    showRepository.updateLocalWatched(
-                        traktShowId = traktShowId,
-                        season = episode.season,
-                        episode = episode.number,
-                        watched = !wasWatched
-                    )
+                    show.ids.let { ids ->
+                        showRepository.updateLocalWatched(
+                            showIds = ids,
+                            season = episode.season,
+                            episode = episode.number,
+                            watched = !wasWatched
+                        )
+                    }
                     _uiState.update { it.copy(togglingEpisode = null) }
                 },
                 onFailure = {
@@ -295,7 +301,7 @@ class ShowDetailViewModel @Inject constructor(
             result.fold(
                 onSuccess = {
                     candidates.forEach { (s, e) ->
-                        showRepository.updateLocalWatched(traktShowId, s, e, watched = true)
+                        showRepository.updateLocalWatched(show.ids, s, e, watched = true)
                     }
                     _uiState.update { it.copy(bulkInProgress = false, bulkSuccessCount = candidates.size) }
                 },

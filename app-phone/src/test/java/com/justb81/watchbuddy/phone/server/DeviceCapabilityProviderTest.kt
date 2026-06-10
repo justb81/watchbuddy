@@ -3,8 +3,8 @@ package com.justb81.watchbuddy.phone.server
 import android.app.ActivityManager
 import android.content.Context
 import com.justb81.watchbuddy.core.model.LlmBackend
-import com.justb81.watchbuddy.core.trakt.TraktApiService
-import com.justb81.watchbuddy.core.trakt.TraktUserProfile
+import com.justb81.watchbuddy.core.tracking.TrackingProfile
+import com.justb81.watchbuddy.core.tracking.TrackingProvider
 import com.justb81.watchbuddy.phone.auth.TokenRepository
 import com.justb81.watchbuddy.phone.llm.LlmOrchestrator
 import com.justb81.watchbuddy.phone.settings.AppSettings
@@ -24,7 +24,7 @@ class DeviceCapabilityProviderTest {
 
     private val context: Context = mockk(relaxed = true)
     private val orchestrator: LlmOrchestrator = mockk()
-    private val traktApi: TraktApiService = mockk()
+    private val trackingProvider: TrackingProvider = mockk()
     private val tokenRepository: TokenRepository = mockk()
     private val settingsRepository: SettingsRepository = mockk()
     private val activityManager: ActivityManager = mockk(relaxed = true)
@@ -51,7 +51,7 @@ class DeviceCapabilityProviderTest {
         every { settingsRepository.getTmdbApiKey() } returns flowOf("")
         every { settingsRepository.settings } returns flowOf(AppSettings())
         provider = DeviceCapabilityProvider(
-            context, orchestrator, traktApi, tokenRepository, settingsRepository, stateManager
+            context, orchestrator, trackingProvider, tokenRepository, settingsRepository, stateManager
         )
     }
 
@@ -85,9 +85,9 @@ class DeviceCapabilityProviderTest {
     }
 
     @Test
-    fun `getCapability uses Trakt profile username when available`() = runTest {
+    fun `getCapability uses tracking provider profile username when available`() = runTest {
         every { tokenRepository.getAccessToken() } returns "token"
-        coEvery { traktApi.getProfile("Bearer token") } returns TraktUserProfile("walter")
+        coEvery { trackingProvider.getProfile("Bearer token") } returns TrackingProfile("walter", null)
 
         val cap = provider.getCapability()
         assertEquals("walter", cap.userName)
@@ -104,7 +104,7 @@ class DeviceCapabilityProviderTest {
     @Test
     fun `getCapability returns default userName when API fails`() = runTest {
         every { tokenRepository.getAccessToken() } returns "token"
-        coEvery { traktApi.getProfile(any()) } throws RuntimeException("Network error")
+        coEvery { trackingProvider.getProfile(any()) } throws RuntimeException("Network error")
 
         val cap = provider.getCapability()
         assertEquals("user", cap.userName)
@@ -113,24 +113,24 @@ class DeviceCapabilityProviderTest {
     @Test
     fun `getCapability caches profile after first successful call`() = runTest {
         every { tokenRepository.getAccessToken() } returns "token"
-        coEvery { traktApi.getProfile(any()) } returns TraktUserProfile("cached-user")
+        coEvery { trackingProvider.getProfile(any()) } returns TrackingProfile("cached-user", null)
 
         provider.getCapability()
         provider.getCapability()
         // API should only be called once
-        coVerify(exactly = 1) { traktApi.getProfile(any()) }
+        coVerify(exactly = 1) { trackingProvider.getProfile(any()) }
     }
 
     @Test
     fun `invalidateCache clears cached profile`() = runTest {
         every { tokenRepository.getAccessToken() } returns "token"
-        coEvery { traktApi.getProfile(any()) } returns TraktUserProfile("user1")
+        coEvery { trackingProvider.getProfile(any()) } returns TrackingProfile("user1", null)
 
         provider.getCapability()
         provider.invalidateCache()
         provider.getCapability()
         // API should be called twice (once before and once after invalidation)
-        coVerify(exactly = 2) { traktApi.getProfile(any()) }
+        coVerify(exactly = 2) { trackingProvider.getProfile(any()) }
     }
 
     @Test

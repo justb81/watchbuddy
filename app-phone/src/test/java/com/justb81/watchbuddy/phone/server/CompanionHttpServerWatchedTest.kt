@@ -5,6 +5,7 @@ import com.justb81.watchbuddy.core.model.TraktSeasonWithEpisodes
 import com.justb81.watchbuddy.core.tmdb.TmdbApiService
 import com.justb81.watchbuddy.core.tmdb.TmdbCache
 import com.justb81.watchbuddy.core.trakt.TraktApiService
+import com.justb81.watchbuddy.core.tracking.TrackingProvider
 import com.justb81.watchbuddy.phone.auth.TokenRefreshManager
 import com.justb81.watchbuddy.phone.auth.TokenRepository
 import com.justb81.watchbuddy.phone.data.ProviderCatalogRepository
@@ -40,6 +41,7 @@ class CompanionHttpServerWatchedTest {
     private val showRepository: ShowRepository = mockk()
     private val tokenRepository: TokenRepository = mockk()
     private val tokenRefreshManager: TokenRefreshManager = mockk()
+    private val trackingProvider: TrackingProvider = mockk(relaxed = true)
     private val traktApiService: TraktApiService = mockk()
     private val tmdbApiService: TmdbApiService = mockk()
     private val tmdbCache = TmdbCache()
@@ -83,7 +85,8 @@ class CompanionHttpServerWatchedTest {
         application {
             configureCompanionRoutes(
                 recapGenerator, capabilityProvider, showRepository,
-                tokenRepository, tokenRefreshManager, traktApiService, tmdbApiService, tmdbCache,
+                tokenRepository, tokenRefreshManager, trackingProvider, traktApiService,
+                tmdbApiService, tmdbCache,
                 settingsRepository, avatarImageStore, stateManager, titleExtractor,
                 bearerTokenRepository, providerCatalogRepository, episodeRepository,
             )

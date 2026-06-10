@@ -16,3 +16,8 @@ annotation class TmdbClient
 @Qualifier
 @Retention(AnnotationRetention.BINARY)
 annotation class JustWatchClient
+
+/** Qualifies the SIMKL [okhttp3.OkHttpClient] and [retrofit2.Retrofit] instances. */
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class SimklClient

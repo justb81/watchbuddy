@@ -5,6 +5,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.core.network.TokenProxyServiceFactory
+import com.justb81.watchbuddy.core.simkl.SimklApiService
+import com.justb81.watchbuddy.core.tracking.TrackingBackend
 import com.justb81.watchbuddy.core.trakt.DeviceCodeRequest
 import com.justb81.watchbuddy.core.trakt.DeviceCodeResponse
 import com.justb81.watchbuddy.core.trakt.DeviceTokenRequest
@@ -40,6 +42,8 @@ enum class NotConfiguredReason {
     SELF_HOSTED_MISSING_CLIENT_ID,
     /** DIRECT mode: either the Client ID or Client Secret is missing. */
     DIRECT_MISSING_CREDENTIALS,
+    /** SIMKL mode: Client ID or Client Secret not yet configured in Advanced settings. */
+    SIMKL_MISSING_CREDENTIALS,
 }
 
 sealed class OnboardingState {
@@ -66,6 +70,7 @@ class OnboardingViewModel @Inject constructor(
     private val tokenRepository: TokenRepository,
     private val settingsRepository: SettingsRepository,
     private val tokenProxyServiceFactory: TokenProxyServiceFactory,
+    private val simklApi: SimklApiService,
     @param:Named("managedBackendAvailable") private val managedBackendAvailable: Boolean
 ) : AndroidViewModel(application) {
 
@@ -144,6 +149,12 @@ class OnboardingViewModel @Inject constructor(
             _state.value = OnboardingState.LoadingCode
             try {
                 val settings = settingsRepository.settings.first()
+
+                if (settings.trackingBackend == TrackingBackend.SIMKL) {
+                    requestSimklPinCode(settings.simklClientId)
+                    return@launch
+                }
+
                 val (clientId, reason) = resolveClientId(
                     settings.authMode, settings.backendUrl, settings.directClientId
                 )
@@ -166,6 +177,112 @@ class OnboardingViewModel @Inject constructor(
                         R.string.onboarding_error_loading_code, e.message
                     )
                 )
+            }
+        }
+    }
+
+    private fun requestSimklPinCode(clientId: String) {
+        viewModelScope.launch {
+            val secret = settingsRepository.getSimklClientSecret()
+            if (clientId.isBlank() || secret.isBlank()) {
+                _state.value = OnboardingState.NotConfigured(NotConfiguredReason.SIMKL_MISSING_CREDENTIALS)
+                return@launch
+            }
+            try {
+                val pinResponse = simklApi.requestPinCode(clientId)
+                startSimklCountdown(pinResponse.userCode, pinResponse.verificationUrl, pinResponse.expiresIn)
+                startSimklPolling(pinResponse.userCode, pinResponse.interval, clientId)
+            } catch (e: Exception) {
+                _state.value = OnboardingState.Error(
+                    getApplication<Application>().getString(
+                        R.string.onboarding_error_loading_code, e.message
+                    )
+                )
+            }
+        }
+    }
+
+    private fun startSimklCountdown(userCode: String, verificationUrl: String, expiresIn: Int) {
+        countdownJob?.cancel()
+        countdownJob = viewModelScope.launch {
+            var remaining = expiresIn
+            while (remaining > 0) {
+                _state.value = OnboardingState.WaitingForPin(
+                    userCode = userCode,
+                    verificationUrl = verificationUrl,
+                    expiresInSeconds = remaining,
+                    deviceCode = userCode
+                )
+                delay(1_000)
+                remaining--
+            }
+            _state.value = OnboardingState.Error(
+                getApplication<Application>().getString(R.string.onboarding_code_expired)
+            )
+        }
+    }
+
+    private suspend fun startSimklPolling(userCode: String, intervalSeconds: Int, clientId: String) {
+        pollingJob?.cancelAndJoin()
+        pollingJob = viewModelScope.launch {
+            var consecutiveNetworkFailures = 0
+            while (isActive) {
+                delay(intervalSeconds * 1_000L)
+                try {
+                    val poll = simklApi.pollPin(userCode = userCode, clientId = clientId)
+                    if (poll.result == "OK" && poll.accessToken != null) {
+                        tokenRepository.saveSimklToken(poll.accessToken)
+                        val profile = try {
+                            simklApi.getProfile("Bearer ${poll.accessToken}")
+                        } catch (_: Exception) {
+                            null
+                        }
+                        val username = profile?.user?.name
+                            ?: profile?.user?.username
+                            ?: "simkl_user"
+                        countdownJob?.cancel()
+                        _state.value = OnboardingState.Success(username)
+                        return@launch
+                    }
+                    // result == "KO" means still waiting — continue polling
+                    consecutiveNetworkFailures = 0
+                } catch (e: HttpException) {
+                    when (e.code()) {
+                        400, 404 -> {
+                            // Code not yet activated or unknown — keep polling
+                            consecutiveNetworkFailures = 0
+                        }
+                        409, 410 -> {
+                            failPolling(getApplication<Application>().getString(R.string.onboarding_code_expired))
+                            return@launch
+                        }
+                        418 -> {
+                            failPolling(getApplication<Application>().getString(R.string.onboarding_error_denied))
+                            return@launch
+                        }
+                        else -> {
+                            consecutiveNetworkFailures++
+                            if (consecutiveNetworkFailures >= 3) {
+                                failPolling(
+                                    getApplication<Application>().getString(
+                                        R.string.onboarding_error_polling_network
+                                    )
+                                )
+                                return@launch
+                            }
+                        }
+                    }
+                } catch (_: Exception) {
+                    consecutiveNetworkFailures++
+                    if (consecutiveNetworkFailures >= 3) {
+                        failPolling(
+                            getApplication<Application>().getString(
+                                R.string.onboarding_error_polling_network
+                            )
+                        )
+                        return@launch
+                    }
+                }
             }
         }
     }

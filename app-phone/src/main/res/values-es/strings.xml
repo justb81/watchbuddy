@@ -23,6 +23,7 @@
     <string name="onboarding_not_configured_self_hosted_no_url">URL del backend no configurada. Introduce la URL de tu servidor proxy en Ajustes → Avanzado.</string>
     <string name="onboarding_not_configured_self_hosted_no_id">Introduce tu Client ID de Trakt en Ajustes → Avanzado.</string>
     <string name="onboarding_not_configured_direct_no_credentials">Introduce tu Client ID y Client Secret de Trakt en Ajustes → Avanzado.</string>
+    <string name="onboarding_not_configured_simkl_no_credentials">Introduce tu Client ID y Client Secret de SIMKL en Ajustes → Avanzado.</string>
     <string name="onboarding_open_settings">Abrir ajustes</string>
     <string name="onboarding_error_polling_network">Se perdió la conexión durante la autorización. Comprueba tu conexión a internet e inténtalo de nuevo.</string>
     <string name="onboarding_error_auth_failed">Autorización fallida. Por favor, comprueba tus credenciales de Trakt e inténtalo de nuevo.</string>
@@ -97,6 +98,16 @@
     <string name="settings_llm_ready">Listo</string>
     <string name="settings_llm_not_available">No disponible (RAM insuficiente)</string>
     <string name="settings_advanced">Ajustes avanzados</string>
+    <!-- Tracking service -->
+    <string name="settings_tracking_service">Servicio de seguimiento</string>
+    <string name="tracking_backend_trakt">Trakt</string>
+    <string name="tracking_backend_simkl">SIMKL</string>
+    <!-- SIMKL credentials -->
+    <string name="settings_simkl_client_id">Client ID de SIMKL</string>
+    <string name="settings_simkl_client_secret">Client Secret de SIMKL</string>
+    <string name="settings_simkl_connected_as">Conectado como %1$s</string>
+    <string name="settings_simkl_disconnect_message">Tus tokens de SIMKL serán eliminados. Puedes volver a conectarte en cualquier momento.</string>
+
     <string name="settings_auth_mode">Autenticación de Trakt</string>
     <string name="settings_auth_managed">Backend gestionado (por defecto)</string>
     <string name="settings_auth_managed_unavailable">No configurado en esta compilación</string>

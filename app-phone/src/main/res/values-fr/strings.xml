@@ -23,6 +23,7 @@
     <string name="onboarding_not_configured_self_hosted_no_url">URL du backend non définie. Entrez l\'URL de votre serveur proxy dans Paramètres → Avancé.</string>
     <string name="onboarding_not_configured_self_hosted_no_id">Entrez votre Client ID Trakt dans Paramètres → Avancé.</string>
     <string name="onboarding_not_configured_direct_no_credentials">Entrez votre Client ID et Client Secret Trakt dans Paramètres → Avancé.</string>
+    <string name="onboarding_not_configured_simkl_no_credentials">Entrez votre Client ID et Client Secret SIMKL dans Paramètres → Avancé.</string>
     <string name="onboarding_open_settings">Ouvrir les paramètres</string>
     <string name="onboarding_error_polling_network">Connexion perdue pendant l\'autorisation. Vérifiez votre connexion internet et réessayez.</string>
     <string name="onboarding_error_auth_failed">Autorisation échouée. Veuillez vérifier vos identifiants Trakt et réessayer.</string>
@@ -97,6 +98,16 @@
     <string name="settings_llm_ready">Prêt</string>
     <string name="settings_llm_not_available">Non disponible (RAM insuffisante)</string>
     <string name="settings_advanced">Paramètres avancés</string>
+    <!-- Tracking service -->
+    <string name="settings_tracking_service">Service de suivi</string>
+    <string name="tracking_backend_trakt">Trakt</string>
+    <string name="tracking_backend_simkl">SIMKL</string>
+    <!-- SIMKL credentials -->
+    <string name="settings_simkl_client_id">Client ID SIMKL</string>
+    <string name="settings_simkl_client_secret">Client Secret SIMKL</string>
+    <string name="settings_simkl_connected_as">Connecté en tant que %1$s</string>
+    <string name="settings_simkl_disconnect_message">Vos jetons SIMKL seront supprimés. Vous pouvez vous reconnecter à tout moment.</string>
+
     <string name="settings_auth_mode">Authentification Trakt</string>
     <string name="settings_auth_managed">Backend géré (par défaut)</string>
     <string name="settings_auth_managed_unavailable">Non configuré dans cette version</string>

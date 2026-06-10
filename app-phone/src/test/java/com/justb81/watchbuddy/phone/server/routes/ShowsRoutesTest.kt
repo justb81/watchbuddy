@@ -5,8 +5,7 @@ import com.justb81.watchbuddy.core.model.TraktIds
 import com.justb81.watchbuddy.core.model.TraktShow
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
 import com.justb81.watchbuddy.core.network.WatchBuddyJson
-import com.justb81.watchbuddy.core.trakt.SyncHistoryResult
-import com.justb81.watchbuddy.core.trakt.TraktApiService
+import com.justb81.watchbuddy.core.tracking.TrackingProvider
 import com.justb81.watchbuddy.phone.auth.TokenRefreshManager
 import com.justb81.watchbuddy.phone.auth.TokenRepository
 import com.justb81.watchbuddy.phone.server.EpisodeRepository
@@ -38,14 +37,14 @@ class ShowsRoutesTest {
     private val episodeRepository: EpisodeRepository = mockk(relaxed = true)
     private val tokenRepository: TokenRepository = mockk()
     private val tokenRefreshManager: TokenRefreshManager = mockk()
-    private val traktApiService: TraktApiService = mockk()
+    private val trackingProvider: TrackingProvider = mockk()
 
     private val deps = ShowsRouteDeps(
         showRepository = showRepository,
         episodeRepository = episodeRepository,
         tokenRepository = tokenRepository,
         tokenRefreshManager = tokenRefreshManager,
-        traktApiService = traktApiService,
+        trackingProvider = trackingProvider,
     )
 
     @BeforeEach
@@ -239,9 +238,9 @@ class ShowsRoutesTest {
         }
 
         @Test
-        fun `returns 200 and calls addToHistory`() = testApp {
+        fun `returns 200 and calls markWatched`() = testApp {
             coEvery { tokenRefreshManager.getValidAccessToken() } returns "test-token"
-            coEvery { traktApiService.addToHistory("Bearer test-token", any()) } returns SyncHistoryResult()
+            coEvery { trackingProvider.markWatched(any(), any(), any()) } returns Result.success(Unit)
             coEvery { showRepository.invalidateCache() } just Runs
 
             val response = client.post("/shows/add-to-library") {
@@ -256,7 +255,7 @@ class ShowsRoutesTest {
         @Test
         fun `invalidates cache after successful add`() = testApp {
             coEvery { tokenRefreshManager.getValidAccessToken() } returns "test-token"
-            coEvery { traktApiService.addToHistory(any(), any()) } returns SyncHistoryResult()
+            coEvery { trackingProvider.markWatched(any(), any(), any()) } returns Result.success(Unit)
             coEvery { showRepository.invalidateCache() } just Runs
 
             client.post("/shows/add-to-library") {
@@ -268,9 +267,9 @@ class ShowsRoutesTest {
         }
 
         @Test
-        fun `returns 503 when Trakt throws`() = testApp {
+        fun `returns 503 when provider throws`() = testApp {
             coEvery { tokenRefreshManager.getValidAccessToken() } returns "token"
-            coEvery { traktApiService.addToHistory(any(), any()) } throws RuntimeException("Network error")
+            coEvery { trackingProvider.markWatched(any(), any(), any()) } returns Result.failure(RuntimeException("Network error"))
 
             val response = client.post("/shows/add-to-library") {
                 header(HttpHeaders.ContentType, ContentType.Application.Json.toString())

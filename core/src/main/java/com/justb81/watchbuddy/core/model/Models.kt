@@ -20,7 +20,13 @@ data class TraktIds(
     val slug: String? = null,
     val tvdb: Int? = null,
     val imdb: String? = null,
-    val tmdb: Int? = null
+    val tmdb: Int? = null,
+    /**
+     * SIMKL show ID. Populated when the active tracking backend is SIMKL;
+     * null when using Trakt. The two fields are mutually exclusive at use-time
+     * but both may be non-null when the user has authenticated both providers.
+     */
+    val simkl: Int? = null
 )
 
 @Serializable

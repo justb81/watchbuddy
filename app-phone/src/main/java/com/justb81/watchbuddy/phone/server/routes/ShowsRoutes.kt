@@ -2,11 +2,9 @@ package com.justb81.watchbuddy.phone.server.routes
 
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.model.PhoneAddToLibraryRequest
-import com.justb81.watchbuddy.core.trakt.SyncHistoryBody
+import com.justb81.watchbuddy.core.tracking.TrackingProvider
 import com.justb81.watchbuddy.core.trakt.SyncHistoryEpisodeItem
 import com.justb81.watchbuddy.core.trakt.SyncHistorySeasonItem
-import com.justb81.watchbuddy.core.trakt.SyncHistoryShowItem
-import com.justb81.watchbuddy.core.trakt.TraktApiService
 import com.justb81.watchbuddy.phone.auth.TokenRefreshManager
 import com.justb81.watchbuddy.phone.auth.TokenRepository
 import com.justb81.watchbuddy.phone.server.EpisodeRepository
@@ -27,7 +25,7 @@ data class ShowsRouteDeps(
     val episodeRepository: EpisodeRepository,
     val tokenRepository: TokenRepository,
     val tokenRefreshManager: TokenRefreshManager,
-    val traktApiService: TraktApiService,
+    val trackingProvider: TrackingProvider,
 )
 
 fun Route.showsRoutes(deps: ShowsRouteDeps) {
@@ -75,20 +73,13 @@ fun Route.showsRoutes(deps: ShowsRouteDeps) {
             return@post call.respond(HttpStatusCode.BadRequest, ErrorResponse("Invalid request body"))
         }
         try {
-            val syncBody = SyncHistoryBody(
-                shows = listOf(
-                    SyncHistoryShowItem(
-                        ids = body.show.ids,
-                        seasons = listOf(
-                            SyncHistorySeasonItem(
-                                number = body.episode.season,
-                                episodes = listOf(SyncHistoryEpisodeItem(number = body.episode.number))
-                            )
-                        )
-                    )
+            val seasons = listOf(
+                SyncHistorySeasonItem(
+                    number = body.episode.season,
+                    episodes = listOf(SyncHistoryEpisodeItem(number = body.episode.number))
                 )
             )
-            deps.traktApiService.addToHistory("Bearer $token", syncBody)
+            deps.trackingProvider.markWatched("Bearer $token", body.show.ids, seasons).getOrThrow()
             deps.showRepository.invalidateCache()
             DiagnosticLog.event(
                 TAG,

@@ -180,6 +180,8 @@ private fun NotConfiguredCard(
             R.string.onboarding_not_configured_self_hosted_no_id
         NotConfiguredReason.DIRECT_MISSING_CREDENTIALS ->
             R.string.onboarding_not_configured_direct_no_credentials
+        NotConfiguredReason.SIMKL_MISSING_CREDENTIALS ->
+            R.string.onboarding_not_configured_simkl_no_credentials
     }
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,

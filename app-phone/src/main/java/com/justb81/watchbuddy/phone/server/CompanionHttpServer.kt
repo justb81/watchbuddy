@@ -5,6 +5,7 @@ import com.justb81.watchbuddy.core.network.WatchBuddyJson
 import com.justb81.watchbuddy.core.tmdb.TmdbApiService
 import com.justb81.watchbuddy.core.tmdb.TmdbCache
 import com.justb81.watchbuddy.core.trakt.TraktApiService
+import com.justb81.watchbuddy.core.tracking.TrackingProvider
 import com.justb81.watchbuddy.phone.auth.TokenRefreshManager
 import com.justb81.watchbuddy.phone.auth.TokenRepository
 import com.justb81.watchbuddy.phone.data.ProviderCatalogRepository
@@ -116,6 +117,7 @@ class CompanionHttpServer @Inject constructor(
     private val showRepository: ShowRepository,
     private val tokenRepository: TokenRepository,
     private val tokenRefreshManager: TokenRefreshManager,
+    private val trackingProvider: TrackingProvider,
     private val traktApiService: TraktApiService,
     private val tmdbApiService: TmdbApiService,
     private val tmdbCache: TmdbCache,
@@ -147,7 +149,8 @@ class CompanionHttpServer @Inject constructor(
             server = embeddedServer(Netty, host = host, port = PORT) {
                 configureCompanionRoutes(
                     recapGenerator, capabilityProvider, showRepository,
-                    tokenRepository, tokenRefreshManager, traktApiService, tmdbApiService, tmdbCache,
+                    tokenRepository, tokenRefreshManager, trackingProvider, traktApiService,
+                    tmdbApiService, tmdbCache,
                     settingsRepository, avatarImageStore, stateManager, titleExtractor,
                     bearerTokenRepository, providerCatalogRepository, episodeRepository,
                 )
@@ -178,6 +181,7 @@ internal fun Application.configureCompanionRoutes(
     showRepository: ShowRepository,
     tokenRepository: TokenRepository,
     tokenRefreshManager: TokenRefreshManager,
+    trackingProvider: TrackingProvider,
     traktApiService: TraktApiService,
     tmdbApiService: TmdbApiService,
     tmdbCache: TmdbCache,
@@ -272,7 +276,7 @@ internal fun Application.configureCompanionRoutes(
                     episodeRepository = episodeRepository,
                     tokenRepository = tokenRepository,
                     tokenRefreshManager = tokenRefreshManager,
-                    traktApiService = traktApiService,
+                    trackingProvider = trackingProvider,
                 )
             )
             recapRoutes(

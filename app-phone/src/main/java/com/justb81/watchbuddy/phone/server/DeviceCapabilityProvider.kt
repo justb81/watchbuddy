@@ -5,8 +5,8 @@ import android.content.Context
 import android.os.Build
 import com.justb81.watchbuddy.core.model.AvatarSource
 import com.justb81.watchbuddy.core.model.DeviceCapability
-import com.justb81.watchbuddy.core.trakt.TraktApiService
-import com.justb81.watchbuddy.core.trakt.TraktUserProfile
+import com.justb81.watchbuddy.core.tracking.TrackingProfile
+import com.justb81.watchbuddy.core.tracking.TrackingProvider
 import com.justb81.watchbuddy.phone.auth.TokenRepository
 import com.justb81.watchbuddy.phone.llm.LlmOrchestrator
 import com.justb81.watchbuddy.phone.settings.AppSettings
@@ -24,16 +24,16 @@ import javax.inject.Singleton
 class DeviceCapabilityProvider @Inject constructor(
     @param:ApplicationContext private val context: Context,
     private val llmOrchestrator: LlmOrchestrator,
-    private val traktApiService: TraktApiService,
+    private val trackingProvider: TrackingProvider,
     private val tokenRepository: TokenRepository,
     private val settingsRepository: SettingsRepository,
     private val stateManager: CompanionStateManager
 ) {
     private val profileMutex = Mutex()
 
-    @Volatile private var cachedProfile: TraktUserProfile? = null
+    @Volatile private var cachedProfile: TrackingProfile? = null
 
-    private suspend fun getCachedProfile(): TraktUserProfile? {
+    private suspend fun getCachedProfile(): TrackingProfile? {
         // Fast path: @Volatile read avoids mutex acquisition when cache is warm.
         cachedProfile?.let { return it }
         return profileMutex.withLock {
@@ -41,7 +41,7 @@ class DeviceCapabilityProvider @Inject constructor(
             cachedProfile?.let { return@withLock it }
             val token = tokenRepository.getAccessToken() ?: return@withLock null
             try {
-                traktApiService.getProfile("Bearer $token").also { cachedProfile = it }
+                trackingProvider.getProfile("Bearer $token").also { cachedProfile = it }
             } catch (_: Exception) {
                 null
             }
@@ -81,9 +81,9 @@ class DeviceCapabilityProvider @Inject constructor(
         )
     }
 
-    private fun resolveAvatarUrl(settings: AppSettings, profile: TraktUserProfile?): String? =
+    private fun resolveAvatarUrl(settings: AppSettings, profile: TrackingProfile?): String? =
         when (settings.avatarSource) {
-            AvatarSource.TRAKT -> profile?.images?.avatar?.full
+            AvatarSource.TRAKT -> profile?.avatarUrl
             AvatarSource.GENERATED -> null
             AvatarSource.CUSTOM -> {
                 val ipv4 = stateManager.wifiIpv4.value

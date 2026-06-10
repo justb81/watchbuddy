@@ -10,6 +10,7 @@ import com.justb81.watchbuddy.core.model.LlmBackend
 import com.justb81.watchbuddy.core.trakt.TraktApiService
 import com.justb81.watchbuddy.phone.MainDispatcherRule
 import com.justb81.watchbuddy.phone.auth.TokenRepository
+import com.justb81.watchbuddy.phone.server.ShowRepository
 import com.justb81.watchbuddy.phone.llm.LlmOrchestrator
 import com.justb81.watchbuddy.phone.llm.ModelDownloadWorker
 import com.justb81.watchbuddy.phone.server.DeviceCapabilityProvider
@@ -50,6 +51,7 @@ class SettingsViewModelTest {
     private val llmOrchestrator: LlmOrchestrator = mockk(relaxed = true)
     private val traktApi: TraktApiService = mockk(relaxed = true)
     private val tokenRepository: TokenRepository = mockk(relaxed = true)
+    private val showRepository: ShowRepository = mockk(relaxed = true)
     private val deviceCapabilityProvider: DeviceCapabilityProvider = mockk(relaxed = true)
     private val settingsRepository: SettingsRepository = mockk(relaxed = true)
     private val avatarImageStore: AvatarImageStore = mockk(relaxed = true)
@@ -81,6 +83,7 @@ class SettingsViewModelTest {
             tokenRepository = tokenRepository,
             deviceCapabilityProvider = deviceCapabilityProvider,
             settingsRepository = settingsRepository,
+            showRepository = showRepository,
             avatarImageStore = avatarImageStore,
             managedBackendAvailable = managedBackendAvailable
         )

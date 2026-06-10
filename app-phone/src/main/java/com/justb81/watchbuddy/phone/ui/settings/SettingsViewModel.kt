@@ -15,12 +15,14 @@ import androidx.work.workDataOf
 import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.model.AvatarSource
+import com.justb81.watchbuddy.core.tracking.TrackingBackend
 import com.justb81.watchbuddy.core.trakt.TraktApiService
 import com.justb81.watchbuddy.phone.auth.TokenRepository
 import com.justb81.watchbuddy.service.CompanionService
 import com.justb81.watchbuddy.phone.llm.LlmOrchestrator
 import com.justb81.watchbuddy.phone.llm.ModelDownloadWorker
 import com.justb81.watchbuddy.phone.server.DeviceCapabilityProvider
+import com.justb81.watchbuddy.phone.server.ShowRepository
 import com.justb81.watchbuddy.phone.settings.AppSettings
 import com.justb81.watchbuddy.phone.settings.AvatarImageStore
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
@@ -81,7 +83,15 @@ data class SettingsUiState(
      * Two-letter ISO 3166-1 country code override. Empty string = "Auto (device locale)".
      * Shown in Settings → Advanced as a dropdown.
      */
-    val countryOverride: String = ""
+    val countryOverride: String = "",
+    /** The active watch-tracking backend (Trakt or SIMKL). */
+    val trackingBackend: TrackingBackend = TrackingBackend.TRAKT,
+    /** Username of the connected SIMKL account, or null when not connected. */
+    val simklUsername: String? = null,
+    /** User-supplied SIMKL Client ID entered in Advanced settings. */
+    val simklClientId: String = "",
+    /** User-supplied SIMKL Client Secret entered in Advanced settings (Keystore-backed). */
+    val simklClientSecret: String = ""
 )
 
 @HiltViewModel
@@ -93,6 +103,7 @@ class SettingsViewModel @Inject constructor(
     private val tokenRepository: TokenRepository,
     private val deviceCapabilityProvider: DeviceCapabilityProvider,
     private val settingsRepository: SettingsRepository,
+    private val showRepository: ShowRepository,
     private val avatarImageStore: AvatarImageStore,
     @param:Named("managedBackendAvailable") private val managedBackendAvailable: Boolean
 ) : AndroidViewModel(application) {
@@ -168,6 +179,35 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    // ── SIMKL-specific settings ───────────────────────────────────────────────
+
+    fun setSimklClientId(id: String) {
+        _uiState.value = _uiState.value.copy(simklClientId = id)
+    }
+
+    fun setSimklClientSecret(secret: String) {
+        _uiState.value = _uiState.value.copy(simklClientSecret = secret)
+    }
+
+    fun setTrackingBackend(backend: TrackingBackend) {
+        _uiState.value = _uiState.value.copy(trackingBackend = backend)
+    }
+
+    fun disconnectSimkl() {
+        try {
+            tokenRepository.clearSimklTokens()
+        } catch (e: Exception) {
+            DiagnosticLog.warn(TAG, "disconnectSimkl: clearSimklTokens failed", e)
+        }
+        try {
+            deviceCapabilityProvider.invalidateCache()
+        } catch (e: Exception) {
+            DiagnosticLog.warn(TAG, "disconnectSimkl: invalidateCache failed", e)
+        }
+        _uiState.value = _uiState.value.copy(simklUsername = null)
+        DiagnosticLog.event(TAG, "disconnectSimkl:done")
+    }
+
     private fun loadPersistedSettings() {
         launchSafe {
             try {
@@ -181,6 +221,7 @@ class SettingsViewModel @Inject constructor(
                     saved.authMode
                 }
                 val buildHasBundled = saved.defaultTmdbApiKeyAvailable  // true = build has a key
+                val simklClientSecret = settingsRepository.getSimklClientSecret()
                 _uiState.value = _uiState.value.copy(
                     authMode = resolvedAuthMode,
                     customBackendUrl = saved.backendUrl,
@@ -198,7 +239,10 @@ class SettingsViewModel @Inject constructor(
                     hasCustomAvatar = avatarImageStore.exists(),
                     customAvatarVersion = saved.customAvatarVersion,
                     llmActivityLoggingEnabled = saved.llmActivityLoggingEnabled,
-                    countryOverride = saved.countryOverride
+                    countryOverride = saved.countryOverride,
+                    trackingBackend = saved.trackingBackend,
+                    simklClientId = saved.simklClientId,
+                    simklClientSecret = simklClientSecret
                 )
                 Log.d(TAG, "loadPersistedSettings: authMode=$resolvedAuthMode tmdbConnected=${saved.tmdbApiKey.isNotBlank()}")
             } catch (e: Exception) {
@@ -359,10 +403,19 @@ class SettingsViewModel @Inject constructor(
                         directClientId = state.directClientId,
                         modelDownloadUrl = state.modelDownloadUrl,
                         tmdbApiKey = tmdbKeyToSave,
-                        countryOverride = state.countryOverride
+                        countryOverride = state.countryOverride,
+                        trackingBackend = state.trackingBackend,
+                        simklClientId = state.simklClientId
                     )
                 )
                 settingsRepository.saveClientSecret(state.directClientSecret)
+                settingsRepository.saveSimklClientSecret(state.simklClientSecret)
+                // Invalidate caches when the backend changes so stale data doesn't bleed across.
+                if (current.trackingBackend != state.trackingBackend) {
+                    showRepository.invalidateCache()
+                    deviceCapabilityProvider.invalidateCache()
+                    DiagnosticLog.event(TAG, "saveAdvancedSettings: backend switched to ${state.trackingBackend}")
+                }
                 _uiState.value = _uiState.value.copy(
                     tmdbConnected = tmdbKeyToSave.isNotBlank(),
                     defaultTmdbApiKeyAvailable = tmdbKeyToSave.isBlank() && current.defaultTmdbApiKeyAvailable,
