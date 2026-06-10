@@ -230,10 +230,11 @@ class OnboardingViewModel @Inject constructor(
                 delay(intervalSeconds * 1_000L)
                 try {
                     val poll = simklApi.pollPin(userCode = userCode, clientId = clientId)
-                    if (poll.result == "OK" && poll.accessToken != null) {
-                        tokenRepository.saveSimklToken(poll.accessToken)
+                    val accessToken = poll.accessToken
+                    if (poll.result == "OK" && accessToken != null) {
+                        tokenRepository.saveSimklToken(accessToken)
                         val profile = try {
-                            simklApi.getProfile("Bearer ${poll.accessToken}")
+                            simklApi.getProfile("Bearer $accessToken")
                         } catch (_: Exception) {
                             null
                         }
