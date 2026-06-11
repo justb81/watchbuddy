@@ -53,6 +53,8 @@ class TokenRepository @Inject constructor(
         DiagnosticLog.event(TAG, "init: ready (file=$PREFS_FILE)")
     }
 
+    // ── Trakt tokens ──────────────────────────────────────────────────────────
+
     fun saveTokens(accessToken: String, refreshToken: String, expiresIn: Int) {
         val expiresAt = System.currentTimeMillis() + expiresIn * 1_000L
         prefs.edit {
@@ -97,6 +99,32 @@ class TokenRepository @Inject constructor(
 
     fun saveClientSecret(secret: String) {
         prefs.edit { putString(KEY_CLIENT_SECRET, encrypt(secret)) }
+    }
+
+    // ── SIMKL tokens ──────────────────────────────────────────────────────────
+    // SIMKL access tokens do not expire and there is no refresh token.
+    // Client credentials are stored here for use during the PIN exchange and future
+    // on-device direct calls; they never leave the device.
+
+    fun saveSimklToken(accessToken: String) {
+        prefs.edit { putString(KEY_SIMKL_ACCESS_TOKEN, encrypt(accessToken)) }
+    }
+
+    fun getSimklAccessToken(): String? =
+        decrypt(KEY_SIMKL_ACCESS_TOKEN, prefs.getString(KEY_SIMKL_ACCESS_TOKEN, null))
+
+    fun clearSimklTokens() {
+        prefs.edit {
+            remove(KEY_SIMKL_ACCESS_TOKEN)
+            remove(KEY_SIMKL_CLIENT_SECRET)
+        }
+    }
+
+    fun getSimklClientSecret(): String =
+        decrypt(KEY_SIMKL_CLIENT_SECRET, prefs.getString(KEY_SIMKL_CLIENT_SECRET, null)) ?: ""
+
+    fun saveSimklClientSecret(secret: String) {
+        prefs.edit { putString(KEY_SIMKL_CLIENT_SECRET, encrypt(secret)) }
     }
 
     private fun readExpiresAt(): Long =
@@ -151,6 +179,8 @@ class TokenRepository @Inject constructor(
         const val KEY_REFRESH_TOKEN = "refresh_token"
         const val KEY_EXPIRES_AT = "expires_at"
         const val KEY_CLIENT_SECRET = "trakt_client_secret"
+        const val KEY_SIMKL_ACCESS_TOKEN = "simkl_access_token"
+        const val KEY_SIMKL_CLIENT_SECRET = "simkl_client_secret"
         const val TAG = "TokenRepository"
 
         const val PREFS_FILE = "watchbuddy_tokens_v2"

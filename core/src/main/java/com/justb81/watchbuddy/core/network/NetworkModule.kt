@@ -1,7 +1,10 @@
 package com.justb81.watchbuddy.core.network
 
 import com.justb81.watchbuddy.core.justwatch.JustWatchApiService
+import com.justb81.watchbuddy.core.simkl.SimklApiService
 import com.justb81.watchbuddy.core.tmdb.TmdbApiService
+import com.justb81.watchbuddy.core.tracking.SimklTrackingProvider
+import com.justb81.watchbuddy.core.tracking.TraktTrackingProvider
 import com.justb81.watchbuddy.core.trakt.NoOpTokenProxyService
 import com.justb81.watchbuddy.core.trakt.TokenProxyService
 import com.justb81.watchbuddy.core.trakt.TraktApiService
@@ -147,6 +150,60 @@ object NetworkModule {
     @Singleton
     fun provideJustWatchApiService(@JustWatchClient retrofit: Retrofit): JustWatchApiService =
         retrofit.create(JustWatchApiService::class.java)
+
+    /**
+     * Dedicated OkHttpClient for SIMKL API calls.
+     *
+     * Uses a separate client from the Trakt client so that Trakt-specific
+     * headers (`trakt-api-version`, `trakt-api-key`) are never sent to
+     * api.simkl.com. The `simkl-api-key` header is injected per-request by
+     * [SimklApiService] callers using the user-supplied client ID from settings.
+     */
+    @Provides
+    @Singleton
+    @SimklClient
+    fun provideSimklOkHttpClient(): OkHttpClient = OkHttpClient.Builder()
+        .connectTimeout(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        .readTimeout(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        .callTimeout(CALL_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        .retryOnConnectionFailure(false)
+        .addInterceptor(RateLimitInterceptor())
+        .addInterceptor(HttpLoggingInterceptor().apply {
+            if (com.justb81.watchbuddy.core.BuildConfig.DEBUG) {
+                level = HttpLoggingInterceptor.Level.HEADERS
+                redactHeader("Authorization")
+                redactHeader("simkl-api-key")
+            } else {
+                level = HttpLoggingInterceptor.Level.NONE
+            }
+        })
+        .build()
+
+    @Provides
+    @Singleton
+    @SimklClient
+    fun provideSimklRetrofit(@SimklClient client: OkHttpClient): Retrofit = Retrofit.Builder()
+        .baseUrl("https://api.simkl.com/")
+        .client(client)
+        .addConverterFactory(WatchBuddyJson.asConverterFactory("application/json".toMediaType()))
+        .build()
+
+    @Provides
+    @Singleton
+    fun provideSimklApiService(@SimklClient retrofit: Retrofit): SimklApiService =
+        retrofit.create(SimklApiService::class.java)
+
+    @Provides
+    @Singleton
+    fun provideTraktTrackingProvider(traktApi: TraktApiService): TraktTrackingProvider =
+        TraktTrackingProvider(traktApi)
+
+    @Provides
+    @Singleton
+    fun provideSimklTrackingProvider(
+        simklApi: SimklApiService,
+        @SimklClientIdProvider clientIdProvider: @JvmSuppressWildcards () -> String
+    ): SimklTrackingProvider = SimklTrackingProvider(simklApi, clientIdProvider)
 
     /**
      * TokenProxyService for the WatchBuddy managed token proxy backend.

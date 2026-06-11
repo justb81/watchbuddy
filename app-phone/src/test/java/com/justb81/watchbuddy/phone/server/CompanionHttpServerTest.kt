@@ -16,8 +16,8 @@ import com.justb81.watchbuddy.core.model.TraktWatchedEpisode
 import com.justb81.watchbuddy.core.model.TraktWatchedSeason
 import com.justb81.watchbuddy.core.tmdb.TmdbApiService
 import com.justb81.watchbuddy.core.tmdb.TmdbCache
+import com.justb81.watchbuddy.core.tracking.TrackingProvider
 import com.justb81.watchbuddy.core.trakt.ScrobbleResponse
-import com.justb81.watchbuddy.core.trakt.SyncHistoryResult
 import com.justb81.watchbuddy.core.trakt.TraktApiService
 import com.justb81.watchbuddy.phone.auth.TokenRefreshManager
 import com.justb81.watchbuddy.phone.auth.TokenRepository
@@ -58,6 +58,7 @@ class CompanionHttpServerTest {
     private val showRepository: ShowRepository = mockk()
     private val tokenRepository: TokenRepository = mockk()
     private val tokenRefreshManager: TokenRefreshManager = mockk()
+    private val trackingProvider: TrackingProvider = mockk(relaxed = true)
     private val traktApiService: TraktApiService = mockk()
     private val tmdbApiService: TmdbApiService = mockk()
     private val tmdbCache = TmdbCache()
@@ -122,7 +123,8 @@ class CompanionHttpServerTest {
         application {
             configureCompanionRoutes(
                 recapGenerator, capabilityProvider, showRepository,
-                tokenRepository, tokenRefreshManager, traktApiService, tmdbApiService, tmdbCache,
+                tokenRepository, tokenRefreshManager, trackingProvider, traktApiService,
+                tmdbApiService, tmdbCache,
                 settingsRepository, avatarImageStore, stateManager, titleExtractor,
                 bearerTokenRepository, providerCatalogRepository, episodeRepository,
             )
@@ -1121,10 +1123,9 @@ class CompanionHttpServerTest {
         }
 
         @Test
-        fun `returns 200 and calls addToHistory on Trakt`() = testApp {
+        fun `returns 200 and calls markWatched on tracking provider`() = testApp {
             coEvery { tokenRefreshManager.getValidAccessToken() } returns "test-token"
-            coEvery { traktApiService.addToHistory("Bearer test-token", any()) } returns
-                SyncHistoryResult(added = com.justb81.watchbuddy.core.trakt.SyncHistoryCount(episodes = 1))
+            coEvery { trackingProvider.markWatched(any(), any(), any()) } returns Result.success(Unit)
             coEvery { showRepository.invalidateCache() } just Runs
 
             val response = client.post("/shows/add-to-library") {
@@ -1134,13 +1135,13 @@ class CompanionHttpServerTest {
 
             assertEquals(HttpStatusCode.OK, response.status)
             assertTrue(response.bodyAsText().contains("true"))
-            coVerify { traktApiService.addToHistory("Bearer test-token", any()) }
+            coVerify { trackingProvider.markWatched(eq("Bearer test-token"), any(), any()) }
         }
 
         @Test
         fun `invalidates ShowRepository cache after successful add`() = testApp {
             coEvery { tokenRefreshManager.getValidAccessToken() } returns "test-token"
-            coEvery { traktApiService.addToHistory(any(), any()) } returns SyncHistoryResult()
+            coEvery { trackingProvider.markWatched(any(), any(), any()) } returns Result.success(Unit)
             coEvery { showRepository.invalidateCache() } just Runs
 
             client.post("/shows/add-to-library") {
@@ -1152,9 +1153,9 @@ class CompanionHttpServerTest {
         }
 
         @Test
-        fun `returns 503 when Trakt addToHistory throws`() = testApp {
+        fun `returns 503 when tracking provider markWatched fails`() = testApp {
             coEvery { tokenRefreshManager.getValidAccessToken() } returns "token"
-            coEvery { traktApiService.addToHistory(any(), any()) } throws RuntimeException("Trakt error")
+            coEvery { trackingProvider.markWatched(any(), any(), any()) } returns Result.failure(RuntimeException("Provider error"))
 
             val response = client.post("/shows/add-to-library") {
                 contentType(ContentType.Application.Json)
@@ -1162,14 +1163,15 @@ class CompanionHttpServerTest {
             }
 
             assertEquals(HttpStatusCode.ServiceUnavailable, response.status)
-            assertFalse(response.bodyAsText().contains("Trakt error"))
+            assertFalse(response.bodyAsText().contains("Provider error"))
         }
 
         @Test
-        fun `builds correct SyncHistoryBody from request show and episode`() = testApp {
+        fun `passes correct ids and season data to trackingProvider`() = testApp {
             coEvery { tokenRefreshManager.getValidAccessToken() } returns "test-token"
-            val capturedBodies = mutableListOf<com.justb81.watchbuddy.core.trakt.SyncHistoryBody>()
-            coEvery { traktApiService.addToHistory(any(), capture(capturedBodies)) } returns SyncHistoryResult()
+            val capturedIds = slot<com.justb81.watchbuddy.core.model.TraktIds>()
+            val capturedSeasons = slot<List<com.justb81.watchbuddy.core.trakt.SyncHistorySeasonItem>>()
+            coEvery { trackingProvider.markWatched(any(), capture(capturedIds), capture(capturedSeasons)) } returns Result.success(Unit)
             coEvery { showRepository.invalidateCache() } just Runs
 
             client.post("/shows/add-to-library") {
@@ -1177,15 +1179,11 @@ class CompanionHttpServerTest {
                 setBody(addToLibraryBody)
             }
 
-            assertEquals(1, capturedBodies.size)
-            val body = capturedBodies.first()
-            assertEquals(1, body.shows.size)
-            val showItem = body.shows.first()
-            assertEquals(66732, showItem.ids.tmdb)
-            assertEquals(1, showItem.seasons.size)
-            assertEquals(1, showItem.seasons.first().number)
-            assertEquals(1, showItem.seasons.first().episodes.size)
-            assertEquals(1, showItem.seasons.first().episodes.first().number)
+            assertEquals(66732, capturedIds.captured.tmdb)
+            assertEquals(1, capturedSeasons.captured.size)
+            assertEquals(1, capturedSeasons.captured.first().number)
+            assertEquals(1, capturedSeasons.captured.first().episodes.size)
+            assertEquals(1, capturedSeasons.captured.first().episodes.first().number)
         }
     }
 

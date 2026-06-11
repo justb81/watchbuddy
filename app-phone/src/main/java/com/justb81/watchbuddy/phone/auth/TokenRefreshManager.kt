@@ -2,6 +2,7 @@ package com.justb81.watchbuddy.phone.auth
 
 import android.util.Log
 import com.justb81.watchbuddy.core.network.TokenProxyServiceFactory
+import com.justb81.watchbuddy.core.tracking.TrackingBackend
 import com.justb81.watchbuddy.core.trakt.ProxyRefreshRequest
 import com.justb81.watchbuddy.core.trakt.RefreshTokenRequest
 import com.justb81.watchbuddy.core.trakt.TokenProxyService
@@ -45,14 +46,23 @@ class TokenRefreshManager @Inject constructor(
     private val mutex = Mutex()
 
     /**
-     * Returns a valid access token, refreshing it first if it has expired or is about to.
+     * Returns a valid access token for the currently active tracking backend.
+     *
+     * - **SIMKL**: SIMKL access tokens never expire and have no refresh token.
+     *   Returns the stored SIMKL token directly with no expiry check.
+     * - **TRAKT**: Checks expiry, refreshes under a [Mutex] if needed.
      *
      * Returns `null` when:
      * - no token is stored (user never authenticated), or
-     * - no refresh token is available, or
-     * - the refresh call fails (network error, revoked token, etc.).
+     * - (Trakt only) no refresh token is available or the refresh call fails.
      */
     suspend fun getValidAccessToken(): String? {
+        val backend = settingsRepository.settings.first().trackingBackend
+        if (backend == TrackingBackend.SIMKL) {
+            return tokenRepository.getSimklAccessToken()
+        }
+
+        // Trakt path: check expiry and refresh under lock if needed.
         // Fast path — token is valid and not expiring soon; no lock needed.
         if (!tokenRepository.isTokenExpiredOrExpiringSoon(REFRESH_BUFFER_MS)) {
             return tokenRepository.getAccessToken()

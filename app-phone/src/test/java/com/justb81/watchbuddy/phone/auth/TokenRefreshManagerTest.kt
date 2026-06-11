@@ -1,6 +1,7 @@
 package com.justb81.watchbuddy.phone.auth
 
 import com.justb81.watchbuddy.core.network.TokenProxyServiceFactory
+import com.justb81.watchbuddy.core.tracking.TrackingBackend
 import com.justb81.watchbuddy.core.trakt.DeviceTokenResponse
 import com.justb81.watchbuddy.core.trakt.ProxyRefreshRequest
 import com.justb81.watchbuddy.core.trakt.ProxyTokenResponse
@@ -57,6 +58,8 @@ class TokenRefreshManagerTest {
 
     @BeforeEach
     fun setUp() {
+        // Default: Trakt backend so existing tests are unaffected.
+        every { settingsRepository.settings } returns flowOf(AppSettings(trackingBackend = TrackingBackend.TRAKT))
         manager = TokenRefreshManager(
             tokenRepository = tokenRepository,
             settingsRepository = settingsRepository,

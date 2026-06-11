@@ -22,6 +22,7 @@
     <string name="onboarding_not_configured_self_hosted_no_url">Backend URL not set. Enter your proxy server URL in Settings → Advanced.</string>
     <string name="onboarding_not_configured_self_hosted_no_id">Enter your Trakt Client ID in Settings → Advanced.</string>
     <string name="onboarding_not_configured_direct_no_credentials">Enter your Trakt Client ID and Client Secret in Settings → Advanced.</string>
+    <string name="onboarding_not_configured_simkl_no_credentials">Enter your SIMKL Client ID and Client Secret in Settings → Advanced.</string>
     <string name="onboarding_open_settings">Open Settings</string>
     <string name="onboarding_error_polling_network">Lost connection while waiting for authorization. Please check your internet connection and try again.</string>
     <string name="onboarding_error_auth_failed">Authorization failed. Please check your Trakt credentials and try again.</string>
@@ -105,6 +106,16 @@
     <string name="settings_llm_ready">Ready</string>
     <string name="settings_llm_not_available">Not available (insufficient RAM)</string>
     <string name="settings_advanced">Advanced settings</string>
+    <!-- Tracking service -->
+    <string name="settings_tracking_service">Watch-tracking service</string>
+    <string name="tracking_backend_trakt">Trakt</string>
+    <string name="tracking_backend_simkl">SIMKL</string>
+    <!-- SIMKL credentials -->
+    <string name="settings_simkl_client_id">SIMKL Client ID</string>
+    <string name="settings_simkl_client_secret">SIMKL Client Secret</string>
+    <string name="settings_simkl_connected_as">Connected as %1$s</string>
+    <string name="settings_simkl_disconnect_message">Your SIMKL tokens will be removed. You can reconnect at any time.</string>
+
     <string name="settings_auth_mode">Trakt authentication</string>
     <string name="settings_auth_managed">Managed backend (default)</string>
     <string name="settings_auth_managed_unavailable">Not configured in this build</string>

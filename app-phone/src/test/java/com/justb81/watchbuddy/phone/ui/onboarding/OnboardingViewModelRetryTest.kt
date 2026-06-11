@@ -2,6 +2,7 @@ package com.justb81.watchbuddy.phone.ui.onboarding
 
 import android.app.Application
 import com.justb81.watchbuddy.core.network.TokenProxyServiceFactory
+import com.justb81.watchbuddy.core.simkl.SimklApiService
 import com.justb81.watchbuddy.core.trakt.DeviceCodeResponse
 import com.justb81.watchbuddy.core.trakt.ProxyTokenResponse
 import com.justb81.watchbuddy.core.trakt.TokenProxyService
@@ -48,6 +49,7 @@ class OnboardingViewModelRetryTest {
     private val tokenRepository: TokenRepository = mockk(relaxed = true)
     private val settingsRepository: SettingsRepository = mockk(relaxed = true)
     private val tokenProxyServiceFactory: TokenProxyServiceFactory = mockk(relaxed = true)
+    private val simklApi: SimklApiService = mockk(relaxed = true)
 
     private val deviceCodeResponse = DeviceCodeResponse(
         device_code = "device-abc",
@@ -83,6 +85,7 @@ class OnboardingViewModelRetryTest {
         tokenRepository = tokenRepository,
         settingsRepository = settingsRepository,
         tokenProxyServiceFactory = tokenProxyServiceFactory,
+        simklApi = simklApi,
         managedBackendAvailable = true
     )
 

@@ -22,6 +22,7 @@
     <string name="onboarding_not_configured_self_hosted_no_url">Backend-URL nicht gesetzt. Trage deine Proxy-Server-URL in Einstellungen → Erweitert ein.</string>
     <string name="onboarding_not_configured_self_hosted_no_id">Gib deine Trakt-Client-ID in Einstellungen → Erweitert ein.</string>
     <string name="onboarding_not_configured_direct_no_credentials">Gib deine Trakt-Client-ID und dein Client-Secret in Einstellungen → Erweitert ein.</string>
+    <string name="onboarding_not_configured_simkl_no_credentials">Gib deine SIMKL-Client-ID und dein Client-Secret in Einstellungen → Erweitert ein.</string>
     <string name="onboarding_open_settings">Einstellungen öffnen</string>
     <string name="onboarding_error_polling_network">Verbindung während der Autorisierung verloren. Bitte überprüfe deine Internetverbindung und versuche es erneut.</string>
     <string name="onboarding_error_auth_failed">Autorisierung fehlgeschlagen. Bitte überprüfe deine Trakt-Zugangsdaten und versuche es erneut.</string>
@@ -96,6 +97,16 @@
     <string name="settings_llm_ready">Bereit</string>
     <string name="settings_llm_not_available">Nicht verfügbar (zu wenig RAM)</string>
     <string name="settings_advanced">Erweiterte Einstellungen</string>
+    <!-- Tracking service -->
+    <string name="settings_tracking_service">Watch-Tracking-Dienst</string>
+    <string name="tracking_backend_trakt">Trakt</string>
+    <string name="tracking_backend_simkl">SIMKL</string>
+    <!-- SIMKL credentials -->
+    <string name="settings_simkl_client_id">SIMKL Client-ID</string>
+    <string name="settings_simkl_client_secret">SIMKL Client-Secret</string>
+    <string name="settings_simkl_connected_as">Verbunden als %1$s</string>
+    <string name="settings_simkl_disconnect_message">Deine SIMKL-Token werden entfernt. Du kannst dich jederzeit wieder verbinden.</string>
+
     <string name="settings_auth_mode">Trakt-Authentifizierung</string>
     <string name="settings_auth_managed">Verwaltetes Backend (Standard)</string>
     <string name="settings_auth_managed_unavailable">In diesem Build nicht konfiguriert</string>

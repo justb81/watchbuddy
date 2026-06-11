@@ -33,6 +33,7 @@ import com.justb81.watchbuddy.BuildConfig
 import com.justb81.watchbuddy.R
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.model.AvatarSource
+import com.justb81.watchbuddy.core.tracking.TrackingBackend
 import com.justb81.watchbuddy.phone.ui.components.InitialsAvatar
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -384,7 +385,87 @@ fun SettingsScreen(
 
 @Composable
 private fun AdvancedAuthSettings(uiState: SettingsUiState, viewModel: SettingsViewModel) {
+    var showSimklDisconnectDialog by remember { mutableStateOf(false) }
+
     Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+        // ── Tracking service group ──────────────────────────────────────────────
+        Text(
+            text  = stringResource(R.string.settings_tracking_service),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Spacer(Modifier.height(4.dp))
+
+        TrackingBackend.entries.forEach { backend ->
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                RadioButton(
+                    selected = uiState.trackingBackend == backend,
+                    onClick  = { viewModel.setTrackingBackend(backend) }
+                )
+                Text(
+                    text  = stringResource(
+                        when (backend) {
+                            TrackingBackend.TRAKT  -> R.string.tracking_backend_trakt
+                            TrackingBackend.SIMKL  -> R.string.tracking_backend_simkl
+                        }
+                    ),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
+
+        // ── SIMKL credentials (shown only when SIMKL is selected) ──────────────
+        if (uiState.trackingBackend == TrackingBackend.SIMKL) {
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value         = uiState.simklClientId,
+                onValueChange = viewModel::setSimklClientId,
+                label         = { Text(stringResource(R.string.settings_simkl_client_id)) },
+                modifier      = Modifier.fillMaxWidth(),
+                singleLine    = true
+            )
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value               = uiState.simklClientSecret,
+                onValueChange       = viewModel::setSimklClientSecret,
+                label               = { Text(stringResource(R.string.settings_simkl_client_secret)) },
+                modifier            = Modifier.fillMaxWidth(),
+                singleLine          = true,
+                visualTransformation = PasswordVisualTransformation()
+            )
+            if (uiState.simklUsername != null) {
+                Spacer(Modifier.height(4.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text  = stringResource(R.string.settings_simkl_connected_as, uiState.simklUsername),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    TextButton(onClick = { showSimklDisconnectDialog = true }) {
+                        Text(
+                            stringResource(R.string.settings_disconnect),
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+        HorizontalDivider(
+            color     = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+            thickness = 0.5.dp
+        )
+        Spacer(Modifier.height(12.dp))
+
         // ── Authentication group ──
         Text(
             text  = stringResource(R.string.settings_auth_mode),
@@ -597,6 +678,27 @@ private fun AdvancedAuthSettings(uiState: SettingsUiState, viewModel: SettingsVi
             Text(stringResource(R.string.settings_save))
         }
         Spacer(Modifier.height(12.dp))
+    }
+
+    if (showSimklDisconnectDialog) {
+        AlertDialog(
+            onDismissRequest = { showSimklDisconnectDialog = false },
+            title   = { Text(stringResource(R.string.settings_disconnect_title)) },
+            text    = { Text(stringResource(R.string.settings_simkl_disconnect_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.disconnectSimkl()
+                    showSimklDisconnectDialog = false
+                }) {
+                    Text(stringResource(R.string.settings_disconnect), color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSimklDisconnectDialog = false }) {
+                    Text(stringResource(R.string.settings_cancel))
+                }
+            }
+        )
     }
 }
 

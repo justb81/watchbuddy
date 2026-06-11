@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.justb81.watchbuddy.core.logging.DiagnosticLog
 import com.justb81.watchbuddy.core.model.AvatarSource
+import com.justb81.watchbuddy.core.tracking.TrackingBackend
 import com.justb81.watchbuddy.phone.auth.TokenRepository
 import com.justb81.watchbuddy.phone.llm.LlmEventLog
 import com.justb81.watchbuddy.phone.ui.settings.AuthMode
@@ -49,6 +50,8 @@ class SettingsRepository @Inject constructor(
         val CUSTOM_AVATAR_VERSION = longPreferencesKey("custom_avatar_version")
         val LLM_ACTIVITY_LOGGING_ENABLED = booleanPreferencesKey("llm_activity_logging_enabled")
         val COUNTRY_OVERRIDE = stringPreferencesKey("country_override")
+        val TRACKING_BACKEND = stringPreferencesKey("tracking_backend")
+        val SIMKL_CLIENT_ID = stringPreferencesKey("simkl_client_id")
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -86,7 +89,11 @@ class SettingsRepository @Inject constructor(
                 ?: AvatarSource.TRAKT,
             customAvatarVersion = prefs[Keys.CUSTOM_AVATAR_VERSION] ?: 0L,
             llmActivityLoggingEnabled = prefs[Keys.LLM_ACTIVITY_LOGGING_ENABLED] ?: true,
-            countryOverride = prefs[Keys.COUNTRY_OVERRIDE] ?: ""
+            countryOverride = prefs[Keys.COUNTRY_OVERRIDE] ?: "",
+            trackingBackend = prefs[Keys.TRACKING_BACKEND]
+                ?.let { runCatching { TrackingBackend.valueOf(it) }.getOrNull() }
+                ?: TrackingBackend.TRAKT,
+            simklClientId = prefs[Keys.SIMKL_CLIENT_ID] ?: ""
         )
     }
 
@@ -103,6 +110,8 @@ class SettingsRepository @Inject constructor(
             prefs[Keys.CUSTOM_AVATAR_VERSION] = settings.customAvatarVersion
             prefs[Keys.LLM_ACTIVITY_LOGGING_ENABLED] = settings.llmActivityLoggingEnabled
             prefs[Keys.COUNTRY_OVERRIDE] = settings.countryOverride
+            prefs[Keys.TRACKING_BACKEND] = settings.trackingBackend.name
+            prefs[Keys.SIMKL_CLIENT_ID] = settings.simklClientId
         }
     }
 
@@ -184,6 +193,33 @@ class SettingsRepository @Inject constructor(
             prefs[Keys.LLM_ACTIVITY_LOGGING_ENABLED] = enabled
         }
         if (!enabled) llmEventLog.clear()
+    }
+
+    /**
+     * Switches the active tracking backend. Cache invalidation is the caller's
+     * responsibility — callers should call [ShowRepository.invalidateCache] and
+     * [DeviceCapabilityProvider.invalidateCache] after switching so stale data
+     * from the previous backend does not bleed across.
+     */
+    suspend fun setTrackingBackend(backend: TrackingBackend) {
+        dataStore.edit { prefs ->
+            prefs[Keys.TRACKING_BACKEND] = backend.name
+        }
+    }
+
+    fun getSimklClientSecret(): String = try {
+        tokenRepository.getSimklClientSecret()
+    } catch (e: Exception) {
+        DiagnosticLog.error(TAG, "getSimklClientSecret failed (Keystore?)", e)
+        ""
+    }
+
+    fun saveSimklClientSecret(secret: String) {
+        try {
+            tokenRepository.saveSimklClientSecret(secret)
+        } catch (e: Exception) {
+            DiagnosticLog.error(TAG, "saveSimklClientSecret failed (Keystore?)", e)
+        }
     }
 
     /** Persists the two-letter ISO 3166-1 country code override, or clears it when blank. */

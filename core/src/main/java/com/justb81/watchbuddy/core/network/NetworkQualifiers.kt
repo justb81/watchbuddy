@@ -16,3 +16,13 @@ annotation class TmdbClient
 @Qualifier
 @Retention(AnnotationRetention.BINARY)
 annotation class JustWatchClient
+
+/** Qualifies the SIMKL [okhttp3.OkHttpClient] and [retrofit2.Retrofit] instances. */
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class SimklClient
+
+/** Qualifies the SIMKL client-ID provider lambda injected into [com.justb81.watchbuddy.core.tracking.SimklTrackingProvider]. */
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class SimklClientIdProvider

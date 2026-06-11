@@ -1,6 +1,7 @@
 package com.justb81.watchbuddy.phone.settings
 
 import com.justb81.watchbuddy.core.model.AvatarSource
+import com.justb81.watchbuddy.core.tracking.TrackingBackend
 import com.justb81.watchbuddy.phone.ui.settings.AuthMode
 
 data class AppSettings(
@@ -38,5 +39,17 @@ data class AppSettings(
      * Blank string means "Auto" — fall back to [java.util.Locale.getDefault] country.
      * Projected into `/capability` by [com.justb81.watchbuddy.phone.server.DeviceCapabilityProvider].
      */
-    val countryOverride: String = ""
+    val countryOverride: String = "",
+    /**
+     * The active watch-tracking backend. Defaults to [TrackingBackend.TRAKT] for existing
+     * installs (backward-safe, DataStore returns null for the missing key which resolves to
+     * the default). Trakt and SIMKL are mutually exclusive in v1.
+     */
+    val trackingBackend: TrackingBackend = TrackingBackend.TRAKT,
+    /**
+     * User-supplied SIMKL Client ID entered in Settings → Advanced.
+     * Empty string means SIMKL is not configured. The client secret is stored
+     * separately in the Keystore via [com.justb81.watchbuddy.phone.auth.TokenRepository].
+     */
+    val simklClientId: String = ""
 )

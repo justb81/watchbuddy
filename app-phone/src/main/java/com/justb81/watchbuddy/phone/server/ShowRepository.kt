@@ -6,15 +6,14 @@ import com.justb81.watchbuddy.core.locale.LocaleHelper
 import com.justb81.watchbuddy.core.model.EnrichedShowEntry
 import com.justb81.watchbuddy.core.model.TmdbProgressHint
 import com.justb81.watchbuddy.core.model.TmdbShow
+import com.justb81.watchbuddy.core.model.TraktIds
 import com.justb81.watchbuddy.core.model.TraktShow
 import com.justb81.watchbuddy.core.model.TraktWatchedEntry
 import com.justb81.watchbuddy.core.model.TraktWatchedEpisode
 import com.justb81.watchbuddy.core.model.TraktWatchedSeason
 import com.justb81.watchbuddy.core.progress.ShowProgressCalculator
 import com.justb81.watchbuddy.core.tmdb.TmdbApiService
-import com.justb81.watchbuddy.core.trakt.SyncWatchlistBody
-import com.justb81.watchbuddy.core.trakt.SyncWatchlistShowItem
-import com.justb81.watchbuddy.core.trakt.TraktApiService
+import com.justb81.watchbuddy.core.tracking.TrackingProvider
 import com.justb81.watchbuddy.core.trakt.TraktSearchResult
 import com.justb81.watchbuddy.phone.auth.TokenRefreshManager
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
@@ -49,7 +48,7 @@ private const val TAG = "ShowRepository"
  */
 @Singleton
 class ShowRepository @Inject constructor(
-    private val traktApi: TraktApiService,
+    private val trackingProvider: TrackingProvider,
     private val tokenRefreshManager: TokenRefreshManager,
     private val tmdbApiService: TmdbApiService,
     private val settingsRepository: SettingsRepository
@@ -59,7 +58,7 @@ class ShowRepository @Inject constructor(
 
     private val cache = TimedCachedResource<Unit, List<EnrichedShowEntry>>(
         ttlMillis = 5.minutes.inWholeMilliseconds,
-        fetcher = { fetchFromTrakt() },
+        fetcher = { fetchFromProvider() },
     )
 
     private val showComparator = compareByDescending<EnrichedShowEntry> {
@@ -76,24 +75,21 @@ class ShowRepository @Inject constructor(
             _shows.value = enriched
             enriched
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to fetch shows from Trakt; serving ${_shows.value.size} cached entries", e)
+            Log.e(TAG, "Failed to fetch shows; serving ${_shows.value.size} cached entries", e)
             _shows.value
         }
     }
 
     suspend fun searchShows(bearer: String, query: String): List<TraktSearchResult> {
-        return traktApi.searchShow(bearer, query)
+        return trackingProvider.search(bearer, query)
     }
 
     suspend fun addShowToWatchlist(bearer: String, show: TraktShow) {
-        traktApi.addToWatchlist(
-            bearer,
-            SyncWatchlistBody(shows = listOf(SyncWatchlistShowItem(ids = show.ids)))
-        )
-        val traktId = show.ids.trakt
-        if (traktId != null) {
+        trackingProvider.addToWatchlist(bearer, show)
+        val stableKey = stableKey(show.ids)
+        if (stableKey != null) {
             _shows.update { current ->
-                if (current.any { it.entry.show.ids.trakt == traktId }) {
+                if (current.any { stableKey(it.entry.show.ids) == stableKey }) {
                     current
                 } else {
                     (current + EnrichedShowEntry(entry = TraktWatchedEntry(show = show)))
@@ -104,40 +100,31 @@ class ShowRepository @Inject constructor(
         cache.invalidate(Unit)
     }
 
-    private suspend fun fetchFromTrakt(): List<EnrichedShowEntry> {
+    private suspend fun fetchFromProvider(): List<EnrichedShowEntry> {
         val token = tokenRefreshManager.getValidAccessToken()
             ?: error("No access token available")
         val bearer = "Bearer $token"
-        return coroutineScope {
-            val watchedDeferred = async { traktApi.getWatchedShows(bearer) }
-            val watchlistDeferred = async {
-                runCatching { traktApi.getWatchlistShows(bearer) }
-                    .onFailure { Log.w(TAG, "watchlist fetch failed; continuing with watched only", it) }
-                    .getOrDefault(emptyList())
-            }
-            val watched = watchedDeferred.await()
-            val watchlist = watchlistDeferred.await()
-            val watchedIds = watched.mapNotNull { it.show.ids.trakt }.toSet()
-            val watchlistOnly = watchlist
-                .filter { it.show.ids.trakt == null || it.show.ids.trakt !in watchedIds }
-                .map { TraktWatchedEntry(show = it.show, seasons = emptyList()) }
-            enrich(watched + watchlistOnly).sortedWith(showComparator)
-        }
+        val allShows = trackingProvider.getWatchedAndWatchlistShows(bearer)
+        return enrich(allShows).sortedWith(showComparator)
     }
 
     /**
      * Mutates the in-memory cache so Home counters update instantly after a
      * per-episode toggle on the detail screen. Network sync is the caller's
      * responsibility (see `EpisodeRepository.markEpisode{Watched,Unwatched}`).
+     *
+     * [showIds] identifies the show using the stable key: [TraktIds.trakt] for Trakt
+     * items, [TraktIds.simkl] for SIMKL items, [TraktIds.tmdb] as a fallback.
      */
     fun updateLocalWatched(
-        traktShowId: Int,
+        showIds: com.justb81.watchbuddy.core.model.TraktIds,
         season: Int,
         episode: Int,
         watched: Boolean
     ) {
+        val targetKey = stableKey(showIds) ?: return
         _shows.update { current ->
-            val index = current.indexOfFirst { it.entry.show.ids.trakt == traktShowId }
+            val index = current.indexOfFirst { stableKey(it.entry.show.ids) == targetKey }
             if (index < 0) return@update current
             val existing = current[index]
             val updatedSeasons = if (watched) {
@@ -222,6 +209,14 @@ class ShowRepository @Inject constructor(
         }
     }
 }
+
+/**
+ * Returns a stable numeric key for a show regardless of the active tracking backend.
+ * Trakt items use the Trakt ID; SIMKL items use the SIMKL ID; TMDB ID is a fallback
+ * when neither is populated.
+ */
+private fun stableKey(ids: com.justb81.watchbuddy.core.model.TraktIds): Int? =
+    ids.trakt ?: ids.simkl ?: ids.tmdb
 
 private fun TmdbShow.toProgressHint(): TmdbProgressHint = TmdbProgressHint(
     status = status,
