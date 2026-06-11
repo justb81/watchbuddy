@@ -13,6 +13,7 @@ import com.justb81.watchbuddy.core.trakt.DeviceTokenRequest
 import com.justb81.watchbuddy.core.trakt.ProxyTokenRequest
 import com.justb81.watchbuddy.core.trakt.TokenProxyService
 import com.justb81.watchbuddy.core.trakt.TraktApiService
+import com.justb81.watchbuddy.core.trakt.isServerMisconfigured
 import com.justb81.watchbuddy.phone.auth.TokenRepository
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import com.justb81.watchbuddy.phone.ui.settings.AuthMode
@@ -26,7 +27,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import com.justb81.watchbuddy.core.trakt.isServerMisconfigured
 import retrofit2.HttpException
 import javax.inject.Inject
 import javax.inject.Named
@@ -42,6 +42,7 @@ enum class NotConfiguredReason {
     SELF_HOSTED_MISSING_CLIENT_ID,
     /** DIRECT mode: either the Client ID or Client Secret is missing. */
     DIRECT_MISSING_CREDENTIALS,
+
     /** SIMKL mode: Client ID or Client Secret not yet configured in Advanced settings. */
     SIMKL_MISSING_CREDENTIALS,
 }

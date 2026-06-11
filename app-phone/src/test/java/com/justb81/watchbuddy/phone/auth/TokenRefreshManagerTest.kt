@@ -1,13 +1,13 @@
 package com.justb81.watchbuddy.phone.auth
 
 import com.justb81.watchbuddy.core.network.TokenProxyServiceFactory
+import com.justb81.watchbuddy.core.tracking.TrackingBackend
 import com.justb81.watchbuddy.core.trakt.DeviceTokenResponse
 import com.justb81.watchbuddy.core.trakt.ProxyRefreshRequest
 import com.justb81.watchbuddy.core.trakt.ProxyTokenResponse
 import com.justb81.watchbuddy.core.trakt.RefreshTokenRequest
 import com.justb81.watchbuddy.core.trakt.TokenProxyService
 import com.justb81.watchbuddy.core.trakt.TraktApiService
-import com.justb81.watchbuddy.core.tracking.TrackingBackend
 import com.justb81.watchbuddy.phone.settings.AppSettings
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import com.justb81.watchbuddy.phone.ui.settings.AuthMode

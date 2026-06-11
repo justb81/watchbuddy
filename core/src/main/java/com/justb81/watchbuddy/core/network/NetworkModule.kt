@@ -3,11 +3,11 @@ package com.justb81.watchbuddy.core.network
 import com.justb81.watchbuddy.core.justwatch.JustWatchApiService
 import com.justb81.watchbuddy.core.simkl.SimklApiService
 import com.justb81.watchbuddy.core.tmdb.TmdbApiService
+import com.justb81.watchbuddy.core.tracking.SimklTrackingProvider
+import com.justb81.watchbuddy.core.tracking.TraktTrackingProvider
 import com.justb81.watchbuddy.core.trakt.NoOpTokenProxyService
 import com.justb81.watchbuddy.core.trakt.TokenProxyService
 import com.justb81.watchbuddy.core.trakt.TraktApiService
-import com.justb81.watchbuddy.core.tracking.SimklTrackingProvider
-import com.justb81.watchbuddy.core.tracking.TraktTrackingProvider
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn

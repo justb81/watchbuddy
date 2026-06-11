@@ -9,16 +9,19 @@ import androidx.datastore.preferences.preferencesDataStore
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.work.WorkManager
 import com.justb81.watchbuddy.BuildConfig
+import com.justb81.watchbuddy.core.model.TraktIds
+import com.justb81.watchbuddy.core.model.TraktShow
+import com.justb81.watchbuddy.core.network.SimklClientIdProvider
 import com.justb81.watchbuddy.core.tracking.SimklTrackingProvider
 import com.justb81.watchbuddy.core.tracking.TrackingBackend
 import com.justb81.watchbuddy.core.tracking.TrackingProvider
 import com.justb81.watchbuddy.core.tracking.TraktTrackingProvider
+import com.justb81.watchbuddy.core.trakt.SyncHistorySeasonItem
 import com.justb81.watchbuddy.phone.data.ProviderCatalogRepository
 import com.justb81.watchbuddy.phone.network.WifiStateProvider
 import com.justb81.watchbuddy.phone.settings.SettingsRepository
 import dagger.Module
 import dagger.Provides
-import com.justb81.watchbuddy.core.network.SimklClientIdProvider
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
@@ -175,16 +178,23 @@ object AppModule {
         override suspend fun getSeasonsWithEpisodes(bearer: String, showId: String) =
             delegate().getSeasonsWithEpisodes(bearer, showId)
 
-        override suspend fun markWatched(bearer: String, ids: com.justb81.watchbuddy.core.model.TraktIds, seasons: List<com.justb81.watchbuddy.core.trakt.SyncHistorySeasonItem>) =
-            delegate().markWatched(bearer, ids, seasons)
+        override suspend fun markWatched(
+            bearer: String,
+            ids: TraktIds,
+            seasons: List<SyncHistorySeasonItem>,
+        ) = delegate().markWatched(bearer, ids, seasons)
 
-        override suspend fun markUnwatched(bearer: String, ids: com.justb81.watchbuddy.core.model.TraktIds, season: Int, episode: Int) =
-            delegate().markUnwatched(bearer, ids, season, episode)
+        override suspend fun markUnwatched(
+            bearer: String,
+            ids: TraktIds,
+            season: Int,
+            episode: Int,
+        ) = delegate().markUnwatched(bearer, ids, season, episode)
 
         override suspend fun search(bearer: String, query: String) =
             delegate().search(bearer, query)
 
-        override suspend fun addToWatchlist(bearer: String, show: com.justb81.watchbuddy.core.model.TraktShow) =
+        override suspend fun addToWatchlist(bearer: String, show: TraktShow) =
             delegate().addToWatchlist(bearer, show)
 
         override suspend fun getProfile(bearer: String) =
