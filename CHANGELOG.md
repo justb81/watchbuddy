@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.44.0](https://github.com/justb81/watchbuddy/compare/v0.43.2...v0.44.0) (2026-06-12)
+
+
+### Features
+
+* add SIMKL as alternative watch-tracking provider ([#775](https://github.com/justb81/watchbuddy/issues/775)) ([c1abd2a](https://github.com/justb81/watchbuddy/commit/c1abd2a2a793b2e80e0988ae9ec1456aad027fd3))
+
 ## [0.43.2](https://github.com/justb81/watchbuddy/compare/v0.43.1...v0.43.2) (2026-06-03)
 
 
