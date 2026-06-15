@@ -1,6 +1,6 @@
 [versions]
 agp = "9.2.1"
-kotlin = "2.3.21"
+kotlin = "2.4.0"
 ksp = "2.3.9"
 hilt = "2.59.2"
 compose-bom = "2026.05.01"
@@ -11,7 +11,7 @@ retrofit = "3.0.0"
 okhttp = "5.3.2"
 coroutines = "1.11.0"
 serialization = "1.11.0"
-litertlm = "0.12.0"
+litertlm = "0.13.1"
 aicore = "0.0.1-exp02"
 coil3 = "3.4.0"
 navigation = "2.9.8"
@@ -24,7 +24,7 @@ turbine = "1.2.1"
 robolectric = "4.16.1"
 androidx-test-core = "1.7.0"
 androidx-arch-core = "2.2.0"
-errorprone-annotations = "2.49.0"
+errorprone-annotations = "2.50.0"
 gradlePlayPublisher = "4.0.0"
 detekt = "1.23.8"
 jsoup = "1.22.2"
@@ -33,7 +33,7 @@ androidx-tvprovider = "1.1.0"
 
 [libraries]
 # AndroidX Core
-androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version = "1.18.0" }
+androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version = "1.19.0" }
 androidx-lifecycle-runtime = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycle" }
 androidx-lifecycle-runtime-compose = { group = "androidx.lifecycle", name = "lifecycle-runtime-compose", version.ref = "lifecycle" }
 androidx-lifecycle-viewmodel = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "lifecycle" }
