@@ -3,12 +3,15 @@ package com.justb81.watchbuddy.tv.ui.showdetail
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import com.justb81.watchbuddy.core.model.ResolvedProvider
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkConstructor
+import io.mockk.mockkStatic
 import io.mockk.slot
 import io.mockk.unmockkConstructor
+import io.mockk.unmockkStatic
 import io.mockk.verify
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -51,6 +54,14 @@ class LaunchProviderTest {
         every { anyConstructed<Intent>().addFlags(any()) } answers { self as Intent }
         every { anyConstructed<Intent>().setPackage(any()) } answers { self as Intent }
 
+        // The cascade builds candidate URIs via the inlined `String.toUri()`, whose
+        // body (`Uri.parse(this)`) is compiled into this test's call site. The
+        // android.jar stub returns null, and the Kotlin compiler emits a non-null
+        // assertion on that platform-type result, so stub Uri.parse to return a
+        // (mock) Uri instead of letting the assertion throw.
+        mockkStatic(Uri::class)
+        every { Uri.parse(any()) } returns mockk(relaxed = true)
+
         every { context.packageManager } returns pm
         val intentSlot = slot<Intent>()
         every { context.startActivity(capture(intentSlot)) } answers {
@@ -65,6 +76,7 @@ class LaunchProviderTest {
     @AfterEach
     fun tearDown() {
         unmockkConstructor(Intent::class)
+        unmockkStatic(Uri::class)
         startedIntents.clear()
     }
 

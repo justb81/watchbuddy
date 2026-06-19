@@ -102,6 +102,20 @@ kotlin {
     }
 }
 
+// Dagger/Hilt 2.59.2 (the latest release) bundles a kotlin-metadata-jvm that
+// reads Kotlin metadata only up to format 2.3.0. Kotlin 2.4.0 — and libraries
+// compiled with it, e.g. coil3 3.5.0 — emit 2.4.0 metadata, which makes Hilt's
+// annotation processor (hiltJavaCompileDebug) fail with "Provided Metadata
+// instance has version 2.4.0, while maximum supported version is 2.3.0". Force
+// the metadata reader to match the Kotlin version on every configuration,
+// including the Hilt aggregating task's annotation-processor classpath. Remove
+// once Dagger ships a release built against kotlin-metadata-jvm 2.4.0.
+configurations.configureEach {
+    resolutionStrategy {
+        force("org.jetbrains.kotlin:kotlin-metadata-jvm:${libs.versions.kotlin.get()}")
+    }
+}
+
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
 }
