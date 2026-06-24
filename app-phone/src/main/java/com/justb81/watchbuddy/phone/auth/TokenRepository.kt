@@ -68,11 +68,21 @@ class TokenRepository @Inject constructor(
 
     fun getRefreshToken(): String? = decrypt(KEY_REFRESH_TOKEN, prefs.getString(KEY_REFRESH_TOKEN, null))
 
+    /**
+     * Returns `true` when a usable Trakt session is stored — i.e. an access token is
+     * present and either still unexpired or accompanied by a refresh token.
+     *
+     * Trakt access tokens are short-lived (currently 7 days). An expired one is renewed
+     * transparently by [com.justb81.watchbuddy.phone.auth.TokenRefreshManager] on the next
+     * authenticated call as long as a refresh token exists, so an expired access token with
+     * a refresh token must **not** be treated as disconnected: otherwise the user is bounced
+     * to onboarding (and `canWatch` flips off) every time the access token expires (~weekly).
+     */
     fun isTokenValid(): Boolean {
         val token = getAccessToken() ?: return false
         if (token.isBlank()) return false
-        val expiresAt = readExpiresAt()
-        return System.currentTimeMillis() < expiresAt
+        if (!getRefreshToken().isNullOrBlank()) return true
+        return System.currentTimeMillis() < readExpiresAt()
     }
 
     /**

@@ -147,11 +147,24 @@ class TokenRepositoryTest {
         }
 
         @Test
-        fun `returns false when token has expired`() {
+        fun `returns false when token has expired and no refresh token is stored`() {
             every { mockPrefs.getString("access_token", null) } returns v1Ciphertext("expired")
+            every { mockPrefs.getString("refresh_token", null) } returns null
             every { mockPrefs.getString("expires_at", null) } returns
                 v1Ciphertext((System.currentTimeMillis() - 1_000L).toString())
             assertFalse(repository.isTokenValid())
+        }
+
+        @Test
+        fun `returns true when access token has expired but a refresh token is stored`() {
+            // Regression (#790): an expired access token must NOT read as disconnected while
+            // a refresh token can renew it — otherwise the user is bounced to onboarding
+            // every time the short-lived access token expires (~weekly).
+            every { mockPrefs.getString("access_token", null) } returns v1Ciphertext("expired-access")
+            every { mockPrefs.getString("refresh_token", null) } returns v1Ciphertext("refresh")
+            every { mockPrefs.getString("expires_at", null) } returns
+                v1Ciphertext((System.currentTimeMillis() - 1_000L).toString())
+            assertTrue(repository.isTokenValid())
         }
     }
 
