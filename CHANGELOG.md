@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.44.1](https://github.com/justb81/watchbuddy/compare/v0.44.0...v0.44.1) (2026-06-24)
+
+
+### Bug Fixes
+
+* **phone:** keep Trakt session alive when access token expires ([#790](https://github.com/justb81/watchbuddy/issues/790)) ([cf2866d](https://github.com/justb81/watchbuddy/commit/cf2866d00b2c11dfcb290e5020b57befbaa15ae2))
+
 ## [0.44.0](https://github.com/justb81/watchbuddy/compare/v0.43.2...v0.44.0) (2026-06-12)
 
 
