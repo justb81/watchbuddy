@@ -70,7 +70,6 @@
     <string name="tv_all_episodes">Tous les épisodes</string>
 
     <!-- Show detail — manually mark episodes watched (#217) -->
-    <string name="tv_detail_episodes">Épisodes</string>
     <string name="tv_detail_season_header">Saison %1$d</string>
     <string name="tv_detail_mark_watched_cd">Marquer comme vu</string>
     <string name="tv_detail_mark_unwatched_cd">Marquer comme non vu</string>

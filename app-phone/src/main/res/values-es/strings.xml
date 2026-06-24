@@ -155,7 +155,6 @@
     <string name="scrobble_prompt_channel_description">Muestra un aviso cuando el scrobbler no puede identificar lo que estás viendo</string>
     <string name="scrobble_prompt_title">¿Qué estás viendo?</string>
     <string name="scrobble_prompt_body_with_app">Viendo en %1$s — elige la serie a continuación.</string>
-    <string name="scrobble_prompt_action_not_watching">Eso no es lo que estoy viendo</string>
     <string name="scrobble_prompt_card_title">¿Qué estás viendo?</string>
     <string name="scrobble_prompt_candidate_cd">Seleccionar %1$s</string>
 
@@ -292,7 +291,6 @@
     <string name="search_cd_add_show">Añadir %1$s a la lista de seguimiento</string>
     <string name="search_cd_already_tracked">Ya en seguimiento</string>
     <string name="search_cd_cover_art">Portada de %1$s</string>
-    <string name="search_cd_cover_art_placeholder">Sin portada disponible</string>
     <string name="search_season_range_ongoing">%1$d –</string>
     <string name="search_season_range_ended">%1$d – %2$d</string>
     <string name="search_status_ongoing">En emisión</string>
