@@ -163,7 +163,6 @@
     <string name="scrobble_prompt_channel_description">Shows a prompt when the scrobbler can\'t identify what you\'re watching</string>
     <string name="scrobble_prompt_title">What are you watching?</string>
     <string name="scrobble_prompt_body_with_app">Watching on %1$s — pick the show below.</string>
-    <string name="scrobble_prompt_action_not_watching">Not what I\'m watching</string>
     <string name="scrobble_prompt_card_title">What are you watching?</string>
     <string name="scrobble_prompt_candidate_cd">Select %1$s</string>
 
@@ -286,7 +285,6 @@
     <string name="search_cd_add_show">Add %1$s to tracking list</string>
     <string name="search_cd_already_tracked">Already tracked</string>
     <string name="search_cd_cover_art">Cover art for %1$s</string>
-    <string name="search_cd_cover_art_placeholder">No cover art available</string>
     <string name="search_season_range_ongoing">%1$d –</string>
     <string name="search_season_range_ended">%1$d – %2$d</string>
     <string name="search_status_ongoing">Ongoing</string>

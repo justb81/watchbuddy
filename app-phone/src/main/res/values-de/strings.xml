@@ -154,7 +154,6 @@
     <string name="scrobble_prompt_channel_description">Zeigt eine Abfrage an, wenn der Scrobbler nicht erkennen kann, was du schaust</string>
     <string name="scrobble_prompt_title">Was schaust du gerade?</string>
     <string name="scrobble_prompt_body_with_app">Du schaust auf %1$s – wähle die Serie unten.</string>
-    <string name="scrobble_prompt_action_not_watching">Das schaue ich nicht</string>
     <string name="scrobble_prompt_card_title">Was schaust du gerade?</string>
     <string name="scrobble_prompt_candidate_cd">%1$s auswählen</string>
 
@@ -286,7 +285,6 @@
     <string name="search_cd_add_show">%1$s zur Merkliste hinzufügen</string>
     <string name="search_cd_already_tracked">Bereits verfolgt</string>
     <string name="search_cd_cover_art">Coverbild für %1$s</string>
-    <string name="search_cd_cover_art_placeholder">Kein Coverbild verfügbar</string>
     <string name="search_season_range_ongoing">%1$d –</string>
     <string name="search_season_range_ended">%1$d – %2$d</string>
     <string name="search_status_ongoing">Laufend</string>

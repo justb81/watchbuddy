@@ -155,7 +155,6 @@
     <string name="scrobble_prompt_channel_description">Affiche une invite quand le scrobbler ne peut pas identifier ce que vous regardez</string>
     <string name="scrobble_prompt_title">Qu\'est-ce que tu regardes ?</string>
     <string name="scrobble_prompt_body_with_app">Tu regardes sur %1$s — choisis la série ci-dessous.</string>
-    <string name="scrobble_prompt_action_not_watching">Ce n\'est pas ce que je regarde</string>
     <string name="scrobble_prompt_card_title">Qu\'est-ce que tu regardes ?</string>
     <string name="scrobble_prompt_candidate_cd">Sélectionner %1$s</string>
 
@@ -292,7 +291,6 @@
     <string name="search_cd_add_show">Ajouter %1$s à la liste de suivi</string>
     <string name="search_cd_already_tracked">Déjà suivi</string>
     <string name="search_cd_cover_art">Pochette de %1$s</string>
-    <string name="search_cd_cover_art_placeholder">Aucune pochette disponible</string>
     <string name="search_season_range_ongoing">%1$d –</string>
     <string name="search_season_range_ended">%1$d – %2$d</string>
     <string name="search_status_ongoing">En cours</string>
